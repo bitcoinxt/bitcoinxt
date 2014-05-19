@@ -66,6 +66,7 @@ public:
 /** nServices flags */
 enum {
     NODE_NETWORK = (1 << 0),
+    NODE_GETUTXOS = (1 << 1),
 
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
     // isn't getting used, or one not being used much, and notify the
