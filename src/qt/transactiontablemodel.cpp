@@ -162,8 +162,12 @@ public:
             parent->endRemoveRows();
             break;
         case CT_UPDATED:
-            // Miscellaneous updates -- nothing to do, status update will take care of this, and is only computed for
-            // visible transactions.
+            emit parent->dataChanged(parent->index(lowerIndex, parent->Status), parent->index(upperIndex-1, parent->Amount));
+            break;
+        case CT_GOT_CONFLICT:
+            emit parent->message(parent->tr("Conflict Received"),
+                                 parent->tr("WARNING: Transaction may never be confirmed. Its input was seen being spent by another transaction on the network."),
+                                 CClientUIInterface::MSG_WARNING);
             break;
         }
     }
@@ -183,20 +187,21 @@ public:
             // stuck if the core is holding the locks for a longer time - for
             // example, during a wallet rescan.
             //
-            // If a status update is needed (blocks came in since last check),
-            //  update the status of this transaction from the wallet. Otherwise,
+            // If a status update is needed (blocks or conflicts came in since last check),
+            // update the status of this transaction from the wallet. Otherwise,
             // simply re-use the cached status.
             TRY_LOCK(cs_main, lockMain);
             if(lockMain)
             {
                 TRY_LOCK(wallet->cs_wallet, lockWallet);
-                if(lockWallet && rec->statusUpdateNeeded())
+                if(lockWallet && rec->statusUpdateNeeded(wallet->nConflictsReceived))
                 {
                     std::map<uint256, CWalletTx>::iterator mi = wallet->mapWallet.find(rec->hash);
 
                     if(mi != wallet->mapWallet.end())
                     {
                         rec->updateStatus(mi->second);
+                        rec->status.cur_num_conflicts = wallet->nConflictsReceived;
                     }
                 }
             }
@@ -230,6 +235,7 @@ TransactionTableModel::TransactionTableModel(CWallet* wallet, WalletModel *paren
     priv->refreshWallet();
 
     connect(walletModel->getOptionsModel(), SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit()));
+    connect(this, SIGNAL(message(QString,QString,unsigned int)), walletModel, SIGNAL(message(QString,QString,unsigned int)));
 
     subscribeToCoreSignals();
 }
@@ -253,6 +259,17 @@ void TransactionTableModel::updateTransaction(const QString &hash, int status, b
     updated.SetHex(hash.toStdString());
 
     priv->updateWallet(updated, status, showTransaction);
+
+    if (status == CT_GOT_CONFLICT)
+    {
+        // TODO: Figure out how to do this after commit 023e63df78b847812040bf6958c97476606dfbfd
+        /*
+        emit message(tr("Conflict Received"),
+                     tr("WARNING: Transaction may never be confirmed. Its input was seen being spent by another transaction on the network. Wait for confirmation!"),
+                     CClientUIInterface::MSG_WARNING);
+         */
+        return;
+    }
 }
 
 void TransactionTableModel::updateConfirmations()
@@ -360,6 +377,8 @@ QString TransactionTableModel::formatTxType(const TransactionRecord *wtx) const
         return tr("Payment to yourself");
     case TransactionRecord::Generated:
         return tr("Mined");
+    case TransactionRecord::Other:
+        return tr("Other");
     default:
         return QString();
     }
@@ -550,7 +569,13 @@ QVariant TransactionTableModel::data(const QModelIndex &index, int role) const
         return formatTooltip(rec);
     case Qt::TextAlignmentRole:
         return column_alignments[index.column()];
+    case Qt::BackgroundColorRole:
+        if (rec->status.hasConflicting)
+            return COLOR_HASCONFLICTING_BG;
+        break;
     case Qt::ForegroundRole:
+        if (rec->status.hasConflicting)
+            return COLOR_HASCONFLICTING;
         // Non-confirmed (but not immature) as transactions are grey
         if(!rec->status.countsForBalance && rec->status.status != TransactionStatus::Immature)
         {
