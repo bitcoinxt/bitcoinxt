@@ -17,7 +17,7 @@
 #include <boost/foreach.hpp>
 #include <boost/lexical_cast.hpp>
 
-#include "json/json_spirit_value.h"
+#include "json_spirit_wrapper.h"
 
 using namespace json_spirit;
 using namespace std;
@@ -60,7 +60,7 @@ Value ping(const Array& params, bool fHelp)
         pNode->fPingQueued = true;
     }
 
-    return Value::null;
+    return NullUniValue;
 }
 
 static void CopyNodeStats(std::vector<CNodeStats>& vstats)
@@ -297,7 +297,7 @@ Value addnode(const Array& params, bool fHelp)
     {
         CAddress addr;
         OpenNetworkConnection(addr, NULL, strNode.c_str());
-        return Value::null;
+        return NullUniValue;
     }
 
     LOCK(cs_vAddedNodes);
@@ -319,7 +319,7 @@ Value addnode(const Array& params, bool fHelp)
         vAddedNodes.erase(it);
     }
 
-    return Value::null;
+    return NullUniValue;
 }
 
 Value getaddednodeinfo(const Array& params, bool fHelp)
