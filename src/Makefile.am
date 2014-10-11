@@ -241,6 +241,7 @@ libbitcoin_server_a_SOURCES = \
   noui.cpp \
   options.cpp \
   policy/fees.cpp \
+  policy/policy.cpp \
   pow.cpp \
   process_xthinblock.cpp \
   rest.cpp \

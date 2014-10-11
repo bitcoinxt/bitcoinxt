@@ -10,6 +10,10 @@
 #include "script/interpreter.h"
 #include "script/standard.h"
 
+#include <string>
+
+class CCoinsViewCache;
+
 /** Default for -blockprioritysize, maximum space for zero/low-fee transactions **/
 static const unsigned int DEFAULT_BLOCK_PRIORITY_SIZE = 50000;
 /** The maximum size for transactions we're willing to relay/mine */
@@ -41,5 +45,17 @@ static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS = STANDARD_SCRIPT_
 static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS = LOCKTIME_VERIFY_SEQUENCE |
                                                            LOCKTIME_MEDIAN_TIME_PAST;
 
+bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType);
+    /**
+     * Check for standard transaction types
+     * @return True if all outputs (scriptPubKeys) use only standard transaction forms
+     */
+bool IsStandardTx(const CTransaction& tx, std::string& reason);
+    /**
+     * Check for standard transaction types
+     * @param[in] mapInputs    Map of previous transactions that have outputs we're spending
+     * @return True if all inputs (scriptSigs) use only standard transaction forms
+     */
+bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs);
 
 #endif // BITCOIN_POLICY_H
