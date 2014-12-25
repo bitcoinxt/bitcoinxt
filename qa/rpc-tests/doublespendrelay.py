@@ -21,11 +21,14 @@ class DoubleSpendRelay(BitcoinTestFramework):
     # [0,1] <--> [2] <--> [3]
     #
     def setup_network(self):
+        self.is_network_split = False
         self.nodes = []
         for i in range(0,4):
             self.nodes.append(start_node(i, self.options.tmpdir))
         connect_nodes(self.nodes[0], 2)
+        connect_nodes(self.nodes[1], 2)
         connect_nodes(self.nodes[3], 2)
+        self.nodes[0].setgenerate(True, 110)
         sync_blocks(self.nodes)
         return self.nodes
 
