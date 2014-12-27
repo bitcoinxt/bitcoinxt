@@ -164,6 +164,11 @@ public:
         case CT_UPDATED:
             emit parent->dataChanged(parent->index(lowerIndex, parent->Status), parent->index(upperIndex-1, parent->Amount));
             break;
+        case CT_GOT_CONFLICT:
+            emit parent->message(parent->tr("Conflict Received"),
+                                 parent->tr("WARNING: Transaction may never be confirmed. Its input was seen being spent by another transaction on the network."),
+                                 CClientUIInterface::MSG_WARNING);
+            break;
         }
     }
 
@@ -230,6 +235,7 @@ TransactionTableModel::TransactionTableModel(CWallet* wallet, WalletModel *paren
     priv->refreshWallet();
 
     connect(walletModel->getOptionsModel(), SIGNAL(displayUnitChanged(int)), this, SLOT(updateDisplayUnit()));
+    connect(this, SIGNAL(message(QString,QString,unsigned int)), walletModel, SIGNAL(message(QString,QString,unsigned int)));
 
     subscribeToCoreSignals();
 }
