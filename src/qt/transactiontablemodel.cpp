@@ -259,17 +259,6 @@ void TransactionTableModel::updateTransaction(const QString &hash, int status, b
     updated.SetHex(hash.toStdString());
 
     priv->updateWallet(updated, status, showTransaction);
-
-    if (status == CT_GOT_CONFLICT)
-    {
-        // TODO: Figure out how to do this after commit 023e63df78b847812040bf6958c97476606dfbfd
-        /*
-        emit message(tr("Conflict Received"),
-                     tr("WARNING: Transaction may never be confirmed. Its input was seen being spent by another transaction on the network. Wait for confirmation!"),
-                     CClientUIInterface::MSG_WARNING);
-         */
-        return;
-    }
 }
 
 void TransactionTableModel::updateConfirmations()
