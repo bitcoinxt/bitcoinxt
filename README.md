@@ -10,13 +10,9 @@ Bitcoin XT is more experimental than Bitcoin Core, and has a strong emphasis on 
 
 XT uses the same data directories as Core so you can easily switch back and forth.
 
-Download it for:
+*[Download it from github](https://github.com/bitcoinxt/bitcoinxt/releases/v0.10/)*
 
-* Windows
-* Mac
-* Linux
-
-Bitcoin XT downloads are code signed and are built reproducibly using gitian. If you use it please [sign up to the announcement mailing list](https://groups.google.com/forum/#!forum/bitcoin-xt-announce) so you can be reminded of new versions.
+Bitcoin XT downloads are code signed and are [built reproducibly using gitian](https://github.com/bitcoinxt/gitian.sigs). If you use it please [sign up to the announcement mailing list](https://groups.google.com/forum/#!forum/bitcoin-xt-announce) so you can be reminded of new versions.
 
 Development process
 -------------------
