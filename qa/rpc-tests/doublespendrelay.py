@@ -28,8 +28,6 @@ class DoubleSpendRelay(BitcoinTestFramework):
         connect_nodes(self.nodes[0], 2)
         connect_nodes(self.nodes[1], 2)
         connect_nodes(self.nodes[3], 2)
-        self.nodes[0].setgenerate(True, 110)
-        sync_blocks(self.nodes)
         return self.nodes
 
     def run_test(self):
