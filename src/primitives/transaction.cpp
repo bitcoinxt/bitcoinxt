@@ -89,18 +89,11 @@ CTransaction& CTransaction::operator=(const CTransaction &tx) {
 
 bool CTransaction::IsEquivalentTo(const CTransaction& tx) const
 {
-    if (nVersion   != tx.nVersion   ||
-        nLockTime  != tx.nLockTime  ||
-        vin.size() != tx.vin.size() ||
-        vout       != tx.vout)
-        return false;
-    for (unsigned int i = 0; i < vin.size(); i++)
-    {
-        if (vin[i].nSequence != tx.vin[i].nSequence ||
-            vin[i].prevout   != tx.vin[i].prevout)
-            return false;
-    }
-    return true;
+	CMutableTransaction tx1 = *this;
+	CMutableTransaction tx2 = tx;
+	for (unsigned int i = 0; i < tx1.vin.size(); i++) tx1.vin[i].scriptSig = CScript();
+	for (unsigned int i = 0; i < tx2.vin.size(); i++) tx2.vin[i].scriptSig = CScript();
+	return CTransaction(tx1) == CTransaction(tx2);
 }
 
 CAmount CTransaction::GetValueOut() const
