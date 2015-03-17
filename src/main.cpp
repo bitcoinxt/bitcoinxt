@@ -534,7 +534,7 @@ void OnBlockFinished::rejectAndPunish(const CValidationState& state,
     auto rejectPunishFunc = [=](CNode* pnode) {
         if (!strCommand.empty()) {
             g_connman->PushMessage(pnode, NetMsg(pnode, NetMsgType::REJECT,
-                                                 strCommand, state.GetRejectCode(),
+                                                 strCommand, (unsigned char)state.GetRejectCode(),
                                                  reason.substr(0, MAX_REJECT_MESSAGE_LENGTH), hash));
         }
         if (dos <= 0)
@@ -991,9 +991,9 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             }
         }
         if (fRejectAbsurdFee && feestate == FeeEvaluator::ABSURD_HIGH_FEE) {
-            return error("AcceptToMemoryPool: absurdly high fees %s amount: %d size: %d",
-                         hash.ToString(),
-                         nFees, entry.GetTxSize());
+            return state.Invalid(error("AcceptToMemoryPool: absurdly high "
+                        "fees %s amount: %d size: %d", hash.ToString(), nFees,
+                        entry.GetTxSize()), REJECT_HIGHFEE, "absurdly-high-fee");
         }
 
         // Calculate in-mempool ancestors, up to a limit.
@@ -1374,7 +1374,9 @@ void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state
             if (nodeState.IsNull())
                 continue;
 
-            CBlockReject reject = {state.GetRejectCode(), state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), pindex->GetBlockHash()};
+            CBlockReject reject = {(unsigned char)state.GetRejectCode(),
+                state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH),
+                pindex->GetBlockHash()};
             LogPrint(Log::BLOCK, "Rejecting block from %d, code %d, reason %s",
                      id, state.GetRejectCode(), state.GetRejectReason());
             nodeState->rejects.push_back(reject);
