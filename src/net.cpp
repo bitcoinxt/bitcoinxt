@@ -34,6 +34,8 @@
 #include <boost/filesystem.hpp>
 #include <boost/thread.hpp>
 
+#include <math.h>
+
 // Dump addresses to peers.dat every 15 minutes (900s)
 #define DUMP_ADDRESSES_INTERVAL 900
 
@@ -1497,11 +1499,6 @@ void ThreadMessageHandler()
             }
         }
 
-        // Poll the connected nodes for messages
-        CNode* pnodeTrickle = NULL;
-        if (!vNodesCopy.empty())
-            pnodeTrickle = vNodesCopy[GetRand(vNodesCopy.size())];
-
         bool fSleep = true;
 
         BOOST_FOREACH(CNode* pnode, vNodesCopy)
@@ -1532,7 +1529,7 @@ void ThreadMessageHandler()
             {
                 TRY_LOCK(pnode->cs_vSend, lockSend);
                 if (lockSend)
-                    g_signals.SendMessages(pnode, pnode == pnodeTrickle || pnode->fWhitelisted);
+                    g_signals.SendMessages(pnode);
             }
             boost::this_thread::interruption_point();
         }
@@ -2061,6 +2058,9 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     nStartingHeight = -1;
     filterInventoryKnown.reset();
     fGetAddr = false;
+    nNextLocalAddrSend = 0;
+    nNextAddrSend = 0;
+    nNextInvSend = 0;
     fRelayTxes = false;
     fSentAddr = false;
     pfilter = new CBloomFilter();
@@ -2187,4 +2187,8 @@ bool CNode::SupportsXThinBlocks() const {
 
 bool CNode::SupportsCompactBlocks() const {
     return nVersion >= SHORT_IDS_BLOCKS_VERSION;
+}
+
+int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds) {
+    return nNow + (int64_t)(log1p(GetRand(1ULL << 48) * -0.0000000000000035527136788 /* -1/2^48 */) * average_interval_seconds * -1000000.0 + 0.5);
 }

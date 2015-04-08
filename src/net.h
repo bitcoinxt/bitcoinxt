@@ -110,7 +110,7 @@ struct CNodeSignals
     // used to prevent DoS attacks using over-size messages).
     boost::signals2::signal<bool (CNode*, const CNetMessage&), CombinerAll> SanityCheckMessages;
     boost::signals2::signal<bool (CNode*), CombinerAll> ProcessMessages;
-    boost::signals2::signal<bool (CNode*, bool), CombinerAll> SendMessages;
+    boost::signals2::signal<bool (CNode*), CombinerAll> SendMessages;
     boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
     boost::signals2::signal<void (NodeId)> FinalizeNode;
     boost::signals2::signal<int ()> GetMaxBlockSize;
@@ -322,13 +322,15 @@ public:
     CRollingBloomFilter addrKnown;
     bool fGetAddr;
     std::set<uint256> setKnown;
+    int64_t nNextAddrSend;
+    int64_t nNextLocalAddrSend;
 
     // inventory based relay
     CRollingBloomFilter filterInventoryKnown;
     std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
     std::multimap<int64_t, CInv> mapAskFor;
-
+    int64_t nNextInvSend;
     // Used for headers announcements - unfiltered blocks to relay
     // Also protected by cs_inventory
     std::vector<uint256> blocksToAnnounce;
@@ -676,5 +678,8 @@ public:
     bool Write(const CAddrMan& addr);
     bool Read(CAddrMan& addr);
 };
+
+/** Return a timestamp in the future (in microseconds) for exponentially distributed events. */
+int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds);
 
 #endif // BITCOIN_NET_H

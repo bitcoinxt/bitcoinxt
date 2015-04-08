@@ -26,7 +26,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         self.is_network_split = False
         self.nodes = []
         for i in range(0,4):
-            self.nodes.append(start_node(i, self.options.tmpdir))
+            self.nodes.append(start_node(i, self.options.tmpdir, ["-whitelist=127.0.0.1"]))
         connect_nodes(self.nodes[0], 2)
         connect_nodes(self.nodes[1], 2)
         connect_nodes(self.nodes[3], 2)
@@ -55,7 +55,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
 
         # Test 2: Is double-spend of tx1_inputs[0] relayed?
         # Restart nodes[1]
-        nodes[1] = start_node(1, self.options.tmpdir)
+        nodes[1] = start_node(1, self.options.tmpdir, ["-whitelist=127.0.0.1"])
         connect_nodes(nodes[1], 2)
         # Second spend: nodes[0] -> nodes[0]
         amount = Decimal("40")
@@ -79,7 +79,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         # Test 3: Is triple-spend of tx1_inputs[0] not relayed?
         # Clear node1 mempool
         stop_node(nodes[1], 1)
-        nodes[1] = start_node(1, self.options.tmpdir)
+        nodes[1] = start_node(1, self.options.tmpdir, ["-whitelist=127.0.0.1"])
         connect_nodes(nodes[1], 2)
         # Third spend: nodes[0] -> nodes[0]
         outputs = dict(change_outputs)
@@ -94,7 +94,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         # Test 4: Is double-spend of tx1_inputs[1] relayed when triple-spend of tx1_inputs[0] precedes it?
         # Clear node1 mempool
         stop_node(nodes[1], 1)
-        nodes[1] = start_node(1, self.options.tmpdir)
+        nodes[1] = start_node(1, self.options.tmpdir, ["-whitelist=127.0.0.1"])
         connect_nodes(nodes[1], 2)
         # Inputs are third spend, second spend
         amount = Decimal("89")
@@ -116,7 +116,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         # Test 5: Is double-spend of tx1_inputs[2] relayed when triple-spend of tx1_inputs[0] follows it?
         # Clear node1 mempool
         stop_node(nodes[1], 1)
-        nodes[1] = start_node(1, self.options.tmpdir)
+        nodes[1] = start_node(1, self.options.tmpdir, ["-whitelist=127.0.0.1"])
         connect_nodes(nodes[1], 2)
         # Inputs are second spend, third spend
         amount = Decimal("88")
