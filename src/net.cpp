@@ -358,7 +358,7 @@ CNode* FindNode(const CService& addr)
     return NULL;
 }
 
-CNode* ConnectNode(CAddress addrConnect, const char *pszDest)
+CNode* ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure)
 {
     if (pszDest == NULL) {
         if (IsLocal(addrConnect))
@@ -390,7 +390,7 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest)
             return NULL;
         }
 
-        addrman.Attempt(addrConnect);
+        addrman.Attempt(addrConnect, fCountFailure);
 
         // Add node
         CNode* pnode = new CNode(hSocket, addrConnect, pszDest ? pszDest : "", false);
@@ -407,7 +407,7 @@ CNode* ConnectNode(CAddress addrConnect, const char *pszDest)
     } else if (!proxyConnectionFailed) {
         // If connecting to the node failed, and failure is not caused by a problem connecting to
         // the proxy, mark this as an attempt.
-        addrman.Attempt(addrConnect);
+        addrman.Attempt(addrConnect, fCountFailure);
     }
 
     return NULL;
@@ -1288,7 +1288,7 @@ void static ProcessOneShot()
     CAddress addr;
     CSemaphoreGrant grant(*semOutbound, true);
     if (grant) {
-        if (!OpenNetworkConnection(addr, &grant, strDest.c_str(), true))
+        if (!OpenNetworkConnection(addr, false, &grant, strDest.c_str(), true))
             AddOneShot(strDest);
     }
 }
@@ -1304,7 +1304,7 @@ void ThreadOpenConnections()
             BOOST_FOREACH(string strAddr, mapMultiArgs["-connect"])
             {
                 CAddress addr;
-                OpenNetworkConnection(addr, NULL, strAddr.c_str());
+                OpenNetworkConnection(addr, false, NULL, strAddr.c_str());
                 for (int i = 0; i < 10 && i < nLoop; i++)
                 {
                     MilliSleep(500);
@@ -1388,7 +1388,7 @@ void ThreadOpenConnections()
         }
 
         if (addrConnect.IsValid())
-            OpenNetworkConnection(addrConnect, &grant);
+            OpenNetworkConnection(addrConnect, (int)setConnected.size() >= min(nMaxConnections - 1, 2), &grant);
     }
 }
 
@@ -1410,7 +1410,7 @@ void ThreadOpenAddedConnections()
             BOOST_FOREACH(string& strAddNode, lAddresses) {
                 CAddress addr;
                 CSemaphoreGrant grant(*semOutbound);
-                OpenNetworkConnection(addr, &grant, strAddNode.c_str());
+                OpenNetworkConnection(addr, false, &grant, strAddNode.c_str());
                 MilliSleep(500);
             }
             MilliSleep(120000); // Retry every 2 minutes
@@ -1457,7 +1457,7 @@ void ThreadOpenAddedConnections()
         BOOST_FOREACH(vector<CService>& vserv, lservAddressesToAdd)
         {
             CSemaphoreGrant grant(*semOutbound);
-            OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), &grant);
+            OpenNetworkConnection(CAddress(vserv[i % vserv.size()]), false, &grant);
             MilliSleep(500);
         }
         MilliSleep(120000); // Retry every 2 minutes
@@ -1465,7 +1465,7 @@ void ThreadOpenAddedConnections()
 }
 
 // if successful, this moves the passed grant to the constructed node
-bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot)
+bool OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound, const char *pszDest, bool fOneShot)
 {
     //
     // Initiate outbound network connection
@@ -1479,7 +1479,7 @@ bool OpenNetworkConnection(const CAddress& addrConnect, CSemaphoreGrant *grantOu
     } else if (FindNode(std::string(pszDest)))
         return false;
 
-    CNode* pnode = ConnectNode(addrConnect, pszDest);
+    CNode* pnode = ConnectNode(addrConnect, pszDest, fCountFailure);
     boost::this_thread::interruption_point();
 
     if (!pnode)
