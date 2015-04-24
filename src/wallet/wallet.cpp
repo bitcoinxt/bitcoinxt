@@ -1571,7 +1571,9 @@ void CWallet::AvailableCoins(vector<COutput>& vCoins, bool fOnlyConfirmed, const
                 if (!(IsSpent(wtxid, i)) && mine != ISMINE_NO &&
                     !IsLockedCoin((*it).first, i) && (pcoin->vout[i].nValue > 0 || fIncludeZeroValue) &&
                     (!coinControl || !coinControl->HasSelected() || coinControl->fAllowOtherInputs || coinControl->IsSelected((*it).first, i)))
-                        vCoins.push_back(COutput(pcoin, i, nDepth, (mine & ISMINE_SPENDABLE) != ISMINE_NO));
+                        vCoins.push_back(COutput(pcoin, i, nDepth,
+                                                 ((mine & ISMINE_SPENDABLE) != ISMINE_NO) ||
+                                                  (coinControl && coinControl->fAllowWatchOnly && (mine & ISMINE_WATCH_PUBKEY) != ISMINE_NO)));
             }
         }
     }
@@ -1787,7 +1789,7 @@ bool CWallet::SelectCoins(const CAmount& nTargetValue, set<pair<const CWalletTx*
     return res;
 }
 
-bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount &nFeeRet, int& nChangePosRet, std::string& strFailReason)
+bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount &nFeeRet, int& nChangePosRet, std::string& strFailReason, bool includeWatching)
 {
     vector<CRecipient> vecSend;
 
@@ -1800,6 +1802,7 @@ bool CWallet::FundTransaction(CMutableTransaction& tx, CAmount &nFeeRet, int& nC
 
     CCoinControl coinControl;
     coinControl.fAllowOtherInputs = true;
+    coinControl.fAllowWatchOnly = includeWatching;
     BOOST_FOREACH(const CTxIn& txin, tx.vin)
         coinControl.Select(txin.prevout);
 
