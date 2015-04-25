@@ -107,6 +107,7 @@ testScripts = [
     'zapwallettxes.py',
     'proxy_test.py',
     'merkle_blocks.py',
+    'fundrawtransaction.py',
     'signrawtransactions.py',
     'p2p-versionbits-warning.py',
     'decodescript.py',
