@@ -393,7 +393,7 @@ Value setmocktime(const Array& params, bool fHelp)
     // in a long time.
     LOCK2(cs_main, cs_vNodes);
 
-    RPCTypeCheck(params, boost::assign::list_of(int_type));
+    RPCTypeCheck(params, boost::assign::list_of(UniValue::VNUM));
 
     SetMockTime(params[0].get_int64());
 
@@ -402,5 +402,5 @@ Value setmocktime(const Array& params, bool fHelp)
         pnode->nLastSend = pnode->nLastRecv = t;
     }
 
-    return Value::null;
+    return NullUniValue;
 }
