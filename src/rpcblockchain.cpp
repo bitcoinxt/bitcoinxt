@@ -82,7 +82,7 @@ Object blockheaderToJSON(const CBlockIndex* blockindex)
 
 Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDetails = false)
 {
-    Object result;
+    UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hash", block.GetHash().GetHex()));
     int confirmations = -1;
     // Only report confirmations if the block is on the main chain
@@ -93,12 +93,12 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDe
     result.push_back(Pair("height", blockindex->nHeight));
     result.push_back(Pair("version", block.nVersion));
     result.push_back(Pair("merkleroot", block.hashMerkleRoot.GetHex()));
-    Array txs;
+    UniValue txs(UniValue::VARR);
     BOOST_FOREACH(const CTransaction&tx, block.vtx)
     {
         if(txDetails)
         {
-            Object objTx;
+            UniValue objTx(UniValue::VOBJ);
             TxToJSON(tx, uint256(), objTx);
             txs.push_back(objTx);
         }
@@ -218,11 +218,11 @@ Value getrawmempool(const Array& params, bool fHelp)
     if (fVerbose)
     {
         LOCK(mempool.cs);
-        Object o;
+        UniValue o(UniValue::VOBJ);
         BOOST_FOREACH(const CTxMemPoolEntry& e, mempool.mapTx)
         {
             const uint256& hash = e.GetTx().GetHash();
-            Object info;
+            UniValue info(UniValue::VOBJ);
             info.push_back(Pair("size", (int)e.GetTxSize()));
             info.push_back(Pair("fee", ValueFromAmount(e.GetFee())));
             info.push_back(Pair("time", e.GetTime()));
@@ -256,7 +256,7 @@ Value getrawmempool(const Array& params, bool fHelp)
         vector<uint256> vtxid;
         mempool.queryHashes(vtxid);
 
-        Array a;
+        UniValue a(UniValue::VARR);
         BOOST_FOREACH(const uint256& hash, vtxid)
             a.push_back(hash.ToString());
 
@@ -439,7 +439,7 @@ Value gettxoutsetinfo(const Array& params, bool fHelp)
 
     LOCK(cs_main);
 
-    Object ret;
+    UniValue ret(UniValue::VOBJ);
 
     CCoinsStats stats;
     FlushStateToDisk();
@@ -495,7 +495,7 @@ Value gettxout(const Array& params, bool fHelp)
 
     LOCK(cs_main);
 
-    Object ret;
+    UniValue ret(UniValue::VOBJ);
 
     std::string strHash = params[0].get_str();
     uint256 hash(uint256S(strHash));
@@ -526,7 +526,7 @@ Value gettxout(const Array& params, bool fHelp)
     else
         ret.push_back(Pair("confirmations", pindex->nHeight - coins.nHeight + 1));
     ret.push_back(Pair("value", ValueFromAmount(coins.vout[n].nValue)));
-    Object o;
+    UniValue o(UniValue::VOBJ);
     ScriptPubKeyToJSON(coins.vout[n].scriptPubKey, o, true);
     ret.push_back(Pair("scriptPubKey", o));
     ret.push_back(Pair("version", coins.nVersion));
@@ -650,7 +650,7 @@ Value getblockchaininfo(const Array& params, bool fHelp)
 
     LOCK(cs_main);
 
-    Object obj;
+    UniValue obj(UniValue::VOBJ);
     obj.push_back(Pair("chain",                 Params().NetworkIDString()));
     obj.push_back(Pair("blocks",                (int)chainActive.Height()));
     obj.push_back(Pair("headers",               pindexBestHeader ? pindexBestHeader->nHeight : -1));
@@ -750,10 +750,10 @@ Value getchaintips(const Array& params, bool fHelp)
     setTips.insert(chainActive.Tip());
 
     /* Construct the output array.  */
-    Array res;
+    UniValue res(UniValue::VARR);
     BOOST_FOREACH(const CBlockIndex* block, setTips)
     {
-        Object obj;
+        UniValue obj(UniValue::VOBJ);
         obj.push_back(Pair("height", block->nHeight));
         obj.push_back(Pair("hash", block->phashBlock->GetHex()));
 
@@ -805,7 +805,7 @@ Value getmempoolinfo(const Array& params, bool fHelp)
             + HelpExampleRpc("getmempoolinfo", "")
         );
 
-    Object ret;
+    UniValue ret;
     ret.push_back(Pair("size", (int64_t) mempool.size()));
     ret.push_back(Pair("bytes", (int64_t) mempool.GetTotalTxSize()));
     ret.push_back(Pair("usage", (int64_t) mempool.DynamicMemoryUsage()));
