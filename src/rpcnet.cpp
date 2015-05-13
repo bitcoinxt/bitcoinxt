@@ -22,7 +22,7 @@
 using namespace json_spirit;
 using namespace std;
 
-Value getconnectioncount(const Array& params, bool fHelp)
+UniValue getconnectioncount(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -40,7 +40,7 @@ Value getconnectioncount(const Array& params, bool fHelp)
     return (int)vNodes.size();
 }
 
-Value ping(const Array& params, bool fHelp)
+UniValue ping(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -76,7 +76,7 @@ static void CopyNodeStats(std::vector<CNodeStats>& vstats)
     }
 }
 
-Value getpeerinfo(const Array& params, bool fHelp)
+UniValue getpeerinfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -166,7 +166,7 @@ Value getpeerinfo(const Array& params, bool fHelp)
     return ret;
 }
 
-Value gettrafficshaping(const Array& params, bool fHelp)
+UniValue gettrafficshaping(const Array& params, bool fHelp)
 {
     string strCommand;
     if (params.size() == 1)
@@ -205,7 +205,7 @@ Value gettrafficshaping(const Array& params, bool fHelp)
     return ret;
 }
 
-Value settrafficshaping(const Array& params, bool fHelp)
+UniValue settrafficshaping(const Array& params, bool fHelp)
 {
     bool disable = false;
     bool badArg = false;
@@ -272,7 +272,7 @@ Value settrafficshaping(const Array& params, bool fHelp)
     return Value::null;
 }
 
-Value addnode(const Array& params, bool fHelp)
+UniValue addnode(const Array& params, bool fHelp)
 {
     string strCommand;
     if (params.size() == 2)
@@ -322,7 +322,7 @@ Value addnode(const Array& params, bool fHelp)
     return NullUniValue;
 }
 
-Value getaddednodeinfo(const Array& params, bool fHelp)
+UniValue getaddednodeinfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error(
@@ -439,7 +439,7 @@ Value getaddednodeinfo(const Array& params, bool fHelp)
     return ret;
 }
 
-Value getnettotals(const Array& params, bool fHelp)
+UniValue getnettotals(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 0)
         throw runtime_error(
@@ -464,7 +464,7 @@ Value getnettotals(const Array& params, bool fHelp)
     return obj;
 }
 
-static Array GetNetworksInfo()
+static UniValue GetNetworksInfo()
 {
     UniValue networks(UniValue::VARR);
     for(int n=0; n<NET_MAX; ++n)
@@ -485,7 +485,7 @@ static Array GetNetworksInfo()
     return networks;
 }
 
-Value getnetworkinfo(const Array& params, bool fHelp)
+UniValue getnetworkinfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(

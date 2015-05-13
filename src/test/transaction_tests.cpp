@@ -30,7 +30,7 @@ using namespace std;
 using namespace json_spirit;
 
 // In script_tests.cpp
-extern Array read_json(const std::string& jsondata);
+extern UniValue read_json(const std::string& jsondata);
 
 static std::map<string, unsigned int> mapFlagNames = boost::assign::map_list_of
     (string("NONE"), (unsigned int)SCRIPT_VERIFY_NONE)
@@ -92,7 +92,7 @@ BOOST_AUTO_TEST_CASE(tx_valid)
     // ... where all scripts are stringified scripts.
     //
     // verifyFlags is a comma separated list of script verification flags to apply, or "NONE"
-    Array tests = read_json(std::string(json_tests::tx_valid, json_tests::tx_valid + sizeof(json_tests::tx_valid)));
+    UniValue tests = read_json(std::string(json_tests::tx_valid, json_tests::tx_valid + sizeof(json_tests::tx_valid)));
 
 <<<<<<< HEAD
     ScriptError err;
@@ -103,7 +103,7 @@ BOOST_AUTO_TEST_CASE(tx_valid)
         if (test[0].type() == array_type)
 =======
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        Array test = tests[idx];
+        UniValue test = tests[idx];
         string strTest = test.write();
         if (test[0].isArray())
 >>>>>>> Convert tree to using univalue. Eliminate all json_spirit uses.
@@ -115,7 +115,7 @@ BOOST_AUTO_TEST_CASE(tx_valid)
             }
 
             map<COutPoint, CScript> mapprevOutScriptPubKeys;
-            Array inputs = test[0].get_array();
+            UniValue inputs = test[0].get_array();
             bool fValid = true;
 	    for (unsigned int inpIdx = 0; inpIdx < inputs.size(); inpIdx++) {
 	        const Value& input = inputs[inpIdx];
@@ -124,7 +124,7 @@ BOOST_AUTO_TEST_CASE(tx_valid)
                     fValid = false;
                     break;
                 }
-                Array vinput = input.get_array();
+                UniValue vinput = input.get_array();
                 if (vinput.size() != 3)
                 {
                     fValid = false;
@@ -175,7 +175,7 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
     // ... where all scripts are stringified scripts.
     //
     // verifyFlags is a comma separated list of script verification flags to apply, or "NONE"
-    Array tests = read_json(std::string(json_tests::tx_invalid, json_tests::tx_invalid + sizeof(json_tests::tx_invalid)));
+    UniValue tests = read_json(std::string(json_tests::tx_invalid, json_tests::tx_invalid + sizeof(json_tests::tx_invalid)));
 
 <<<<<<< HEAD
     ScriptError err;
@@ -186,7 +186,7 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
         if (test[0].type() == array_type)
 =======
     for (unsigned int idx = 0; idx < tests.size(); idx++) {
-        Array test = tests[idx];
+        UniValue test = tests[idx];
         string strTest = test.write();
         if (test[0].isArray())
 >>>>>>> Convert tree to using univalue. Eliminate all json_spirit uses.
@@ -198,7 +198,7 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
             }
 
             map<COutPoint, CScript> mapprevOutScriptPubKeys;
-            Array inputs = test[0].get_array();
+            UniValue inputs = test[0].get_array();
             bool fValid = true;
 	    for (unsigned int inpIdx = 0; inpIdx < inputs.size(); inpIdx++) {
 	        const Value& input = inputs[inpIdx];
@@ -207,7 +207,7 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
                     fValid = false;
                     break;
                 }
-                Array vinput = input.get_array();
+                UniValue vinput = input.get_array();
                 if (vinput.size() != 3)
                 {
                     fValid = false;

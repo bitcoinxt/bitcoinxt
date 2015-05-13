@@ -80,7 +80,7 @@ Object blockheaderToJSON(const CBlockIndex* blockindex)
 }
 
 
-Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDetails = false)
+UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDetails = false)
 {
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("hash", block.GetHash().GetHex()));
@@ -122,7 +122,7 @@ Object blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDe
 }
 
 
-Value getblockcount(const Array& params, bool fHelp)
+UniValue getblockcount(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -139,7 +139,7 @@ Value getblockcount(const Array& params, bool fHelp)
     return chainActive.Height();
 }
 
-Value getbestblockhash(const Array& params, bool fHelp)
+UniValue getbestblockhash(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -156,7 +156,7 @@ Value getbestblockhash(const Array& params, bool fHelp)
     return chainActive.Tip()->GetBlockHash().GetHex();
 }
 
-Value getdifficulty(const Array& params, bool fHelp)
+UniValue getdifficulty(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -174,7 +174,7 @@ Value getdifficulty(const Array& params, bool fHelp)
 }
 
 
-Value getrawmempool(const Array& params, bool fHelp)
+UniValue getrawmempool(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 1)
         throw runtime_error(
@@ -264,7 +264,7 @@ Value getrawmempool(const Array& params, bool fHelp)
     }
 }
 
-Value getblockhash(const Array& params, bool fHelp)
+UniValue getblockhash(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
         throw runtime_error(
@@ -289,7 +289,7 @@ Value getblockhash(const Array& params, bool fHelp)
     return pblockindex->GetBlockHash().GetHex();
 }
 
-Value getblockheader(const Array& params, bool fHelp)
+UniValue getblockheader(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error(
@@ -346,7 +346,7 @@ Value getblockheader(const Array& params, bool fHelp)
     return blockheaderToJSON(pblockindex);
 }
 
-Value getblock(const Array& params, bool fHelp)
+UniValue getblock(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 1 || params.size() > 2)
         throw runtime_error(
@@ -415,7 +415,7 @@ Value getblock(const Array& params, bool fHelp)
     return blockToJSON(block, pblockindex);
 }
 
-Value gettxoutsetinfo(const Array& params, bool fHelp)
+UniValue gettxoutsetinfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -455,7 +455,7 @@ Value gettxoutsetinfo(const Array& params, bool fHelp)
     return ret;
 }
 
-Value gettxout(const Array& params, bool fHelp)
+UniValue gettxout(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() < 2 || params.size() > 3)
         throw runtime_error(
@@ -535,7 +535,7 @@ Value gettxout(const Array& params, bool fHelp)
     return ret;
 }
 
-Value verifychain(const Array& params, bool fHelp)
+UniValue verifychain(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() > 2)
         throw runtime_error(
@@ -607,7 +607,7 @@ Object BIP9SoftForkDesc(const std::string& name, const Consensus::Params& consen
     return rv;
 }
 
-Value getblockchaininfo(const Array& params, bool fHelp)
+UniValue getblockchaininfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -698,7 +698,7 @@ struct CompareBlocksByHeight
     }
 };
 
-Value getchaintips(const Array& params, bool fHelp)
+UniValue getchaintips(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -788,7 +788,7 @@ Value getchaintips(const Array& params, bool fHelp)
     return res;
 }
 
-Value getmempoolinfo(const Array& params, bool fHelp)
+UniValue getmempoolinfo(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 0)
         throw runtime_error(
@@ -813,7 +813,7 @@ Value getmempoolinfo(const Array& params, bool fHelp)
     return ret;
 }
 
-Value invalidateblock(const Array& params, bool fHelp)
+UniValue invalidateblock(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
         throw runtime_error(
@@ -851,7 +851,7 @@ Value invalidateblock(const Array& params, bool fHelp)
     return NullUniValue;
 }
 
-Value reconsiderblock(const Array& params, bool fHelp)
+UniValue reconsiderblock(const Array& params, bool fHelp)
 {
     if (fHelp || params.size() != 1)
         throw runtime_error(
