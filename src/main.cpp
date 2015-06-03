@@ -485,9 +485,14 @@ void OnBlockFinished::operator()(const CBlock& block, const std::vector<NodeId>&
     std::set<NodeId> nodes(begin(ids), end(ids));
     BlockSource source(block.GetHash(), nodes, canMisbehave);
 
+    // Process all blocks from whitelisted peers, even if not requested,
+    // unless we're still syncing with the network.
+    // Such an unrequested block may still be processed, subject to the
+    // conditions in AcceptBlock().
+    bool forceProcessing = hasWhitelistedNode(ids) && !IsInitialBlockDownload();
+
     CBlock copy(block);
-    if (!ProcessNewBlock(state, source, &copy,
-            hasWhitelistedNode(ids), NULL)) {
+    if (!ProcessNewBlock(state, source, &copy, forceProcessing, nullptr)) {
         LogPrintf("ProcessNewBlock failed in %s\n", __func__);
     }
     rejectAndPunish(state, block.GetHash(), ids);
