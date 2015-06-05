@@ -32,6 +32,7 @@
 
 class CAddrMan;
 class CBlockIndex;
+class CNetMessage;
 class CNode;
 
 namespace boost {
@@ -46,8 +47,6 @@ static const int TIMEOUT_INTERVAL = 20 * 60;
 static const unsigned int MAX_INV_SZ = 50000;
 /** The maximum number of new addresses to accumulate before announcing. */
 static const unsigned int MAX_ADDR_TO_SEND = 1000;
-/** Maximum length of incoming protocol messages (no message over 2 MiB is currently acceptable). */
-static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 2 * 1024 * 1024;
 /** -listen default */
 static const bool DEFAULT_LISTEN = true;
 /** -upnp default */
@@ -79,12 +78,31 @@ void SocketSendData(CNode *pnode);
 
 typedef int NodeId;
 
-// Signals for message handling
+struct CombinerAll
+{
+    typedef bool result_type;
+
+    template<typename I>
+    bool operator()(I first, I last) const
+    {
+        while (first != last) {
+            if (!(*first)) return false;
+            ++first;
+        }
+        return true;
+    }
+};
+
+// Signals are used to communicate with higher-level code.
 struct CNodeSignals
 {
     boost::signals2::signal<int ()> GetHeight;
-    boost::signals2::signal<bool (CNode*)> ProcessMessages;
-    boost::signals2::signal<bool (CNode*, bool)> SendMessages;
+    // register a handler for this signal to do sanity checks as the bytes of a message are being
+    // received. Note that the message may not be completely read (so this can be
+    // used to prevent DoS attacks using over-size messages).
+    boost::signals2::signal<bool (CNode*, const CNetMessage&), CombinerAll> SanityCheckMessages;
+    boost::signals2::signal<bool (CNode*), CombinerAll> ProcessMessages;
+    boost::signals2::signal<bool (CNode*, bool), CombinerAll> SendMessages;
     boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
     boost::signals2::signal<void (NodeId)> FinalizeNode;
 };

@@ -94,6 +94,8 @@ static const unsigned int BLOCK_DOWNLOAD_WINDOW = 1024;
 static const unsigned int DATABASE_WRITE_INTERVAL = 3600;
 /** Maximum length of reject messages. */
 static const unsigned int MAX_REJECT_MESSAGE_LENGTH = 111;
+/** Maximum length of incoming protocol messages (no message over 2 MiB is currently acceptable). */
+static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 2 * 1024 * 1024;
 
 /** "reject" message codes */
 static const unsigned char REJECT_MALFORMED = 0x01;

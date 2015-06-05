@@ -25,6 +25,7 @@
 
 #include <boost/dynamic_bitset.hpp>
 #include <boost/algorithm/string/replace.hpp>
+#include <boost/assign/list_of.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/thread.hpp>
@@ -70,6 +71,13 @@ map<uint256, COrphanTx> mapOrphanTransactions;
 map<uint256, set<uint256> > mapOrphanTransactionsByPrev;
 void EraseOrphansFor(NodeId peer);
 
+static bool SanityCheckMessage(CNode* peer, const CNetMessage& msg);
+
+/**
+ * Returns true if there are nRequired or more blocks of minVersion or above
+ * in the last Consensus::Params::nMajorityWindow blocks, starting at pstart and going backwards.
+ */
+static bool IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned nRequired);
 static void CheckBlockIndex();
 
 /** Constant stuff for coinbase transactions we create: */
@@ -521,6 +529,7 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
 void RegisterNodeSignals(CNodeSignals& nodeSignals)
 {
     nodeSignals.GetHeight.connect(&GetHeight);
+    nodeSignals.SanityCheckMessages.connect(&SanityCheckMessage);
     nodeSignals.ProcessMessages.connect(&ProcessMessages);
     nodeSignals.SendMessages.connect(&SendMessages);
     nodeSignals.InitializeNode.connect(&InitializeNode);
@@ -530,6 +539,7 @@ void RegisterNodeSignals(CNodeSignals& nodeSignals)
 void UnregisterNodeSignals(CNodeSignals& nodeSignals)
 {
     nodeSignals.GetHeight.disconnect(&GetHeight);
+    nodeSignals.SanityCheckMessages.disconnect(&SanityCheckMessage);
     nodeSignals.ProcessMessages.disconnect(&ProcessMessages);
     nodeSignals.SendMessages.disconnect(&SendMessages);
     nodeSignals.InitializeNode.disconnect(&InitializeNode);
@@ -3486,6 +3496,32 @@ string GetWarnings(string strFor)
 //
 // Messages
 //
+
+static std::map<std::string, size_t> maxMessageSizes = boost::assign::map_list_of
+    ("addr", 2+1000*30)
+    ("getaddr",0)
+    ("getdata", 2+MAX_INV_SZ*36)
+    ("inv", 2+MAX_INV_SZ*36)
+    ("mempool",0)
+    ("notfound", 2+MAX_INV_SZ*36)
+    ("ping",8)
+    ("pong",8)
+    ("verack", 0)
+    ;
+
+bool static SanityCheckMessage(CNode* peer, const CNetMessage& msg)
+{
+    const std::string& strCommand = msg.hdr.GetCommand();
+    if (msg.hdr.nMessageSize > MAX_PROTOCOL_MESSAGE_LENGTH ||
+        (maxMessageSizes.count(strCommand) && msg.hdr.nMessageSize > maxMessageSizes[strCommand])) {
+        LogPrint("net", "Oversized %s message from peer=%i\n", SanitizeString(strCommand), peer->GetId());
+        return false;
+    }
+    // This would be a good place for more sophisticated DoS detection/prevention.
+    // (e.g. disconnect a peer that is flooding us with excessive messages)
+
+    return true;
+}
 
 
 bool static AlreadyHave(const CInv& inv)
