@@ -12,6 +12,7 @@
 #include "primitives/block.h"
 #include "protocol.h"
 
+#include <limits>
 #include <vector>
 
 struct CDNSSeedData {
@@ -71,6 +72,7 @@ public:
     const std::vector<unsigned char>& Base58Prefix(Base58Type type) const { return base58Prefixes[type]; }
     const std::vector<SeedSpec6>& FixedSeeds() const { return vFixedSeeds; }
     const Checkpoints::CCheckpointData& Checkpoints() const { return checkpointData; }
+
 protected:
     CChainParams() {}
 
@@ -79,6 +81,7 @@ protected:
     //! Raw pub key bytes for the broadcast alert signing key.
     std::vector<unsigned char> vAlertPubKey;
     int nDefaultPort;
+
     int nMinerThreads;
     uint64_t nPruneAfterHeight;
     std::vector<CDNSSeedData> vSeeds;

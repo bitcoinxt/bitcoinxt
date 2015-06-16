@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "main.h"
 #include "merkleblock.h"
 #include "serialize.h"
 #include "streams.h"
@@ -17,6 +18,8 @@
 #include <boost/test/unit_test.hpp>
 
 using namespace std;
+
+static const int maxTxn = 1000*1000/MIN_TRANSACTION_SIZE; // upper limit, number txns in 1MB block
 
 class CPartialMerkleTreeTester : public CPartialMerkleTree
 {
@@ -87,7 +90,7 @@ BOOST_AUTO_TEST_CASE(pmt_test1)
 
             // extract merkle root and matched txids from copy
             std::vector<uint256> vMatchTxid2;
-            uint256 merkleRoot2 = pmt2.ExtractMatches(vMatchTxid2);
+            uint256 merkleRoot2 = pmt2.ExtractMatches(maxTxn, vMatchTxid2);
 
             // check that it has the same merkle root as the original, and a valid one
             BOOST_CHECK(merkleRoot1 == merkleRoot2);
@@ -101,7 +104,7 @@ BOOST_AUTO_TEST_CASE(pmt_test1)
                 CPartialMerkleTreeTester pmt3(pmt2);
                 pmt3.Damage();
                 std::vector<uint256> vMatchTxid3;
-                uint256 merkleRoot3 = pmt3.ExtractMatches(vMatchTxid3);
+                uint256 merkleRoot3 = pmt3.ExtractMatches(maxTxn, vMatchTxid3);
                 BOOST_CHECK(merkleRoot3 != merkleRoot1);
             }
         }
@@ -121,7 +124,7 @@ BOOST_AUTO_TEST_CASE(pmt_malleability)
 
     CPartialMerkleTree tree(vTxid, vMatch);
     std::vector<uint256> vTxid2;
-    BOOST_CHECK(tree.ExtractMatches(vTxid).IsNull());
+    BOOST_CHECK(tree.ExtractMatches(100, vTxid).IsNull());
 }
 
 BOOST_AUTO_TEST_SUITE_END()
