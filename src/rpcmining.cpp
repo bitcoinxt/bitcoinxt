@@ -574,6 +574,7 @@ Value getblocktemplate(const Array& params, bool fHelp)
     }
 
     Object result;
+    int64_t nBlockTime = pblock->GetBlockTime();
     result.push_back(Pair("capabilities", aCaps));
     result.push_back(Pair("version", pblock->nVersion));
     result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
@@ -585,9 +586,9 @@ Value getblocktemplate(const Array& params, bool fHelp)
     result.push_back(Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1));
     result.push_back(Pair("mutable", aMutable));
     result.push_back(Pair("noncerange", "00000000ffffffff"));
-    result.push_back(Pair("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS));
-    result.push_back(Pair("sizelimit", (int64_t)MAX_BLOCK_SIZE));
-    result.push_back(Pair("curtime", pblock->GetBlockTime()));
+    result.push_back(Pair("sigoplimit", Params().MaxBlockSigops(nBlockTime)));
+    result.push_back(Pair("sizelimit", Params().MaxBlockSize(nBlockTime)));
+    result.push_back(Pair("curtime", nBlockTime));
     result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
     result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight+1)));
 

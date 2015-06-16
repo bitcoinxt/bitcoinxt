@@ -123,6 +123,18 @@ public:
         nTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         nTargetSpacing = 10 * 60;
 
+        // Timestamps for forking consensus rule changes:
+        //  Allow bigger blocks
+        //  Limit transactions to 100,000 bytes
+        nEarliestSizeForkTime = 1452470400; // 11 Jan 2016 00:00:00 UTC
+        nSizeForkActivationTime = std::numeric_limits<int32_t>::max(); // Until miner vote passes, "never"
+        // 1MB max blocks before 11 Jan 2016
+        // Then, if miner consensus: 8MB max, doubling every two years
+        nMaxSizePreFork = 1000*1000; // 1MB max pre-fork
+        nSizeDoubleEpoch = 60*60*24*365*2; // two years
+        nMaxSizeBase = 8*1000*1000; // 8MB
+        nMaxSizeDoublings = 10;
+
         /**
          * Build the genesis block. Note that the output of the genesis coinbase cannot
          * be spent as it did not originally exist in the database.
@@ -204,6 +216,15 @@ public:
         nMinerThreads = 0;
         nTargetTimespan = 14 * 24 * 60 * 60; //! two weeks
         nTargetSpacing = 10 * 60;
+
+        // 1MB max blocks before 1 Aug 2015
+        // Then, if miner consensus: 8MB max, doubling every two years
+        nMaxSizePreFork = 1000*1000; // 1MB max pre-fork
+        nEarliestSizeForkTime = 1438387200; // 1 Aug 2015 00:00:00 UTC
+        nSizeForkActivationTime = std::numeric_limits<int32_t>::max(); // Until miner vote passes, "never"
+        nSizeDoubleEpoch = 60*60*24*365*2; // two years
+        nMaxSizeBase = 8*1000*1000; // 8MB
+        nMaxSizeDoublings = 10;
 
         //! Modify the testnet genesis block so the timestamp is valid for a later start.
         genesis.nTime = 1296688602;
@@ -361,4 +382,10 @@ bool SelectParamsFromCommandLine()
 
     SelectParams(network);
     return true;
+}
+
+void CChainParams::SetSizeForkActivationTime(uint64_t t)
+{
+    assert(pCurrentParams);
+    pCurrentParams->nSizeForkActivationTime = t;
 }

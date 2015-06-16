@@ -118,13 +118,13 @@ CPartialMerkleTree::CPartialMerkleTree(const std::vector<uint256> &vTxid, const 
 
 CPartialMerkleTree::CPartialMerkleTree() : nTransactions(0), fBad(true) {}
 
-uint256 CPartialMerkleTree::ExtractMatches(std::vector<uint256> &vMatch) {
+uint256 CPartialMerkleTree::ExtractMatches(uint64_t nMaxTransactions, std::vector<uint256> &vMatch) {
     vMatch.clear();
     // An empty set will not work
     if (nTransactions == 0)
         return 0;
     // check for excessively high numbers of transactions
-    if (nTransactions > MAX_BLOCK_SIZE / 60) // 60 is the lower bound for the size of a serialized CTransaction
+    if (nTransactions > nMaxTransactions) // 60 is the lower bound for the size of a serialized CTransaction
         return 0;
     // there can never be more hashes provided than one for every txid
     if (vHash.size() > nTransactions)
