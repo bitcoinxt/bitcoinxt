@@ -370,6 +370,7 @@ Value getblocktemplate(const Array& params, bool fHelp)
             "  \"noncerange\" : \"00000000ffffffff\",   (string) A range of valid nonces\n"
             "  \"sigoplimit\" : n,                 (numeric) limit of sigops in blocks\n"
             "  \"sizelimit\" : n,                  (numeric) limit of block size\n"
+            "  \"txsizelimit\" : n,                (numeric) limit of transaction size\n"
             "  \"curtime\" : ttt,                  (numeric) current timestamp in seconds since epoch (Jan 1 1970 GMT)\n"
             "  \"bits\" : \"xxx\",                 (string) compressed target of next block\n"
             "  \"height\" : n                      (numeric) The height of the next block\n"
@@ -569,6 +570,7 @@ Value getblocktemplate(const Array& params, bool fHelp)
     }
 
     Object result;
+    int64_t nBlockTime = pblock->GetBlockTime();
     result.push_back(Pair("capabilities", aCaps));
     result.push_back(Pair("version", pblock->nVersion));
     result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
@@ -580,9 +582,9 @@ Value getblocktemplate(const Array& params, bool fHelp)
     result.push_back(Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1));
     result.push_back(Pair("mutable", aMutable));
     result.push_back(Pair("noncerange", "00000000ffffffff"));
-    result.push_back(Pair("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS));
-    result.push_back(Pair("sizelimit", (int64_t)MAX_BLOCK_SIZE));
-    result.push_back(Pair("curtime", pblock->GetBlockTime()));
+    result.push_back(Pair("sigoplimit", Params().GetConsensus().MaxBlockSigops(nBlockTime, sizeForkTime.load())));
+    result.push_back(Pair("sizelimit", Params().GetConsensus().MaxBlockSize(nBlockTime, sizeForkTime.load())));
+    result.push_back(Pair("curtime", nBlockTime));
     result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
     result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight+1)));
 
