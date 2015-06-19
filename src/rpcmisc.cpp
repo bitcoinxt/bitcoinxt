@@ -388,15 +388,13 @@ Value setmocktime(const Array& params, bool fHelp)
     if (!Params().MineBlocksOnDemand())
         throw runtime_error("setmocktime for regression testing (-regtest mode) only");
 
-    LOCK(cs_main);
-
-    RPCTypeCheck(params, boost::assign::list_of(int_type));
-
     // cs_vNodes is locked and node send/receive times are updated
     // atomically with the time change to prevent peers from being
     // disconnected because we think we haven't communicated with them
     // in a long time.
-    LOCK(cs_vNodes);
+    LOCK2(cs_main, cs_vNodes);
+
+    RPCTypeCheck(params, boost::assign::list_of(int_type));
 
     SetMockTime(params[0].get_int64());
 
