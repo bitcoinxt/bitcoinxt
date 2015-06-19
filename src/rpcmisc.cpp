@@ -391,7 +391,19 @@ Value setmocktime(const Array& params, bool fHelp)
     LOCK(cs_main);
 
     RPCTypeCheck(params, boost::assign::list_of(int_type));
+
+    // cs_vNodes is locked and node send/receive times are updated
+    // atomically with the time change to prevent peers from being
+    // disconnected because we think we haven't communicated with them
+    // in a long time.
+    LOCK(cs_vNodes);
+
     SetMockTime(params[0].get_int64());
+
+    uint64_t t = GetTime();
+    BOOST_FOREACH(CNode* pnode, vNodes) {
+        pnode->nLastSend = pnode->nLastRecv = t;
+    }
 
     return Value::null;
 }
