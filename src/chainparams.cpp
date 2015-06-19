@@ -254,12 +254,7 @@ public:
         pchMessageStart[2] = 0xb5;
         pchMessageStart[3] = 0xda;
         nSubsidyHalvingInterval = 150;
-        nEnforceBlockUpgradeMajority = 750;
-        nRejectBlockOutdatedMajority = 950;
-        nToCheckBlockUpgradeMajority = 1000;
         nMinerThreads = 1;
-        nTargetTimespan = 14 * 24 * 60 * 60; //! two weeks
-        nTargetSpacing = 10 * 60;
         bnProofOfWorkLimit = ~uint256(0) >> 1;
         genesis.nTime = 1296688602;
         genesis.nBits = 0x207fffff;
