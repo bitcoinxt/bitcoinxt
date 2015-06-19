@@ -134,6 +134,8 @@ public:
         nSizeDoubleEpoch = 60*60*24*365*2; // two years
         nMaxSizeBase = 8*1000*1000; // 8MB
         nMaxSizeDoublings = 10;
+        nActivateSizeForkMajority = 750; // 75% of hashpower to activate fork
+        nSizeForkGracePeriod = 60*60*24*14; // two week grace period after activation
 
         /**
          * Build the genesis block. Note that the output of the genesis coinbase cannot
@@ -225,6 +227,8 @@ public:
         nSizeDoubleEpoch = 60*60*24*365*2; // two years
         nMaxSizeBase = 8*1000*1000; // 8MB
         nMaxSizeDoublings = 10;
+        nActivateSizeForkMajority = 75; // 75 of 100 to activate fork
+        nSizeForkGracePeriod = 60*60*24; // 1-day grace period
 
         //! Modify the testnet genesis block so the timestamp is valid for a later start.
         genesis.nTime = 1296688602;
@@ -384,7 +388,7 @@ bool SelectParamsFromCommandLine()
     return true;
 }
 
-void CChainParams::SetSizeForkActivationTime(uint64_t t)
+void CChainParams::SetSizeForkTime(uint64_t t)
 {
     assert(pCurrentParams);
     pCurrentParams->nSizeForkActivationTime = t;

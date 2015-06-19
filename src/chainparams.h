@@ -82,6 +82,8 @@ public:
     virtual const Checkpoints::CCheckpointData& Checkpoints() const = 0;
 
     /** Maximum block size of a block with timestamp nBlockTimestamp */
+    int ActivateSizeForkMajority() const { return nActivateSizeForkMajority; }
+    uint64_t SizeForkGracePeriod() const { return nSizeForkGracePeriod; }
     uint64_t MaxBlockSize(uint64_t nBlockTimestamp) const {
         if (nBlockTimestamp < nEarliestSizeForkTime || nBlockTimestamp < nSizeForkActivationTime)
             return nMaxSizePreFork;
@@ -110,8 +112,10 @@ public:
         return 100*1000;
     }
 
-    /** Set when a supermajority of hashpower agrees to bigger blocks */
-    static void SetSizeForkActivationTime(uint64_t t);
+    /** Called at startup or when a supermajority of hashpower agrees to
+     *    create bigger blocks: blocks with a timestamp >= t may be >1 MB
+     */
+    static void SetSizeForkTime(uint64_t t);
 
 protected:
     CChainParams() : nSizeForkActivationTime(std::numeric_limits<uint64_t>::max()) {}
@@ -134,6 +138,8 @@ protected:
     uint32_t nSizeDoubleEpoch;
     uint64_t nMaxSizeBase;
     uint8_t nMaxSizeDoublings;
+    int nActivateSizeForkMajority;
+    uint64_t nSizeForkGracePeriod;
 
     int64_t nTargetTimespan;
     int64_t nTargetSpacing;

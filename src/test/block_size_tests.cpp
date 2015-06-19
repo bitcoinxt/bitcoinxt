@@ -86,7 +86,7 @@ BOOST_AUTO_TEST_CASE(BigBlockFork_Time1)
     uint64_t postforkSize = MAXSIZE_POSTFORK;
     uint64_t tActivate = EARLIEST_FORK_TIME;
 
-    CChainParams::SetSizeForkActivationTime(tActivate);
+    CChainParams::SetSizeForkTime(tActivate);
 
     LOCK(cs_main);
 
@@ -133,7 +133,7 @@ BOOST_AUTO_TEST_CASE(BigBlockFork_Time1)
     BOOST_CHECK(!TestCheckBlock(*pblock, farFuture, (postforkSize<<maxDoublings)+1));
 #endif
 
-    CChainParams::SetSizeForkActivationTime(std::numeric_limits<uint64_t>::max());
+    CChainParams::SetSizeForkTime(std::numeric_limits<uint64_t>::max());
 }
 
 // Test activation time 30 days after earliest possible:
@@ -147,7 +147,7 @@ BOOST_AUTO_TEST_CASE(BigBlockFork_Time2)
     uint64_t postforkSize = MAXSIZE_POSTFORK;
 
     uint64_t tActivate = EARLIEST_FORK_TIME+60*60*24*30;
-    CChainParams::SetSizeForkActivationTime(tActivate);
+    CChainParams::SetSizeForkTime(tActivate);
 
     LOCK(cs_main);
 
@@ -166,7 +166,7 @@ BOOST_AUTO_TEST_CASE(BigBlockFork_Time2)
     uint64_t tHalf = t+SIZE_DOUBLE_EPOCH/2;
     BOOST_CHECK(TestCheckBlock(*pblock, tHalf, (3*postforkSize)/2));
 
-    CChainParams::SetSizeForkActivationTime(std::numeric_limits<uint64_t>::max());
+    CChainParams::SetSizeForkTime(std::numeric_limits<uint64_t>::max());
 }
 
 // Test: no miner consensus, no big blocks:
