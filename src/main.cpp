@@ -4307,7 +4307,11 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             const CInv &inv = vInv[nInv];
 
             boost::this_thread::interruption_point();
-            pfrom->AddInventoryKnown(inv);
+            // Ignore duplicate advertisements for the same item from the same peer. This check
+            // prevents a peer from constantly promising to deliver an item that it never does,
+            // thus blinding us to new transactions and blocks.
+            if (!pfrom->AddInventoryKnown(inv))
+                continue;
 
             bool fAlreadyHave = AlreadyHave(inv);
             LogPrint("net", "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
