@@ -20,7 +20,6 @@ static const uint64_t EARLIEST_FORK_TIME = 1452470400; // 11 Jan 2016
 static const uint32_t MAXSIZE_PREFORK = 1000*1000;
 static const uint32_t MAXSIZE_POSTFORK = 8*1000*1000;
 static const uint64_t SIZE_DOUBLE_EPOCH = 60*60*24*365*2; // two years
-static const int SIZE_MAX_DOUBLINGS = 8;
 
 BOOST_FIXTURE_TEST_SUITE(block_size_tests, TestingSetup)
 
@@ -115,7 +114,7 @@ BOOST_AUTO_TEST_CASE(BigBlockFork_Time1)
     // Sanity check: April 1 2017 is more than halfway to first
     // doubling:
     uint64_t tApril_2017 = 1491004800;
-    BOOST_CHECK(TestCheckBlock(*pblock, tHalf, (3*postforkSize)/2)+1);
+    BOOST_CHECK(TestCheckBlock(*pblock, tApril_2017, (3*postforkSize)/2)+1);
 
     // After one doubling...
     uint64_t yearsAfter = t+SIZE_DOUBLE_EPOCH;
