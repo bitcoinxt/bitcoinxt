@@ -7,6 +7,7 @@
 #include "base58.h"
 #include "clientversion.h"
 #include "key.h"
+#include "main.h"
 #include "merkleblock.h"
 #include "serialize.h"
 #include "streams.h"
@@ -22,7 +23,7 @@
 using namespace std;
 using namespace boost::tuples;
 
-static const int maxTxn = 1000*1000/60; // upper limit, number txns in 1MB block
+static const int maxTxn = 1000*1000/MIN_TRANSACTION_SIZE; // upper limit, number txns in 1MB block
 
 BOOST_AUTO_TEST_SUITE(bloom_tests)
 
