@@ -25,7 +25,7 @@ class CBlockHeader
 public:
     static const int32_t CURRENT_VERSION=SIZE_FORK_VERSION;
     // This code knows the rules for these block versions:
-    static const int32_t UNDERSTOOD_VERSIONS = (SIZE_FORK_VERSION | 3 | 2 | 1);
+    static const int32_t UNDERSTOOD_VERSIONS = (SIZE_FORK_VERSION | 4 | 3 | 2 | 1);
 
     // header
     int32_t nVersion;
