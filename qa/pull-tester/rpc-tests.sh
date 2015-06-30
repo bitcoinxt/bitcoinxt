@@ -36,6 +36,7 @@ testScripts=(
     'signrawtransactions.py'
     'walletbackup.py'
     'p2p-versionbits-warning.py'
+    'decodescript.py'
 );
 testScriptsExt=(
     'bigblocks.py'
