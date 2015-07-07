@@ -914,6 +914,16 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, uint64_t 
     return true;
 }
 
+static uint64_t CalcDefaultBlockPrioritySize() {
+    uint64_t nConsensusMaxSize = Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load());
+    // How much of the block should be dedicated to high-priority transactions,
+    // included regardless of the fees they pay. This is to help people who want
+    // to make free transactions and don't mind waiting a while: coin age stands
+    // in for the monetary value of the fee. Defaults to an arbitrary 5% of the
+    // current max block size.
+    return nConsensusMaxSize / 20;
+}
+
 CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowFree)
 {
     {
@@ -934,7 +944,7 @@ CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowF
         // * If we are relaying we allow transactions up to DEFAULT_BLOCK_PRIORITY_SIZE - 1000
         //   to be considered to fall into this category. We don't want to encourage sending
         //   multiple transactions instead of one big transaction to avoid fees.
-        if (nBytes < (DEFAULT_BLOCK_PRIORITY_SIZE - 1000))
+        if (nBytes < (CalcDefaultBlockPrioritySize() - 1000))
             nMinFee = 0;
     }
 
