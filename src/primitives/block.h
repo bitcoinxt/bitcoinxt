@@ -23,8 +23,11 @@ const unsigned int SIZE_FORK_VERSION = 0x20000007;
 class CBlockHeader
 {
 public:
-    // header
     static const int32_t CURRENT_VERSION=SIZE_FORK_VERSION;
+    // This code knows the rules for these block versions:
+    static const int32_t UNDERSTOOD_VERSIONS = (SIZE_FORK_VERSION | 3 | 2 | 1);
+
+    // header
     int32_t nVersion;
     uint256 hashPrevBlock;
     uint256 hashMerkleRoot;
