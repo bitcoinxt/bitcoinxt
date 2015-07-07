@@ -129,16 +129,21 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         UpdateTime(pblock, Params().GetConsensus(), pindexPrev);
         uint64_t nBlockTime = pblock->GetBlockTime();
 
-        // Largest block you're willing to create:
-        uint64_t nBlockMaxSize = GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE);
         uint64_t nConsensusMaxSize = chainparams.GetConsensus().MaxBlockSize(nBlockTime, sizeForkTime.load());
+        // Largest block you're willing to create, defaults to being the biggest possible.
+        // Miners can adjust downwards if they wish to throttle their blocks, for instance, to work around
+        // high orphan rates or other scaling problems.
+        uint64_t nBlockMaxSize = (uint64_t) GetArg("-blockmaxsize", nConsensusMaxSize);
         // Limit to betweeen 1K and MAX_BLOCK_SIZE-1K for sanity:
         nBlockMaxSize = std::max((uint64_t)1000,
                                  std::min(nConsensusMaxSize-1000, nBlockMaxSize));
 
         // How much of the block should be dedicated to high-priority transactions,
-        // included regardless of the fees they pay
-        uint64_t nBlockPrioritySize = GetArg("-blockprioritysize", DEFAULT_BLOCK_PRIORITY_SIZE);
+        // included regardless of the fees they pay. This is to help people who want
+        // to make free transactions and don't mind waiting a while: coin age stands
+        // in for the monetary value of the fee. Defaults to an arbitrary 5% of the
+        // current max block size.
+        uint64_t nBlockPrioritySize = (uint64_t) GetArg("-blockprioritysize", nBlockMaxSize / DEFAULT_BLOCK_PRIORITY_SIZE_FRAC);
         nBlockPrioritySize = std::min(nBlockMaxSize, nBlockPrioritySize);
 
         // Minimum block size you want to create; block will be filled with free transactions
