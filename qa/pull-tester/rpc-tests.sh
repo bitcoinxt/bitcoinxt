@@ -57,6 +57,7 @@ testScriptsExt=(
     'rawtransactions.py'
 #    'forknotify.py'
     'p2p-acceptblock.py'
+    'mempool_packages.py'
 );
 
 extArg="-extended"

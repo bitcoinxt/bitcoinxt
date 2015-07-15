@@ -1176,6 +1176,17 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                          hash.ToString(),
                          nFees, ::minRelayTxFee.GetFee(nSize) * 10000);
 
+        // Calculate in-mempool ancestors, up to a limit.
+        CTxMemPool::setEntries setAncestors;
+        size_t nLimitAncestors = GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
+        size_t nLimitAncestorSize = GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT)*1000;
+        size_t nLimitDescendants = GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT);
+        size_t nLimitDescendantSize = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT)*1000;
+        std::string errString;
+        if (!pool.CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize, nLimitDescendants, nLimitDescendantSize, errString)) {
+            return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false);
+        }
+
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS, true, NULL))
@@ -1210,7 +1221,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         else
         {
             // Store transaction in memory
-            pool.addUnchecked(hash, entry, !IsInitialBlockDownload());
+        	pool.addUnchecked(hash, entry, setAncestors, !IsInitialBlockDownload());
         }
     }
 
@@ -2325,13 +2336,23 @@ bool static DisconnectTip(CValidationState &state) {
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
     // Resurrect mempool transactions from the disconnected block.
+    std::vector<uint256> vHashUpdate;
     BOOST_FOREACH(const CTransaction &tx, block.vtx) {
         // ignore validation errors in resurrected transactions
         list<CTransaction> removed;
         CValidationState stateDummy;
-        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, NULL))
+        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, NULL)) {
             mempool.remove(tx, removed, true);
+        } else if (mempool.exists(tx.GetHash())) {
+            vHashUpdate.push_back(tx.GetHash());
+        }
     }
+    // AcceptToMemoryPool/addUnchecked all assume that new mempool entries have
+    // no in-mempool children, which is generally not true when adding
+    // previously-confirmed transactions back to the mempool.
+    // UpdateTransactionsFromBlock finds descendants of any transactions in this
+    // block that were added back and cleans up the mempool state.
+    mempool.UpdateTransactionsFromBlock(vHashUpdate);
     mempool.removeCoinbaseSpends(pcoinsTip, pindexDelete->nHeight);
     mempool.check(pcoinsTip);
 
@@ -4721,7 +4742,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             LogPrint("mempool", "AcceptToMemoryPool: peer=%d %s: accepted %s (poolsz %u)\n",
                 pfrom->id, pfrom->cleanSubVer,
                 tx.GetHash().ToString(),
-                mempool.mapTx.size());
+                mempool.size());
 
             // Recursively process any orphan transactions that depended on this one
             set<NodeId> setMisbehaving;
