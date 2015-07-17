@@ -95,6 +95,7 @@ BITCOIN_CORE_H = \
   consensus/validation.h \
   core_io.h \
   curl_wrapper.h \
+  core_memusage.h \
   eccryptoverify.h \
   ecwrapper.h \
   hash.h \
