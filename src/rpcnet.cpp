@@ -251,12 +251,12 @@ UniValue settrafficshaping(const UniValue& params, bool fHelp)
     {
         int burst;
         int ave;
-        if (params[1].isReal())
+        if (params[1].isNum())
             burst = params[1].get_int();
         else
             burst = boost::lexical_cast<int>(params[1].getValStr());
 
-        if (params[2].isReal())
+        if (params[2].isNum())
             ave = params[2].get_int();
         else
             ave = boost::lexical_cast<int>(params[2].getValStr());
