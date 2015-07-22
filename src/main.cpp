@@ -4330,7 +4330,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
         if (fLogIPs)
             remoteAddr = ", peeraddr=" + pfrom->addr.ToString();
 
-        string group = pfrom->pIpGroup ? tfm::format(", ipgroup=%s", pfrom->pIpGroup->name) : "";
+        string group = pfrom->ipgroup.name != "" ? tfm::format(", ipgroup=%s", pfrom->ipgroup.name) : "";
 
         LogPrintf("receive version message: %s: version %d, blocks=%d, us=%s, peerid=%d%s%s\n",
                   pfrom->cleanSubVer, pfrom->nVersion,

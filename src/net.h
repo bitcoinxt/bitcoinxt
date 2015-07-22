@@ -287,7 +287,9 @@ public:
     CBloomFilter* pfilter;
     int nRefCount;
     NodeId id;
-    CIPGroup *pIpGroup;
+
+    // IP group
+    CIPGroupData ipgroup;
 
 protected:
 

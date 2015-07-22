@@ -7,10 +7,11 @@
 
 #include "netbase.h"
 
+class CScheduler;
+
 // A group of logically related IP addresses. Useful for banning or deprioritising
 // sources of abusive traffic/DoS attacks.
-struct CIPGroup {
-    std::vector<CSubNet> subnets;
+struct CIPGroupData {
     std::string name;
     // A priority score indicates how important this group of IP addresses is to this node.
     // Importance determines which group wins when the node is out of resources. Any IP
@@ -19,12 +20,17 @@ struct CIPGroup {
     // IPs, and groups with a higher priority will be serviced before ungrouped IPs.
     int priority;
 
-    CIPGroup(const std::string &name_) : name(name_), priority(0) {}
+    CIPGroupData() : priority(0) {}
+};
+
+struct CIPGroup {
+    CIPGroupData header;
+    std::vector<CSubNet> subnets;
 };
 
 // Returns NULL if the IP does not belong to any group.
-CIPGroup *FindGroupForIP(CNetAddr ip);
+CIPGroupData FindGroupForIP(CNetAddr ip);
 
-void InitIPGroups();
+void InitIPGroups(CScheduler *scheduler);
 
 #endif //BITCOIN_CIPGROUPS_H
