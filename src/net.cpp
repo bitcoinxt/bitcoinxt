@@ -868,18 +868,17 @@ void ThreadSocketHandler()
                 {
                     // Calculate the priority of the new IP to see if we should drop it immediately (normal) or kick
                     // one of the other peers out to make room for it.
-                    CIPGroup *group = FindGroupForIP(addr);
-                    int priority = group ? group->priority : 0;
+                    CIPGroupData ipgroup = FindGroupForIP(addr);
 
                     bool disconnected = false;
                     {
                         LOCK(cs_vNodes);
                         BOOST_FOREACH(CNode *n, vNodes)
                         {
-                            int nodePriority = n->pIpGroup ? n->pIpGroup->priority : 0;
-                            if (nodePriority < priority) {
+                            int nodePriority = n->ipgroup.priority;
+                            if (nodePriority < ipgroup.priority) {
                                 LogPrintf("Connection slots exhausted, evicting peer %d with priority %d (group %s) to free up resources\n",
-                                          n->id, nodePriority, n->pIpGroup ? n->pIpGroup->name : "default");
+                                          n->id, nodePriority, n->ipgroup.name == "" ? string("default") : n->ipgroup.name);
                                 n->fDisconnect = true;
                                 disconnected = true;
                                 // Leave shouldConnect = true to allow this socket through.
@@ -1660,7 +1659,7 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (pnodeLocalHost == NULL)
         pnodeLocalHost = new CNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), nLocalServices));
 
-    InitIPGroups();
+    InitIPGroups(&scheduler);
 
     Discover(threadGroup);
 
@@ -1997,8 +1996,8 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
         id = nLastNodeId++;
     }
 
-    pIpGroup = FindGroupForIP(CNetAddr(addr.ToStringIP()));
-    std::string strIpGroup = pIpGroup ? tfm::format("(group %s)", pIpGroup->name) : "";
+    ipgroup = FindGroupForIP(CNetAddr(addr.ToStringIP()));
+    std::string strIpGroup = ipgroup.name != "" ? tfm::format("(group %s)", ipgroup.name) : "";
     if (fLogIPs)
         LogPrint("net", "Added connection to %s peer=%d %s\n", addrName, id, strIpGroup);
     else
