@@ -2027,8 +2027,10 @@ void CNode::AskFor(const CInv& inv)
     nNow = std::max(nNow, nLastTime);
     nLastTime = nNow;
 
-    // Each retry is 2 minutes after the last
-    nRequestTime = std::max(nRequestTime + 2 * 60 * 1000000, nNow);
+    // Each retry is 20 seconds after the last. Calculations based on observed relay
+    // times as of July 2015 show that we will receive a transaction within 20 seconds
+    // 99% of the time.
+    nRequestTime = std::max(nRequestTime + (20 * 1000000), nNow);
     if (it != mapAlreadyAskedFor.end())
         mapAlreadyAskedFor.update(it, nRequestTime);
     else
