@@ -98,7 +98,10 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
     if(!pblocktemplate.get())
         return NULL;
     CBlock *pblock = &pblocktemplate->block; // pointer for convenience
-    BlockValidationResourceTracker resourceTracker(std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max());
+
+    uint64_t maxAccurateSigops = chainparams.GetConsensus().MaxBlockAccurateSigops(pblock->GetBlockTime(), sizeForkTime.load());
+    uint64_t maxSighashBytes = chainparams.GetConsensus().MaxBlockSighashBytes(pblock->GetBlockTime(), sizeForkTime.load());
+    BlockValidationResourceTracker resourceTracker(maxAccurateSigops, maxSighashBytes);
 
     // -regtest only: allow overriding block.nVersion with
     // -blockversion=N to test forking scenarios
@@ -257,7 +260,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
 
             // Legacy limits on sigOps:
             unsigned int nTxSigOps = GetLegacySigOpCount(tx);
-            if (nBlockSigOps + nTxSigOps >= chainparams.GetConsensus().MaxBlockSigops(nBlockTime, sizeForkTime.load()))
+            if (nBlockSigOps + nTxSigOps >= chainparams.GetConsensus().MaxBlockLegacySigops(nBlockTime, sizeForkTime.load()))
                 continue;
 
             // Skip free transactions if we're past the minimum block size:
@@ -284,7 +287,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             CAmount nTxFees = view.GetValueIn(tx)-tx.GetValueOut();
 
             nTxSigOps += GetP2SHSigOpCount(tx, view);
-            if (nBlockSigOps + nTxSigOps >= chainparams.GetConsensus().MaxBlockSigops(nBlockTime, sizeForkTime.load()))
+            if (nBlockSigOps + nTxSigOps >= chainparams.GetConsensus().MaxBlockLegacySigops(nBlockTime, sizeForkTime.load()))
                 continue;
 
             // Note that flags: we don't want to set mempool/IsStandard()
@@ -292,7 +295,12 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             // create only contains transactions that are valid in new blocks.
             CValidationState state;
             if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true, &resourceTracker))
-                continue;
+            {
+                if (!resourceTracker.IsWithinLimits())
+                    break; // Ran out of sigops / sighash bytes, done building block
+                else
+                    continue;
+            }
 
             UpdateCoins(tx, state, view, nHeight);
 

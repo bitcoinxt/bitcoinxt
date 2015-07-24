@@ -53,10 +53,25 @@ struct Params {
         uint64_t nMaxSize = (nMaxSizeBase << doublings) + interpolate;
         return nMaxSize;
     }
-    /** Maximum number of signature ops in a block with timestamp nBlockTimestamp */
-    uint64_t MaxBlockSigops(uint64_t nBlockTimestamp, uint64_t nSizeForkActivationTime) const {
-        return MaxBlockSize(nBlockTimestamp, nSizeForkActivationTime)/50;
+    /** Pre-fork consensus rules use an inaccurate method of counting sigops **/
+    uint64_t MaxBlockLegacySigops(uint64_t nBlockTimestamp, uint64_t nSizeForkActivationTime) const {
+        if (nBlockTimestamp < nEarliestSizeForkTime || nBlockTimestamp < nSizeForkActivationTime)
+            return MaxBlockSize(nBlockTimestamp, nSizeForkActivationTime)/50;
+        return std::numeric_limits<uint64_t>::max(); // Post-fork uses accurate method
     }
+    /** Post-fork consensus rule uses an accurate method of counting sigops **/
+    uint64_t MaxBlockAccurateSigops(uint64_t nBlockTimestamp, uint64_t nSizeForkActivationTime) const {
+        if (nBlockTimestamp < nEarliestSizeForkTime || nBlockTimestamp < nSizeForkActivationTime)
+            return std::numeric_limits<uint64_t>::max(); // Pre-fork doesn't care
+        return MaxBlockSize(nBlockTimestamp, nSizeForkActivationTime)/100;
+    }
+    /** Post-fork consensus rule to mitigate CVE-2013-2292 **/
+    uint64_t MaxBlockSighashBytes(uint64_t nBlockTimestamp, uint64_t nSizeForkActivationTime) const {
+        if (nBlockTimestamp < nEarliestSizeForkTime || nBlockTimestamp < nSizeForkActivationTime)
+            return std::numeric_limits<uint64_t>::max(); // Pre-fork doesn't care
+        return MaxBlockSize(nBlockTimestamp, nSizeForkActivationTime)*160;
+    }
+
     int ActivateSizeForkMajority() const { return nActivateSizeForkMajority; }
     uint64_t SizeForkGracePeriod() const { return nSizeForkGracePeriod; }
 };
