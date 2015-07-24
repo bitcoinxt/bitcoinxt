@@ -1978,7 +1978,17 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     CBlockUndo blockundo;
 
-    BlockValidationResourceTracker resourceTracker(std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max());
+    // Pre-fork, maxAccurateSigops and maxSighashBytes will be unlimited (they'll
+    // be the maximum possible uint64 value).
+    // And Post-fork, the legacy sigop limits will be unlimited.
+    // This code is written to be oblivious to whether or not the fork has happened;
+    // one or the other counting method is wasted effort (but it is not worth optimizing
+    // because sigop counting is not a significant percentage of validation time).
+    // Some future release well after the fork has occurred should remove all of the
+    // legacy sigop counting code and just keep the accurate counting method.
+    uint64_t maxAccurateSigops = chainparams.GetConsensus().MaxBlockAccurateSigops(block.GetBlockTime(), sizeForkTime.load());
+    uint64_t maxSighashBytes = chainparams.GetConsensus().MaxBlockSighashBytes(block.GetBlockTime(), sizeForkTime.load());
+    BlockValidationResourceTracker resourceTracker(maxAccurateSigops, maxSighashBytes);
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && nScriptCheckThreads ? &scriptcheckqueue : NULL);
 
     int64_t nTimeStart = GetTimeMicros();
@@ -1995,7 +2005,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
         nInputs += tx.vin.size();
         nSigOps += GetLegacySigOpCount(tx);
-        if (nSigOps > chainparams.GetConsensus().MaxBlockSigops(block.GetBlockTime(), sizeForkTime.load()))
+        if (nSigOps > chainparams.GetConsensus().MaxBlockLegacySigops(block.GetBlockTime(), sizeForkTime.load()))
             return state.DoS(100, error("ConnectBlock(): too many sigops"),
                              REJECT_INVALID, "bad-blk-sigops");
 
@@ -2011,7 +2021,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 // this is to prevent a "rogue miner" from creating
                 // an incredibly-expensive-to-validate block.
                 nSigOps += GetP2SHSigOpCount(tx, view);
-                if (nSigOps > chainparams.GetConsensus().MaxBlockSigops(block.GetBlockTime(), sizeForkTime.load()))
+                if (nSigOps > chainparams.GetConsensus().MaxBlockLegacySigops(block.GetBlockTime(), sizeForkTime.load()))
                     return state.DoS(100, error("ConnectBlock(): too many sigops"),
                                      REJECT_INVALID, "bad-blk-sigops");
             }
@@ -2875,7 +2885,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     {
         nSigOps += GetLegacySigOpCount(tx);
     }
-    if (nSigOps > Params().GetConsensus().MaxBlockSigops(block.GetBlockTime(), sizeForkTime.load()))
+    if (nSigOps > Params().GetConsensus().MaxBlockLegacySigops(block.GetBlockTime(), sizeForkTime.load()))
         return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"),
                          REJECT_INVALID, "bad-blk-sigops", true);
 

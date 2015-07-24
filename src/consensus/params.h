@@ -7,6 +7,7 @@
 #define BITCOIN_CONSENSUS_PARAMS_H
 
 #include "uint256.h"
+#include <limits>
 
 namespace Consensus {
 /**
@@ -53,10 +54,47 @@ struct Params {
         uint64_t nMaxSize = (nMaxSizeBase << doublings) + interpolate;
         return nMaxSize;
     }
-    /** Maximum number of signature ops in a block with timestamp nBlockTimestamp */
-    uint64_t MaxBlockSigops(uint64_t nBlockTimestamp, uint64_t nSizeForkActivationTime) const {
-        return MaxBlockSize(nBlockTimestamp, nSizeForkActivationTime)/50;
+
+    // Signature-operation-counting is a CPU exhaustion denial-of-service prevention
+    // measure. Prior to the maximum block size fork it was done in two different, ad-hoc,
+    // inaccurate ways.
+    // Post-fork it is done in an accurate way, counting how many ECDSA verify operations
+    // and how many bytes must be hashed to compute signature hashes to validate a block.
+
+    /** Pre-fork consensus rules use an inaccurate method of counting sigops **/
+    uint64_t MaxBlockLegacySigops(uint64_t nBlockTimestamp, uint64_t nSizeForkActivationTime) const {
+        if (nBlockTimestamp < nEarliestSizeForkTime || nBlockTimestamp < nSizeForkActivationTime)
+            return MaxBlockSize(nBlockTimestamp, nSizeForkActivationTime)/50;
+        return std::numeric_limits<uint64_t>::max(); // Post-fork uses accurate method
     }
+    //
+    // MaxBlockSize/100 was chosen for number of sigops (ECDSA verifications) because
+    // a single ECDSA signature verification requires a public key (33 bytes) plus
+    // a signature (~72 bytes), so allowing one sigop per 100 bytes should allow any
+    // reasonable set of transactions (but will prevent 'attack' transactions that
+    // just try to use as much CPU as possible in as few bytes as possible).
+    //
+    uint64_t MaxBlockAccurateSigops(uint64_t nBlockTimestamp, uint64_t nSizeForkActivationTime) const {
+        if (nBlockTimestamp < nEarliestSizeForkTime || nBlockTimestamp < nSizeForkActivationTime)
+            return std::numeric_limits<uint64_t>::max(); // Pre-fork doesn't care
+        return MaxBlockSize(nBlockTimestamp, nSizeForkActivationTime)/100;
+    }
+    //
+    // MaxBlockSize*160 was chosen for maximum number of bytes hashed so any possible
+    // non-attack one-megabyte-large transaction that might have been signed and
+    // saved before the fork could still be mined after the fork. A 5,000-SIGHASH_ALL-input,
+    // single-output, 999,000-byte transaction requires about 1.2 gigabytes of hashing
+    // to compute those 5,000 signature hashes.
+    //
+    // Note that such a transaction was, and is, considered "non-standard" because it is
+    // over 100,000 bytes big.
+    //
+    uint64_t MaxBlockSighashBytes(uint64_t nBlockTimestamp, uint64_t nSizeForkActivationTime) const {
+        if (nBlockTimestamp < nEarliestSizeForkTime || nBlockTimestamp < nSizeForkActivationTime)
+            return std::numeric_limits<uint64_t>::max(); // Pre-fork doesn't care
+        return MaxBlockSize(nBlockTimestamp, nSizeForkActivationTime)*160;
+    }
+
     int ActivateSizeForkMajority() const { return nActivateSizeForkMajority; }
     uint64_t SizeForkGracePeriod() const { return nSizeForkGracePeriod; }
 };
