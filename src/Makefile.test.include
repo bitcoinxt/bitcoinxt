@@ -40,6 +40,7 @@ BITCOIN_TESTS =\
   test/base58_tests.cpp \
   test/base64_tests.cpp \
   test/bip32_tests.cpp \
+  test/block_size_tests.cpp \
   test/bloom_tests.cpp \
   test/checkblock_tests.cpp \
   test/Checkpoints_tests.cpp \
@@ -59,6 +60,7 @@ BITCOIN_TESTS =\
   test/pmt_tests.cpp \
   test/policyestimator_tests.cpp \
   test/pow_tests.cpp \
+  test/ReceiveMsgBytes_tests.cpp \
   test/rpc_tests.cpp \
   test/sanity_tests.cpp \
   test/scheduler_tests.cpp \

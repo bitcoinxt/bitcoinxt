@@ -25,6 +25,55 @@ struct Params {
     int64_t nPowTargetSpacing;
     int64_t nPowTargetTimespan;
     int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
+
+    /** Maximum block size parameters */
+    uint32_t nMaxSizePreFork;
+    uint64_t nEarliestSizeForkTime;
+    uint32_t nSizeDoubleEpoch;
+    uint64_t nMaxSizeBase;
+    uint8_t nMaxSizeDoublings;
+    int nActivateSizeForkMajority;
+    uint64_t nSizeForkGracePeriod;
+
+    /** Maximum block size of a block with timestamp nBlockTimestamp */
+    uint64_t MaxBlockSize(uint64_t nBlockTimestamp, uint64_t nSizeForkActivationTime) const {
+        if (nBlockTimestamp < nEarliestSizeForkTime || nBlockTimestamp < nSizeForkActivationTime)
+            return nMaxSizePreFork;
+        if (nBlockTimestamp >= nEarliestSizeForkTime + nSizeDoubleEpoch * nMaxSizeDoublings)
+            return nMaxSizeBase << nMaxSizeDoublings;
+
+        // Piecewise-linear-between-doublings growth. Calculated based on a fixed
+        // timestamp and not the activation time so the maximum size is
+        // predictable, and so the activation time can be completely removed in
+        // a future version of this code after the fork is complete.
+        uint64_t timeDelta = nBlockTimestamp - nEarliestSizeForkTime;
+        uint64_t doublings = timeDelta / nSizeDoubleEpoch;
+        uint64_t remain = timeDelta % nSizeDoubleEpoch;
+        uint64_t interpolate = (nMaxSizeBase << doublings) * remain / nSizeDoubleEpoch;
+        uint64_t nMaxSize = (nMaxSizeBase << doublings) + interpolate;
+        return nMaxSize;
+    }
+    /** Pre-fork consensus rules use an inaccurate method of counting sigops **/
+    uint64_t MaxBlockLegacySigops(uint64_t nBlockTimestamp, uint64_t nSizeForkActivationTime) const {
+        if (nBlockTimestamp < nEarliestSizeForkTime || nBlockTimestamp < nSizeForkActivationTime)
+            return MaxBlockSize(nBlockTimestamp, nSizeForkActivationTime)/50;
+        return std::numeric_limits<uint64_t>::max(); // Post-fork uses accurate method
+    }
+    /** Post-fork consensus rule uses an accurate method of counting sigops **/
+    uint64_t MaxBlockAccurateSigops(uint64_t nBlockTimestamp, uint64_t nSizeForkActivationTime) const {
+        if (nBlockTimestamp < nEarliestSizeForkTime || nBlockTimestamp < nSizeForkActivationTime)
+            return std::numeric_limits<uint64_t>::max(); // Pre-fork doesn't care
+        return MaxBlockSize(nBlockTimestamp, nSizeForkActivationTime)/100;
+    }
+    /** Post-fork consensus rule to mitigate CVE-2013-2292 **/
+    uint64_t MaxBlockSighashBytes(uint64_t nBlockTimestamp, uint64_t nSizeForkActivationTime) const {
+        if (nBlockTimestamp < nEarliestSizeForkTime || nBlockTimestamp < nSizeForkActivationTime)
+            return std::numeric_limits<uint64_t>::max(); // Pre-fork doesn't care
+        return MaxBlockSize(nBlockTimestamp, nSizeForkActivationTime)*160;
+    }
+
+    int ActivateSizeForkMajority() const { return nActivateSizeForkMajority; }
+    uint64_t SizeForkGracePeriod() const { return nSizeForkGracePeriod; }
 };
 } // namespace Consensus
 

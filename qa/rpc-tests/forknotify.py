@@ -22,16 +22,29 @@ class ForkNotifyTest(BitcoinTestFramework):
         with open(self.alert_filename, 'w') as f:
             pass  # Just open then close to create zero-length file
         self.nodes.append(start_node(0, self.options.tmpdir,
-                            ["-blockversion=2", "-alertnotify=echo %s >> \"" + self.alert_filename + "\""]))
+                            ["-blockversion=3", "-alertnotify=echo %s >> \"" + self.alert_filename + "\""]))
         # Node1 mines block.version=211 blocks
         self.nodes.append(start_node(1, self.options.tmpdir,
                                 ["-blockversion=211"]))
         connect_nodes(self.nodes[1], 0)
 
+        # Node2 mines block.version=0x20000007 blocks
+        self.nodes.append(start_node(2, self.options.tmpdir,
+                            ["-blockversion=%d"%(0x20000007,)]))
+        connect_nodes(self.nodes[2], 0)
+
         self.is_network_split = False
         self.sync_all()
 
     def run_test(self):
+        # Should be no alerts if nodes 0 or 2 mine:
+        self.nodes[0].generate(1)
+        self.sync_all()
+        self.nodes[2].generate(1)
+        self.sync_all()
+        if os.stat(self.alert_filename).st_size > 0:
+            raise AssertionError("Erroneous up-version alert")
+
         # Mine 51 up-version blocks
         self.nodes[1].generate(51)
         self.sync_all()
