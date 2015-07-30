@@ -1857,7 +1857,7 @@ static int64_t nTimeCallbacks = 0;
 static int64_t nTimeTotal = 0;
 
 static bool DidBlockTriggerSizeFork(const CBlock &block, const CBlockIndex *pindex, const CChainParams &chainparams) {
-    return (block.nVersion & SIZE_FORK_VERSION) &&
+    return ((block.nVersion & SIZE_FORK_VERSION) == SIZE_FORK_VERSION) &&
            (pblocktree->ForkActivated(SIZE_FORK_VERSION) == uint256()) &&
            IsSuperMajority(SIZE_FORK_VERSION, pindex, chainparams.GetConsensus().ActivateSizeForkMajority(), chainparams.GetConsensus(), true /* use bitmask */);
 }
