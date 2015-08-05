@@ -14,7 +14,7 @@ from binascii import hexlify, unhexlify
 import cStringIO
 import time
 
-# A canonical signature consists of: 
+# A canonical signature consists of:
 # <30> <total len> <02> <len R> <R> <02> <len S> <S> <hashtype>
 def unDERify(tx):
     '''
@@ -29,7 +29,7 @@ def unDERify(tx):
         else:
             newscript.append(i)
     tx.vin[0].scriptSig = CScript(newscript)
-    
+
 '''
 This test is meant to exercise BIP66 (DER SIG).
 Connect to a single node.
@@ -43,7 +43,7 @@ Mine 1 old-version block.
 Mine 1 new version block.
 Mine 1 old version block, see that the node rejects.
 '''
-            
+
 class BIP66Test(ComparisonTestFramework):
 
     def __init__(self):
@@ -51,7 +51,7 @@ class BIP66Test(ComparisonTestFramework):
 
     def setup_network(self):
         # Must set the blockversion for this test
-        self.nodes = start_nodes(1, self.options.tmpdir, 
+        self.nodes = start_nodes(1, self.options.tmpdir,
                                  extra_args=[['-debug', '-whitelist=127.0.0.1', '-blockversion=2']],
                                  binary=[self.options.testbinary])
 
@@ -75,6 +75,7 @@ class BIP66Test(ComparisonTestFramework):
     def get_tests(self):
 
         self.coinbase_blocks = self.nodes[0].generate(2)
+        height = 3  # height of the next block to build
         self.tip = int ("0x" + self.nodes[0].getbestblockhash() + "L", 0)
         self.nodeaddress = self.nodes[0].getnewaddress()
         self.last_block_time = time.time()
@@ -82,28 +83,30 @@ class BIP66Test(ComparisonTestFramework):
         ''' 98 more version 2 blocks '''
         test_blocks = []
         for i in xrange(98):
-            block = create_block(self.tip, create_coinbase(2), self.last_block_time + 1)
+            block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
             block.nVersion = 2
             block.rehash()
             block.solve()
             test_blocks.append([block, True])
             self.last_block_time += 1
             self.tip = block.sha256
+            height += 1
         yield TestInstance(test_blocks, sync_every_block=False)
 
         ''' Mine 74 version 3 blocks '''
         test_blocks = []
         for i in xrange(74):
-            block = create_block(self.tip, create_coinbase(2), self.last_block_time + 1)
+            block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
             block.nVersion = 3
             block.rehash()
             block.solve()
             test_blocks.append([block, True])
             self.last_block_time += 1
             self.tip = block.sha256
+            height += 1
         yield TestInstance(test_blocks, sync_every_block=False)
 
-        ''' 
+        '''
         Check that the new DERSIG rules are not enforced in the 75th
         version 3 block.
         '''
@@ -112,7 +115,7 @@ class BIP66Test(ComparisonTestFramework):
         unDERify(spendtx)
         spendtx.rehash()
 
-        block = create_block(self.tip, create_coinbase(2), self.last_block_time + 1)
+        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
         block.nVersion = 3
         block.vtx.append(spendtx)
         block.hashMerkleRoot = block.calc_merkle_root()
@@ -121,9 +124,10 @@ class BIP66Test(ComparisonTestFramework):
 
         self.last_block_time += 1
         self.tip = block.sha256
+        height += 1
         yield TestInstance([[block, True]])
 
-        ''' 
+        '''
         Check that the new DERSIG rules are enforced in the 76th version 3
         block.
         '''
@@ -132,7 +136,7 @@ class BIP66Test(ComparisonTestFramework):
         unDERify(spendtx)
         spendtx.rehash()
 
-        block = create_block(self.tip, create_coinbase(1), self.last_block_time + 1)
+        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
         block.nVersion = 3
         block.vtx.append(spendtx)
         block.hashMerkleRoot = block.calc_merkle_root()
@@ -144,35 +148,38 @@ class BIP66Test(ComparisonTestFramework):
         ''' Mine 19 new version blocks on last valid tip '''
         test_blocks = []
         for i in xrange(19):
-            block = create_block(self.tip, create_coinbase(1), self.last_block_time + 1)
+            block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
             block.nVersion = 3
             block.rehash()
             block.solve()
             test_blocks.append([block, True])
             self.last_block_time += 1
             self.tip = block.sha256
+            height += 1
         yield TestInstance(test_blocks, sync_every_block=False)
 
         ''' Mine 1 old version block '''
-        block = create_block(self.tip, create_coinbase(1), self.last_block_time + 1)
+        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
         block.nVersion = 2
         block.rehash()
         block.solve()
         self.last_block_time += 1
         self.tip = block.sha256
+        height += 1
         yield TestInstance([[block, True]])
 
         ''' Mine 1 new version block '''
-        block = create_block(self.tip, create_coinbase(1), self.last_block_time + 1)
+        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
         block.nVersion = 3
         block.rehash()
         block.solve()
         self.last_block_time += 1
         self.tip = block.sha256
+        height += 1
         yield TestInstance([[block, True]])
 
         ''' Mine 1 old version block, should be invalid '''
-        block = create_block(self.tip, create_coinbase(1), self.last_block_time + 1)
+        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
         block.nVersion = 2
         block.rehash()
         block.solve()

@@ -27,7 +27,7 @@ if sys.version > '3':
 import copy
 import struct
 
-from .bignum import bn2vch
+from test_framework.bignum import bn2vch
 
 MAX_SCRIPT_SIZE = 10000
 MAX_SCRIPT_ELEMENT_SIZE = 520
