@@ -14,6 +14,7 @@
 #include "net.h"
 #include "ui_interface.h"
 #include "util.h"
+#include "options.h"
 
 #include <stdint.h>
 
@@ -175,6 +176,14 @@ PeerTableModel *ClientModel::getPeerTableModel()
 QString ClientModel::formatFullVersion() const
 {
     return QString::fromStdString(FormatFullVersion());
+}
+
+QString ClientModel::formatSubVersion() const
+{
+    return QString::fromStdString(XTSubVersion(GetNodeSignals().GetMaxBlockSizeInsecure().get(),
+                                               Opt().UserAgent(),
+                                               Opt().UAComment(),
+                                               Opt().HidePlatform()));
 }
 
 QString ClientModel::formatBuildDate() const
