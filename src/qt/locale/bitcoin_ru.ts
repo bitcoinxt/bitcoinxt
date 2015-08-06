@@ -283,8 +283,8 @@
         <translation>Открыть &amp;URI...</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
-        <translation>Bitcoin Core клиент</translation>
+        <source>Bitcoin XT client</source>
+        <translation>Bitcoin XT клиент</translation>
     </message>
     <message>
         <source>Importing blocks from disk...</source>
@@ -335,8 +335,8 @@
         <translation>&amp;Получить</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Core</source>
-        <translation>Показать информацию о Bitcoin Core</translation>
+        <source>Show information about Bitcoin XT</source>
+        <translation>Показать информацию о Bitcoin XT</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -375,16 +375,16 @@
         <translation>Панель вкладок</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>Request payments (generates QR codes and bitcoin: URIs)</source>
         <translation>Запросить платежи (создаёт QR-коды и bitcoin: ссылки)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
-        <translation>&amp;О Bitcoin Core</translation>
+        <source>&amp;About Bitcoin XT</source>
+        <translation>&amp;О Bitcoin XT</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -403,8 +403,8 @@
         <translation>&amp;Параметры командной строки</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
-        <translation>Показать помощь по Bitcoin Core и получить список доступных параметров командной строки.</translation>
+        <source>Show the Bitcoin XT help message to get a list with possible Bitcoin command-line options</source>
+        <translation>Показать помощь по Bitcoin XT и получить список доступных параметров командной строки.</translation>
     </message>
     <message>
         <source>No block source available...</source>
@@ -762,8 +762,8 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>version</source>
@@ -774,8 +774,8 @@
         <translation>(%1-бит)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
-        <translation>О Bitcoin Core</translation>
+        <source>About Bitcoin XT</source>
+        <translation>О Bitcoin XT</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -797,16 +797,16 @@
         <translation>Добро пожаловать</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
-        <translation>Добро пожаловать в Bitcoin Core.</translation>
+        <source>Welcome to Bitcoin XT.</source>
+        <translation>Добро пожаловать в Bitcoin XT.</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Core will store its data.</source>
-        <translation>Так как вы впервые запустили программу, вы можете выбрать, где Bitcoin Core будет хранить данные.</translation>
+        <source>As this is the first time the program is launched, you can choose where Bitcoin XT will store its data.</source>
+        <translation>Так как вы впервые запустили программу, вы можете выбрать, где Bitcoin XT будет хранить данные.</translation>
     </message>
     <message>
-        <source>Bitcoin Core will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
-        <translation>Bitcoin Core скачает и сохранит копию цепи блоков. Как минимум, %1ГБ данных будет храниться в этом каталоге, и со временем он будет расти. Бумажник будет также сохранён в этом каталоге.</translation>
+        <source>Bitcoin XT will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <translation>Bitcoin XT скачает и сохранит копию цепи блоков. Как минимум, %1ГБ данных будет храниться в этом каталоге, и со временем он будет расти. Бумажник будет также сохранён в этом каталоге.</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -817,8 +817,8 @@
         <translation>Использовать другой каталог данных:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>Error: Specified data directory "%1" cannot be created.</source>
@@ -1967,8 +1967,8 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
-        <translation>Bitcoin Core выключается...</translation>
+        <source>Bitcoin XT is shutting down...</source>
+        <translation>Bitcoin XT выключается...</translation>
     </message>
     <message>
         <source>Do not shut down the computer until this window disappears.</source>
@@ -2109,12 +2109,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
-        <translation>Разработчики Bitcoin Core</translation>
+        <source>The Bitcoin XT developers</source>
+        <translation>Разработчики Bitcoin XT</translation>
     </message>
     <message>
         <source>[testnet]</source>
@@ -2631,8 +2631,8 @@
         <translation>Это пре-релизная тестовая сборка - используйте на свой страх и риск - не используйте для добычи или торговых приложений</translation>
     </message>
     <message>
-        <source>Unable to bind to %s on this computer. Bitcoin Core is probably already running.</source>
-        <translation>Не удалось забиндиться на %s на этом компьютере. Возможно, Bitcoin Core уже запущен.</translation>
+        <source>Unable to bind to %s on this computer. Bitcoin XT is probably already running.</source>
+        <translation>Не удалось забиндиться на %s на этом компьютере. Возможно, Bitcoin XT уже запущен.</translation>
     </message>
     <message>
         <source>Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction.</source>
@@ -2807,8 +2807,8 @@
         <translation>Привязаться к указанному адресу для прослушивания JSON-RPC подключений. Используйте запись [хост]:порт для IPv6. Эту опцию можно использовать многократно (по умолчанию: привязываться ко всем интерфейсам)</translation>
     </message>
     <message>
-        <source>Cannot obtain a lock on data directory %s. Bitcoin Core is probably already running.</source>
-        <translation>Не удалось установить блокировку на каталог данных %s. Возможно, Bitcoin Core уже запущен.</translation>
+        <source>Cannot obtain a lock on data directory %s. Bitcoin XT is probably already running.</source>
+        <translation>Не удалось установить блокировку на каталог данных %s. Возможно, Bitcoin XT уже запущен.</translation>
     </message>
     <message>
         <source>Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)</source>
@@ -2887,8 +2887,8 @@ rpcpassword=%s
         <translation>Внимание: установлено очень большое значение -paytxfee. Такие большие комиссии могут быть уплачены в отдельной транзакции.</translation>
     </message>
     <message>
-        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin Core will not work properly.</source>
-        <translation>Внимание: убедитесь, что дата и время на Вашем компьютере выставлены верно. Если Ваши часы идут неправильно, Bitcoin Core будет работать некорректно.</translation>
+        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin XT will not work properly.</source>
+        <translation>Внимание: убедитесь, что дата и время на Вашем компьютере выставлены верно. Если Ваши часы идут неправильно, Bitcoin XT будет работать некорректно.</translation>
     </message>
     <message>
         <source>Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if they are already in the mempool, useful e.g. for a gateway</source>
@@ -2911,16 +2911,16 @@ rpcpassword=%s
         <translation>Подключаться через SOCKS5 прокси</translation>
     </message>
     <message>
-        <source>Copyright (C) 2009-%i The Bitcoin Core Developers</source>
-        <translation>Все права защищены © 2009-%i Разработчики Bitcoin Core</translation>
+        <source>Copyright (C) 2009-%i The Bitcoin XT Developers</source>
+        <translation>Все права защищены © 2009-%i Разработчики Bitcoin XT</translation>
     </message>
     <message>
         <source>Could not parse -rpcbind value %s as network address</source>
         <translation>Не удалось разобрать значение %s параметра -rpcbind как сетевой адрес</translation>
     </message>
     <message>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Core</source>
-        <translation>Ошибка загрузки wallet.dat: бумажник требует более новую версию Bitcoin Core</translation>
+        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin XT</source>
+        <translation>Ошибка загрузки wallet.dat: бумажник требует более новую версию Bitcoin XT</translation>
     </message>
     <message>
         <source>Error reading from database, shutting down.</source>
@@ -2939,8 +2939,8 @@ rpcpassword=%s
         <translation>Информация</translation>
     </message>
     <message>
-        <source>Initialization sanity check failed. Bitcoin Core is shutting down.</source>
-        <translation>Не удалось проверить чистоту. Bitcoin Core выключается.</translation>
+        <source>Initialization sanity check failed. Bitcoin XT is shutting down.</source>
+        <translation>Не удалось проверить чистоту. Bitcoin XT выключается.</translation>
     </message>
     <message>
         <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s'</source>
@@ -3055,8 +3055,8 @@ rpcpassword=%s
         <translation>Имя для подключений JSON-RPC</translation>
     </message>
     <message>
-        <source>Wallet needed to be rewritten: restart Bitcoin Core to complete</source>
-        <translation>Необходимо перезаписать бумажник, перезапустите Bitcoin Core для завершения операции.</translation>
+        <source>Wallet needed to be rewritten: restart Bitcoin XT to complete</source>
+        <translation>Необходимо перезаписать бумажник, перезапустите Bitcoin XT для завершения операции.</translation>
     </message>
     <message>
         <source>Warning</source>

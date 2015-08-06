@@ -160,7 +160,7 @@
         <translation>آیا مطمئن هستید که می‌خواهید کیف پول خود را رمزنگاری کنید؟</translation>
     </message>
     <message>
-        <source>Bitcoin Core will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
+        <source>Bitcoin XT will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
         <translation>هسته بیت‌کوین هم اکنون بسته می‌شود تا فرایند رمزگذاری را تمام کند. به خاطر داشته باشید که رمزگذاری کردن کیف پول‌تان نمی‌تواند به طور کامل بیت‌کوین‌های شما را در برابر دزدیده شدن توسط بدافزارهایی که رایانه‌ی شما را آلوده می‌کنند، محافظت نماید.</translation>
     </message>
     <message>
@@ -347,11 +347,11 @@
         <translation>نوارابزار برگه‌ها</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation> هسته Bitcoin </translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
+        <source>&amp;About Bitcoin XT</source>
         <translation>درباره هسته ی بیت کوین</translation>
     </message>
     <message numerus="yes">
@@ -614,7 +614,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation> هسته Bitcoin </translation>
     </message>
     <message>
@@ -649,7 +649,7 @@
         <translation>استفاده از یک مسیر سفارشی:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation> هسته Bitcoin </translation>
     </message>
     <message>
@@ -1285,11 +1285,11 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation> هسته Bitcoin </translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
+        <source>The Bitcoin XT developers</source>
         <translation>توسعه‌دهندگان هسته بیت‌کوین</translation>
     </message>
     <message>
@@ -1787,7 +1787,7 @@
         <translation>در حال بازبینی کیف پول...</translation>
     </message>
     <message>
-        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin Core will not work properly.</source>
+        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin XT will not work properly.</source>
         <translation>هشدار: تاریخ و ساعت کامپیوتر خود را بررسی کنید. اگر ساعت درست نباشد هسته بیت‌کوین به درستی کار نخواهد کرد.</translation>
     </message>
     <message>

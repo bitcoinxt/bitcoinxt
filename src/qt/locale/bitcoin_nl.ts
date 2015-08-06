@@ -168,8 +168,8 @@
         <translation>Weet u zeker dat u uw portemonnee wilt versleutelen?</translation>
     </message>
     <message>
-        <source>Bitcoin Core will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
-        <translation>Bitcoin Core zal nu afsluiten om het versleutelingsproces te voltooien. Hou er rekening mee dat versleuteling van je portemonnee je niet volledig beschermt tegen diefstal van jouw bitcoins door malware op je computer.</translation>
+        <source>Bitcoin XT will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
+        <translation>Bitcoin XT zal nu afsluiten om het versleutelingsproces te voltooien. Hou er rekening mee dat versleuteling van je portemonnee je niet volledig beschermt tegen diefstal van jouw bitcoins door malware op je computer.</translation>
     </message>
     <message>
         <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
@@ -295,7 +295,7 @@
         <translation>Open &amp;URI...</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
+        <source>Bitcoin XT client</source>
         <translation>Bitcoin Kern applicatie</translation>
     </message>
     <message>
@@ -347,7 +347,7 @@
         <translation>&amp;Ontvangen</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Core</source>
+        <source>Show information about Bitcoin XT</source>
         <translation>Toon informatie over bitcoin kern</translation>
     </message>
     <message>
@@ -387,7 +387,7 @@
         <translation>Tab-werkbalk</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Bitcoin Kern</translation>
     </message>
     <message>
@@ -395,8 +395,8 @@
         <translation>Vraag betaling aan (genereert QR codes en bitcoin: URIs)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
-        <translation>&amp;Over Bitcoin Core</translation>
+        <source>&amp;About Bitcoin XT</source>
+        <translation>&amp;Over Bitcoin XT</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -415,8 +415,8 @@
         <translation>&amp;Commandoregel-opties</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
-        <translation>Toon het Bitcoin Core hulpbericht om een lijst te krijgen met mogelijke Bitcoin commandoregelopties</translation>
+        <source>Show the Bitcoin XT help message to get a list with possible Bitcoin command-line options</source>
+        <translation>Toon het Bitcoin XT hulpbericht om een lijst te krijgen met mogelijke Bitcoin commandoregelopties</translation>
     </message>
     <message numerus="yes">
         <source>%n active connection(s) to Bitcoin network</source>
@@ -840,7 +840,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Bitcoin Kern</translation>
     </message>
     <message>
@@ -852,8 +852,8 @@
         <translation>(%1-bit)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
-        <translation>Over Bitcoin Core</translation>
+        <source>About Bitcoin XT</source>
+        <translation>Over Bitcoin XT</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -875,16 +875,16 @@
         <translation>Welkom</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
-        <translation>Welkom bij Bitcoin Core</translation>
+        <source>Welcome to Bitcoin XT.</source>
+        <translation>Welkom bij Bitcoin XT</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Core will store its data.</source>
-        <translation>Omdat dit de eerste keer is dat het programma gestart is, kunt u nu kiezen waar Bitcoin Core de data moet opslaan.</translation>
+        <source>As this is the first time the program is launched, you can choose where Bitcoin XT will store its data.</source>
+        <translation>Omdat dit de eerste keer is dat het programma gestart is, kunt u nu kiezen waar Bitcoin XT de data moet opslaan.</translation>
     </message>
     <message>
-        <source>Bitcoin Core will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
-        <translation>Bitcoin Core zal een kopie van de Bitcoin blokketen downloaden en opslaan. Tenminste %1 GB aan data wordt opgeslagen in deze map en het zal groeien in de tijd. De portemonnee wordt ook in deze map opgeslagen.</translation>
+        <source>Bitcoin XT will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <translation>Bitcoin XT zal een kopie van de Bitcoin blokketen downloaden en opslaan. Tenminste %1 GB aan data wordt opgeslagen in deze map en het zal groeien in de tijd. De portemonnee wordt ook in deze map opgeslagen.</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -895,7 +895,7 @@
         <translation>Gebruik een persoonlijke gegevensmap:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Bitcoin Kern</translation>
     </message>
     <message>
@@ -973,7 +973,7 @@
         <translation>IP-adres van de proxy (bijv. IPv4: 127.0.0.1 / IPv6: ::1)</translation>
     </message>
     <message>
-        <source>The user interface language can be set here. This setting will take effect after restarting Bitcoin Core.</source>
+        <source>The user interface language can be set here. This setting will take effect after restarting Bitcoin XT.</source>
         <translation>Stel hier de taal van de applicatie in. Deze instelling zal van kracht worden na het herstarten van de applicatie.</translation>
     </message>
     <message>
@@ -1001,11 +1001,11 @@
         <translation>&amp;Netwerk</translation>
     </message>
     <message>
-        <source>Automatically start Bitcoin Core after logging in to the system.</source>
+        <source>Automatically start Bitcoin XT after logging in to the system.</source>
         <translation>Bitcoin Kern automatisch starten bij inloggen.</translation>
     </message>
     <message>
-        <source>&amp;Start Bitcoin Core on system login</source>
+        <source>&amp;Start Bitcoin XT on system login</source>
         <translation>&amp;Start Bitcoin Kern tijdens login.</translation>
     </message>
     <message>
@@ -2069,8 +2069,8 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
-        <translation>Bitcoin Core is aan het afsluiten...</translation>
+        <source>Bitcoin XT is shutting down...</source>
+        <translation>Bitcoin XT is aan het afsluiten...</translation>
     </message>
     <message>
         <source>Do not shut down the computer until this window disappears.</source>
@@ -2211,12 +2211,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Bitcoin Kern</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
-        <translation>De Bitcoin Core ontwikkelaars</translation>
+        <source>The Bitcoin XT developers</source>
+        <translation>De Bitcoin XT ontwikkelaars</translation>
     </message>
     <message>
         <source>[testnet]</source>
@@ -2753,8 +2753,8 @@
         <translation>Dit is een pre-release testversie - gebruik op eigen risico! Gebruik deze niet voor het delven van munten of handelsdoeleinden</translation>
     </message>
     <message>
-        <source>Unable to bind to %s on this computer. Bitcoin Core is probably already running.</source>
-        <translation>Niet in staat om %s te verbinden op deze computer. Bitcoin Core draait waarschijnlijk al.</translation>
+        <source>Unable to bind to %s on this computer. Bitcoin XT is probably already running.</source>
+        <translation>Niet in staat om %s te verbinden op deze computer. Bitcoin XT draait waarschijnlijk al.</translation>
     </message>
     <message>
         <source>Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction.</source>
@@ -2929,8 +2929,8 @@
         <translation>Bind aan gegeven adres om te luisteren voor JSON-RPC verbindingen. Gebruik [host]:poort notatie voor IPv6. Deze optie kan meerdere keren gespecificeerd worden (standaard: bind aan alle interfaces.</translation>
     </message>
     <message>
-        <source>Cannot obtain a lock on data directory %s. Bitcoin Core is probably already running.</source>
-        <translation>Kan geen lock verkrijgen op gegevensmap %s. Bitcoin Core draait waarschijnlijk al.</translation>
+        <source>Cannot obtain a lock on data directory %s. Bitcoin XT is probably already running.</source>
+        <translation>Kan geen lock verkrijgen op gegevensmap %s. Bitcoin XT draait waarschijnlijk al.</translation>
     </message>
     <message>
         <source>Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)</source>
@@ -2986,8 +2986,8 @@
         <translation>Let op: -maxtxfee is erg hoog ingesteld! Transactiekosten van dergelijke groottes kunnen in een enkele transactie worden betaald.</translation>
     </message>
     <message>
-        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin Core will not work properly.</source>
-        <translation>Waarschuwing: Controleer dat de datum en tijd van uw computer correct zijn ingesteld! Bij een onjuist ingestelde klok zal Bitcoin Core niet goed werken.</translation>
+        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin XT will not work properly.</source>
+        <translation>Waarschuwing: Controleer dat de datum en tijd van uw computer correct zijn ingesteld! Bij een onjuist ingestelde klok zal Bitcoin XT niet goed werken.</translation>
     </message>
     <message>
         <source>Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if they are already in the mempool, useful e.g. for a gateway</source>
@@ -3010,16 +3010,16 @@
         <translation>Verbind door SOCKS5 proxy</translation>
     </message>
     <message>
-        <source>Copyright (C) 2009-%i The Bitcoin Core Developers</source>
-        <translation>Auteursrecht (C) 2009-%i De Bitcoin Core Ontwikkelaars</translation>
+        <source>Copyright (C) 2009-%i The Bitcoin XT Developers</source>
+        <translation>Auteursrecht (C) 2009-%i De Bitcoin XT Ontwikkelaars</translation>
     </message>
     <message>
         <source>Could not parse -rpcbind value %s as network address</source>
         <translation>Niet mogelijk om -rpcbind waarde %s te verwerken als netwerk adres</translation>
     </message>
     <message>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Core</source>
-        <translation>Fout bij laden wallet.dat: Portemonnee vereist een nieuwere versie van Bitcoin Core</translation>
+        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin XT</source>
+        <translation>Fout bij laden wallet.dat: Portemonnee vereist een nieuwere versie van Bitcoin XT</translation>
     </message>
     <message>
         <source>Error reading from database, shutting down.</source>
@@ -3038,8 +3038,8 @@
         <translation>Informatie</translation>
     </message>
     <message>
-        <source>Initialization sanity check failed. Bitcoin Core is shutting down.</source>
-        <translation>Initialisatie sanity check mislukt. Bitcoin Core is aan het afsluiten.</translation>
+        <source>Initialization sanity check failed. Bitcoin XT is shutting down.</source>
+        <translation>Initialisatie sanity check mislukt. Bitcoin XT is aan het afsluiten.</translation>
     </message>
     <message>
         <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s'</source>
@@ -3154,8 +3154,8 @@
         <translation>Gebruikersnaam voor JSON-RPC-verbindingen</translation>
     </message>
     <message>
-        <source>Wallet needed to be rewritten: restart Bitcoin Core to complete</source>
-        <translation>Portemonnee moest herschreven worden: Herstart Bitcoin Core om te voltooien</translation>
+        <source>Wallet needed to be rewritten: restart Bitcoin XT to complete</source>
+        <translation>Portemonnee moest herschreven worden: Herstart Bitcoin XT om te voltooien</translation>
     </message>
     <message>
         <source>Warning</source>

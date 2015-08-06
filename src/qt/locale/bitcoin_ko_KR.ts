@@ -275,7 +275,7 @@
         <translation>URI&amp;열기...</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
+        <source>Bitcoin XT client</source>
         <translation>비트코인 코어 클라이언트</translation>
     </message>
     <message>
@@ -327,7 +327,7 @@
         <translation>받기(&amp;R)</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Core</source>
+        <source>Show information about Bitcoin XT</source>
         <translation>비트코인 코어에 관한 정보입니다.</translation>
     </message>
     <message>
@@ -367,7 +367,7 @@
         <translation>툴바 색인표</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>비트코인 코어</translation>
     </message>
     <message>
@@ -375,7 +375,7 @@
         <translation>지불 요청하기 (QR코드와 비트코인이 생성됩니다: URIs)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
+        <source>&amp;About Bitcoin XT</source>
         <translation>&amp;비트코인 코어 소개</translation>
     </message>
     <message>
@@ -395,7 +395,7 @@
         <translation>명령어-라인 옵션</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
+        <source>Show the Bitcoin XT help message to get a list with possible Bitcoin command-line options</source>
         <translation>사용할 수 있는 비트코인 명령어 옵션 목록을 가져오기 위해 Bitcoin-Qt 도움말 메시지를 표시합니다.</translation>
     </message>
     <message>
@@ -730,7 +730,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>비트코인 코어</translation>
     </message>
     <message>
@@ -742,7 +742,7 @@
         <translation>(%1-비트)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
+        <source>About Bitcoin XT</source>
         <translation>비트코인 코어 소개</translation>
     </message>
     <message>
@@ -765,15 +765,15 @@
         <translation>환영합니다</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
+        <source>Welcome to Bitcoin XT.</source>
         <translation>비트코인 코어에 오신것을 환영합니.</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Core will store its data.</source>
+        <source>As this is the first time the program is launched, you can choose where Bitcoin XT will store its data.</source>
         <translation>프로그램이 처음으로 실행되고 있습니다. 비트코인 코어가 어디에 데이터를 저장할지 선택할 수 있습니다. </translation>
     </message>
     <message>
-        <source>Bitcoin Core will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <source>Bitcoin XT will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
         <translation>비트코인 코어가 블럭체인의 복사본을 다운로드 저장합니다. 적어도 %1GB의 데이터가 이 폴더에 저장되며 시간이 경과할수록 점차 증가합니다. 그리고 지갑 또한 이 폴더에 저장됩니다. </translation>
     </message>
     <message>
@@ -785,7 +785,7 @@
         <translation>커스텀 데이터 폴더 사용:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>비트코인 코어</translation>
     </message>
     <message>
@@ -1615,7 +1615,7 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
+        <source>Bitcoin XT is shutting down...</source>
         <translation>비트코인코어가 닫아지고 있습니다</translation>
     </message>
     <message>
@@ -1749,11 +1749,11 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>비트코인 코어</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
+        <source>The Bitcoin XT developers</source>
         <translation>비트코인코어 개발자들</translation>
     </message>
     <message>
@@ -2367,7 +2367,7 @@
         <translation>외부 blk000??.dat 파일에서 블록을 가져옵니다.</translation>
     </message>
     <message>
-        <source>Cannot obtain a lock on data directory %s. Bitcoin Core is probably already running.</source>
+        <source>Cannot obtain a lock on data directory %s. Bitcoin XT is probably already running.</source>
         <translation>데이터 디렉토리 %s에 락을 걸 수 없었습니다. 비트코인 코어가 이미 실행 중인 것으로 보입니다.</translation>
     </message>
     <message>

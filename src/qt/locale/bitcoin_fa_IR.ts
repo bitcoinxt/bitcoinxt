@@ -652,7 +652,7 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
+        <source>Bitcoin XT is shutting down...</source>
         <translation>هسته بیت کوین در حال خاموش شدن است...</translation>
     </message>
     <message>

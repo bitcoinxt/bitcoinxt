@@ -168,8 +168,8 @@
         <translation>Sind Sie sich sicher, dass Sie Ihre Wallet verschlüsseln möchten?</translation>
     </message>
     <message>
-        <source>Bitcoin Core will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
-        <translation>Bitcoin Core wird jetzt beendet, um den Verschlüsselungsprozess abzuschließen. Vergessen Sie nicht, dass eine Wallet-Verschlüsselung nicht vollständig vor Diebstahl Ihrer Bitcoins durch Schadsoftware schützen kann, die Ihren Computer infiziert.</translation>
+        <source>Bitcoin XT will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
+        <translation>Bitcoin XT wird jetzt beendet, um den Verschlüsselungsprozess abzuschließen. Vergessen Sie nicht, dass eine Wallet-Verschlüsselung nicht vollständig vor Diebstahl Ihrer Bitcoins durch Schadsoftware schützen kann, die Ihren Computer infiziert.</translation>
     </message>
     <message>
         <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
@@ -295,8 +295,8 @@
         <translation>&amp;URI öffnen...</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
-        <translation>"Bitcoin Core"-Client</translation>
+        <source>Bitcoin XT client</source>
+        <translation>"Bitcoin XT"-Client</translation>
     </message>
     <message>
         <source>Importing blocks from disk...</source>
@@ -347,8 +347,8 @@
         <translation>&amp;Empfangen</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Core</source>
-        <translation>Informationen über Bitcoin Core anzeigen</translation>
+        <source>Show information about Bitcoin XT</source>
+        <translation>Informationen über Bitcoin XT anzeigen</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -387,20 +387,20 @@
         <translation>Registerkartenleiste</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>Request payments (generates QR codes and bitcoin: URIs)</source>
         <translation>Zahlungen anfordern (erzeugt QR-Codes und "bitcoin:"-URIs)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
-        <translation>&amp;Über Bitcoin Core</translation>
+        <source>&amp;About Bitcoin XT</source>
+        <translation>&amp;Über Bitcoin XT</translation>
     </message>
     <message>
-        <source>Modify configuration options for Bitcoin Core</source>
-        <translation>Konfiguration von Bitcoin Core bearbeiten</translation>
+        <source>Modify configuration options for Bitcoin XT</source>
+        <translation>Konfiguration von Bitcoin XT bearbeiten</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -419,8 +419,8 @@
         <translation>&amp;Kommandozeilenoptionen</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
-        <translation>Zeige den "Bitcoin Core"-Hilfetext, um eine Liste mit möglichen Kommandozeilenoptionen zu erhalten</translation>
+        <source>Show the Bitcoin XT help message to get a list with possible Bitcoin command-line options</source>
+        <translation>Zeige den "Bitcoin XT"-Hilfetext, um eine Liste mit möglichen Kommandozeilenoptionen zu erhalten</translation>
     </message>
     <message numerus="yes">
         <source>%n active connection(s) to Bitcoin network</source>
@@ -844,8 +844,8 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>version</source>
@@ -856,8 +856,8 @@
         <translation>(%1-Bit)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
-        <translation>Über Bitcoin Core</translation>
+        <source>About Bitcoin XT</source>
+        <translation>Über Bitcoin XT</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -879,16 +879,16 @@
         <translation>Willkommen</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
-        <translation>Willkommen zu Bitcoin Core.</translation>
+        <source>Welcome to Bitcoin XT.</source>
+        <translation>Willkommen zu Bitcoin XT.</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Core will store its data.</source>
-        <translation>Da Sie das Programm gerade zum ersten Mal starten, können Sie nun auswählen wo Bitcoin Core seine Daten ablegen soll.</translation>
+        <source>As this is the first time the program is launched, you can choose where Bitcoin XT will store its data.</source>
+        <translation>Da Sie das Programm gerade zum ersten Mal starten, können Sie nun auswählen wo Bitcoin XT seine Daten ablegen soll.</translation>
     </message>
     <message>
-        <source>Bitcoin Core will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
-        <translation>Bitcoin Core wird eine Kopie der Blockkette herunterladen und speichern. Mindestens %1GB Daten werden in diesem Verzeichnis abgelegt und die Datenmenge wächst über die Zeit an. Auch die Wallet wird in diesem Verzeichnis abgelegt.</translation>
+        <source>Bitcoin XT will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <translation>Bitcoin XT wird eine Kopie der Blockkette herunterladen und speichern. Mindestens %1GB Daten werden in diesem Verzeichnis abgelegt und die Datenmenge wächst über die Zeit an. Auch die Wallet wird in diesem Verzeichnis abgelegt.</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -899,8 +899,8 @@
         <translation>Ein benutzerdefiniertes Datenverzeichnis verwenden:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>Error: Specified data directory "%1" cannot be created.</source>
@@ -981,8 +981,8 @@
         <translation>Minimiert die Anwendung anstatt sie zu beenden wenn das Fenster geschlossen wird. Wenn dies aktiviert ist, müssen Sie die Anwendung über "Beenden" im Menü schließen.</translation>
     </message>
     <message>
-        <source>The user interface language can be set here. This setting will take effect after restarting Bitcoin Core.</source>
-        <translation>Legt die Sprache der Benutzeroberfläche fest. Diese Einstellung wird erst nach einem Neustart von Bitcoin Core aktiv.</translation>
+        <source>The user interface language can be set here. This setting will take effect after restarting Bitcoin XT.</source>
+        <translation>Legt die Sprache der Benutzeroberfläche fest. Diese Einstellung wird erst nach einem Neustart von Bitcoin XT aktiv.</translation>
     </message>
     <message>
         <source>Third party URLs (e.g. a block explorer) that appear in the transactions tab as context menu items. %s in the URL is replaced by transaction hash. Multiple URLs are separated by vertical bar |.</source>
@@ -1009,12 +1009,12 @@
         <translation>&amp;Netzwerk</translation>
     </message>
     <message>
-        <source>Automatically start Bitcoin Core after logging in to the system.</source>
-        <translation>Bitcoin Core nach der Anmeldung am System automatisch starten.</translation>
+        <source>Automatically start Bitcoin XT after logging in to the system.</source>
+        <translation>Bitcoin XT nach der Anmeldung am System automatisch starten.</translation>
     </message>
     <message>
-        <source>&amp;Start Bitcoin Core on system login</source>
-        <translation>&amp;Bitcoin Core nach Systemanmeldung starten</translation>
+        <source>&amp;Start Bitcoin XT on system login</source>
+        <translation>&amp;Bitcoin XT nach Systemanmeldung starten</translation>
     </message>
     <message>
         <source>(0 = auto, &lt;0 = leave that many cores free)</source>
@@ -1443,8 +1443,8 @@
         <translation>Aktuelle Anzahl Blöcke</translation>
     </message>
     <message>
-        <source>Open the Bitcoin Core debug log file from the current data directory. This can take a few seconds for large log files.</source>
-        <translation>Öffnet die "Bitcoin Core"-Debugprotokolldatei aus dem aktuellen Datenverzeichnis. Dies kann bei großen Protokolldateien einige Sekunden dauern.</translation>
+        <source>Open the Bitcoin XT debug log file from the current data directory. This can take a few seconds for large log files.</source>
+        <translation>Öffnet die "Bitcoin XT"-Debugprotokolldatei aus dem aktuellen Datenverzeichnis. Dies kann bei großen Protokolldateien einige Sekunden dauern.</translation>
     </message>
     <message>
         <source>Received</source>
@@ -1563,8 +1563,8 @@
         <translation>Konsole zurücksetzen</translation>
     </message>
     <message>
-        <source>Welcome to the Bitcoin Core RPC console.</source>
-        <translation>Willkommen in der "Bitcoin Core"-RPC-Konsole.</translation>
+        <source>Welcome to the Bitcoin XT RPC console.</source>
+        <translation>Willkommen in der "Bitcoin XT"-RPC-Konsole.</translation>
     </message>
     <message>
         <source>Use up and down arrows to navigate history, and &lt;b&gt;Ctrl-L&lt;/b&gt; to clear screen.</source>
@@ -2141,8 +2141,8 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
-        <translation>Bitcoin Core wird beendet...</translation>
+        <source>Bitcoin XT is shutting down...</source>
+        <translation>Bitcoin XT wird beendet...</translation>
     </message>
     <message>
         <source>Do not shut down the computer until this window disappears.</source>
@@ -2291,12 +2291,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
-        <translation>Die "Bitcoin Core"-Entwickler</translation>
+        <source>The Bitcoin XT developers</source>
+        <translation>Die "Bitcoin XT"-Entwickler</translation>
     </message>
     <message>
         <source>[testnet]</source>
@@ -2845,8 +2845,8 @@
         <translation>Dies ist eine Vorab-Testversion - Verwendung auf eigene Gefahr - nicht für Mining- oder Handelsanwendungen nutzen!</translation>
     </message>
     <message>
-        <source>Unable to bind to %s on this computer. Bitcoin Core is probably already running.</source>
-        <translation>Kann auf diesem Computer nicht an %s binden, da Bitcoin Core wahrscheinlich bereits gestartet wurde.</translation>
+        <source>Unable to bind to %s on this computer. Bitcoin XT is probably already running.</source>
+        <translation>Kann auf diesem Computer nicht an %s binden, da Bitcoin XT wahrscheinlich bereits gestartet wurde.</translation>
     </message>
     <message>
         <source>Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction.</source>
@@ -3033,8 +3033,8 @@
         <translation>An die angegebene Adresse binden und nach eingehenden JSON-RPC-Verbindungen abhören. Für IPv6 "[Host]:Port"-Notation verwenden. Kann mehrmals angegeben werden. (Standard: an alle Schnittstellen binden)</translation>
     </message>
     <message>
-        <source>Cannot obtain a lock on data directory %s. Bitcoin Core is probably already running.</source>
-        <translation>Datenverzeichnis %s kann nicht gesperrt werden, da Bitcoin Core wahrscheinlich bereits gestartet wurde.</translation>
+        <source>Cannot obtain a lock on data directory %s. Bitcoin XT is probably already running.</source>
+        <translation>Datenverzeichnis %s kann nicht gesperrt werden, da Bitcoin XT wahrscheinlich bereits gestartet wurde.</translation>
     </message>
     <message>
         <source>Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)</source>
@@ -3129,8 +3129,8 @@ Beispiel: alertnotify=echo %%s | mail -s "Bitcoin Alert" admin@foo.com
         <translation>Warnung: -maxtxfee ist auf einen sehr hohen Wert festgelegt! Gebühren dieser Höhe könnten für eine einzelne Transaktion bezahlt werden.</translation>
     </message>
     <message>
-        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin Core will not work properly.</source>
-        <translation>Warnung: Bitte korrigieren Sie die Datums- und Uhrzeiteinstellungen Ihres Computers, da Bitcoin Core ansonsten nicht ordnungsgemäß funktionieren wird.</translation>
+        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin XT will not work properly.</source>
+        <translation>Warnung: Bitte korrigieren Sie die Datums- und Uhrzeiteinstellungen Ihres Computers, da Bitcoin XT ansonsten nicht ordnungsgemäß funktionieren wird.</translation>
     </message>
     <message>
         <source>Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if they are already in the mempool, useful e.g. for a gateway</source>
@@ -3169,16 +3169,16 @@ Beispiel: alertnotify=echo %%s | mail -s "Bitcoin Alert" admin@foo.com
         <translation>Über einen SOCKS5-Proxy &amp;verbinden</translation>
     </message>
     <message>
-        <source>Copyright (C) 2009-%i The Bitcoin Core Developers</source>
-        <translation>Urheberrecht (C) 2009-%i Die "Bitcoin Core"-Entwickler</translation>
+        <source>Copyright (C) 2009-%i The Bitcoin XT Developers</source>
+        <translation>Urheberrecht (C) 2009-%i Die "Bitcoin XT"-Entwickler</translation>
     </message>
     <message>
         <source>Could not parse -rpcbind value %s as network address</source>
         <translation>Der Wert %s von -rpcbind wurde nicht als Netzwerkadresse erkannt</translation>
     </message>
     <message>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Core</source>
-        <translation>Fehler beim Laden von wallet.dat: Wallet benötigt neuere Version von Bitcoin Core</translation>
+        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin XT</source>
+        <translation>Fehler beim Laden von wallet.dat: Wallet benötigt neuere Version von Bitcoin XT</translation>
     </message>
     <message>
         <source>Error reading from database, shutting down.</source>
@@ -3197,8 +3197,8 @@ Beispiel: alertnotify=echo %%s | mail -s "Bitcoin Alert" admin@foo.com
         <translation>Hinweis</translation>
     </message>
     <message>
-        <source>Initialization sanity check failed. Bitcoin Core is shutting down.</source>
-        <translation>Initialisierungsplausibilitätsprüfung fehlgeschlagen. Bitcoin Core wird beendet.</translation>
+        <source>Initialization sanity check failed. Bitcoin XT is shutting down.</source>
+        <translation>Initialisierungsplausibilitätsprüfung fehlgeschlagen. Bitcoin XT wird beendet.</translation>
     </message>
     <message>
         <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s'</source>
@@ -3325,8 +3325,8 @@ Beispiel: alertnotify=echo %%s | mail -s "Bitcoin Alert" admin@foo.com
         <translation>Benutzername für JSON-RPC-Verbindungen</translation>
     </message>
     <message>
-        <source>Wallet needed to be rewritten: restart Bitcoin Core to complete</source>
-        <translation>Wallet musste neu geschrieben werden: starten Sie Bitcoin Core zur Fertigstellung neu</translation>
+        <source>Wallet needed to be rewritten: restart Bitcoin XT to complete</source>
+        <translation>Wallet musste neu geschrieben werden: starten Sie Bitcoin XT zur Fertigstellung neu</translation>
     </message>
     <message>
         <source>Warning</source>

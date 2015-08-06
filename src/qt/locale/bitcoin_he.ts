@@ -283,7 +283,7 @@
         <translation>פתיחת &amp;כתובת משאב…</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
+        <source>Bitcoin XT client</source>
         <translation>לקוח ליבה של ביטקוין</translation>
     </message>
     <message>
@@ -335,7 +335,7 @@
         <translation>&amp;קבלה</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Core</source>
+        <source>Show information about Bitcoin XT</source>
         <translation>הצגת מידע על ליבת ביטקוין</translation>
     </message>
     <message>
@@ -375,7 +375,7 @@
         <translation>סרגל כלים לשוניות</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>ליבת ביטקוין</translation>
     </message>
     <message>
@@ -383,7 +383,7 @@
         <translation>בקשת תשלומים (יצירה של קודים מסוג QR וסכימות כתובות משאב של :bitcoin)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
+        <source>&amp;About Bitcoin XT</source>
         <translation>על &amp;אודות ליבת ביטקוין</translation>
     </message>
     <message>
@@ -403,7 +403,7 @@
         <translation>אפשרויות &amp;שורת הפקודה</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
+        <source>Show the Bitcoin XT help message to get a list with possible Bitcoin command-line options</source>
         <translation>הצגת הודעות העזרה של ליבת ביטקוין כדי לקבל רשימה עם אפשרויות שורת הפקודה האפשריות של ביטקוין</translation>
     </message>
     <message>
@@ -742,7 +742,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>ליבת ביטקוין</translation>
     </message>
     <message>
@@ -754,7 +754,7 @@
         <translation>(%1-סיביות)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
+        <source>About Bitcoin XT</source>
         <translation>על אודות ליבת ביטקוין</translation>
     </message>
     <message>
@@ -777,15 +777,15 @@
         <translation>ברוך בואך</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
+        <source>Welcome to Bitcoin XT.</source>
         <translation>ברוך בואך לליבת ביטקוין</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Core will store its data.</source>
+        <source>As this is the first time the program is launched, you can choose where Bitcoin XT will store its data.</source>
         <translation>מכיוון שזאת הפעם הראשונה שהתכנית פועלת ניתן לבחור איפה ליבת ביטקוין תאחסן את הנתונים שלה.</translation>
     </message>
     <message>
-        <source>Bitcoin Core will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <source>Bitcoin XT will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
         <translation>לקוח ביטקוין יוריד וישמור העתק של שרשרת המקטעים של ביטקוין. לפחות %1 ג״ב מהנתונים יאוחסנו בתיקייה זו, והיא תגדל עם הזמן. הארנק גם יאוחסן בתיקייה הזו.</translation>
     </message>
     <message>
@@ -797,7 +797,7 @@
         <translation>שימוש בתיקיית נתונים מותאמת אישית:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>ליבת ביטקוין</translation>
     </message>
     <message>
@@ -1859,7 +1859,7 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
+        <source>Bitcoin XT is shutting down...</source>
         <translation>ליבת ביטקוין נסגרת…</translation>
     </message>
     <message>
@@ -2001,11 +2001,11 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>ליבת ביטקוין</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
+        <source>The Bitcoin XT developers</source>
         <translation>מתכנתי ליבת ביטקוין</translation>
     </message>
     <message>
@@ -2519,7 +2519,7 @@
         <translation>זוהי בניית ניסיון טרום-שחרור - השימוש בה על אחריותך - אין להשתמש לצורך כריה או יישומי מסחר</translation>
     </message>
     <message>
-        <source>Unable to bind to %s on this computer. Bitcoin Core is probably already running.</source>
+        <source>Unable to bind to %s on this computer. Bitcoin XT is probably already running.</source>
         <translation>לא ניתן להתאגד אל %s במחשב זה. כנראה שליבת ביטקוין כבר פועלת.</translation>
     </message>
     <message>
@@ -2671,7 +2671,7 @@
         <translation>הרץ פקודה כאשר ההתראה הרלוונטית מתקבלת או כשאנחנו עדים לפיצול ארוך מאוד (%s בשורת הפקודה יוחלף ע"י ההודעה)</translation>
     </message>
     <message>
-        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin Core will not work properly.</source>
+        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin XT will not work properly.</source>
         <translation>אזהרה: נא לבדוק שהתאריך והשעה של המחשב שלך נכונים! אם השעון שלך שגוי ליבת ביטקוין לא תעבוד כראוי.</translation>
     </message>
     <message>
@@ -2687,7 +2687,7 @@
         <translation>התחברות דרך מתווך SOCKS5</translation>
     </message>
     <message>
-        <source>Copyright (C) 2009-%i The Bitcoin Core Developers</source>
+        <source>Copyright (C) 2009-%i The Bitcoin XT Developers</source>
         <translation>כל הזכויות שמורות (C)‏ 2009‏-%i מתכנתי ליבת ביטקוין</translation>
     </message>
     <message>
@@ -2695,7 +2695,7 @@
         <translation>לא ניתן לנתח את הערך של ‎-rpcbind שצוין בתור %s ככתובת רשת</translation>
     </message>
     <message>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Core</source>
+        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin XT</source>
         <translation>אירעה שגיאה בטעינת wallet.dat: הארנק דורש גרסה חדשה יותר של ליבת ביטקוין</translation>
     </message>
     <message>
@@ -2711,7 +2711,7 @@
         <translation>מידע</translation>
     </message>
     <message>
-        <source>Initialization sanity check failed. Bitcoin Core is shutting down.</source>
+        <source>Initialization sanity check failed. Bitcoin XT is shutting down.</source>
         <translation>בדיקת התקינות ההתחלתית נכשלה. ליבת ביטקוין תיסגר כעת.</translation>
     </message>
     <message>
@@ -2807,7 +2807,7 @@
         <translation>שם משתמש לחיבורי JSON-RPC</translation>
     </message>
     <message>
-        <source>Wallet needed to be rewritten: restart Bitcoin Core to complete</source>
+        <source>Wallet needed to be rewritten: restart Bitcoin XT to complete</source>
         <translation>יש לכתוב את הארנק מחדש: נא להפעיל את ליבת ביטקוין מחדש כדי להשלים את הפעולה</translation>
     </message>
     <message>

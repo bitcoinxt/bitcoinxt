@@ -287,8 +287,8 @@
         <translation>Otvoriť &amp;URI...</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
-        <translation>Bitcoin Core klient</translation>
+        <source>Bitcoin XT client</source>
+        <translation>Bitcoin XT klient</translation>
     </message>
     <message>
         <source>Importing blocks from disk...</source>
@@ -339,8 +339,8 @@
         <translation>&amp;Prijať</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Core</source>
-        <translation>Zobraziť informácie o Bitcoin Core</translation>
+        <source>Show information about Bitcoin XT</source>
+        <translation>Zobraziť informácie o Bitcoin XT</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -379,7 +379,7 @@
         <translation>Lišta záložiek</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Jadro Bitcoin</translation>
     </message>
     <message>
@@ -387,7 +387,7 @@
         <translation>Vyžiadať platbu (vygeneruje QR kód a bitcoin: URI)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
+        <source>&amp;About Bitcoin XT</source>
         <translation>O jadre Bitcoin</translation>
     </message>
     <message>
@@ -407,7 +407,7 @@
         <translation>Možnosti príkazového riadku</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
+        <source>Show the Bitcoin XT help message to get a list with possible Bitcoin command-line options</source>
         <translation>Zobraziť pomocnú správu od Bitcoin Jadra pre získanie zoznamu dostupných možností príkazového riadku</translation>
     </message>
     <message>
@@ -766,7 +766,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Jadro Bitcoin</translation>
     </message>
     <message>
@@ -778,7 +778,7 @@
         <translation>(%1-bit)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
+        <source>About Bitcoin XT</source>
         <translation>O jadre Bitcoin</translation>
     </message>
     <message>
@@ -801,15 +801,15 @@
         <translation>Vitajte</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
+        <source>Welcome to Bitcoin XT.</source>
         <translation>Vitajte v jadre Bitcoin.</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Core will store its data.</source>
+        <source>As this is the first time the program is launched, you can choose where Bitcoin XT will store its data.</source>
         <translation>Keďže spúštate program prvý krát, môžte si vybrať kde bude Bitcoin Jadro ukladať svoje dáta.</translation>
     </message>
     <message>
-        <source>Bitcoin Core will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <source>Bitcoin XT will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
         <translation>Jadro Bitcoin stiahne zo siete a uloží kópiu Bitcoin blockchain. Aspoň %1GB dát bude uložených v tomto priečinku a časom porastie. Peňaženka bude tiež uložená v tomto priečinku.</translation>
     </message>
     <message>
@@ -821,7 +821,7 @@
         <translation>Použiť vlastný dátový adresár:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Jadro Bitcoin</translation>
     </message>
     <message>
@@ -1859,7 +1859,7 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
+        <source>Bitcoin XT is shutting down...</source>
         <translation>Jadro Bitcoin sa ukončuje...</translation>
     </message>
     <message>
@@ -1993,11 +1993,11 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Jadro Bitcoin</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
+        <source>The Bitcoin XT developers</source>
         <translation>Vývojári jadra Bitcoin</translation>
     </message>
     <message>
@@ -2483,7 +2483,7 @@
         <translation>Toto je pred-testovacia verzia - použitie je na vlastné riziko - nepoužívajte na tvorbu bitcoin ani obchodovanie.</translation>
     </message>
     <message>
-        <source>Unable to bind to %s on this computer. Bitcoin Core is probably already running.</source>
+        <source>Unable to bind to %s on this computer. Bitcoin XT is probably already running.</source>
         <translation>Nepodarilo sa pripojiť na %s na tomto počítači. Bitcoin Jadro je už pravdepodobne spustené.</translation>
     </message>
     <message>
@@ -2629,7 +2629,7 @@ The network does not appear to fully agree! Some miners appear to be experiencin
         <translation>Importuje bloky z externého súboru blk000??.dat</translation>
     </message>
     <message>
-        <source>Cannot obtain a lock on data directory %s. Bitcoin Core is probably already running.</source>
+        <source>Cannot obtain a lock on data directory %s. Bitcoin XT is probably already running.</source>
         <translation>Neviem uzamknúť data adresár %s. Jadro Bitcoin je pravdepodobne už spustené.</translation>
     </message>
     <message>
@@ -2657,7 +2657,7 @@ The network does not appear to fully agree! Some miners appear to be experiencin
         <translation>Pripojiť cez proxy server SOCKS5</translation>
     </message>
     <message>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Core</source>
+        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin XT</source>
         <translation>Chyba pri čítaní wallet.dat: Peňaženka vyžaduje vyššiu verziu Jadra Bitcoin</translation>
     </message>
     <message>

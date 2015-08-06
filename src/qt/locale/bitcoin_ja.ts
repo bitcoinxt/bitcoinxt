@@ -168,8 +168,8 @@
         <translation>本当にウォレットを暗号化しますか?</translation>
     </message>
     <message>
-        <source>Bitcoin Core will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
-        <translation>暗号化処理を完了させるため Bitcoin Core をいますぐ終了します。ウォレットの暗号化では、コンピュータに感染したマルウェアなどによるビットコインの盗難から完全に守ることはできないことにご注意ください。</translation>
+        <source>Bitcoin XT will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
+        <translation>暗号化処理を完了させるため Bitcoin XT をいますぐ終了します。ウォレットの暗号化では、コンピュータに感染したマルウェアなどによるビットコインの盗難から完全に守ることはできないことにご注意ください。</translation>
     </message>
     <message>
         <source>IMPORTANT: Any previous backups you have made of your wallet file should be replaced with the newly generated, encrypted wallet file. For security reasons, previous backups of the unencrypted wallet file will become useless as soon as you start using the new, encrypted wallet.</source>
@@ -295,7 +295,7 @@
         <translation>URI を開く (&amp;U)...</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
+        <source>Bitcoin XT client</source>
         <translation>Bitcoinコア クライアント</translation>
     </message>
     <message>
@@ -347,7 +347,7 @@
         <translation>受信 (&amp;R)</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Core</source>
+        <source>Show information about Bitcoin XT</source>
         <translation>Bitcoinコアに関する情報を表示</translation>
     </message>
     <message>
@@ -387,7 +387,7 @@
         <translation>タブツールバー</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Bitcoin のコア</translation>
     </message>
     <message>
@@ -395,12 +395,12 @@
         <translation>支払いを要求する (QRコードとbitcoin:ではじまるURIを生成する)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
+        <source>&amp;About Bitcoin XT</source>
         <translation>ビットコインコアについて (&amp;A)</translation>
     </message>
     <message>
-        <source>Modify configuration options for Bitcoin Core</source>
-        <translation>Bitcoin Core の設定を編集する</translation>
+        <source>Modify configuration options for Bitcoin XT</source>
+        <translation>Bitcoin XT の設定を編集する</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -419,8 +419,8 @@
         <translation>コマンドラインオプション (&amp;C)</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
-        <translation>有効な Bitcoin のコマンドライン オプションを見るために Bitcoin Core のヘルプメッセージを表示します。</translation>
+        <source>Show the Bitcoin XT help message to get a list with possible Bitcoin command-line options</source>
+        <translation>有効な Bitcoin のコマンドライン オプションを見るために Bitcoin XT のヘルプメッセージを表示します。</translation>
     </message>
     <message numerus="yes">
         <source>%n active connection(s) to Bitcoin network</source>
@@ -844,7 +844,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Bitcoin のコア</translation>
     </message>
     <message>
@@ -856,7 +856,7 @@
         <translation>(%1ビット)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
+        <source>About Bitcoin XT</source>
         <translation>Bitcoinコアについて</translation>
     </message>
     <message>
@@ -879,16 +879,16 @@
         <translation>ようこそ</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
+        <source>Welcome to Bitcoin XT.</source>
         <translation>ようこそ！</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Core will store its data.</source>
-        <translation>これはプログラム最初の起動です。Bitcoin Coreがデータを保存する場所を選択して下さい。</translation>
+        <source>As this is the first time the program is launched, you can choose where Bitcoin XT will store its data.</source>
+        <translation>これはプログラム最初の起動です。Bitcoin XTがデータを保存する場所を選択して下さい。</translation>
     </message>
     <message>
-        <source>Bitcoin Core will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
-        <translation>Bitcoin Coreは、ビットコインのブロックチェーンのコピーを、ダウンロードして保存します。少なくとも%1ギガバイトのデータが、このディレクトリに保存されます。そしてそれは時間と共に増加します。またウォレットもこのディレクトリに保存されます。</translation>
+        <source>Bitcoin XT will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <translation>Bitcoin XTは、ビットコインのブロックチェーンのコピーを、ダウンロードして保存します。少なくとも%1ギガバイトのデータが、このディレクトリに保存されます。そしてそれは時間と共に増加します。またウォレットもこのディレクトリに保存されます。</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -899,7 +899,7 @@
         <translation>任意のデータ ディレクトリを使用:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Bitcoin のコア</translation>
     </message>
     <message>
@@ -981,8 +981,8 @@
         <translation>ウィンドウを閉じる際にアプリケーションを終了するのではなく、最小化します。このオプションが有効化された場合、メニューから終了を選択した場合にのみアプリケーションは閉じられます。</translation>
     </message>
     <message>
-        <source>The user interface language can be set here. This setting will take effect after restarting Bitcoin Core.</source>
-        <translation>ユーザ・インタフェイス言語はここで設定できます。この設定はBitcoin Coreの再起動後に有効となります。</translation>
+        <source>The user interface language can be set here. This setting will take effect after restarting Bitcoin XT.</source>
+        <translation>ユーザ・インタフェイス言語はここで設定できます。この設定はBitcoin XTの再起動後に有効となります。</translation>
     </message>
     <message>
         <source>Third party URLs (e.g. a block explorer) that appear in the transactions tab as context menu items. %s in the URL is replaced by transaction hash. Multiple URLs are separated by vertical bar |.</source>
@@ -1009,12 +1009,12 @@
         <translation>ネットワーク (&amp;N)</translation>
     </message>
     <message>
-        <source>Automatically start Bitcoin Core after logging in to the system.</source>
-        <translation>システムにログインした際、自動的にBitcoin Coreを起動する。</translation>
+        <source>Automatically start Bitcoin XT after logging in to the system.</source>
+        <translation>システムにログインした際、自動的にBitcoin XTを起動する。</translation>
     </message>
     <message>
-        <source>&amp;Start Bitcoin Core on system login</source>
-        <translation>システムへログインした際にBitcoin Coreを起動する (&amp;S)</translation>
+        <source>&amp;Start Bitcoin XT on system login</source>
+        <translation>システムへログインした際にBitcoin XTを起動する (&amp;S)</translation>
     </message>
     <message>
         <source>(0 = auto, &lt;0 = leave that many cores free)</source>
@@ -1443,8 +1443,8 @@
         <translation>現在のブロック数</translation>
     </message>
     <message>
-        <source>Open the Bitcoin Core debug log file from the current data directory. This can take a few seconds for large log files.</source>
-        <translation>現在のデータディレクトリからBitcoin Coreのデバッグ用ログファイルを開きます。ログファイルが巨大な場合、数秒かかることがあります。</translation>
+        <source>Open the Bitcoin XT debug log file from the current data directory. This can take a few seconds for large log files.</source>
+        <translation>現在のデータディレクトリからBitcoin XTのデバッグ用ログファイルを開きます。ログファイルが巨大な場合、数秒かかることがあります。</translation>
     </message>
     <message>
         <source>Received</source>
@@ -1563,8 +1563,8 @@
         <translation>コンソールをクリア</translation>
     </message>
     <message>
-        <source>Welcome to the Bitcoin Core RPC console.</source>
-        <translation>Bitcoin CoreのRPCコンソールへようこそ。</translation>
+        <source>Welcome to the Bitcoin XT RPC console.</source>
+        <translation>Bitcoin XTのRPCコンソールへようこそ。</translation>
     </message>
     <message>
         <source>Use up and down arrows to navigate history, and &lt;b&gt;Ctrl-L&lt;/b&gt; to clear screen.</source>
@@ -2141,8 +2141,8 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
-        <translation>Bitcoin Coreをシャットダウンしています。</translation>
+        <source>Bitcoin XT is shutting down...</source>
+        <translation>Bitcoin XTをシャットダウンしています。</translation>
     </message>
     <message>
         <source>Do not shut down the computer until this window disappears.</source>
@@ -2291,11 +2291,11 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Bitcoin のコア</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
+        <source>The Bitcoin XT developers</source>
         <translation>ビットコインコアの開発者</translation>
     </message>
     <message>
@@ -2845,8 +2845,8 @@
         <translation>これはリリース前のテストビルドです - 各自の責任で利用すること - 採掘や商取引に使用しないでください</translation>
     </message>
     <message>
-        <source>Unable to bind to %s on this computer. Bitcoin Core is probably already running.</source>
-        <translation>このコンピュータの %s にバインドすることができません。おそらく Bitcoin Core は既に実行されています。</translation>
+        <source>Unable to bind to %s on this computer. Bitcoin XT is probably already running.</source>
+        <translation>このコンピュータの %s にバインドすることができません。おそらく Bitcoin XT は既に実行されています。</translation>
     </message>
     <message>
         <source>Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction.</source>
@@ -3034,8 +3034,8 @@
         <translation>指定されたアドレスに対して JSON-RPC 接続をリッスンしするようバインドします。IPv6の場合には [host]:port 表記を使用してください。このオプションは複数回指定することが可能です (初期値: すべてのインターフェースに対してバインドする)</translation>
     </message>
     <message>
-        <source>Cannot obtain a lock on data directory %s. Bitcoin Core is probably already running.</source>
-        <translation>データ ディレクトリ %s のロックを取得することができません。おそらく Bitcoin Core は実行中です。</translation>
+        <source>Cannot obtain a lock on data directory %s. Bitcoin XT is probably already running.</source>
+        <translation>データ ディレクトリ %s のロックを取得することができません。おそらく Bitcoin XT は実行中です。</translation>
     </message>
     <message>
         <source>Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)</source>
@@ -3130,8 +3130,8 @@ rpcpassword=%s
         <translation>警告: -maxtxfee が非常に高く設定されています！ひとつのトランザクションでこの量の手数料が支払われてしまうことがあります。</translation>
     </message>
     <message>
-        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin Core will not work properly.</source>
-        <translation>警告： あなたのPCの日付と時刻が正しいことを確認して下さい！ もしあなたの時計が正しくなければBitcoin Coreが正確に動作しません。</translation>
+        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin XT will not work properly.</source>
+        <translation>警告： あなたのPCの日付と時刻が正しいことを確認して下さい！ もしあなたの時計が正しくなければBitcoin XTが正確に動作しません。</translation>
     </message>
     <message>
         <source>Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if they are already in the mempool, useful e.g. for a gateway</source>
@@ -3170,16 +3170,16 @@ rpcpassword=%s
         <translation>SOCKS5 プロキシ経由で接続する</translation>
     </message>
     <message>
-        <source>Copyright (C) 2009-%i The Bitcoin Core Developers</source>
-        <translation>Copyright (C) 2009-%i Bitcoin Core 開発者</translation>
+        <source>Copyright (C) 2009-%i The Bitcoin XT Developers</source>
+        <translation>Copyright (C) 2009-%i Bitcoin XT 開発者</translation>
     </message>
     <message>
         <source>Could not parse -rpcbind value %s as network address</source>
         <translation>-rpcbind の値 %s をネットワークアドレスとして解釈できませんでした</translation>
     </message>
     <message>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Core</source>
-        <translation>wallet.dat の読み込みに失敗しました: ウォレットの読み込みにはより新しいバージョンの Bitcoin Core が必要です</translation>
+        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin XT</source>
+        <translation>wallet.dat の読み込みに失敗しました: ウォレットの読み込みにはより新しいバージョンの Bitcoin XT が必要です</translation>
     </message>
     <message>
         <source>Error reading from database, shutting down.</source>
@@ -3198,8 +3198,8 @@ rpcpassword=%s
         <translation>情報</translation>
     </message>
     <message>
-        <source>Initialization sanity check failed. Bitcoin Core is shutting down.</source>
-        <translation>初期化時の健全性チェックに失敗しました。Bitcoin Coreを終了します。</translation>
+        <source>Initialization sanity check failed. Bitcoin XT is shutting down.</source>
+        <translation>初期化時の健全性チェックに失敗しました。Bitcoin XTを終了します。</translation>
     </message>
     <message>
         <source>Invalid amount for -maxtxfee=&lt;amount&gt;: '%s'</source>
@@ -3326,8 +3326,8 @@ rpcpassword=%s
         <translation>JSON-RPC 接続のユーザー名</translation>
     </message>
     <message>
-        <source>Wallet needed to be rewritten: restart Bitcoin Core to complete</source>
-        <translation>ウォレットが書き直される必要がありました: 完了するために Bitcoin Core を再起動します</translation>
+        <source>Wallet needed to be rewritten: restart Bitcoin XT to complete</source>
+        <translation>ウォレットが書き直される必要がありました: 完了するために Bitcoin XT を再起動します</translation>
     </message>
     <message>
         <source>Warning</source>

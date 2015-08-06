@@ -303,7 +303,7 @@
         <translation>Gamit para king Tabs</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Kapilubluban ning Bitcoin</translation>
     </message>
     <message>
@@ -442,7 +442,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Kapilubluban ning Bitcoin</translation>
     </message>
     <message>
@@ -469,7 +469,7 @@
         <translation>Malaus ka</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Kapilubluban ning Bitcoin</translation>
     </message>
     <message>
@@ -965,7 +965,7 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Kapilubluban ning Bitcoin</translation>
     </message>
     <message>

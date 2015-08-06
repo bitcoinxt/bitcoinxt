@@ -314,7 +314,7 @@
         <translation>верзија</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
+        <source>About Bitcoin XT</source>
         <translation>O Bitcoin Coru</translation>
     </message>
     <message>

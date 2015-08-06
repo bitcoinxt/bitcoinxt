@@ -287,8 +287,8 @@
         <translation>&amp;URI azonosító megnyitása...</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
-        <translation>Bitcoin Core kliens</translation>
+        <source>Bitcoin XT client</source>
+        <translation>Bitcoin XT kliens</translation>
     </message>
     <message>
         <source>Importing blocks from disk...</source>
@@ -339,8 +339,8 @@
         <translation>&amp;Fogadás</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Core</source>
-        <translation>Bitcoin Core információ megjelenítése</translation>
+        <source>Show information about Bitcoin XT</source>
+        <translation>Bitcoin XT információ megjelenítése</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -379,16 +379,16 @@
         <translation>Fül eszköztár</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>Request payments (generates QR codes and bitcoin: URIs)</source>
         <translation>Fizetési kérelem (QR-kódot és "bitcoin:" URI azonosítót hoz létre)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
-        <translation>&amp;A Bitcoin Core-ról</translation>
+        <source>&amp;About Bitcoin XT</source>
+        <translation>&amp;A Bitcoin XT-ról</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -407,8 +407,8 @@
         <translation>Paran&amp;cssor kapcsolók</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
-        <translation>A Bitcoin Core súgóüzenet megjelenítése a Bitcoin lehetséges parancssori kapcsolóival.</translation>
+        <source>Show the Bitcoin XT help message to get a list with possible Bitcoin command-line options</source>
+        <translation>A Bitcoin XT súgóüzenet megjelenítése a Bitcoin lehetséges parancssori kapcsolóival.</translation>
     </message>
     <message>
         <source>No block source available...</source>
@@ -750,8 +750,8 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>version</source>
@@ -762,8 +762,8 @@
         <translation>(%1-bit)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
-        <translation>A Bitcoin Core-ról</translation>
+        <source>About Bitcoin XT</source>
+        <translation>A Bitcoin XT-ról</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -785,8 +785,8 @@
         <translation>Üdvözlünk</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
-        <translation>Üdvözlünk a Bitcoin Core-ban.</translation>
+        <source>Welcome to Bitcoin XT.</source>
+        <translation>Üdvözlünk a Bitcoin XT-ban.</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -797,8 +797,8 @@
         <translation>Saját adatkönyvtár használata:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>Error: Specified data directory "%1" cannot be created.</source>
@@ -1480,8 +1480,8 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
-        <translation>A Bitcoin Core leáll...</translation>
+        <source>Bitcoin XT is shutting down...</source>
+        <translation>A Bitcoin XT leáll...</translation>
     </message>
     </context>
 <context>
@@ -1574,12 +1574,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
-        <translation>A Bitcoin Core fejlesztői</translation>
+        <source>The Bitcoin XT developers</source>
+        <translation>A Bitcoin XT fejlesztői</translation>
     </message>
     <message>
         <source>[testnet]</source>

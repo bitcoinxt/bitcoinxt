@@ -287,8 +287,8 @@
         <translation>Načíst &amp;URI...</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
-        <translation>Bitcoin Core klient</translation>
+        <source>Bitcoin XT client</source>
+        <translation>Bitcoin XT klient</translation>
     </message>
     <message>
         <source>Importing blocks from disk...</source>
@@ -339,8 +339,8 @@
         <translation>Při&amp;jmi</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Core</source>
-        <translation>Zobraz informace o Bitcoin Core</translation>
+        <source>Show information about Bitcoin XT</source>
+        <translation>Zobraz informace o Bitcoin XT</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -379,16 +379,16 @@
         <translation>Panel s listy</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>Request payments (generates QR codes and bitcoin: URIs)</source>
         <translation>Požaduj platby (generuje QR kódy a bitcoin: URI)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
-        <translation>O &amp;Bitcoin Core</translation>
+        <source>&amp;About Bitcoin XT</source>
+        <translation>O &amp;Bitcoin XT</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -407,7 +407,7 @@
         <translation>Ar&amp;gumenty z příkazové řádky</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
+        <source>Show the Bitcoin XT help message to get a list with possible Bitcoin command-line options</source>
         <translation>Seznam argumentů Bitcoinu pro příkazovou řádku získáš v nápovědě Bitcoinu Core</translation>
     </message>
     <message numerus="yes">
@@ -786,8 +786,8 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>version</source>
@@ -798,8 +798,8 @@
         <translation>(%1-bit)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
-        <translation>O Bitcoin Core</translation>
+        <source>About Bitcoin XT</source>
+        <translation>O Bitcoin XT</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -821,16 +821,16 @@
         <translation>Vítej</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
-        <translation>Vítej v Bitcoin Core.</translation>
+        <source>Welcome to Bitcoin XT.</source>
+        <translation>Vítej v Bitcoin XT.</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Core will store its data.</source>
-        <translation>Tohle je poprvé, co spouštíš Bitcoin Core, takže si můžeš zvolit, kam bude ukládat svá data.</translation>
+        <source>As this is the first time the program is launched, you can choose where Bitcoin XT will store its data.</source>
+        <translation>Tohle je poprvé, co spouštíš Bitcoin XT, takže si můžeš zvolit, kam bude ukládat svá data.</translation>
     </message>
     <message>
-        <source>Bitcoin Core will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
-        <translation>Bitcoin Core bude stahovat kopii řetězce bloků. Proto bude potřeba do tohoto adresáře uložit nejméně %1 GB dat – toto číslo bude navíc v průběhu času pomalu růst. Tvá peněženka bude rovněž uložena v tomto adresáři.</translation>
+        <source>Bitcoin XT will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <translation>Bitcoin XT bude stahovat kopii řetězce bloků. Proto bude potřeba do tohoto adresáře uložit nejméně %1 GB dat – toto číslo bude navíc v průběhu času pomalu růst. Tvá peněženka bude rovněž uložena v tomto adresáři.</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -841,8 +841,8 @@
         <translation>Použij tento adresář pro data:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>Error: Specified data directory "%1" cannot be created.</source>
@@ -1999,8 +1999,8 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
-        <translation>Bitcoin Core se ukončuje...</translation>
+        <source>Bitcoin XT is shutting down...</source>
+        <translation>Bitcoin XT se ukončuje...</translation>
     </message>
     <message>
         <source>Do not shut down the computer until this window disappears.</source>
@@ -2141,12 +2141,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
-        <translation>Vývojáři Bitcoin Core</translation>
+        <source>The Bitcoin XT developers</source>
+        <translation>Vývojáři Bitcoin XT</translation>
     </message>
     <message>
         <source>[testnet]</source>
@@ -2683,8 +2683,8 @@
         <translation>Tohle je testovací verze – používej ji jen na vlastní riziko, ale rozhodně ji nepoužívej k těžbě nebo pro obchodní aplikace</translation>
     </message>
     <message>
-        <source>Unable to bind to %s on this computer. Bitcoin Core is probably already running.</source>
-        <translation>Nedaří se mi připojit na %s na tomhle počítači. Bitcoin Core už pravděpodobně jednou běží.</translation>
+        <source>Unable to bind to %s on this computer. Bitcoin XT is probably already running.</source>
+        <translation>Nedaří se mi připojit na %s na tomhle počítači. Bitcoin XT už pravděpodobně jednou běží.</translation>
     </message>
     <message>
         <source>Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction.</source>
@@ -2859,8 +2859,8 @@
         <translation>Čekat na zadané adrese na JSON-RPC spojení. Pro zápis IPv6 adresy použij notaci [adresa]:port. Tuto volbu lze použít i vícekrát (výchozí: poslouchat na všech rozhraních)</translation>
     </message>
     <message>
-        <source>Cannot obtain a lock on data directory %s. Bitcoin Core is probably already running.</source>
-        <translation>Nedaří se mi získat zámek na datový adresář %s. Bitcoin Core pravděpodobně už jednou běží.</translation>
+        <source>Cannot obtain a lock on data directory %s. Bitcoin XT is probably already running.</source>
+        <translation>Nedaří se mi získat zámek na datový adresář %s. Bitcoin XT pravděpodobně už jednou běží.</translation>
     </message>
     <message>
         <source>Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)</source>
@@ -2907,8 +2907,8 @@
         <translation>Tento produkt zahrnuje programy vyvinuté OpenSSL Projektem pro použití v OpenSSL Toolkitu &lt;https://www.openssl.org/&gt; a kryptografický program od Erika Younga a program UPnP od Thomase Bernarda.</translation>
     </message>
     <message>
-        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin Core will not work properly.</source>
-        <translation>Upozornění: Zkontroluj, že máš v počítači správně nastavený datum a čas! Pokud jsou nastaveny špatně, Bitcoin Core nebude fungovat správně.</translation>
+        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin XT will not work properly.</source>
+        <translation>Upozornění: Zkontroluj, že máš v počítači správně nastavený datum a čas! Pokud jsou nastaveny špatně, Bitcoin XT nebude fungovat správně.</translation>
     </message>
     <message>
         <source>Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if they are already in the mempool, useful e.g. for a gateway</source>
@@ -2927,16 +2927,16 @@
         <translation>Připojit se přes SOCKS5 proxy</translation>
     </message>
     <message>
-        <source>Copyright (C) 2009-%i The Bitcoin Core Developers</source>
-        <translation>Copyright (C) 2009-%i Vývojáři Bitcoin Core</translation>
+        <source>Copyright (C) 2009-%i The Bitcoin XT Developers</source>
+        <translation>Copyright (C) 2009-%i Vývojáři Bitcoin XT</translation>
     </message>
     <message>
         <source>Could not parse -rpcbind value %s as network address</source>
         <translation>Nejde mi přečíst hodnotu -rpcbind %s jako síťovou adresu</translation>
     </message>
     <message>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Core</source>
-        <translation>Chyba při načítání wallet.dat: peněženka vyžaduje novější verzi Bitcoin Core</translation>
+        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin XT</source>
+        <translation>Chyba při načítání wallet.dat: peněženka vyžaduje novější verzi Bitcoin XT</translation>
     </message>
     <message>
         <source>Error reading from database, shutting down.</source>
@@ -2955,8 +2955,8 @@
         <translation>Informace</translation>
     </message>
     <message>
-        <source>Initialization sanity check failed. Bitcoin Core is shutting down.</source>
-        <translation>Selhala úvodní zevrubná prověrka. Bitcoin Core se ukončuje.</translation>
+        <source>Initialization sanity check failed. Bitcoin XT is shutting down.</source>
+        <translation>Selhala úvodní zevrubná prověrka. Bitcoin XT se ukončuje.</translation>
     </message>
     <message>
         <source>Invalid amount for -minrelaytxfee=&lt;amount&gt;: '%s'</source>
@@ -3063,8 +3063,8 @@
         <translation>Uživatelské jméno pro JSON-RPC spojení</translation>
     </message>
     <message>
-        <source>Wallet needed to be rewritten: restart Bitcoin Core to complete</source>
-        <translation>Soubor s peněženkou potřeboval přepsat: restartuj Bitcoin Core, aby se operace dokončila</translation>
+        <source>Wallet needed to be rewritten: restart Bitcoin XT to complete</source>
+        <translation>Soubor s peněženkou potřeboval přepsat: restartuj Bitcoin XT, aby se operace dokončila</translation>
     </message>
     <message>
         <source>Warning</source>

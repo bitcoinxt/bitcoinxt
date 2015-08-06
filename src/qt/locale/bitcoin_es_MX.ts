@@ -315,7 +315,7 @@
         <translation>Pestañas</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>nucleo Bitcoin</translation>
     </message>
     <message>
@@ -323,7 +323,7 @@
         <translation>opciones de la &amp;Linea de comandos</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
+        <source>Show the Bitcoin XT help message to get a list with possible Bitcoin command-line options</source>
         <translation>Mostrar mensaje de ayuda del nucleo de Bitcoin para optener una lista con los posibles comandos  de Bitcoin</translation>
     </message>
     <message>
@@ -474,7 +474,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>nucleo Bitcoin</translation>
     </message>
     <message>
@@ -486,8 +486,8 @@
         <translation>(%1-bit)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
-        <translation>Acerca de Bitcoin Core</translation>
+        <source>About Bitcoin XT</source>
+        <translation>Acerca de Bitcoin XT</translation>
     </message>
     <message>
         <source>Usage:</source>
@@ -501,7 +501,7 @@
 <context>
     <name>Intro</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>nucleo Bitcoin</translation>
     </message>
     </context>
@@ -755,7 +755,7 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
+        <source>Bitcoin XT is shutting down...</source>
         <translation>Apagando el nucleo de Bitcoin...</translation>
     </message>
     <message>
@@ -781,12 +781,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>nucleo Bitcoin</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
-        <translation>Los desarrolladores de Bitcoin Core</translation>
+        <source>The Bitcoin XT developers</source>
+        <translation>Los desarrolladores de Bitcoin XT</translation>
     </message>
     </context>
 <context>

@@ -263,8 +263,8 @@
         <translation>Atvērt &amp;URI...</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
-        <translation>Bitcoin Core klients</translation>
+        <source>Bitcoin XT client</source>
+        <translation>Bitcoin XT klients</translation>
     </message>
     <message>
         <source>Importing blocks from disk...</source>
@@ -315,8 +315,8 @@
         <translation>&amp;Saņemt</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Core</source>
-        <translation>Parādīt informāciju par Bitcoin Core</translation>
+        <source>Show information about Bitcoin XT</source>
+        <translation>Parādīt informāciju par Bitcoin XT</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -355,16 +355,16 @@
         <translation>Ciļņu rīkjosla</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>Request payments (generates QR codes and bitcoin: URIs)</source>
         <translation>Pieprasīt maksājumus (izveido QR kodu un bitcoin: URIs)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
-        <translation>Par &amp;Bitcoin Core</translation>
+        <source>&amp;About Bitcoin XT</source>
+        <translation>Par &amp;Bitcoin XT</translation>
     </message>
     <message>
         <source>Open a bitcoin: URI or payment request</source>
@@ -678,8 +678,8 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>version</source>
@@ -690,8 +690,8 @@
         <translation>(%1-biti)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
-        <translation>Par Bitcoin Core</translation>
+        <source>About Bitcoin XT</source>
+        <translation>Par Bitcoin XT</translation>
     </message>
     <message>
         <source>Usage:</source>
@@ -709,8 +709,8 @@
         <translation>Sveiciens</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
-        <translation>Sveicināts Bitcoin Core</translation>
+        <source>Welcome to Bitcoin XT.</source>
+        <translation>Sveicināts Bitcoin XT</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -721,8 +721,8 @@
         <translation>Izmantot pielāgotu datu mapi:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>Error</source>
@@ -1495,8 +1495,8 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
-        <translation>Bitcoin Core tiek izslēgta...</translation>
+        <source>Bitcoin XT is shutting down...</source>
+        <translation>Bitcoin XT tiek izslēgta...</translation>
     </message>
     <message>
         <source>Do not shut down the computer until this window disappears.</source>
@@ -1625,12 +1625,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
-        <translation>Bitcoin Core izstrādātāji</translation>
+        <source>The Bitcoin XT developers</source>
+        <translation>Bitcoin XT izstrādātāji</translation>
     </message>
     <message>
         <source>[testnet]</source>

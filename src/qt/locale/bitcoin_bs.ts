@@ -15,7 +15,7 @@
         <translation>Bitcoin</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Bitcoin Jezrga</translation>
     </message>
     </context>
@@ -34,14 +34,14 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Bitcoin Jezrga</translation>
     </message>
     </context>
 <context>
     <name>Intro</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Bitcoin Jezrga</translation>
     </message>
     </context>
@@ -109,7 +109,7 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Bitcoin Jezrga</translation>
     </message>
     </context>

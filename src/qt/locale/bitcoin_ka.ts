@@ -359,16 +359,16 @@
         <translation>ბარათების პანელი</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>Request payments (generates QR codes and bitcoin: URIs)</source>
         <translation>გადახდის მოთხოვნა (შეიქმნება QR-კოდები და bitcoin: ბმულები)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
-        <translation>Bitcoin Core-ს შეს&amp;ახებ</translation>
+        <source>&amp;About Bitcoin XT</source>
+        <translation>Bitcoin XT-ს შეს&amp;ახებ</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -387,8 +387,8 @@
         <translation>საკომანდო სტრიქონის ოპ&amp;ციები</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
-        <translation>Bitcoin Core-ს დახმარების ჩვენება Bitcoin-ის საკომანდო სტრიქონის დასაშვები ოპციების სანახავად</translation>
+        <source>Show the Bitcoin XT help message to get a list with possible Bitcoin command-line options</source>
+        <translation>Bitcoin XT-ს დახმარების ჩვენება Bitcoin-ის საკომანდო სტრიქონის დასაშვები ოპციების სანახავად</translation>
     </message>
     <message>
         <source>No block source available...</source>
@@ -722,16 +722,16 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>version</source>
         <translation>ვერსია</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
-        <translation>Bitcoin Core-ს შესახებ</translation>
+        <source>About Bitcoin XT</source>
+        <translation>Bitcoin XT-ს შესახებ</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -753,12 +753,12 @@
         <translation>მოგესალმებით</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
-        <translation>მოგესალმებათ Bitcoin Core.</translation>
+        <source>Welcome to Bitcoin XT.</source>
+        <translation>მოგესალმებათ Bitcoin XT.</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Core will store its data.</source>
-        <translation>ეს პროგრამის პირველი გაშვებაა; შეგიძლიათ მიუთითოთ, სად შეინახოს მონაცემები Bitcoin Core-მ.</translation>
+        <source>As this is the first time the program is launched, you can choose where Bitcoin XT will store its data.</source>
+        <translation>ეს პროგრამის პირველი გაშვებაა; შეგიძლიათ მიუთითოთ, სად შეინახოს მონაცემები Bitcoin XT-მ.</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -769,8 +769,8 @@
         <translation>მითითებული კატალოგის გამოყენება:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
         <source>Error</source>
@@ -1603,8 +1603,8 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
-        <translation>Bitcoin Core იხურება...</translation>
+        <source>Bitcoin XT is shutting down...</source>
+        <translation>Bitcoin XT იხურება...</translation>
     </message>
     <message>
         <source>Do not shut down the computer until this window disappears.</source>
@@ -1737,12 +1737,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
-        <translation>Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation>Bitcoin XT</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
-        <translation>Bitcoin Core-ს ავტორები</translation>
+        <source>The Bitcoin XT developers</source>
+        <translation>Bitcoin XT-ს ავტორები</translation>
     </message>
     <message>
         <source>[testnet]</source>

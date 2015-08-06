@@ -283,8 +283,8 @@
         <translation>Obri un &amp;URI...</translation>
     </message>
     <message>
-        <source>Bitcoin Core client</source>
-        <translation>Client del Bitcoin Core</translation>
+        <source>Bitcoin XT client</source>
+        <translation>Client del Bitcoin XT</translation>
     </message>
     <message>
         <source>Importing blocks from disk...</source>
@@ -335,8 +335,8 @@
         <translation>&amp;Rep</translation>
     </message>
     <message>
-        <source>Show information about Bitcoin Core</source>
-        <translation>Mostra informació del Bitcoin Core</translation>
+        <source>Show information about Bitcoin XT</source>
+        <translation>Mostra informació del Bitcoin XT</translation>
     </message>
     <message>
         <source>&amp;Show / Hide</source>
@@ -375,7 +375,7 @@
         <translation>Barra d'eines de les pestanyes</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Nucli de Bitcoin</translation>
     </message>
     <message>
@@ -383,8 +383,8 @@
         <translation>Sol·licita pagaments (genera codis QR i bitcoin: URI)</translation>
     </message>
     <message>
-        <source>&amp;About Bitcoin Core</source>
-        <translation>&amp;Quant al Bitcoin Core</translation>
+        <source>&amp;About Bitcoin XT</source>
+        <translation>&amp;Quant al Bitcoin XT</translation>
     </message>
     <message>
         <source>Show the list of used sending addresses and labels</source>
@@ -403,8 +403,8 @@
         <translation>Opcions de la &amp;línia d'ordes</translation>
     </message>
     <message>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
-        <translation>Mostra el missatge d'ajuda del Bitcoin Core per obtindre una llista amb les possibles opcions de línia d'ordes de Bitcoin</translation>
+        <source>Show the Bitcoin XT help message to get a list with possible Bitcoin command-line options</source>
+        <translation>Mostra el missatge d'ajuda del Bitcoin XT per obtindre una llista amb les possibles opcions de línia d'ordes de Bitcoin</translation>
     </message>
     <message>
         <source>No block source available...</source>
@@ -750,7 +750,7 @@
 <context>
     <name>HelpMessageDialog</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Nucli de Bitcoin</translation>
     </message>
     <message>
@@ -762,8 +762,8 @@
         <translation>(%1-bit)</translation>
     </message>
     <message>
-        <source>About Bitcoin Core</source>
-        <translation>Quant al Bitcoin Core</translation>
+        <source>About Bitcoin XT</source>
+        <translation>Quant al Bitcoin XT</translation>
     </message>
     <message>
         <source>Command-line options</source>
@@ -785,16 +785,16 @@
         <translation>Vos donem la benviguda</translation>
     </message>
     <message>
-        <source>Welcome to Bitcoin Core.</source>
-        <translation>Vos donem la benvinguda al Bitcoin Core.</translation>
+        <source>Welcome to Bitcoin XT.</source>
+        <translation>Vos donem la benvinguda al Bitcoin XT.</translation>
     </message>
     <message>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Core will store its data.</source>
-        <translation>Atès que és la primera vegada que executeu el programa, podeu triar on emmagatzemarà el Bitcoin Core les dades.</translation>
+        <source>As this is the first time the program is launched, you can choose where Bitcoin XT will store its data.</source>
+        <translation>Atès que és la primera vegada que executeu el programa, podeu triar on emmagatzemarà el Bitcoin XT les dades.</translation>
     </message>
     <message>
-        <source>Bitcoin Core will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
-        <translation>El Bitcoin Core descarregarà i emmagatzemarà una còpia de la cadena de blocs de Bitcoin. Com a mínim s'emmagatzemaran %1 GB de dades en este directori, que seguiran creixent gradualment. També s'hi emmagatzemarà el moneder.</translation>
+        <source>Bitcoin XT will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <translation>El Bitcoin XT descarregarà i emmagatzemarà una còpia de la cadena de blocs de Bitcoin. Com a mínim s'emmagatzemaran %1 GB de dades en este directori, que seguiran creixent gradualment. També s'hi emmagatzemarà el moneder.</translation>
     </message>
     <message>
         <source>Use the default data directory</source>
@@ -805,7 +805,7 @@
         <translation>Utilitza un directori de dades personalitzat:</translation>
     </message>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Nucli de Bitcoin</translation>
     </message>
     <message>
@@ -1859,8 +1859,8 @@
 <context>
     <name>ShutdownWindow</name>
     <message>
-        <source>Bitcoin Core is shutting down...</source>
-        <translation>S'està parant el Bitcoin Core...</translation>
+        <source>Bitcoin XT is shutting down...</source>
+        <translation>S'està parant el Bitcoin XT...</translation>
     </message>
     <message>
         <source>Do not shut down the computer until this window disappears.</source>
@@ -2001,12 +2001,12 @@
 <context>
     <name>SplashScreen</name>
     <message>
-        <source>Bitcoin Core</source>
+        <source>Bitcoin XT</source>
         <translation>Nucli de Bitcoin</translation>
     </message>
     <message>
-        <source>The Bitcoin Core developers</source>
-        <translation>Els desenvolupadors del Bitcoin Core</translation>
+        <source>The Bitcoin XT developers</source>
+        <translation>Els desenvolupadors del Bitcoin XT</translation>
     </message>
     <message>
         <source>[testnet]</source>
@@ -2515,8 +2515,8 @@
         <translation>Esta és una versió de pre-llançament - utilitza-la sota la teva responsabilitat - No usar per a minería o aplicacions de compra-venda</translation>
     </message>
     <message>
-        <source>Unable to bind to %s on this computer. Bitcoin Core is probably already running.</source>
-        <translation>No es pot enllaçar %s a este ordinador. El Bitcoin Core probablement ja estiga executant-s'hi.</translation>
+        <source>Unable to bind to %s on this computer. Bitcoin XT is probably already running.</source>
+        <translation>No es pot enllaçar %s a este ordinador. El Bitcoin XT probablement ja estiga executant-s'hi.</translation>
     </message>
     <message>
         <source>Warning: -paytxfee is set very high! This is the transaction fee you will pay if you send a transaction.</source>
@@ -2671,8 +2671,8 @@
         <translation>Vincula a l'adreça donada per a escoltar les connexions JSON-RPC. Feu servir la notació [host]:port per a IPv6. Esta opció pot ser especificada moltes vegades (per defecte: vincula a totes les interfícies)</translation>
     </message>
     <message>
-        <source>Cannot obtain a lock on data directory %s. Bitcoin Core is probably already running.</source>
-        <translation>No es pot obtindre un bloqueig del directori de dades %s. El Bitcoin Core probablement ja s'estiga executant.</translation>
+        <source>Cannot obtain a lock on data directory %s. Bitcoin XT is probably already running.</source>
+        <translation>No es pot obtindre un bloqueig del directori de dades %s. El Bitcoin XT probablement ja s'estiga executant.</translation>
     </message>
     <message>
         <source>Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)</source>
@@ -2707,8 +2707,8 @@
         <translation>Este producte inclou programari desenvolupat pel projecte OpenSSL per a ús a l'OpenSSL Toolkit &lt;https://www.openssl.org/&gt; i programari criptogràfic escrit per Eric Young i programari UPnP escrit per Thomas Bernard.</translation>
     </message>
     <message>
-        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin Core will not work properly.</source>
-        <translation>Avís: comproveu que la data i hora del vostre ordinador siguen correctes! Si el vostre rellotge no és correcte, el Bitcoin Core no funcionarà correctament.</translation>
+        <source>Warning: Please check that your computer's date and time are correct! If your clock is wrong Bitcoin XT will not work properly.</source>
+        <translation>Avís: comproveu que la data i hora del vostre ordinador siguen correctes! Si el vostre rellotge no és correcte, el Bitcoin XT no funcionarà correctament.</translation>
     </message>
     <message>
         <source>Whitelisted peers cannot be DoS banned and their transactions are always relayed, even if they are already in the mempool, useful e.g. for a gateway</source>
@@ -2727,15 +2727,15 @@
         <translation>Connecta a través del proxy SOCKS5</translation>
     </message>
     <message>
-        <source>Copyright (C) 2009-%i The Bitcoin Core Developers</source>
-        <translation>Copyright (C) 2009-%i Els desenvolupadors del Bitcoin Core</translation>
+        <source>Copyright (C) 2009-%i The Bitcoin XT Developers</source>
+        <translation>Copyright (C) 2009-%i Els desenvolupadors del Bitcoin XT</translation>
     </message>
     <message>
         <source>Could not parse -rpcbind value %s as network address</source>
         <translation>No s'ha pogut analitzar el valor -rpcbind %s com una adreça de xarxa</translation>
     </message>
     <message>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Core</source>
+        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin XT</source>
         <translation>Error en carregar wallet.dat: el moneder requereix una versió més nova del Bitcoin core</translation>
     </message>
     <message>
@@ -2751,8 +2751,8 @@
         <translation>&amp;Informació</translation>
     </message>
     <message>
-        <source>Initialization sanity check failed. Bitcoin Core is shutting down.</source>
-        <translation>Ha fallat la inicialització de la comprovació de validesa. El Bitcoin Core s'està parant.</translation>
+        <source>Initialization sanity check failed. Bitcoin XT is shutting down.</source>
+        <translation>Ha fallat la inicialització de la comprovació de validesa. El Bitcoin XT s'està parant.</translation>
     </message>
     <message>
         <source>Invalid amount for -minrelaytxfee=&lt;amount&gt;: '%s'</source>
@@ -2847,8 +2847,8 @@
         <translation>Nom d'usuari per a connexions JSON-RPC</translation>
     </message>
     <message>
-        <source>Wallet needed to be rewritten: restart Bitcoin Core to complete</source>
-        <translation>Cal reescriure el moneder: reiniceu el Bitcoin Core per completar-ho.</translation>
+        <source>Wallet needed to be rewritten: restart Bitcoin XT to complete</source>
+        <translation>Cal reescriure el moneder: reiniceu el Bitcoin XT per completar-ho.</translation>
     </message>
     <message>
         <source>Warning</source>

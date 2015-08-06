@@ -211,7 +211,7 @@
     </message>
     <message>
         <location line="+11"/>
-        <source>Bitcoin Core will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
+        <source>Bitcoin XT will close now to finish the encryption process. Remember that encrypting your wallet cannot fully protect your bitcoins from being stolen by malware infecting your computer.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -377,7 +377,7 @@
     </message>
     <message>
         <location line="+176"/>
-        <source>Bitcoin Core client</source>
+        <source>Bitcoin XT client</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -442,7 +442,7 @@
     </message>
     <message>
         <location line="+40"/>
-        <source>Show information about Bitcoin Core</source>
+        <source>Show information about Bitcoin XT</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -492,8 +492,8 @@
     </message>
     <message>
         <location line="-311"/>
-        <source>Bitcoin Core</source>
-        <translation type="unfinished">Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation type="unfinished">Bitcoin XT</translation>
     </message>
     <message>
         <location line="+164"/>
@@ -502,12 +502,12 @@
     </message>
     <message>
         <location line="+38"/>
-        <source>&amp;About Bitcoin Core</source>
+        <source>&amp;About Bitcoin XT</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+7"/>
-        <source>Modify configuration options for Bitcoin Core</source>
+        <source>Modify configuration options for Bitcoin XT</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -532,7 +532,7 @@
     </message>
     <message>
         <location line="+2"/>
-        <source>Show the Bitcoin Core help message to get a list with possible Bitcoin command-line options</source>
+        <source>Show the Bitcoin XT help message to get a list with possible Bitcoin command-line options</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
@@ -1074,8 +1074,8 @@
     <name>HelpMessageDialog</name>
     <message>
         <location filename="../utilitydialog.cpp" line="+33"/>
-        <source>Bitcoin Core</source>
-        <translation type="unfinished">Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation type="unfinished">Bitcoin XT</translation>
     </message>
     <message>
         <location line="+0"/>
@@ -1090,7 +1090,7 @@
     </message>
     <message>
         <location line="+5"/>
-        <source>About Bitcoin Core</source>
+        <source>About Bitcoin XT</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1118,17 +1118,17 @@
     </message>
     <message>
         <location line="+9"/>
-        <source>Welcome to Bitcoin Core.</source>
+        <source>Welcome to Bitcoin XT.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+26"/>
-        <source>As this is the first time the program is launched, you can choose where Bitcoin Core will store its data.</source>
+        <source>As this is the first time the program is launched, you can choose where Bitcoin XT will store its data.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+10"/>
-        <source>Bitcoin Core will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
+        <source>Bitcoin XT will download and store a copy of the Bitcoin block chain. At least %1GB of data will be stored in this directory, and it will grow over time. The wallet will also be stored in this directory.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1143,8 +1143,8 @@
     </message>
     <message>
         <location filename="../intro.cpp" line="+82"/>
-        <source>Bitcoin Core</source>
-        <translation type="unfinished">Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation type="unfinished">Bitcoin XT</translation>
     </message>
     <message>
         <location line="+1"/>
@@ -1250,7 +1250,7 @@
     </message>
     <message>
         <location line="+45"/>
-        <source>The user interface language can be set here. This setting will take effect after restarting Bitcoin Core.</source>
+        <source>The user interface language can be set here. This setting will take effect after restarting Bitcoin XT.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1286,12 +1286,12 @@
     </message>
     <message>
         <location line="-153"/>
-        <source>Automatically start Bitcoin Core after logging in to the system.</source>
+        <source>Automatically start Bitcoin XT after logging in to the system.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location line="+3"/>
-        <source>&amp;Start Bitcoin Core on system login</source>
+        <source>&amp;Start Bitcoin XT on system login</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -1862,7 +1862,7 @@
     </message>
     <message>
         <location line="+72"/>
-        <source>Open the Bitcoin Core debug log file from the current data directory. This can take a few seconds for large log files.</source>
+        <source>Open the Bitcoin XT debug log file from the current data directory. This can take a few seconds for large log files.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2014,7 +2014,7 @@
     </message>
     <message>
         <location filename="../rpcconsole.cpp" line="-36"/>
-        <source>Welcome to the Bitcoin Core RPC console.</source>
+        <source>Welcome to the Bitcoin XT RPC console.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2752,7 +2752,7 @@
     <name>ShutdownWindow</name>
     <message>
         <location filename="../utilitydialog.cpp" line="+81"/>
-        <source>Bitcoin Core is shutting down...</source>
+        <source>Bitcoin XT is shutting down...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -2947,12 +2947,12 @@
     <name>SplashScreen</name>
     <message>
         <location filename="../splashscreen.cpp" line="+41"/>
-        <source>Bitcoin Core</source>
-        <translation type="unfinished">Bitcoin Core</translation>
+        <source>Bitcoin XT</source>
+        <translation type="unfinished">Bitcoin XT</translation>
     </message>
     <message>
         <location line="+2"/>
-        <source>The Bitcoin Core developers</source>
+        <source>The Bitcoin XT developers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3659,7 +3659,7 @@
     </message>
     <message>
         <location line="+20"/>
-        <source>Unable to bind to %s on this computer. Bitcoin Core is probably already running.</source>
+        <source>Unable to bind to %s on this computer. Bitcoin XT is probably already running.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3904,7 +3904,7 @@
     </message>
     <message>
         <location line="+4"/>
-        <source>Cannot obtain a lock on data directory %s. Bitcoin Core is probably already running.</source>
+        <source>Cannot obtain a lock on data directory %s. Bitcoin XT is probably already running.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4009,7 +4009,7 @@ for example: alertnotify=echo %%s | mail -s &quot;Bitcoin Alert&quot; admin@foo.
     </message>
     <message>
         <location line="+6"/>
-        <source>Warning: Please check that your computer&apos;s date and time are correct! If your clock is wrong Bitcoin Core will not work properly.</source>
+        <source>Warning: Please check that your computer&apos;s date and time are correct! If your clock is wrong Bitcoin XT will not work properly.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4059,7 +4059,7 @@ for example: alertnotify=echo %%s | mail -s &quot;Bitcoin Alert&quot; admin@foo.
     </message>
     <message>
         <location line="+3"/>
-        <source>Copyright (C) 2009-%i The Bitcoin Core Developers</source>
+        <source>Copyright (C) 2009-%i The Bitcoin XT Developers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4069,7 +4069,7 @@ for example: alertnotify=echo %%s | mail -s &quot;Bitcoin Alert&quot; admin@foo.
     </message>
     <message>
         <location line="+10"/>
-        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin Core</source>
+        <source>Error loading wallet.dat: Wallet requires newer version of Bitcoin XT</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4094,7 +4094,7 @@ for example: alertnotify=echo %%s | mail -s &quot;Bitcoin Alert&quot; admin@foo.
     </message>
     <message>
         <location line="+1"/>
-        <source>Initialization sanity check failed. Bitcoin Core is shutting down.</source>
+        <source>Initialization sanity check failed. Bitcoin XT is shutting down.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4254,7 +4254,7 @@ for example: alertnotify=echo %%s | mail -s &quot;Bitcoin Alert&quot; admin@foo.
     </message>
     <message>
         <location line="+4"/>
-        <source>Wallet needed to be rewritten: restart Bitcoin Core to complete</source>
+        <source>Wallet needed to be rewritten: restart Bitcoin XT to complete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
