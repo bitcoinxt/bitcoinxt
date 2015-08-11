@@ -124,9 +124,7 @@ CBlock ThinBlockBuilder::finishBlock() {
     for (size_t i = 0; i < thinBlock.vtx.size(); ++i)
         assert(!thinBlock.vtx[i].IsNull());
 
-    bool dummy;
-    const uint256& root = thinBlock.BuildMerkleTree(&dummy);
-
+    const uint256& root = thinBlock.ComputeMerkleRoot();
 
     if (root != thinBlock.hashMerkleRoot) {
         std::stringstream ss;
