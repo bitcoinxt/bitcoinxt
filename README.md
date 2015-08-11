@@ -1,4 +1,4 @@
-*Want to get XT? Download it from https://bitcoinxt.software*
+*Want to get XT? Download it from http://xtnodes.com/*
 
 Bitcoin XT
 ==========
