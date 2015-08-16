@@ -3952,11 +3952,16 @@ string GetWarnings(string strFor)
 //
 
 static std::map<std::string, size_t> maxMessageSizes = boost::assign::map_list_of
-    ("getaddr",0)
-    ("mempool",0)
-    ("ping",8)
-    ("pong",8)
+    // values list the max size of each part of the message payload currently defined/used.
+    // values equate to the max payload size for that respective message type.
+    ("getaddr", 0)
+    ("mempool", 0)
+    ("ping", 8)
+    ("pong", 8)
     ("verack", 0)
+    ("version", 4 + 8 + 8 + (4 + 8 + 16 + 2) + (4 + 8 + 16 + 2) + 8 + (3 + 256) + 4 + 1)
+    ("filterclear", 0)
+    ("reject", (1 + 12) + 1 + (1 + 111) + 32) // this is loose max because the max valid is actually 151 bytes as of BIP 61. see the p2p_protocol_tests unit tests.
     ;
 
 bool static SanityCheckMessage(CNode* peer, const CNetMessage& msg)
@@ -4223,7 +4228,7 @@ bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, ve
 }
 
 
-bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived)
+bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived)
 {
     const CChainParams& chainparams = Params();
     RandAddSeedPerfmon();
@@ -5039,6 +5044,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
             } catch (const std::ios_base::failure&) {
                 // Avoid feedback loops by preventing reject messages from triggering a new reject message.
                 LogPrint("net", "Unparseable reject message received\n");
+                return false;
             }
         }
     }
@@ -5162,7 +5168,7 @@ bool ProcessMessages(CNode* pfrom)
         }
 
         if (!fRet)
-            LogPrintf("%s(%s, %u bytes) FAILED peer=%d\n", __func__, SanitizeString(strCommand), nMessageSize, pfrom->id);
+            LogPrint("net", "%s(%s, %u bytes) FAILED peer=%d\n", __func__, SanitizeString(strCommand), nMessageSize, pfrom->id);
 
         break;
     }
