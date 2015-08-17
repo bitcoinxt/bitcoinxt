@@ -14,7 +14,6 @@
 #include "net.h"
 #include "pow.h"
 #include "primitives/transaction.h"
-#include "timedata.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #ifdef ENABLE_WALLET
@@ -83,7 +82,7 @@ public:
 
 void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev)
 {
-    pblock->nTime = std::max(pindexPrev->GetMedianTimePast()+1, GetAdjustedTime());
+    pblock->nTime = std::max(pindexPrev->GetMedianTimePast()+1, GetTime());
 
     // Updating time can change work required on testnet:
     if (consensusParams.fPowAllowMinDifficultyBlocks)
@@ -127,7 +126,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         LOCK2(cs_main, mempool.cs);
         CBlockIndex* pindexPrev = chainActive.Tip();
         const int nHeight = pindexPrev->nHeight + 1;
-        pblock->nTime = GetAdjustedTime();
+        pblock->nTime = GetTime();
         CCoinsViewCache view(pcoinsTip);
 
         UpdateTime(pblock, Params().GetConsensus(), pindexPrev);

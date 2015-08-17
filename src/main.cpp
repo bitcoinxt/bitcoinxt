@@ -758,7 +758,7 @@ bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime)
 bool CheckFinalTx(const CTransaction &tx)
 {
     AssertLockHeld(cs_main);
-    return IsFinalTx(tx, chainActive.Height() + 1, GetAdjustedTime());
+    return IsFinalTx(tx, chainActive.Height() + 1, GetTime());
 }
 
 /**
@@ -924,7 +924,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, uint64_t 
 }
 
 static uint64_t CalcDefaultBlockPrioritySize() {
-    uint64_t nConsensusMaxSize = Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load());
+    uint64_t nConsensusMaxSize = Params().GetConsensus().MaxBlockSize(GetTime(), sizeForkTime.load());
     // How much of the block should be dedicated to high-priority transactions,
     // included regardless of the fees they pay. This is to help people who want
     // to make free transactions and don't mind waiting a while: coin age stands
@@ -1004,7 +1004,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     if (pfMissingInputs)
         *pfMissingInputs = false;
 
-    if (!CheckTransaction(tx, state, Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load())))
+    if (!CheckTransaction(tx, state, Params().GetConsensus().MaxBlockSize(GetTime(), sizeForkTime.load())))
         return error("AcceptToMemoryPool: CheckTransaction failed");
 
     // Coinbase is only valid in a block, not as a loose transaction
@@ -1856,7 +1856,7 @@ void PartitionCheck(bool (*initialDownloadCheck)(), CCriticalSection& cs, const 
     if (bestHeader == NULL || initialDownloadCheck()) return;
 
     static int64_t lastAlertTime = 0;
-    int64_t now = GetAdjustedTime();
+    int64_t now = GetTime();
     if (lastAlertTime > now-60*60*24) return; // Alert at most once per day
 
     const int SPAN_HOURS=4;
@@ -1866,7 +1866,7 @@ void PartitionCheck(bool (*initialDownloadCheck)(), CCriticalSection& cs, const 
     boost::math::poisson_distribution<double> poisson(BLOCKS_EXPECTED);
 
     std::string strWarning;
-    int64_t startTime = GetAdjustedTime()-SPAN_SECONDS;
+    int64_t startTime = GetTime()-SPAN_SECONDS;
 
     LOCK(cs);
     const CBlockIndex* i = bestHeader;
@@ -2822,7 +2822,7 @@ bool CheckBlockHeader(const CBlockHeader& block, CValidationState& state, bool f
                          REJECT_INVALID, "high-hash");
 
     // Check timestamp
-    if (block.GetBlockTime() > GetAdjustedTime() + 2 * 60 * 60)
+    if (block.GetBlockTime() > GetTime() + 2 * 60 * 60)
         return state.Invalid(error("CheckBlockHeader(): block timestamp too far in the future"),
                              REJECT_INVALID, "time-too-new");
 
@@ -3603,7 +3603,7 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
     int nLoaded = 0;
     try {
         // This takes over fileIn and calls fclose() on it in the CBufferedFile destructor
-        uint64_t nMaxBlocksize = chainparams.GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load());
+        uint64_t nMaxBlocksize = chainparams.GetConsensus().MaxBlockSize(GetTime(), sizeForkTime.load());
         CBufferedFile blkdat(fileIn, 2*nMaxBlocksize, nMaxBlocksize+8, SER_DISK, CLIENT_VERSION);
         uint64_t nRewind = blkdat.GetPos();
         while (!blkdat.eof()) {
@@ -3963,7 +3963,7 @@ bool static SanityCheckMessage(CNode* peer, const CNetMessage& msg)
 {
     const std::string& strCommand = msg.hdr.GetCommand();
     if (strCommand == "block") {
-        uint64_t maxSize = Params().GetConsensus().MaxBlockSize(GetAdjustedTime() + 2 * 60 * 60, sizeForkTime.load());
+        uint64_t maxSize = Params().GetConsensus().MaxBlockSize(GetTime() + 2 * 60 * 60, sizeForkTime.load());
         if (msg.hdr.nMessageSize > maxSize) {
             LogPrint("net", "Oversized %s message from peer=%i\n", SanitizeString(strCommand), peer->GetId());
             return false;
@@ -4352,14 +4352,13 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         string group = pfrom->ipgroup.name != "" ? tfm::format(", ipgroup=%s", pfrom->ipgroup.name) : "";
 
-        LogPrintf("receive version message: %s: version %d, blocks=%d, us=%s, peerid=%d%s%s\n",
-                  pfrom->cleanSubVer, pfrom->nVersion,
-                  pfrom->nStartingHeight, addrMe.ToString(), pfrom->id,
-                  group, remoteAddr);
-
         int64_t nTimeOffset = nTime - GetTime();
         pfrom->nTimeOffset = nTimeOffset;
-        AddTimeData(pfrom->addr, nTimeOffset);
+
+        LogPrintf("receive version message: %s: version %d, blocks=%d, offset=%lld, us=%s, peerid=%d%s%s\n",
+                  pfrom->cleanSubVer, pfrom->nVersion,
+                  pfrom->nStartingHeight, pfrom->nTimeOffset, addrMe.ToString(), pfrom->id,
+                  group, remoteAddr);
     }
 
 
@@ -4398,7 +4397,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
 
         // Store the new addresses
         vector<CAddress> vAddrOk;
-        int64_t nNow = GetAdjustedTime();
+        int64_t nNow = GetTime();
         int64_t nSince = nNow - 10 * 60;
         BOOST_FOREACH(CAddress& addr, vAddr)
         {
@@ -4493,7 +4492,7 @@ bool static ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, 
                     // not a direct successor.
                     pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), inv.hash);
                     NodeStatePtr nodestate(pfrom->GetId());
-                    if (chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - chainparams.GetConsensus().nPowTargetSpacing * 20 &&
+                    if (chainActive.Tip()->GetBlockTime() > GetTime() - chainparams.GetConsensus().nPowTargetSpacing * 20 &&
                         nodestate->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
                         vToFetch.push_back(inv);
                         // Mark block as in flight already, even though the actual "getdata" message only goes out
@@ -5286,7 +5285,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         bool fFetch = statePtr->fPreferredDownload || (nPreferredDownload == 0 && !pto->fClient && !pto->fOneShot); // Download if this is a nice peer, or we have no nice peers and this one might do.
         if (!statePtr->fSyncStarted && !pto->fClient && !fImporting && !fReindex) {
             // Only actively request headers from a single peer, unless we're close to today.
-            if ((nSyncStarted == 0 && fFetch) || pindexBestHeader->GetBlockTime() > GetAdjustedTime() - 24 * 60 * 60) {
+            if ((nSyncStarted == 0 && fFetch) || pindexBestHeader->GetBlockTime() > GetTime() - 24 * 60 * 60) {
                 statePtr->fSyncStarted = true;
                 nSyncStarted++;
                 CBlockIndex *pindexStart = pindexBestHeader->pprev ? pindexBestHeader->pprev : pindexBestHeader;

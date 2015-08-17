@@ -9,7 +9,6 @@
 #include "protocol.h"
 #include "random.h"
 #include "sync.h"
-#include "timedata.h"
 #include "util.h"
 
 #include <map>
@@ -95,10 +94,10 @@ public:
     int GetBucketPosition(const uint256 &nKey, bool fNew, int nBucket) const;
 
     //! Determine whether the statistics about this entry are bad enough so that it can just be deleted
-    bool IsTerrible(int64_t nNow = GetAdjustedTime()) const;
+    bool IsTerrible(int64_t nNow = GetTime()) const;
 
     //! Calculate the relative chance this entry should be given when selecting nodes to connect to
-    double GetChance(int64_t nNow = GetAdjustedTime()) const;
+    double GetChance(int64_t nNow = GetTime()) const;
 
 };
 
@@ -508,7 +507,7 @@ public:
     }
 
     //! Mark an entry as accessible.
-    void Good(const CService &addr, int64_t nTime = GetAdjustedTime())
+    void Good(const CService &addr, int64_t nTime = GetTime())
     {
         {
             LOCK(cs);
@@ -519,7 +518,7 @@ public:
     }
 
     //! Mark an entry as connection attempted to.
-    void Attempt(const CService &addr, int64_t nTime = GetAdjustedTime())
+    void Attempt(const CService &addr, int64_t nTime = GetTime())
     {
         {
             LOCK(cs);
@@ -558,7 +557,7 @@ public:
     }
 
     //! Mark an entry as currently-connected-to.
-    void Connected(const CService &addr, int64_t nTime = GetAdjustedTime())
+    void Connected(const CService &addr, int64_t nTime = GetTime())
     {
         {
             LOCK(cs);

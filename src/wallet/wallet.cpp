@@ -14,7 +14,6 @@
 #include "net.h"
 #include "script/script.h"
 #include "script/sign.h"
-#include "timedata.h"
 #include "util.h"
 #include "utilmoneystr.h"
 
@@ -633,7 +632,7 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFromLoadWallet, CWalletD
         bool fInsertedNew = ret.second;
         if (fInsertedNew)
         {
-            wtx.nTimeReceived = GetAdjustedTime();
+            wtx.nTimeReceived = GetTime();
             wtx.nOrderPos = IncOrderPosNext(pwalletdb);
 
             wtx.nTimeSmart = wtx.nTimeReceived;
