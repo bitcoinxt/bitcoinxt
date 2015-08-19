@@ -305,7 +305,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
                 if (!resourceTracker.IsWithinLimits())
                     break; // stop before adding this transaction to the block
                 else
-                    // If ConnectInputs fails for some other reason,
+                    // If CheckInputs fails for some other reason,
                     // continue to consider other transactions for inclusion
                     // in this block. This should almost never happen-- it
                     // could theoretically happen if a timelocked transaction
