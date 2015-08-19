@@ -23,8 +23,7 @@ Currently it contains the following additional changes:
 4. DNS seed changes: bitseed.xf2.org is removed as it no longer works, and seeds from Addy Yeow and Mike Hearn are
    (re)added to increase seed diversity and redundancy.
 
-XT uses the same data directories as Core so you can easily switch back and forth. You do *not* need to redownload
-the block chain.
+XT uses the same data directories as Core so you can easily switch back and forth. You will keep and continue updating the same block chain.
 
 Bitcoin XT downloads are code signed and are [built reproducibly using gitian](https://github.com/bitcoinxt/gitian.sigs).
 If you use it please [sign up to the announcement mailing list](https://bitcoinxt.software) so you can be reminded
