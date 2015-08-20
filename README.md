@@ -7,6 +7,10 @@ Bitcoin XT is a patch set on top of Bitcoin Core. It implements various changes 
 
 https://bitcoinxt.software/patches.html
 
+XT uses the same data directories as Core so you can easily switch back and forth. You will keep and continue updating the same block chain.
+ 
+Bitcoin XT downloads are code signed and are [built reproducibly using gitian](https://github.com/bitcoinxt/gitian.sigs). If you use it please [sign up to the announcement mailing list](https://bitcoinxt.software) so you can be reminded of new versions.
+
 Development process
 ===================
 
