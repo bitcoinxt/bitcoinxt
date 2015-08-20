@@ -3,50 +3,9 @@
 Bitcoin XT
 ==========
 
-Bitcoin XT is a patch set on top of Bitcoin Core, with a focus on upgrades to the peer to peer protocol. By running it
-you can opt in to providing the Bitcoin network with additional services beyond what Bitcoin Core provides.
+Bitcoin XT is a patch set on top of Bitcoin Core. It implements various changes which you can read about on the website:
 
-Currently it contains the following additional changes:
-
-1. *Support for larger blocks.* XT has support for BIP 101 by Gavin Andresen, which schedules an increase from the
-   one megabyte limit Bitcoin is now hitting.
-2. Relaying of double spends. Bitcoin Core will simply drop unconfirmed transactions that double spend other unconfirmed
-   transactions, forcing merchants who want to know about them to connect to thousands of nodes in the hope of spotting
-   them. This is unreliable, wastes resources and isn't feasible on mobile devices. Bitcoin XT incorporates work by
-   Tom Harding and Gavin Andresen that relays the first observed double spend of a transaction. Additionally, it will
-   highlight it in red in the user interface. Other wallets also have the opportunity to use the new information to alert
-   the user that there is a fraud attempt against them.
-3. Support for querying the UTXO set given an outpoint. This is useful for apps that use partial transactions, such as
-   the [Lighthouse](https://github.com/vinumeris/lighthouse) crowdfunding app. The feature allows a client to check that
-   a partial SIGHASH_ANYONECANPAY transaction is correctly signed and by querying multiple nodes, build up some
-   confidence that the output is not already spent.
-4. DNS seed changes: bitseed.xf2.org is removed as it no longer works, and seeds from Addy Yeow and Mike Hearn are
-   (re)added to increase seed diversity and redundancy.
-
-XT uses the same data directories as Core so you can easily switch back and forth. You will keep and continue updating the same block chain.
-
-Bitcoin XT downloads are code signed and are [built reproducibly using gitian](https://github.com/bitcoinxt/gitian.sigs).
-If you use it please [sign up to the announcement mailing list](https://bitcoinxt.software) so you can be reminded
-of new versions.
-
-The XT Manifesto
-================
-
-Bitcoin XT incorporates changes that didn't make it into Core, or are very unlikely to, due to differing philosophies.
-
-The principles XT uses to guide decisions on patches are as follows:
-
-* We try to follow the founding vision of the Bitcoin project, as defined by Satoshi's writings. That means:
-  * We support a Bitcoin network in which ordinary people settle with each directly on the block chain.
-  * We aim for mainstream adoption, by people who may not be ideologically motivated.
-  * We focus on the user experience, as ultimately, how users experience Bitcoin is fundamental to the project's success.
-* Better is better. Changes can be useful even if more work remains to be done, or there are theoretically better
-  proposals not backed by working code. Put another way, perfect is the enemy of the good.
-* Truly mainstream adoption is not inevitable; it requires hard work by everyone. We must never make decisions based on
-  the assumption of inevitable success.
-* There is a clear decision making process, and product decisions are made in a timely manner.
-* We maintain a professional working environment at all times. The developer discussion forum is moderated and
-  troublemaking, nastyness, Machiavellianism etc will result in bans.
+https://bitcoinxt.software/patches.html
 
 Development process
 ===================
@@ -56,6 +15,10 @@ To propose a patch for inclusion or to discuss Bitcoin development in general, y
 The repository has a similar structure to upstream, however, because patches are constantly rebased every release
 has a branch including the minor ones. XT releases use the upstream version with a letter after them. If two releases
 are done based on the same upstream release, the letter is incremented (0.11.0A, 0.11.0B etc).
+
+We have a manifesto that lays out things we believe are important, which you can read about here:
+
+https://bitcoinxt.software/
 
 About double spend relaying
 ===========================
