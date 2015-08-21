@@ -22,10 +22,29 @@ tarball=bitcoin-$ver-linux64.tar.gz
 tar xzvf ../$tarball
 mv bitcoin-$ver usr
 
+# copy bitcoinxt.service file to lib/systemd/system directory
+mkdir -p lib/systemd/system 
+cp ../bitcoinxt.service lib/systemd/system
+
+# copy bitcoin.conf file to etc/bitcoinxt 
+mkdir -p etc/bitcoinxt
+cp ../bitcoin.conf etc/bitcoinxt
+
+# create file to force creation of data folder
+mkdir -p var/lib/bitcoinxt
+touch var/lib/bitcoinxt/.empty
+
 # Rename the binaries so we don't conflict with regular Bitcoin
 mv usr/bin/bitcoind usr/bin/bitcoinxt
 mv usr/bin/bitcoin-cli usr/bin/bitcoinxt-cli
 mv usr/bin/bitcoin-tx usr/bin/bitcoinxt-tx
+
+# Remove unneeded files 
+rm usr/bin/bitcoin-qt
+rm usr/bin/test_bitcoin
+rm usr/bin/test_bitcoin-qt
+rm usr/include/*
+rm usr/lib/*
 
 # Set up debian metadata. There are no dependencies beyond libc and other base DSOs as everything is statically linked.
 
@@ -36,6 +55,7 @@ Architecture: amd64
 Description: Bitcoin XT is a fully verifying Bitcoin node implementation, based on the sources of Bitcoin Core.
 Maintainer: Mike Hearn <hearn@vinumeris.com>
 Version: $realver
+Depends: adduser, ntp
 EOF
 
 cat <<EOF >DEBIAN/install
@@ -43,6 +63,50 @@ usr/bin/bitcoinxt usr/bin
 usr/bin/bitcoinxt-cli usr/bin
 usr/bin/bitcoinxt-tx usr/bin
 EOF
+
+cat <<EOF >DEBIAN/conffiles
+lib/systemd/system/bitcoinxt.service
+etc/bitcoinxt/bitcoin.conf
+var/lib/bitcoinxt/.empty
+EOF
+
+cat <<EOF >DEBIAN/postinst
+#!/bin/bash
+
+# add random rpc password to bitcoin.conf
+echo -n "rpcpassword=" >> /etc/bitcoinxt/bitcoin.conf 
+bash -c 'tr -dc a-zA-Z0-9 < /dev/urandom | head -c32 && echo' >> /etc/bitcoinxt/bitcoin.conf 
+
+# add users
+adduser --system --group --quiet bitcoin
+
+# cleanup permissions
+chown root:root /usr/bin/bitcoinxt*
+chown root:root /lib/systemd/system/bitcoinxt.service
+chown root:root /etc/bitcoinxt
+chown bitcoin:bitcoin /etc/bitcoinxt/bitcoin.conf
+chmod ug+r /etc/bitcoinxt/bitcoin.conf 
+chmod u+w /etc/bitcoinxt/bitcoin.conf
+chmod o-rw /etc/bitcoinxt/bitcoin.conf 
+chown -R bitcoin:bitcoin /var/lib/bitcoinxt
+chmod u+rwx /var/lib/bitcoinxt
+
+# enable and start bitcoinxt service
+systemctl enable bitcoinxt.service
+systemctl start bitcoinxt.service
+EOF
+
+chmod a+x DEBIAN/postinst 
+
+cat <<EOF >DEBIAN/prerm
+#!/bin/bash
+
+# stop and disable bitcoinxt service
+systemctl stop bitcoinxt.service
+systemctl disable bitcoinxt.service
+EOF
+
+chmod a+x DEBIAN/prerm
 
 cd ..
 
