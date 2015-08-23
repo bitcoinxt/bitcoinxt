@@ -33,6 +33,7 @@ These dependencies are required:
  ------------|------------------|----------------------
  libssl      | SSL Support      | Secure communications
  libboost    | Boost            | C++ Library
+ libcurl     | cURL             | Data Transfer Library
 
 Optional dependencies:
 
@@ -50,14 +51,14 @@ System requirements
 --------------------
 
 C++ compilers are memory-hungry. It is recommended to have at least 1 GB of
-memory available when compiling Bitcoin Core. With 512MB of memory or less
+memory available when compiling Bitcoin XT. With 512MB of memory or less
 compilation will take much longer due to swap thrashing.
 
 Dependency Build Instructions: Ubuntu & Debian
 ----------------------------------------------
 Build requirements:
 
-	sudo apt-get install build-essential libtool autotools-dev autoconf pkg-config libssl-dev
+	sudo apt-get install build-essential libtool autotools-dev autoconf pkg-config libssl-dev libcurl4-openssl-dev
 	
 for Ubuntu 12.04 and later or Debian 7 and later libboost-all-dev has to be installed:
 
@@ -163,7 +164,7 @@ cd db-4.8.30.NC/build_unix/
 ../dist/configure --enable-cxx --disable-shared --with-pic --prefix=$BDB_PREFIX
 make install
 
-# Configure Bitcoin Core to use our own-built instance of BDB
+# Configure Bitcoin XT to use our own-built instance of BDB
 cd $BITCOIN_ROOT
 ./configure (other args...) LDFLAGS="-L${BDB_PREFIX}/lib/" CPPFLAGS="-I${BDB_PREFIX}/include/"
 ```
