@@ -1,4 +1,5 @@
-**How To Create A Debian Package Installer**
+
+**Create A Debian Package Installer**
 
 1. Download gitian created bitcoinxt tar file to bitcoinxt/contrib/gitian-debian folder:
 
@@ -12,7 +13,7 @@
   ./build.sh
   ```
 
-**How To Test New Debian Package Installer**
+**Test New Debian Package Installer**
 
 1. Install newly created debian package on test debian system:
 
@@ -32,7 +33,7 @@
   sudo usermod -a -G bitcoin <your username>
   ```
   
-4. Logout and back into your account so new group assignment takes affect
+4. Logout and back into your account so new group assignment takes affect.
 
 5. Verify your username was added to the bitcoin group:
 
@@ -45,3 +46,8 @@
   ```
   /usr/bin/bitcoinxt-cli -conf=/etc/bitcoinxt/bitcoin.conf getinfo
   ```
+  
+7. Test bitcoinxt-qt with non-conflicting IP port:
+  
+  ```
+  bitcoinxt-qt -listen=0:8444
