@@ -4,8 +4,7 @@
 #
 #  Improvement ideas:
 #  - Install the man page from the source repo.
-#  - Install an init script or systemd file or whatever then hip kids use these days, so it starts at boot.
-#  - Wrap in a script that restarts the node if it crashes and/or sends crash reports/core dumps to some issue tracker.
+#  - Wrap in a script that sends crash reports/core dumps to some issue tracker.
 #  - etc ...
 
 ver=0.11.0
@@ -38,9 +37,9 @@ touch var/lib/bitcoinxt/.empty
 mv usr/bin/bitcoind usr/bin/bitcoinxt
 mv usr/bin/bitcoin-cli usr/bin/bitcoinxt-cli
 mv usr/bin/bitcoin-tx usr/bin/bitcoinxt-tx
+mv usr/bin/bitcoin-qt usr/bin/bitcoinxt-qt
 
 # Remove unneeded files 
-rm usr/bin/bitcoin-qt
 rm usr/bin/test_bitcoin
 rm usr/bin/test_bitcoin-qt
 rm usr/include/*
@@ -53,7 +52,7 @@ cat <<EOF >DEBIAN/control
 Package: bitcoinxt
 Architecture: amd64
 Description: Bitcoin XT is a fully verifying Bitcoin node implementation, based on the sources of Bitcoin Core.
-Maintainer: Mike Hearn <hearn@vinumeris.com>
+Maintainer: Steve Myers <steven.myers@gmail.com>
 Version: $realver
 Depends: adduser, ntp
 EOF
