@@ -15,9 +15,6 @@
  */
 const std::string CLIENT_NAME("Bitcoin XT");
 
-/**
- * Client version number
- */
 #define CLIENT_VERSION_SUFFIX ""
 
 
@@ -49,13 +46,13 @@ const std::string CLIENT_NAME("Bitcoin XT");
 #endif
 
 #define BUILD_DESC_WITH_SUFFIX(maj, min, rev, build, suffix) \
-    "v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev) "." DO_STRINGIZE(build) "-" DO_STRINGIZE(suffix)
+    "v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev) CLIENT_VERSION_XT_SUBVER "-" DO_STRINGIZE(suffix)
 
 #define BUILD_DESC_FROM_COMMIT(maj, min, rev, build, commit) \
-    "v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev) "." DO_STRINGIZE(build) "-g" commit
+    "v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev) CLIENT_VERSION_XT_SUBVER "-g" commit
 
 #define BUILD_DESC_FROM_UNKNOWN(maj, min, rev, build) \
-    "v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev) "." DO_STRINGIZE(build) "-unk"
+    "v" DO_STRINGIZE(maj) "." DO_STRINGIZE(min) "." DO_STRINGIZE(rev) CLIENT_VERSION_XT_SUBVER "-unk"
 
 #ifndef BUILD_DESC
 #ifdef BUILD_SUFFIX
@@ -94,11 +91,11 @@ std::string FormatFullVersion()
 /** 
  * Format the subversion field according to BIP 14 spec (https://github.com/bitcoin/bips/blob/master/bip-0014.mediawiki) 
  */
-std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments)
+std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments, const char *releaseCharacter)
 {
     std::ostringstream ss;
     ss << "/";
-    ss << name << ":" << FormatVersion(nClientVersion);
+    ss << name << ":" << FormatVersion(nClientVersion) << releaseCharacter;
     if (!comments.empty())
     {
         std::vector<std::string>::const_iterator it(comments.begin());
