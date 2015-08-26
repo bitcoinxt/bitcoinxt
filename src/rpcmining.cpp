@@ -582,10 +582,17 @@ Value getblocktemplate(const Array& params, bool fHelp)
     result.push_back(Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1));
     result.push_back(Pair("mutable", aMutable));
     result.push_back(Pair("noncerange", "00000000ffffffff"));
-    result.push_back(Pair("sigoplimit", Params().GetConsensus().MaxBlockLegacySigops(nBlockTime, sizeForkTime.load())));
     result.push_back(Pair("sizelimit", Params().GetConsensus().MaxBlockSize(nBlockTime, sizeForkTime.load())));
-    result.push_back(Pair("accuratesigoplimit", Params().GetConsensus().MaxBlockAccurateSigops(nBlockTime, sizeForkTime.load())));
-    result.push_back(Pair("sighashlimit", Params().GetConsensus().MaxBlockSighashBytes(nBlockTime, sizeForkTime.load())));
+    // Some JSON libraries can't parse full-64-bit integers. So limit the limits to
+    // the safe javascript number limit, which is 2^53-1
+    // (see http://www.ecma-international.org/ecma-262/6.0/#sec-number.max_safe_integer )
+    uint64_t JSON_NUMBER_LIMIT = 9007199254740991;
+    uint64_t sigoplimit = Params().GetConsensus().MaxBlockLegacySigops(nBlockTime, sizeForkTime.load());
+    result.push_back(Pair("sigoplimit", std::min(JSON_NUMBER_LIMIT, sigoplimit)));
+    uint64_t accuratesigoplimit = Params().GetConsensus().MaxBlockAccurateSigops(nBlockTime, sizeForkTime.load());
+    result.push_back(Pair("accuratesigoplimit", std::min(JSON_NUMBER_LIMIT, accuratesigoplimit)));
+    uint64_t sighashlimit = Params().GetConsensus().MaxBlockSighashBytes(nBlockTime, sizeForkTime.load());
+    result.push_back(Pair("sighashlimit", std::min(JSON_NUMBER_LIMIT, sighashlimit)));
     result.push_back(Pair("curtime", nBlockTime));
     result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
     result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight+1)));
