@@ -90,9 +90,15 @@ chmod o-rw /etc/bitcoinxt/bitcoin.conf
 chown -R bitcoin:bitcoin /var/lib/bitcoinxt
 chmod u+rwx /var/lib/bitcoinxt
 
-# enable and start bitcoinxt service
-systemctl enable bitcoinxt.service
-systemctl start bitcoinxt.service
+# enable and start bitcoinxt service if systemctl exists and is executable
+if [[ -x "/bin/systemctl" ]]
+then
+    /bin/systemctl enable bitcoinxt.service
+    /bin/systemctl start bitcoinxt.service
+else
+    echo "File '/bin/systemctl' is not executable or found, bitcoinxt not automatically enabled and started."
+fi
+
 EOF
 
 chmod a+x DEBIAN/postinst 
@@ -100,9 +106,14 @@ chmod a+x DEBIAN/postinst
 cat <<EOF >DEBIAN/prerm
 #!/bin/bash
 
-# stop and disable bitcoinxt service
-systemctl stop bitcoinxt.service
-systemctl disable bitcoinxt.service
+# stop and disable bitcoinxt service if systemctl exists and is executable
+if [[ -x "/bin/systemctl" ]]
+then
+    /bin/systemctl stop bitcoinxt.service
+    /bin/systemctl disable bitcoinxt.service
+else
+    echo "File '/bin/systemctl' is not executable or found, bitcoinxt not automatically stopped and disabled."
+fi
 EOF
 
 chmod a+x DEBIAN/prerm
