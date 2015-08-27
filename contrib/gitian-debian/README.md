@@ -50,16 +50,15 @@
   
   ```
   bitcoinxt-qt -listen=0:8444
+  ```
   
-**Test Uninstalling bitcoinxt Package**
-
-1. Uninstall bitcoinxt without removing config file or data:
+8. Uninstall bitcoinxt without removing config file or data:
 
   ```
   sudo apt-install uninstall bitcoinxt
   ```
 
-2. Uninstall bitcoinxt AND remove config file and data:
+9. Uninstall bitcoinxt AND remove config file and data:
 
   ```
   sudo apt-install purge bitcoinxt
