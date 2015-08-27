@@ -159,8 +159,8 @@ static CURLcode ssl_context_setup(CURL *curl, void *sslctx, void *param) {
     return CURLE_OK;
 }
 
-static CIPGroup *LoadIPDataFromWeb(const std::string &url, const std::string &groupname, int priority) {
-    std::string data;
+static CIPGroup *LoadIPDataFromWeb(const string &url, const string &groupname, int priority) {
+    string data;
 
     CurlWrapper curlWrapper;
     CURL *curl = curlWrapper.handle;
@@ -200,7 +200,7 @@ static CIPGroup *LoadIPDataFromWeb(const std::string &url, const std::string &gr
     CURLcode rv = curl_easy_perform(curl);
     if (rv == CURLE_OK) {
         LogPrintf("IP list download succeeded from %s\n", url.c_str());
-        std::vector<CSubNet> subnets = ParseIPData(data);
+        vector<CSubNet> subnets = ParseIPData(data);
         if (subnets.size() > 0) {
             CIPGroup *ipGroup = new CIPGroup;
             ipGroup->header.name = groupname;
@@ -216,7 +216,7 @@ static CIPGroup *LoadIPDataFromWeb(const std::string &url, const std::string &gr
 
 static CIPGroup *LoadTorIPsFromWeb() {
     // Just use the first IPv4 address for now. We could try all of them later on.
-    std::string ourip;
+    string ourip;
     {
         LOCK(cs_mapLocalHost);
         BOOST_FOREACH(const PAIRTYPE(CNetAddr, LocalServiceInfo) &item, mapLocalHost)
@@ -232,7 +232,7 @@ static CIPGroup *LoadTorIPsFromWeb() {
         // No routeable IPs so don't bother downloading: we can't receive connections from the outside anyway.
         return NULL;
     }
-    std::string url = strprintf("https://check.torproject.org/torbulkexitlist?ip=%s&port=8333", ourip);
+    string url = strprintf("https://check.torproject.org/torbulkexitlist?ip=%s&port=8333", ourip);
     return LoadIPDataFromWeb(url, "tor", OPEN_PROXY_PRIORITY);
 }
 
