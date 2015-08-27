@@ -1659,8 +1659,6 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (pnodeLocalHost == NULL)
         pnodeLocalHost = new CNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), nLocalServices));
 
-    InitIPGroups(&scheduler);
-
     Discover(threadGroup);
 
     //
@@ -1674,6 +1672,9 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Map ports with UPnP
     MapPort(GetBoolArg("-upnp", DEFAULT_UPNP));
+
+    // Download or load data that's useful for prioritising traffic by IP address.
+    InitIPGroups(&scheduler);
 
     // Send and receive from sockets, accept connections
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "net", &ThreadSocketHandler));

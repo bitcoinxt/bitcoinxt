@@ -15,6 +15,7 @@
 #include "sync.h"
 #include "scheduler.h"
 #include "chainparams.h"
+#include "net.h"
 
 #include "torips.h"
 #include "utilstrencodings.h"
@@ -28,7 +29,7 @@ static vector<CIPGroup> groups;
 // As of July 2015 the Tor IPs document is only 169kb in size so this is plenty.
 static const size_t MAX_DOWNLOAD_SIZE = 1024 * 1024;
 static const int OPEN_PROXY_PRIORITY = -10;
-static const int DEFAULT_TOR_POLL_INTERVAL = 60 * 60 * 24;  // Once per day is plenty.
+static const int DEFAULT_IP_PRIO_URL_POLL_INTERVAL = 60 * 60 * 24;  // Once per day is plenty.
 
 extern bool fListen;
 
@@ -61,25 +62,22 @@ static size_t CurlData(void *ptr, size_t size, size_t nmemb, void *user_ptr) {
     return realsize;
 }
 
-vector<CSubNet> ParseTorData(string input) {
-    vector<string> words;
+vector<CSubNet> ParseIPData(string input) {
+    vector<string> lines;
     vector<CSubNet> results;
-    boost::split(words, input, boost::is_any_of("\n "));
-    for (size_t i = 0; i < words.size(); i++) {
-        if (words[i] == "ExitAddress") {
-            if (++i == words.size()) {
-                LogPrintf("Failed to parse Tor data: truncated\n");
-                results.clear();
-                return results;
-            }
-            CSubNet subNet(words[i]);
-            if (!subNet.IsValid() || words[i].find("/") != string::npos) {
-                LogPrintf("Failed to parse IP address from Tor data at word %d: %s\n", i, SanitizeString(words[i]));
-                results.clear();
-                return results;
-            }
-            results.push_back(subNet);
+    boost::split(lines, input, boost::is_any_of("\n"));
+    for (size_t i = 0; i < lines.size(); i++) {
+        // Skip empty lines and comments.
+        if (lines[i].size() == 0) continue;
+        if (lines[i].size() > 1 && lines[i][0] == '#') continue;
+
+        CSubNet subNet(lines[i]);
+        if (!subNet.IsValid()) {
+            LogPrintf("Failed to parse IP address from IP data file at line %d: %s\n", i, SanitizeString(lines[i]));
+            results.clear();
+            return results;
         }
+        results.push_back(subNet);
     }
     return results;
 }
@@ -90,7 +88,7 @@ struct CurlWrapper {
     CurlWrapper() {
         CURLcode rv = curl_global_init(CURL_GLOBAL_ALL);
         if (rv != CURLE_OK) {
-            LogPrintf("libcurl failed to initialize, cannot load Tor IPs: %s\n", curl_easy_strerror(rv));
+            LogPrintf("libcurl failed to initialize, cannot load IP priority data: %s\n", curl_easy_strerror(rv));
             handle = NULL;
         } else {
             handle = curl_easy_init();
@@ -151,8 +149,7 @@ static CURLcode ssl_context_setup(CURL *curl, void *sslctx, void *param) {
     if (store != NULL) {
         // And add. We don't check the return code because we don't care: this is
         // strictly best effort only.
-        int ret = X509_STORE_add_cert(store, cert);
-        LogPrintf("Tor IPs: adding cert to store: %d\n", ret);
+        X509_STORE_add_cert(store, cert);
     } else {
         LogPrintf("NULL cert store");
     }
@@ -162,7 +159,7 @@ static CURLcode ssl_context_setup(CURL *curl, void *sslctx, void *param) {
     return CURLE_OK;
 }
 
-static CIPGroup *LoadTorIPsFromWeb() {
+static CIPGroup *LoadIPDataFromWeb(const std::string &url, const std::string &groupname, int priority) {
     std::string data;
 
     CurlWrapper curlWrapper;
@@ -177,11 +174,11 @@ static CIPGroup *LoadTorIPsFromWeb() {
     curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
     curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);   // Follow redirects
     curl_easy_setopt(curl, CURLOPT_USERAGENT, "Bitcoin XT");
-    curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);   // Don't use up sockets on check.torproject.org unnecessarily.
+    curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);   // Don't use up sockets on the target website unnecessarily.
     curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &CurlData);
     curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
     curl_easy_setopt(curl, CURLOPT_SSL_CTX_FUNCTION, &ssl_context_setup);
-    curl_easy_setopt(curl, CURLOPT_URL, "https://check.torproject.org/exit-addresses");
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
 
     // curl/openssl seem to know how to use the platform CA store on win/mac.
 #if !defined(WIN32) && !defined(MAC_OSX)
@@ -202,19 +199,41 @@ static CIPGroup *LoadTorIPsFromWeb() {
     // This will block until the download is done.
     CURLcode rv = curl_easy_perform(curl);
     if (rv == CURLE_OK) {
-        LogPrintf("Tor IPs download succeeded\n");
-        std::vector<CSubNet> subnets = ParseTorData(data);
+        LogPrintf("IP list download succeeded from %s\n", url.c_str());
+        std::vector<CSubNet> subnets = ParseIPData(data);
         if (subnets.size() > 0) {
             CIPGroup *ipGroup = new CIPGroup;
-            ipGroup->header.name = "tor";
-            ipGroup->header.priority = OPEN_PROXY_PRIORITY;
+            ipGroup->header.name = groupname;
+            ipGroup->header.priority = priority;
             ipGroup->subnets.assign(subnets.begin(), subnets.end());
             return ipGroup;
         }
     } else {
-        LogPrintf("Failed to download Tor exit IPs: %s\n", curl_easy_strerror(rv));
+        LogPrintf("Failed to download IP priority data from %s: %s\n", url.c_str(), curl_easy_strerror(rv));
     }
     return NULL;
+}
+
+static CIPGroup *LoadTorIPsFromWeb() {
+    // Just use the first IPv4 address for now. We could try all of them later on.
+    std::string ourip;
+    {
+        LOCK(cs_mapLocalHost);
+        BOOST_FOREACH(const PAIRTYPE(CNetAddr, LocalServiceInfo) &item, mapLocalHost)
+        {
+            LogPrintf("Local IP: %s\n", item.first.ToString());
+            if (item.first.IsIPv4()) {
+                ourip = item.first.ToStringIP();
+                break;
+            }
+        }
+    }
+    if (ourip == "") {
+        // No routeable IPs so don't bother downloading: we can't receive connections from the outside anyway.
+        return NULL;
+    }
+    std::string url = strprintf("https://check.torproject.org/torbulkexitlist?ip=%s&port=8333", ourip);
+    return LoadIPDataFromWeb(url, "tor", OPEN_PROXY_PRIORITY);
 }
 
 static void LoadTorIPsFromStaticData() {
@@ -241,7 +260,7 @@ static void PollTorWebsite() {
                 return;
             }
         }
-        groups.push_back(*group.get());
+        groups.insert(groups.begin(), *group.get());
     }
 }
 
@@ -251,7 +270,7 @@ static void InitTorIPGroups(CScheduler *scheduler) {
     // a few seconds after startup (this can happen). Kick off a poll now and then do it (by default) once per day.
     if (scheduler) {
         scheduler->scheduleFromNow(&PollTorWebsite, 0);
-        scheduler->scheduleEvery(&PollTorWebsite, GetArg("-poll-tor-seconds", DEFAULT_TOR_POLL_INTERVAL));
+        scheduler->scheduleEvery(&PollTorWebsite, GetArg("-poll-tor-seconds", DEFAULT_IP_PRIO_URL_POLL_INTERVAL));
     }
     LoadTorIPsFromStaticData();
 }
