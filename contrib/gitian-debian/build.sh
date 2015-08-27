@@ -73,8 +73,7 @@ cat <<EOF >DEBIAN/postinst
 #!/bin/bash
 
 # add random rpc password to bitcoin.conf
-echo -n "rpcpassword=" >> /etc/bitcoinxt/bitcoin.conf 
-bash -c 'tr -dc a-zA-Z0-9 < /dev/urandom | head -c32 && echo' >> /etc/bitcoinxt/bitcoin.conf 
+echo "rpcpassword=$(xxd -l 16 -p /dev/urandom)" >> /etc/bitcoinxt/bitcoin.conf 
 
 # add users
 adduser --system --group --quiet bitcoin
