@@ -2581,7 +2581,7 @@ bool static DisconnectTip(CValidationState &state) {
     // UpdateTransactionsFromBlock finds descendants of any transactions in this
     // block that were added back and cleans up the mempool state.
     mempool.UpdateTransactionsFromBlock(vHashUpdate);
-    mempool.removeCoinbaseSpends(pcoinsTip, pindexDelete->nHeight);
+    mempool.removeForReorg(pcoinsTip, pindexDelete->nHeight);
     mempool.check(pcoinsTip);
 
     // Re-org past the size fork, reset activation condition:
