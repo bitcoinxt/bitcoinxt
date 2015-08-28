@@ -4,6 +4,7 @@
 
 #include <boost/foreach.hpp>
 #include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 #include <boost/algorithm/string.hpp>
 #ifdef WIN32
 #define CURL_STATICLIB
@@ -29,11 +30,14 @@ static vector<CIPGroup> groups;
 // As of July 2015 the Tor IPs document is only 169kb in size so this is plenty.
 static const size_t MAX_DOWNLOAD_SIZE = 1024 * 1024;
 static const int OPEN_PROXY_PRIORITY = -10;
+
+
 static const int DEFAULT_IP_PRIO_URL_POLL_INTERVAL = 60 * 60 * 24;  // Once per day is plenty.
+static const int DEFAULT_IP_PRIO_SRC_POLL_INTERVAL = 60;            // Once per minute for local files is fine.
 
 extern bool fListen;
 
-// Returns NULL if the IP does not belong to any group.
+// Returns the empty/default group if the IP does not belong to any group.
 CIPGroupData FindGroupForIP(CNetAddr ip) {
     LOCK(cs_groups);
     if (!ip.IsValid()) {
@@ -69,13 +73,12 @@ vector<CSubNet> ParseIPData(string input) {
     for (size_t i = 0; i < lines.size(); i++) {
         // Skip empty lines and comments.
         if (lines[i].size() == 0) continue;
-        if (lines[i].size() > 1 && lines[i][0] == '#') continue;
+        if (lines[i][0] == '#') continue;
 
         CSubNet subNet(lines[i]);
         if (!subNet.IsValid()) {
             LogPrintf("Failed to parse IP address from IP data file at line %d: %s\n", i, SanitizeString(lines[i]));
-            results.clear();
-            return results;
+            continue;
         }
         results.push_back(subNet);
     }
@@ -249,19 +252,85 @@ static void LoadTorIPsFromStaticData() {
     groups.push_back(ipGroup);
 }
 
+static void AddOrReplace(CIPGroup &group) {
+    LOCK(cs_groups);
+    // Try to replace existing group with same name.
+    for (size_t i = 0; i < groups.size(); i++) {
+        if (groups[i].header.name == group.header.name) {
+            groups[i] = group;
+            return;
+        }
+    }
+    groups.insert(groups.begin(), group);
+}
+
+static void MaybeRemoveGroup(const string &group_name) {
+    LOCK(cs_groups);
+    for (size_t i = 0; i < groups.size(); i++) {
+        if (groups[i].header.name == group_name) {
+            groups.erase(groups.begin() + i);
+            return;
+        }
+    }
+}
+
+static bool LoadIPGroupsFromFile(const boost::filesystem::path &path, const string &group_name, int priority) {
+    boost::filesystem::ifstream stream(path);
+    if (!stream.good()) {
+        LogPrintf("IP Priority: Unable to read specified IP priority source file %s\n", path.native());
+        return false;
+    }
+
+    stringstream buf;
+    buf << stream.rdbuf();
+
+    CIPGroup group;
+    group.header.name = group_name;
+    group.header.priority = priority;
+
+    group.subnets = ParseIPData(buf.str());
+    if (group.subnets.size() == 0) {
+        LogPrintf("IP Priority: File empty or unable to understand the contents of %s\n", path.native());
+        return false;
+    }
+
+    AddOrReplace(group);
+    return true;
+}
+
+void InitIPGroupsFromCommandLine() {
+    // Allow IP groups to be loaded from a file passed in via the command line.
+    vector<string> &srcs = mapMultiArgs[IP_PRIO_SRC_FLAG_NAME];
+    BOOST_FOREACH(const string &src, srcs)
+    {
+        vector<string> pieces;
+        boost::split(pieces, src, boost::is_any_of(","));
+        if (pieces.size() != 3) {
+            LogPrintf("The -ip-priority-source flag takes a triple of name,priority,file_name: you gave: %s\n", src);
+            continue;
+        }
+
+        string &group_name = pieces[0];
+        int prio = atoi(pieces[1].c_str());
+        if (prio == 0) {
+            LogPrintf("IP Priority: Could not parse %s as an integer or priority of zero would be useless\n", pieces[1]);
+            continue;
+        }
+        string &file_name = pieces[2];
+
+        boost::filesystem::path file_path(file_name);
+        boost::filesystem::path path = file_path.is_complete() ? file_path : GetDataDir(false) / file_name;
+
+        if (!LoadIPGroupsFromFile(path, group_name, prio)) {
+            MaybeRemoveGroup(group_name);
+        }
+    }
+}
+
 static void PollTorWebsite() {
     boost::scoped_ptr<CIPGroup> group(LoadTorIPsFromWeb());
-    if (group) {
-        LOCK(cs_groups);
-        // Try to replace existing.
-        for (size_t i = 0; i < groups.size(); i++) {
-            if (groups[i].header.name == "tor") {
-                groups[i] = *group.get();
-                return;
-            }
-        }
-        groups.insert(groups.begin(), *group.get());
-    }
+    if (group)
+        AddOrReplace(*group.get());
 }
 
 static void InitTorIPGroups(CScheduler *scheduler) {
@@ -276,6 +345,11 @@ static void InitTorIPGroups(CScheduler *scheduler) {
 }
 
 void InitIPGroups(CScheduler *scheduler) {
+    {
+        LOCK(cs_groups);
+        groups.clear();
+    }
+
     // If scheduler is NULL then we're in unit tests.
     if (scheduler) {
         // Don't use in regtest mode to avoid excessive and useless HTTP requests, don't use if the user disabled.
@@ -288,9 +362,12 @@ void InitIPGroups(CScheduler *scheduler) {
     }
 
     InitTorIPGroups(scheduler);
+    InitIPGroupsFromCommandLine();
+    if (scheduler)
+        scheduler->scheduleEvery(&InitIPGroupsFromCommandLine, GetArg("-poll-ip-sources-seconds", DEFAULT_IP_PRIO_SRC_POLL_INTERVAL));
 
     // Future ideas:
-    // - Load IP ranges from files to let node admin deprioritise ranges that seem to be jamming.
+    // - Load IP ranges from URLs to let node admin deprioritise ranges that seem to be jamming.
     // - Dialback on connect to see if an IP is listening/responding to port 8333: if so, more likely
     //   to be a valuable peer than an attacker, so bump priority.
     // - Raise priority of a connection as it does valuable things like relaying data to us.

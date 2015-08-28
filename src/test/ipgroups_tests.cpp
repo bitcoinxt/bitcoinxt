@@ -2,9 +2,14 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <ipgroups.h>
+#include <boost/filesystem.hpp>
+#include <boost/filesystem/fstream.hpp>
 #include <boost/test/unit_test_suite.hpp>
 #include <boost/test/test_tools.hpp>
+
+#include <ipgroups.h>
+#include <util.h>
+#include <test/test_bitcoin.h>
 
 extern std::vector<CSubNet> ParseIPData(std::string input);
 
@@ -47,6 +52,40 @@ BOOST_AUTO_TEST_CASE(parse_ip_data_bad)
     // If/when CSubNet("") is tightened up we can have more aggressive testing of junk here.
     // BOOST_CHECK_EQUAL(ParseIPData("1.2.3")[0].ToString(), "1.2.3.0/24");
     // BOOST_CHECK_EQUAL(ParseIPData("[2a00:1450:400a:805::").size(), 0);   // truncated
+}
+
+BOOST_AUTO_TEST_CASE(cmd_line_sources)
+{
+    TestingSetup setup;
+
+    {
+        boost::filesystem::ofstream stream(GetDataDir() / "ips-test1.txt");
+        stream << "100.200.3.4/24";
+    }
+    {
+        boost::filesystem::ofstream stream(GetDataDir() / "ips-test2.txt");
+        stream << "100.200.5.6";
+    }
+    mapMultiArgs[IP_PRIO_SRC_FLAG_NAME].push_back("test1,10,ips-test1.txt");
+    mapMultiArgs[IP_PRIO_SRC_FLAG_NAME].push_back("test2,-10,ips-test2.txt");
+    InitIPGroupsFromCommandLine();
+
+    BOOST_CHECK_EQUAL(FindGroupForIP(CNetAddr("100.200.3.1")).priority, 10);
+    BOOST_CHECK_EQUAL(FindGroupForIP(CNetAddr("100.200.3.1")).name, "test1");
+
+    BOOST_CHECK_EQUAL(FindGroupForIP(CNetAddr("100.200.5.6")).priority, -10);
+    BOOST_CHECK_EQUAL(FindGroupForIP(CNetAddr("100.200.5.6")).name, "test2");
+
+    // Check we're OK if the file disappears.
+    boost::filesystem::remove(GetDataDir() / "ips-test2.txt");
+    InitIPGroupsFromCommandLine();
+    BOOST_CHECK_EQUAL(FindGroupForIP(CNetAddr("100.200.5.6")).priority, 0);
+    BOOST_CHECK_EQUAL(FindGroupForIP(CNetAddr("100.200.3.1")).priority, 10);
+
+    // Or gets corrupted ....
+    boost::filesystem::resize_file(GetDataDir() / "ips-test1.txt", 3);
+    InitIPGroupsFromCommandLine();
+    BOOST_CHECK_EQUAL(FindGroupForIP(CNetAddr("100.200.3.1")).priority, 0);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
