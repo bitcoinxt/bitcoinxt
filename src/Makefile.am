@@ -136,6 +136,7 @@ BITCOIN_CORE_H = \
   support/pagelocker.h \
   sync.h \
   threadsafety.h \
+  timedata.h \
   tinyformat.h \
   torips.h \
   txdb.h \
@@ -198,6 +199,7 @@ libbitcoin_server_a_SOURCES = \
   rpcrawtransaction.cpp \
   rpcserver.cpp \
   script/sigcache.cpp \
+  timedata.cpp \
   txdb.cpp \
   txmempool.cpp \
   validationinterface.cpp \

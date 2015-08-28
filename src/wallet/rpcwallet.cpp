@@ -11,6 +11,7 @@
 #include "net.h"
 #include "netbase.h"
 #include "rpcserver.h"
+#include "timedata.h"
 #include "util.h"
 #include "utilmoneystr.h"
 #include "wallet.h"
@@ -825,7 +826,7 @@ Value movecmd(const Array& params, bool fHelp)
     if (!walletdb.TxnBegin())
         throw JSONRPCError(RPC_DATABASE_ERROR, "database error");
 
-    int64_t nNow = GetTime();
+    int64_t nNow = GetAdjustedTime();
 
     // Debit
     CAccountingEntry debit;
