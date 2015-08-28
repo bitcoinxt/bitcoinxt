@@ -295,6 +295,7 @@ std::string HelpMessage(HelpMessageMode mode)
 #if !defined(WIN32)
     strUsage += HelpMessageOpt("-sysperms", _("Create new files with system default permissions, instead of umask 077 (only effective with disabled wallet functionality)"));
 #endif
+    strUsage += HelpMessageOpt("-trustsystemclock", _("Trust, and depend solely on, the local system clock. Do not use peer time offset adjustments. (default: 1)"));
     strUsage += HelpMessageOpt("-txindex", strprintf(_("Maintain a full transaction index, used by the getrawtransaction rpc call (default: %u)"), 0));
 
     strUsage += HelpMessageGroup(_("Connection options:"));
