@@ -875,10 +875,11 @@ void ThreadSocketHandler()
                         LOCK(cs_vNodes);
                         BOOST_FOREACH(CNode *n, vNodes)
                         {
-                            int nodePriority = n->ipgroup.priority;
+                            CIPGroupData ngroup = FindGroupForIP(n->addr);
+                            int nodePriority = ngroup.priority;
                             if (nodePriority < ipgroup.priority) {
                                 LogPrintf("Connection slots exhausted, evicting peer %d with priority %d (group %s) to free up resources\n",
-                                          n->id, nodePriority, n->ipgroup.name == "" ? string("default") : n->ipgroup.name);
+                                          n->id, nodePriority, ngroup.name == "" ? string("default") : ngroup.name);
                                 n->fDisconnect = true;
                                 disconnected = true;
                                 // Leave shouldConnect = true to allow this socket through.
@@ -1997,7 +1998,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
         id = nLastNodeId++;
     }
 
-    ipgroup = FindGroupForIP(CNetAddr(addr.ToStringIP()));
+    CIPGroupData ipgroup = FindGroupForIP(CNetAddr(addr.ToStringIP()));
     std::string strIpGroup = ipgroup.name != "" ? tfm::format("(group %s)", ipgroup.name) : "";
     if (fLogIPs)
         LogPrint("net", "Added connection to %s peer=%d %s\n", addrName, id, strIpGroup);

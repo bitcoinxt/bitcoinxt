@@ -4355,7 +4355,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         if (fLogIPs)
             remoteAddr = ", peeraddr=" + pfrom->addr.ToString();
 
-        string group = pfrom->ipgroup.name != "" ? tfm::format(", ipgroup=%s", pfrom->ipgroup.name) : "";
+        CIPGroupData ipgroup = FindGroupForIP(pfrom->addr);
+        string group = ipgroup.name != "" ? tfm::format(", ipgroup=%s", ipgroup.name) : "";
 
         LogPrintf("receive version message: %s: version %d, blocks=%d, us=%s, peerid=%d%s%s\n",
                   pfrom->cleanSubVer, pfrom->nVersion,
