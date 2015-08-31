@@ -868,6 +868,11 @@ void ThreadSocketHandler()
                 {
                     // Calculate the priority of the new IP to see if we should drop it immediately (normal) or kick
                     // one of the other peers out to make room for it.
+
+                    // TODO: Lower the priority of an IP as it establishes more connections.
+                    // The goal is to force an attacker to spread out in order to get lots of priority.
+
+                    // See if this IP has static prio data from a group.
                     CIPGroupData ipgroup = FindGroupForIP(addr);
 
                     bool disconnected = false;
