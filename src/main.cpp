@@ -1004,7 +1004,9 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     if (pfMissingInputs)
         *pfMissingInputs = false;
 
-    if (!CheckTransaction(tx, state, Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load())))
+    int64_t maxBlockSize = Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load());
+
+    if (!CheckTransaction(tx, state, maxBlockSize))
         return error("AcceptToMemoryPool: CheckTransaction failed");
 
     // Coinbase is only valid in a block, not as a loose transaction
@@ -1183,8 +1185,51 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
         else
         {
-            // Store transaction in memory
-            pool.addUnchecked(hash, entry, !IsInitialBlockDownload());
+            // Default max mempool #tx: 25-blocks-worth of 500-byte transactions:
+            int64_t nDefaultMax = 25 * (int64_t)(maxBlockSize / 500);
+            int64_t nMaxPoolTx = GetArg("-maxmempooltx", nDefaultMax);
+
+            if (nMaxPoolTx <= 0) { // Zero or negative: don't limit
+                pool.addUnchecked(hash, entry, !IsInitialBlockDownload());
+            }
+            // fLimitFree is false when transactions are submitted from the wallet
+            // code or RPC send commands. We always want to add them to the pool,
+            // and want to prioritise them so they're never evicted:
+            else if (!fLimitFree) {
+                pool.addUnchecked(hash, entry, !IsInitialBlockDownload());
+                CAmount unused;
+                pool.PrioritiseTransaction(hash, hash.ToString(), AllowFreeThreshold(), unused);
+            }
+            // Mempool not full:
+            else if ((int64_t)pool.size() < nMaxPoolTx) {
+                pool.addUnchecked(hash, entry, !IsInitialBlockDownload());
+            }
+            else { // Mempool full...
+                static int64_t lastEstimate = 0; // Only call estimateFee every 10 minutes
+                static CFeeRate highFee;
+                if (entry.GetTime()-lastEstimate > 600) {
+                    lastEstimate = entry.GetTime();
+                    highFee = pool.estimateFee(2);
+                }
+                if (dPriority < AllowFreeThreshold() && CFeeRate(nFees, nSize) < highFee) {
+                    // Low-priority, low-fee: dropped immediately
+                    LogPrint("mempool", "mempool full, dropped %s\n", hash.ToString());
+                    SyncWithWallets(tx, NULL, false); // Let wallet know it exists
+                    return false;
+                }
+                // High enough priority/fee: add to pool, we'll evict somebody below
+                pool.addUnchecked(hash, entry, !IsInitialBlockDownload());
+            }
+            if (nMaxPoolTx > 0 && (int64_t)pool.size() > nMaxPoolTx) {
+                list<CTransaction> evicted;
+                pool.evictRandom(evicted);
+                BOOST_FOREACH(const CTransaction &etx, evicted) {
+                    LogPrint("mempool", "mempool full, evicted %s\n", etx.GetHash().ToString());
+                    SyncWithWallets(etx, NULL, false);
+                }
+                if (!pool.exists(hash))
+                    return false;
+            }
         }
     }
 

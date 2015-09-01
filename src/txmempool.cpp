@@ -219,6 +219,24 @@ void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx, unsigned i
     minerPolicyEstimator->processBlock(nBlockHeight, entries, fCurrentEstimate);
 }
 
+void CTxMemPool::evictRandom(std::list<CTransaction>& evicted)
+{
+    LOCK(cs);
+    if (mapTx.empty())
+        return;
+    for (int i = 0; i < 11; i++) {
+        map<uint256, CTxMemPoolEntry>::iterator it = mapTx.lower_bound(GetRandHash());
+        if (it == mapTx.end())
+            it = mapTx.begin();
+        if (mapDeltas.find(it->first) != mapDeltas.end())
+            continue;  // prioritised: try again
+        remove(it->second.GetTx(), evicted, true);
+        return;
+    }
+    // There is a small chance nothing will be evicted if the mempool is mostly
+    // prioritised transactions. That's OK.
+}
+
 void CTxMemPool::clear()
 {
     LOCK(cs);
@@ -373,7 +391,7 @@ void CTxMemPool::PrioritiseTransaction(const uint256 hash, const string strHash,
         deltas.first += dPriorityDelta;
         deltas.second += nFeeDelta;
     }
-    LogPrintf("PrioritiseTransaction: %s priority += %f, fee += %d\n", strHash, dPriorityDelta, FormatMoney(nFeeDelta));
+    LogPrint("mempool", "PrioritiseTransaction: %s priority += %f, fee += %d\n", strHash, dPriorityDelta, FormatMoney(nFeeDelta));
 }
 
 void CTxMemPool::ApplyDeltas(const uint256 hash, double &dPriorityDelta, CAmount &nFeeDelta)
