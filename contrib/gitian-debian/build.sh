@@ -21,11 +21,11 @@ tarball=bitcoin-$ver-linux64.tar.gz
 tar xzvf ../$tarball
 mv bitcoin-$ver usr
 
-# copy bitcoinxt.service file to lib/systemd/system directory
+# copy bitcoinxtd.service file to lib/systemd/system directory
 mkdir -p lib/systemd/system 
-cp ../bitcoinxt.service lib/systemd/system
+cp ../bitcoinxtd.service lib/systemd/system
 
-# copy bitcoin.conf file to etc/bitcoinxt 
+# copy bitcoin.conf file to etc/bitcoinxt
 mkdir -p etc/bitcoinxt
 cp ../bitcoin.conf etc/bitcoinxt
 
@@ -34,7 +34,7 @@ mkdir -p var/lib/bitcoinxt
 touch var/lib/bitcoinxt/.empty
 
 # Rename the binaries so we don't conflict with regular Bitcoin
-mv usr/bin/bitcoind usr/bin/bitcoinxt
+mv usr/bin/bitcoind usr/bin/bitcoinxtd
 mv usr/bin/bitcoin-cli usr/bin/bitcoinxt-cli
 mv usr/bin/bitcoin-tx usr/bin/bitcoinxt-tx
 mv usr/bin/bitcoin-qt usr/bin/bitcoinxt-qt
@@ -58,13 +58,13 @@ Depends: adduser, ntp
 EOF
 
 cat <<EOF >DEBIAN/install
-usr/bin/bitcoinxt usr/bin
+usr/bin/bitcoinxtd usr/bin
 usr/bin/bitcoinxt-cli usr/bin
 usr/bin/bitcoinxt-tx usr/bin
 EOF
 
 cat <<EOF >DEBIAN/conffiles
-lib/systemd/system/bitcoinxt.service
+lib/systemd/system/bitcoinxtd.service
 etc/bitcoinxt/bitcoin.conf
 var/lib/bitcoinxt/.empty
 EOF
@@ -80,7 +80,7 @@ adduser --system --group --quiet bitcoin
 
 # cleanup permissions
 chown root:root /usr/bin/bitcoinxt*
-chown root:root /lib/systemd/system/bitcoinxt.service
+chown root:root /lib/systemd/system/bitcoinxtd.service
 chown root:root /etc/bitcoinxt
 chown bitcoin:bitcoin /etc/bitcoinxt/bitcoin.conf
 chmod ug+r /etc/bitcoinxt/bitcoin.conf 
@@ -89,13 +89,13 @@ chmod o-rw /etc/bitcoinxt/bitcoin.conf
 chown -R bitcoin:bitcoin /var/lib/bitcoinxt
 chmod u+rwx /var/lib/bitcoinxt
 
-# enable and start bitcoinxt service if systemctl exists and is executable
+# enable and start bitcoinxtd service if systemctl exists and is executable
 if [[ -x "/bin/systemctl" ]]
 then
-    /bin/systemctl enable bitcoinxt.service
-    /bin/systemctl start bitcoinxt.service
+    /bin/systemctl enable bitcoinxtd.service
+    /bin/systemctl start bitcoinxtd.service
 else
-    echo "File '/bin/systemctl' is not executable or found, bitcoinxt not automatically enabled and started."
+    echo "File '/bin/systemctl' is not executable or found, bitcoinxtd not automatically enabled and started."
 fi
 
 EOF
@@ -105,13 +105,13 @@ chmod a+x DEBIAN/postinst
 cat <<EOF >DEBIAN/prerm
 #!/bin/bash
 
-# stop and disable bitcoinxt service if systemctl exists and is executable
+# stop and disable bitcoinxtd service if systemctl exists and is executable
 if [[ -x "/bin/systemctl" ]]
 then
-    /bin/systemctl stop bitcoinxt.service
-    /bin/systemctl disable bitcoinxt.service
+    /bin/systemctl stop bitcoinxtd.service
+    /bin/systemctl disable bitcoinxtd.service
 else
-    echo "File '/bin/systemctl' is not executable or found, bitcoinxt not automatically stopped and disabled."
+    echo "File '/bin/systemctl' is not executable or found, bitcoinxtd not automatically stopped and disabled."
 fi
 EOF
 

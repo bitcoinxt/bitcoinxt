@@ -1,5 +1,5 @@
 [Unit]
-Description=Bitcoin's distributed currency daemon
+Description=Bitcoin XT distributed currency daemon
 After=network.target
 
 [Service]
@@ -7,9 +7,9 @@ User=bitcoin
 Group=bitcoin
 
 Type=forking
-PIDFile=/var/lib/bitcoinxt/bitcoinxt.pid
-ExecStart=/usr/bin/bitcoinxt -daemon -pid=/var/lib/bitcoinxt/bitcoinxt.pid \
--conf=/etc/bitcoin/bitcoin.conf -datadir=/var/lib/bitcoinxt -disablewallet
+PIDFile=/var/lib/bitcoinxt/bitcoinxtd.pid
+ExecStart=/usr/bin/bitcoinxtd -daemon -pid=/var/lib/bitcoinxt/bitcoinxtd.pid \
+-conf=/etc/bitcoinxt/bitcoin.conf -datadir=/var/lib/bitcoinxt -disablewallet
 
 Restart=always
 PrivateTmp=true
