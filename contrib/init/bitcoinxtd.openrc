@@ -2,36 +2,36 @@
 
 # backward compatibility for existing gentoo layout 
 #
-if [ -d "/var/lib/bitcoin/.bitcoin" ]; then
-	BITCOINXT_DEFAULT_DATADIR="/var/lib/bitcoin/.bitcoin"
+if [ -d "/var/lib/bitcoinxt/.bitcoinxt" ]; then
+	BITCOINXTD_DEFAULT_DATADIR="/var/lib/bitcoinxt/.bitcoinxt"
 else
-	BITCOINXT_DEFAULT_DATADIR="/var/lib/bitcoinxt"
+	BITCOINXTD_DEFAULT_DATADIR="/var/lib/bitcoinxt"
 fi
 
-BITCOINXT_CONFIGFILE=${BITCOINXT_CONFIGFILE:-/etc/bitcoin/bitcoin.conf}
-BITCOINXT_PIDDIR=${BITCOINXT_PIDDIR:-/var/run/bitcoinxt}
-BITCOINXT_PIDFILE=${BITCOINXT_PIDFILE:-${BITCOINXT_PIDDIR}/bitcoinxt.pid}
-BITCOINXT_DATADIR=${BITCOINXT_DATADIR:-${BITCOINXT_DEFAULT_DATADIR}}
-BITCOINXT_USER=${BITCOINXT_USER:-${BITCOIN_USER:-bitcoin}}
-BITCOINXT_GROUP=${BITCOINXT_GROUP:-bitcoin}
-BITCOINXT_BIN=${BITCOINXT_BIN:-/usr/bin/bitcoinxt}
-BITCOINXT_NICE=${BITCOINXT_NICE:-${NICELEVEL:-0}}
-BITCOINXT_OPTS="${BITCOINXT_OPTS:-${BITCOIN_OPTS}}"
+BITCOINXTD_CONFIGFILE=${BITCOINXTD_CONFIGFILE:-/etc/bitcoinxt/bitcoin.conf}
+BITCOINXTD_PIDDIR=${BITCOINXTD_PIDDIR:-/var/run/bitcoinxt}
+BITCOINXTD_PIDFILE=${BITCOINXTD_PIDFILE:-${BITCOINXTD_PIDDIR}/bitcoinxtd.pid}
+BITCOINXTD_DATADIR=${BITCOINXTD_DATADIR:-${BITCOINXTD_DEFAULT_DATADIR}}
+BITCOINXTD_USER=${BITCOINXTD_USER:-${BITCOIN_USER:-bitcoin}}
+BITCOINXTD_GROUP=${BITCOINXTD_GROUP:-bitcoin}
+BITCOINXTD_BIN=${BITCOINXTD_BIN:-/usr/bin/bitcoinxtd}
+BITCOINXTD_NICE=${BITCOINXTD_NICE:-${NICELEVEL:-0}}
+BITCOINXTD_OPTS="${BITCOINXTD_OPTS:-${BITCOIN_OPTS}}"
 
 name="Bitcoin XT Daemon"
 description="Bitcoin cryptocurrency P2P network daemon"
 
-command="/usr/bin/bitcoinxt"
-command_args="-pid=\"${BITCOINXT_PIDFILE}\" \
-		-conf=\"${BITCOINXT_CONFIGFILE}\" \
-		-datadir=\"${BITCOINXT_DATADIR}\" \
+command="/usr/bin/bitcoinxtd"
+command_args="-pid=\"${BITCOINXTD_PIDFILE}\" \
+		-conf=\"${BITCOINXTD_CONFIGFILE}\" \
+		-datadir=\"${BITCOINXTD_DATADIR}\" \
 		-daemon \
-		${BITCOINXT_OPTS}"
+		${BITCOINXTD_OPTS}"
 
-required_files="${BITCOINXT_CONFIGFILE}"
-start_stop_daemon_args="-u ${BITCOINXT_USER} \
-			-N ${BITCOINXT_NICE} -w 2000"
-pidfile="${BITCOINXT_PIDFILE}"
+required_files="${BITCOINXTD_CONFIGFILE}"
+start_stop_daemon_args="-u ${BITCOINXTD_USER} \
+			-N ${BITCOINXTD_NICE} -w 2000"
+pidfile="${BITCOINXTD_PIDFILE}"
 retry=60
 
 depend() {
@@ -46,29 +46,29 @@ start_pre() {
 	checkpath \
 	-d \
 	--mode 0750 \
-	--owner "${BITCOINXT_USER}:${BITCOINXT_GROUP}" \
-	"${BITCOINXT_DATADIR}"
+	--owner "${BITCOINXTD_USER}:${BITCOINXTD_GROUP}" \
+	"${BITCOINXTD_DATADIR}"
 
 	checkpath \
 	-d \
 	--mode 0755 \
-	--owner "${BITCOINXT_USER}:${BITCOINXT_GROUP}" \
-	"${BITCOINXT_PIDDIR}"
+	--owner "${BITCOINXTD_USER}:${BITCOINXTD_GROUP}" \
+	"${BITCOINXTD_PIDDIR}"
 
 	checkpath -f \
-	-o ${BITCOINXT_USER}:${BITCOINXT_GROUP} \
+	-o ${BITCOINXTD_USER}:${BITCOINXTD_GROUP} \
 	-m 0660 \
-	${BITCOINXT_CONFIGFILE}
+	${BITCOINXTD_CONFIGFILE}
 
 	checkconfig || return 1
 }
 
 checkconfig()
 {
-	if ! grep -qs '^rpcpassword=' "${BITCOINXT_CONFIGFILE}" ; then
+	if ! grep -qs '^rpcpassword=' "${BITCOINXTD_CONFIGFILE}" ; then
 		eerror ""
-		eerror "ERROR: You must set a secure rpcpassword to run bitcoinxt."
-		eerror "The setting must appear in ${BITCOINXT_CONFIGFILE}"
+		eerror "ERROR: You must set a secure rpcpassword to run bitcoinxtd."
+		eerror "The setting must appear in ${BITCOINXTD_CONFIGFILE}"
 		eerror ""
 		eerror "This password is security critical to securing wallets "
 		eerror "and must not be the same as the rpcuser setting."

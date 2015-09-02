@@ -1,27 +1,27 @@
-# /etc/conf.d/bitcoinxt: config file for /etc/init.d/bitcoinxt
+# /etc/conf.d/bitcoinxtd: config file for /etc/init.d/bitcoinxtd
 
 # Config file location
-#BITCOINXT_CONFIGFILE="/etc/bitcoin/bitcoin.conf"
+#BITCOINXTD_CONFIGFILE="/etc/bitcoinxt/bitcoin.conf"
 
-# What directory to write pidfile to?  (created and owned by $BITCOINXT_USER)
-#BITCOINXT_PIDDIR="/var/run/bitcoinxt"
+# What directory to write pidfile to?  (created and owned by $BITCOINXTD_USER)
+#BITCOINXTD_PIDDIR="/var/run/bitcoinxt"
 
 # What filename to give the pidfile
-#BITCOINXT_PIDFILE="${BITCOINXT_PIDDIR}/bitcoinxt.pid"
+#BITCOINXTD_PIDFILE="${BITCOINXT_PIDDIR}/bitcoinxtd.pid"
 
-# Where to write bitcoinxt data (be mindful that the blockchain is large)
-#BITCOINXT_DATADIR="/var/lib/bitcoinxt"
+# Where to write bitcoinxtd data (be mindful that the blockchain is large)
+#BITCOINXTD_DATADIR="/var/lib/bitcoinxt"
 
-# User and group to own bitcoinxt process
-#BITCOINXT_USER="bitcoin"
-#BITCOINXT_GROUP="bitcoin"
+# User and group to own bitcoinxtd process
+#BITCOINXTD_USER="bitcoin"
+#BITCOINXTD_GROUP="bitcoin"
 
-# Path to bitcoinxt executable
-#BITCOINXT_BIN="/usr/bin/bitcoinxt"
+# Path to bitcoinxtd executable
+#BITCOINXTD_BIN="/usr/bin/bitcoinxtd"
 
-# Nice value to run bitcoinxt under
-#BITCOINXT_NICE=0
+# Nice value to run bitcoinxtd under
+#BITCOINXTD_NICE=0
 
 # Additional options (avoid -conf and -datadir, use flags above)
-BITCOINXT_OPTS="-disablewallet"
+BITCOINXTD_OPTS="-disablewallet"
 

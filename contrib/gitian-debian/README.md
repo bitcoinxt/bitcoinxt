@@ -23,7 +23,7 @@
 2. Verify bitcoinxt daemon installed and started:
 
   ```
-  sudo systemctl status bitcoinxt
+  sudo systemctl status bitcoinxtd
   ```
 
 3. Add your user account to the bitcoin system group:
