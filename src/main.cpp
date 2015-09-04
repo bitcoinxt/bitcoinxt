@@ -194,6 +194,10 @@ void InitRespendFilter() {
     doubleSpendFilter = CBloomFilter(MAX_DOUBLESPEND_BLOOM, 0.01, insecure_rand(), BLOOM_UPDATE_NONE);
 }
 
+bool IsStealthMode() {
+    return GetBoolArg("-stealth-mode", false);
+}
+
 //////////////////////////////////////////////////////////////////////////////
 //
 // Registration of network node signals.
@@ -1181,7 +1185,9 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             if (insecure_rand()%MAX_DOUBLESPEND_BLOOM == 0)
                 doubleSpendFilter.clear();
             doubleSpendFilter.insert(relayForOutpoint);
-            RelayTransaction(tx);
+
+            if (!IsStealthMode())
+                RelayTransaction(tx);
         }
         else
         {
@@ -4522,7 +4528,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             // Ignore duplicate advertisements for the same item from the same peer. This check
             // prevents a peer from constantly promising to deliver an item that it never does,
             // thus blinding us to new transactions and blocks.
-            if (!pfrom->AddInventoryKnown(inv))
+            if (!IsStealthMode() && !pfrom->AddInventoryKnown(inv))
                 continue;
 
             bool fAlreadyHave = AlreadyHave(inv);
@@ -4670,17 +4676,19 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
     else if (strCommand == "getutxos")
     {
-        bool fCheckMemPool;
-        vector<COutPoint> vOutPoints;
-        vRecv >> fCheckMemPool;
-        vRecv >> vOutPoints;
+        if (!IsStealthMode()) {
+            bool fCheckMemPool;
+            vector<COutPoint> vOutPoints;
+            vRecv >> fCheckMemPool;
+            vRecv >> vOutPoints;
 
-        vector<unsigned char> bitmap;
-        vector<CCoin> outs;
-        if (ProcessGetUTXOs(vOutPoints, fCheckMemPool, &bitmap, &outs))
-            pfrom->PushMessage("utxos", chainActive.Height(), chainActive.Tip()->GetBlockHash(), bitmap, outs);
-        else
-            Misbehaving(pfrom->GetId(), 20);
+            vector<unsigned char> bitmap;
+            vector<CCoin> outs;
+            if (ProcessGetUTXOs(vOutPoints, fCheckMemPool, &bitmap, &outs))
+                pfrom->PushMessage("utxos", chainActive.Height(), chainActive.Tip()->GetBlockHash(), bitmap, outs);
+            else
+                Misbehaving(pfrom->GetId(), 20);
+        }
     }
 
 

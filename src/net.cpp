@@ -8,7 +8,7 @@
 #endif
 
 #include "net.h"
-
+#include "main.h"
 #include "addrman.h"
 #include "chainparams.h"
 #include "clientversion.h"
@@ -427,8 +427,16 @@ void CNode::PushVersion()
         LogPrint("net", "send version message: version %d, blocks=%d, us=%s, them=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), addrYou.ToString(), id);
     else
         LogPrint("net", "send version message: version %d, blocks=%d, us=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), id);
-    PushMessage("version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
+
+    // Stealth mode: pretend to be like Bitcoin Core to hide from DoS attackers.
+    if (IsStealthMode()) {
+        uint64_t services = NODE_NETWORK;
+        PushMessage("version", 70002, services, nTime, addrYou, addrMe,
+                nLocalHostNonce, FormatSubVersion("Satoshi", CLIENT_VERSION, std::vector<string>(), ""), nBestHeight, true);        
+    } else {
+        PushMessage("version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
                 nLocalHostNonce, FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, std::vector<string>(), CLIENT_VERSION_XT_SUBVER), nBestHeight, true);
+    }
 }
 
 
