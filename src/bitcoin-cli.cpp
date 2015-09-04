@@ -17,7 +17,7 @@
 #include <event2/keyvalq_struct.h>
 #include "support/events.h"
 
-#include "univalue/univalue.h"
+#include <univalue.h>
 
 using namespace std;
 
