@@ -99,6 +99,7 @@ BITCOIN_CORE_H = \
   hash.h \
   init.h \
   ipgroups.h \
+  curl_wrapper.h \
   key.h \
   keystore.h \
   leveldbwrapper.h \
@@ -183,6 +184,7 @@ libbitcoin_server_a_SOURCES = \
   checkpoints.cpp \
   init.cpp \
   ipgroups.cpp \
+  curl_wrapper.cpp \
   leveldbwrapper.cpp \
   main.cpp \
   merkleblock.cpp \
