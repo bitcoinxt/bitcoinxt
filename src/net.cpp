@@ -17,6 +17,8 @@
 #include "ui_interface.h"
 #include "crypto/common.h"
 #include "ipgroups.h"
+#include "survey.h"
+#include "curl_wrapper.h"
 
 #ifdef WIN32
 #include <string.h>
@@ -1696,6 +1698,12 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Dump network addresses
     scheduler.scheduleEvery(&DumpAddresses, DUMP_ADDRESSES_INTERVAL);
+
+    if (GetBoolArg("-survey", false))
+    {
+        static Survey s(scheduler, std::auto_ptr<VersionNotifier>(
+                    new VersionNotifier()), MakeCurl());
+    }
 }
 
 bool StopNode()
