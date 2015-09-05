@@ -94,6 +94,7 @@ BITCOIN_CORE_H = \
   consensus/params.h \
   consensus/validation.h \
   core_io.h \
+  curl_wrapper.h \
   eccryptoverify.h \
   ecwrapper.h \
   hash.h \
@@ -183,6 +184,7 @@ libbitcoin_server_a_SOURCES = \
   checkpoints.cpp \
   init.cpp \
   ipgroups.cpp \
+  curl_wrapper.cpp \
   leveldbwrapper.cpp \
   main.cpp \
   merkleblock.cpp \
