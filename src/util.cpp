@@ -327,13 +327,14 @@ int64_t GetArg(const std::string& strArg, int64_t nDefault)
 
 bool GetBoolArg(const std::string& strArg, bool fDefault)
 {
-    if (mapArgs.count(strArg))
-    {
-        if (mapArgs[strArg].empty())
-            return true;
-        return (atoi(mapArgs[strArg]) != 0);
-    }
-    return fDefault;
+    std::map<std::string, std::string>::iterator iter = mapArgs.find(strArg);
+    if (iter == mapArgs.end())
+        return fDefault;
+
+    const std::string &value = iter->second;
+    if (value.empty())
+        return true;
+    return (atoi(value) != 0);
 }
 
 bool SoftSetArg(const std::string& strArg, const std::string& strValue)
