@@ -277,7 +277,7 @@ static void MaybeRemoveGroup(const string &group_name) {
 static bool LoadIPGroupsFromFile(const boost::filesystem::path &path, const string &group_name, int priority) {
     boost::filesystem::ifstream stream(path);
     if (!stream.good()) {
-        LogPrintf("IP Priority: Unable to read specified IP priority source file %s\n", path.native());
+        LogPrintf("IP Priority: Unable to read specified IP priority source file %s\n", path.string());
         return false;
     }
 
@@ -290,7 +290,7 @@ static bool LoadIPGroupsFromFile(const boost::filesystem::path &path, const stri
 
     group.subnets = ParseIPData(buf.str());
     if (group.subnets.size() == 0) {
-        LogPrintf("IP Priority: File empty or unable to understand the contents of %s\n", path.native());
+        LogPrintf("IP Priority: File empty or unable to understand the contents of %s\n", path.string());
         return false;
     }
 
