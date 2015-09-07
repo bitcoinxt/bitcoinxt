@@ -1452,5 +1452,11 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
 #endif
 
+    // Enable survey if user is in stealth mode - unless user explicitly disables it. This way we 
+    // can still track how many XT nodes are out there.
+    if (GetBoolArg("-stealth-mode", false))
+        if (SoftSetBoolArg("-survey", true))
+            LogPrintf("%s: parameter interaction: -stealth-mode=1 -> setting -survey=1\n", __func__);
+
     return !fRequestShutdown;
 }
