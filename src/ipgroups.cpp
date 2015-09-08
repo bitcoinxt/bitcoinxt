@@ -218,10 +218,10 @@ static CIPGroup *LoadIPDataFromWeb(const string &url, const string &groupname, i
 }
 
 static CIPGroup *LoadTorIPsFromWeb() {
-    // Just use the first IPv4 address for now. We could try all of them later on.
-    string ourip;
+    string ourip = "255.255.255.255";
     {
         LOCK(cs_mapLocalHost);
+        // Just use the first IPv4 address for now. We could try all of them later on.
         BOOST_FOREACH(const PAIRTYPE(CNetAddr, LocalServiceInfo) &item, mapLocalHost)
         {
             LogPrintf("Local IP: %s\n", item.first.ToString());
@@ -230,10 +230,6 @@ static CIPGroup *LoadTorIPsFromWeb() {
                 break;
             }
         }
-    }
-    if (ourip == "") {
-        // No routeable IPs so don't bother downloading: we can't receive connections from the outside anyway.
-        return NULL;
     }
     string url = strprintf("https://check.torproject.org/torbulkexitlist?ip=%s&port=8333", ourip);
     return LoadIPDataFromWeb(url, "tor", OPEN_PROXY_PRIORITY);
