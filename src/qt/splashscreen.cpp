@@ -22,7 +22,7 @@
 #include <QPainter>
 #include <QRadialGradient>
 
-SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) :
+SplashScreen::SplashScreen(const NetworkStyle &networkStyle, Qt::WindowFlags f) :
     QWidget(0, f), curAlignment(0)
 {
     // set reference point, paddings
@@ -41,7 +41,7 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
     QString titleText       = tr("Bitcoin XT");
     QString versionText     = QString("Version %1").arg(QString::fromStdString(FormatFullVersion()));
     QString copyrightText   = QChar(0xA9)+QString(" 2009-%1 ").arg(COPYRIGHT_YEAR) + QString(tr("The Bitcoin developers"));
-    QString titleAddText    = networkStyle->getTitleAddText();
+    QString titleAddText    = networkStyle.getTitleAddText();
 
     QString font            = QApplication::font().toString();
 
@@ -67,10 +67,10 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
     // draw the bitcoin icon, expected size of PNG: 1024x1024
     QRect rectIcon(QPoint(-165,-122), QSize(430,430));
 
-    const QSize requiredSize(1024,1024);
-    QPixmap icon(networkStyle->getAppIcon().pixmap(requiredSize));
-
-    pixPaint.drawPixmap(rectIcon, icon);
+    QImage icon = networkStyle.getAppIcon();
+    Q_ASSERT(icon.width() == 1024);
+    Q_ASSERT(icon.height() == 1024);
+    pixPaint.drawImage(rectIcon, icon);
 
     // check font size and drawing with
     pixPaint.setFont(QFont(font, 33*fontFactor));
