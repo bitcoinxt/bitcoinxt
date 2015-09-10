@@ -186,6 +186,8 @@ private slots:
 
     /** Show open dialog */
     void openClicked();
+
+    void showRPCConsoleWindow();
 #endif // ENABLE_WALLET
     /** Show configuration dialog */
     void optionsClicked();
