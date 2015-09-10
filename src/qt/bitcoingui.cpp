@@ -573,7 +573,7 @@ void BitcoinGUI::optionsClicked()
     if(!clientModel || !clientModel->getOptionsModel())
         return;
 
-    OptionsDialog dlg(this, enableWallet);
+    OptionsDialog dlg(enableWallet, this);
     dlg.setModel(clientModel->getOptionsModel());
     dlg.exec();
 }
@@ -583,13 +583,13 @@ void BitcoinGUI::aboutClicked()
     if(!clientModel)
         return;
 
-    HelpMessageDialog dlg(this, true);
+    HelpMessageDialog dlg(HelpMessageDialog::ShowAbout, this);
     dlg.exec();
 }
 
 void BitcoinGUI::showHelpMessageClicked()
 {
-    HelpMessageDialog *help = new HelpMessageDialog(this, false);
+    HelpMessageDialog *help = new HelpMessageDialog(HelpMessageDialog::ShowCommandLineOptions, this);
     help->setAttribute(Qt::WA_DeleteOnClose);
     help->show();
 }

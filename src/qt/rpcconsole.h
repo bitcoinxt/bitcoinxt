@@ -28,7 +28,7 @@ class RPCConsole: public QWidget
     Q_OBJECT
 
 public:
-    explicit RPCConsole(QWidget *parent);
+    explicit RPCConsole(QWidget *parent = 0);
     ~RPCConsole();
 
     void setClientModel(ClientModel *model);

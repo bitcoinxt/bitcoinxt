@@ -22,7 +22,7 @@ class AmountSpinBox: public QAbstractSpinBox
     Q_OBJECT
 
 public:
-    explicit AmountSpinBox(QWidget *parent):
+    explicit AmountSpinBox(QWidget *parent = 0):
         QAbstractSpinBox(parent),
         currentUnit(BitcoinUnits::BTC),
         singleStep(100000) // satoshis

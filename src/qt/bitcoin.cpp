@@ -540,7 +540,10 @@ int main(int argc, char *argv[])
     // but before showing splash screen.
     if (mapArgs.count("-?") || mapArgs.count("-help") || mapArgs.count("-version"))
     {
-        HelpMessageDialog help(NULL, mapArgs.count("-version"));
+        const bool showAbout = mapArgs.count("-version") != 0;
+        HelpMessageDialog help(showAbout ?
+                HelpMessageDialog::ShowAbout :
+                HelpMessageDialog::ShowCommandLineOptions);
         help.showOrPrint();
         return 1;
     }
