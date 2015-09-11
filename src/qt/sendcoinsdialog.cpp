@@ -213,6 +213,7 @@ void SendCoinsDialog::on_sendButton_clicked()
             {
                 valid = false;
             }
+            break;
         }
     }
 
