@@ -1,0 +1,38 @@
+#!/bin/sh -e
+
+# Source debconf library.
+. /usr/share/debconf/confmodule
+
+# add random rpc password to bitcoin.conf
+echo "rpcpassword=$(xxd -l 16 -p /dev/urandom)" >> /etc/bitcoinxt/bitcoin.conf 
+
+# add users
+adduser --system --group --quiet bitcoin
+
+# cleanup permissions
+chown root:root /usr/bin/bitcoinxt*
+chown root:root /lib/systemd/system/bitcoinxtd.service
+chown root:root /etc/bitcoinxt
+chown bitcoin:bitcoin /etc/bitcoinxt/bitcoin.conf
+chmod ug+r /etc/bitcoinxt/bitcoin.conf 
+chmod u+w /etc/bitcoinxt/bitcoin.conf
+chmod o-rw /etc/bitcoinxt/bitcoin.conf 
+chown -R bitcoin:bitcoin /var/lib/bitcoinxt
+chmod u+rwx /var/lib/bitcoinxt
+
+# enable and start bitcoinxtd service if systemctl exists and is executable
+if [ -x "/bin/systemctl" ]; then
+    db_input high bitcoinxt/start_service || true
+    db_go || true
+    db_get bitcoinxt/start_service 
+    if [ "$RET" = "true" ]; then
+        echo "Enabling bitcoinxtd.service"
+    	/bin/systemctl enable bitcoinxtd.service
+        echo "Starting bitcoinxtd.service"
+    	/bin/systemctl start bitcoinxtd.service
+    else
+        echo "The bitcoinxtd.service NOT enabled or started."
+    fi
+else
+    echo "The file '/bin/systemctl' is not executable or found, bitcoinxtd service not automatically enabled or started" 
+fi
