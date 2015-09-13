@@ -64,3 +64,17 @@
   sudo apt-install purge bitcoinxt
   sudo rm -rf /var/lib/bitcoinxt
   ```
+
+**Non-Interactive Installation**
+
+The bitcoinxt debian package uses debconf to ask the user if they want to automatically enable and start the bitcoinxtd service as part of the package installation. To skip this question for non-interactive installs the following instructions allow you to pre-answer the question. This question is only asked the first time the bitcoinxt package is installed and only if the target system has the systemd systemctl binary present and executable.
+
+1. Install ```debconf-utils```
+ ```
+ % sudo apt-get install debconf-utils
+ ```
+
+2. Pre-answer the question, ***true*** to automatically enable and start the ```bitcoinxtd``` service and ***false*** to not automatically enable and start the service during package install
+ ```
+ % sudo sh -c 'echo "bitcoinxt bitcoinxt/start_service boolean false" | debconf-set-selections'
+ ```
