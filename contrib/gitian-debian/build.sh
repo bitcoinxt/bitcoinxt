@@ -7,8 +7,10 @@
 #  - Wrap in a script that sends crash reports/core dumps to some issue tracker.
 #  - etc ...
 
-ver=0.11.0
-realver=0.11A
+ver=0.11.0-B
+realver=0.11B
+
+set +e
 
 # Make working space
 workdir=bitcoinxt-$realver
@@ -17,9 +19,9 @@ mkdir $workdir
 cd $workdir
 
 # Extract the tarball to a directory called usr
-tarball=bitcoin-$ver-linux64.tar.gz
+tarball=bitcoin-xt-$ver-linux64.tar.gz
 tar xzvf ../$tarball
-mv bitcoin-$ver usr
+mv bitcoin-xt-$ver usr
 
 # copy bitcoinxtd.service file to lib/systemd/system directory
 mkdir -p lib/systemd/system 
