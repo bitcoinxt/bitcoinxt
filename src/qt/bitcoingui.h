@@ -9,7 +9,8 @@
 #include "config/bitcoin-config.h"
 #endif
 
-#include "amount.h"
+#include "informationqueue.h"
+#include "../amount.h"
 
 #include <QLabel>
 #include <QMainWindow>
@@ -113,6 +114,8 @@ private:
     Notificator *notificator;
     RPCConsole *rpcConsole;
 
+    InformationQueue infoQueue;
+
     /** Keep track of previous number of blocks, to detect progress */
     int prevBlocks;
     int spinnerFrame;
@@ -151,9 +154,8 @@ public slots:
        @param[in] message   the displayed text
        @param[in] style     modality and style definitions (icon and used buttons - buttons only for message boxes)
                             @see CClientUIInterface::MessageBoxFlags
-       @param[in] ret       pointer to a bool that will be modified to whether Ok was clicked (modal only)
     */
-    void message(const QString &title, const QString &message, unsigned int style, bool *ret = NULL);
+    void message(const QString &title, const QString &message, unsigned int style);
 
 #ifdef ENABLE_WALLET
     /** Set the encryption status as shown in the UI.
