@@ -130,16 +130,11 @@ static CURLcode ssl_context_setup(CURL *curl, void *sslctx, void *param) {
 }
 
 static CIPGroup *LoadIPDataFromWeb(const string &url, const string &groupname, int priority) {
-
-    std::auto_ptr<CurlWrapper> curlWrapper = MakeCurl();
-    CURL *curl = curlWrapper->getHandle();
-    if (curl == NULL)
-        return NULL;
-
-    curl_easy_setopt(curl, CURLOPT_SSL_CTX_FUNCTION, &ssl_context_setup);
-
-    // This will block until the download is done.
     try {
+        std::auto_ptr<CurlWrapper> curlWrapper = MakeCurl();
+        curl_easy_setopt(curlWrapper->getHandle(), CURLOPT_SSL_CTX_FUNCTION, &ssl_context_setup);
+
+        // This will block until the download is done.
         std::string res = curlWrapper->fetchURL(url);
         LogPrintf("IP list download succeeded from %s\n", url.c_str());
 

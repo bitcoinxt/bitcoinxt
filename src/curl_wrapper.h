@@ -18,10 +18,8 @@ struct CurlWrapper {
     // Returns contents of url.
     // Throws curl_error on curl error, or status code other than "200 OK".
     virtual std::string fetchURL(const std::string& url) = 0;
-
     virtual CURL* getHandle() = 0;
-
-    virtual ~CurlWrapper();
+    virtual ~CurlWrapper() = 0;
 };
 inline CurlWrapper::~CurlWrapper() { }
 

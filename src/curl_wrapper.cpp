@@ -37,8 +37,8 @@ static size_t CurlData(void *ptr, size_t size, size_t nmemb, void *user_ptr) {
     return realsize;
 }
 
-std::string statusCodeErrorStr(int code) {
-    std::stringstream ss;
+string statusCodeErrorStr(int code) {
+    stringstream ss;
     ss << "http status code was '" << code << "', wanted 200 OK";
     return ss.str();
 }
@@ -75,13 +75,16 @@ struct CurlWrapperImpl : public CurlWrapper {
             curl_easy_setopt(handle, CURLOPT_CAINFO, NULL);
         }
 #endif
+        // Curl is currently only used for HTTPS connections. Enforce this.
+        curl_easy_setopt(handle, CURLOPT_PROTOCOLS, CURLPROTO_HTTPS);
+        curl_easy_setopt(handle, CURLOPT_REDIR_PROTOCOLS, CURLPROTO_HTTPS);
     }
     ~CurlWrapperImpl() {
         curl_easy_cleanup(handle);
     }
 
-    virtual std::string fetchURL(const std::string& url) {
-        std::string data;
+    virtual string fetchURL(const string& url) {
+        string data;
 
         curl_easy_setopt(handle, CURLOPT_WRITEFUNCTION, &CurlData);
         curl_easy_setopt(handle, CURLOPT_WRITEDATA, &data);
@@ -92,7 +95,9 @@ struct CurlWrapperImpl : public CurlWrapper {
             throw curl_error(url, curl_easy_strerror(rv));
 
         long httpCode;
-        curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &httpCode);
+        rv = curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &httpCode);
+        if (rv != CURLE_OK)
+            throw curl_error(url, curl_easy_strerror(rv));
         if (httpCode != 200)
             throw curl_error(url, statusCodeErrorStr(httpCode));
 
@@ -105,19 +110,12 @@ struct CurlWrapperImpl : public CurlWrapper {
         CURL* handle;
 };
 
-struct BrokenCurl : public CurlWrapper {
-    virtual std::string fetchURL(const std::string& url) {
-        throw curl_error(url, "curl failed to initialize");
-    }
-    virtual CURL* getHandle() { return NULL; }
-};
-
-DummyCurlWrapper::DummyCurlWrapper(int statuscode, const std::string& content) :
+DummyCurlWrapper::DummyCurlWrapper(int statuscode, const string& content) :
     code(statuscode), content(content)
 {
 }
 
-std::string DummyCurlWrapper::fetchURL(const std::string& url) {
+string DummyCurlWrapper::fetchURL(const string& url) {
     lastUrl = url;
     if (code != 200)
         throw curl_error(url, statusCodeErrorStr(code));
@@ -125,13 +123,14 @@ std::string DummyCurlWrapper::fetchURL(const std::string& url) {
     return content;
 }
 
-std::auto_ptr<CurlWrapper> MakeCurl() {
+auto_ptr<CurlWrapper> MakeCurl() {
     static CurlInitWrapper c;
     if (!c.curlOK)
-        return std::auto_ptr<CurlWrapper>(new BrokenCurl);
+        throw curl_error("", "libcurl failed to initialize");
 
     CURL* curl = curl_easy_init();
-    return curl
-        ? std::auto_ptr<CurlWrapper>(new CurlWrapperImpl(curl))
-        : std::auto_ptr<CurlWrapper>(new BrokenCurl);
+    if (!curl)
+        throw curl_error("", "curl_easy_init failed");
+
+    return auto_ptr<CurlWrapper>(new CurlWrapperImpl(curl));
 }

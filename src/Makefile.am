@@ -94,12 +94,12 @@ BITCOIN_CORE_H = \
   consensus/params.h \
   consensus/validation.h \
   core_io.h \
+  curl_wrapper.h \
   eccryptoverify.h \
   ecwrapper.h \
   hash.h \
   init.h \
   ipgroups.h \
-  curl_wrapper.h \
   key.h \
   keystore.h \
   leveldbwrapper.h \
