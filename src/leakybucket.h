@@ -49,6 +49,12 @@ class CLeakyBucket
         }
         
 public:
+        // Initializes a disabled bucket.
+        CLeakyBucket() {
+            lastFill = clock.now();
+            level = max = fill = LONG_MAX;
+        }
+
         CLeakyBucket(int64_t maxp, int64_t fillp,int64_t startLevel=LONG_MAX):max(maxp),fill(fillp) 
         {
             lastFill = clock.now();            
@@ -65,10 +71,18 @@ public:
             lastFill = clock.now();  // need to reset the lastFill time in case we are turning on this leaky bucket.
         }
 
+        bool is_enabled() const {
+            return fill != LONG_MAX;
+        }
+
+        void disable() {
+            set(LONG_MAX, LONG_MAX);
+        }
+
         // Return the # tokens available if that amount is larger than the cutoff, otherwise return 0
         int64_t available(int64_t cutoff=0)
         {
-            if (fill == LONG_MAX) return LONG_MAX;  // shaping is off
+            if (!is_enabled()) return LONG_MAX;  // shaping is off
             fillIt();
             return (level > cutoff) ? level: 0;            
         }
@@ -76,7 +90,7 @@ public:
         // Try to use amt tokens.  Returns TRUE if the tokens were consumed, false otherwise
         bool try_leak(int64_t amt)
         {
-            if (fill == LONG_MAX) return true;  // leaky bucket is turned off.
+            if (!is_enabled()) return true;  // leaky bucket is turned off.
             assert(amt >=0);
             fillIt();
             if (level >= amt)
@@ -90,16 +104,12 @@ public:
         // This function reduces the level in the bucket by amt, even if that makes the level negative, and returns true if the level is >= 0.  This function is useful in a situation like data receipt (with soft limits) where you are not certain how many bytes will be received until after you have received them.
         bool leak(int64_t amt)
         {
-            if (fill == LONG_MAX) return true; // leaky bucket is turned off.
+            if (!is_enabled()) return true; // leaky bucket is turned off.
             fillIt();
             level-=amt;
             return (level>=0);
             
         }
-        
-        
-
-
 };
 
 #endif

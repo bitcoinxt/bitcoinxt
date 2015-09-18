@@ -110,8 +110,8 @@ static CNodeSignals g_signals;
 CNodeSignals& GetNodeSignals() { return g_signals; }
 
 // Variables for traffic shaping
-CLeakyBucket receiveShaper(DEFAULT_MAX_RECV_BURST,DEFAULT_AVE_RECV);
-CLeakyBucket sendShaper(DEFAULT_MAX_SEND_BURST,DEFAULT_AVE_SEND);
+CLeakyBucket receiveShaper;
+CLeakyBucket sendShaper;
 boost::chrono::steady_clock CLeakyBucket::clock;
 
 void AddOneShot(string strDest)
@@ -963,12 +963,12 @@ void ThreadSocketHandler()
             if (FD_ISSET(pnode->hSocket, &fdsetRecv) || FD_ISSET(pnode->hSocket, &fdsetError))
             {
                 TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                int amt2Recv = receiveShaper.available(RECV_SHAPER_MIN_FRAG);
+                int64_t amt2Recv = receiveShaper.available(RECV_SHAPER_MIN_FRAG);
                 if (lockRecv&&amt2Recv)
                 {
                     {
                         progress++;
-                        int amt = min(amt2Recv,MAX_RECV_CHUNK);
+                        int64_t amt = min(amt2Recv,int64_t(MAX_RECV_CHUNK));
                         char pchBuf[amt];
                         int nBytes = recv(pnode->hSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
                         if (nBytes > 0)
@@ -1674,6 +1674,11 @@ void static Discover(boost::thread_group& threadGroup)
 
 void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
 {
+
+    // Init network shapers
+    receiveShaper.set(GetArg("-receiveburst", DEFAULT_MAX_RECV_BURST), GetArg("-receiveavg", DEFAULT_AVE_RECV));
+    sendShaper.set(GetArg("-sendburst", DEFAULT_MAX_SEND_BURST), GetArg("-sendavg", DEFAULT_AVE_SEND));
+
     uiInterface.InitMessage(_("Loading addresses..."));
     // Load addresses for peers.dat
     int64_t nStart = GetTimeMillis();

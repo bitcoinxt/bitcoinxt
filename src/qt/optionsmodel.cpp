@@ -16,6 +16,7 @@
 #include "main.h"
 #include "net.h"
 #include "txdb.h" // for -dbcache defaults
+#include "leakybucket.h"
 
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
@@ -36,6 +37,8 @@ void OptionsModel::addOverriddenOption(const std::string &option)
 {
     strOverriddenByCommandLine += QString::fromStdString(option) + "=" + QString::fromStdString(mapArgs[option]) + " ";
 }
+
+int calcShapeBurst(int avg) { return avg * 2; } // TODO: What's a good burst factor?
 
 // Writes all missing QSettings with their default values
 void OptionsModel::Init()
@@ -116,6 +119,40 @@ void OptionsModel::Init()
         addOverriddenOption("-proxy");
     else if(!settings.value("fUseProxy").toBool() && !GetArg("-proxy", "").empty())
         addOverriddenOption("-proxy");
+    if (!settings.contains("fUseDownloadLimit"))
+        settings.setValue("fUseDownloadLimit", DEFAULT_AVE_RECV != LONG_MAX);
+    if (!settings.contains("nDownloadLimit"))
+        settings.setValue("nDownloadLimit", DEFAULT_AVE_RECV == LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_RECV / 1024));
+    if (!settings.contains("fUseUploadLimit"))
+        settings.setValue("fUseUploadLimit", DEFAULT_AVE_SEND != LONG_MAX);
+    if (!settings.contains("nUploadLimit"))
+        settings.setValue("nUploadLimit", DEFAULT_AVE_SEND == LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_SEND / 1024));
+
+    { // Download limit
+        bool inUse = settings.value("fUseDownloadLimit").toBool();
+        long limitKB = settings.value("nDownloadLimit").toInt();
+
+        std::string avg = QString::number(inUse ? limitKB * 1024 : LONG_MAX).toStdString();
+        std::string burst = QString::number(inUse ? calcShapeBurst(limitKB * 1024) : LONG_MAX).toStdString();
+
+        if (!SoftSetArg("-receiveavg", avg))
+            addOverriddenOption("-receiveavg");
+        if (!SoftSetArg("-receiveburst", burst))
+            addOverriddenOption("-receiveburst");
+    }
+
+    { // Upload limit
+        bool inUse = settings.value("fUseUploadLimit").toBool();
+        long limitKB = settings.value("nUploadLimit").toInt();
+
+        std::string avg = QString::number(inUse ? limitKB * 1024 : LONG_MAX).toStdString();
+        std::string burst = QString::number(inUse ? calcShapeBurst(limitKB * 1024) : LONG_MAX).toStdString();
+
+        if (!SoftSetArg("-sendavg", avg))
+            addOverriddenOption("-sendavg");
+        if (!SoftSetArg("-sendburst", burst))
+            addOverriddenOption("-sendburst");
+    }
 
     // Display
     if (!settings.contains("language"))
@@ -196,6 +233,14 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
             return settings.value("nThreadsScriptVerif");
         case Listen:
             return settings.value("fListen");
+        case DownloadLimitUse:
+            return settings.value("fUseDownloadLimit");
+        case DownloadLimit:
+            return settings.value("nDownloadLimit");
+        case UploadLimitUse:
+            return settings.value("fUseUploadLimit");
+        case UploadLimit:
+            return settings.value("nUploadLimit");
         default:
             return QVariant();
         }
@@ -304,6 +349,46 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
             if (settings.value("fListen") != value) {
                 settings.setValue("fListen", value);
                 setRestartRequired(true);
+            }
+            break;
+        case DownloadLimitUse:
+            if (settings.value("fUseDownloadLimit") != value) {
+                settings.setValue("fUseDownloadLimit", value);
+
+                if (value.toBool()) {
+                    int speed = 1024 * settings.value("nDownloadLimit").toInt();
+                    receiveShaper.set(calcShapeBurst(speed), speed);
+                }
+                else
+                    receiveShaper.disable();
+            };
+            break;
+        case DownloadLimit:
+            if (settings.value("nDownloadLimit") != value) {
+                settings.setValue("nDownloadLimit", value);
+                int64_t avg(value.toInt() * 1024);
+                if (receiveShaper.is_enabled())
+                    receiveShaper.set(calcShapeBurst(avg), avg);
+            }
+            break;
+        case UploadLimitUse:
+            if (settings.value("fUseUploadLimit") != value) {
+                settings.setValue("fUseUploadLimit", value);
+
+                if (value.toBool()) {
+                    int64_t speed(1024 * settings.value("nUploadLimit").toInt());
+                    sendShaper.set(calcShapeBurst(speed), speed);
+                }
+                else
+                    sendShaper.disable();
+            };
+            break;
+        case UploadLimit:
+            if (settings.value("nUploadLimit") != value) {
+                settings.setValue("nUploadLimit", value);
+                int64_t avg(value.toInt() * 1024);
+                if (sendShaper.is_enabled())
+                    sendShaper.set(calcShapeBurst(avg), avg);
             }
             break;
         default:
