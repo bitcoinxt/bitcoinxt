@@ -42,7 +42,11 @@ public:
         DatabaseCache,          // int
         SpendZeroConfChange,    // bool
         Listen,                 // bool
-        OptionIDRowCount,
+        DownloadLimitUse,       // bool
+        DownloadLimit,          // int
+        UploadLimitUse,         // bool
+        UploadLimit,            // int
+        OptionIDRowCount
     };
 
     void Init();

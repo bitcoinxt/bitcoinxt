@@ -173,6 +173,11 @@ void OptionsDialog::setMapper()
     mapper->addMapping(ui->proxyIp, OptionsModel::ProxyIP);
     mapper->addMapping(ui->proxyPort, OptionsModel::ProxyPort);
 
+    mapper->addMapping(ui->limitDownload, OptionsModel::DownloadLimitUse);
+    mapper->addMapping(ui->limitDownloadSpinbox, OptionsModel::DownloadLimit);
+    mapper->addMapping(ui->limitUpload, OptionsModel::UploadLimitUse);
+    mapper->addMapping(ui->limitUploadSpinbox, OptionsModel::UploadLimit);
+
     /* Window */
 #ifndef Q_OS_MAC
     mapper->addMapping(ui->minimizeToTray, OptionsModel::MinimizeToTray);
