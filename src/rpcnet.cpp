@@ -15,6 +15,7 @@
 #include "version.h"
 
 #include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "json/json_spirit_value.h"
 
@@ -38,6 +39,7 @@ Value getconnectioncount(const Array& params, bool fHelp)
 
     return (int)vNodes.size();
 }
+
 
 Value ping(const Array& params, bool fHelp)
 {
@@ -163,6 +165,59 @@ Value getpeerinfo(const Array& params, bool fHelp)
     }
 
     return ret;
+}
+
+Value settrafficshaping(const Array& params, bool fHelp)
+{
+    string strCommand;
+    if (params.size() == 3)
+        strCommand = params[0].get_str();
+    if (fHelp || params.size() != 3 ||
+        (strCommand != "send" && strCommand != "receive"))
+        throw runtime_error(
+            "settrafficshaping \"send|receive\" \"burstKB\" \"averageKB\""
+            "\nSets the network send or receive bandwidth and burst in kilobytes per second.\n"
+            "\nArguments:\n"
+            "1. \"send|receive\"     (string, required) Are you setting the transmit or receive bandwidth\n"
+            "2. \"burst\"  (integer, required) Specify the maximum burst size in Kbytes/sec (actual max will be 1 packet larger than this number)\n"
+            "2. \"average\"  (integer, required) Specify the average throughput in Kbytes/sec\n"
+            "\nExamples:\n"
+            + HelpExampleCli("settrafficshaping", "\"receive\" 10000 1024")
+            + HelpExampleRpc("settrafficshaping", "\"receive\" 10000 1024")
+        );
+
+    
+    uint64_t burst; //= params[1].get_uint64();
+    uint64_t ave;// = params[2].get_uint64();
+    if (params[1].is_uint64()) burst = params[1].get_uint64();
+    else
+      {
+        string temp = params[1].get_str();
+        burst = boost::lexical_cast<uint64_t>(temp);
+      }
+    if (params[2].is_uint64()) ave = params[2].get_uint64();
+    else
+      {
+        string temp = params[2].get_str();
+        ave = boost::lexical_cast<uint64_t>(temp);
+      }
+
+    if (burst < ave)
+      {
+        throw runtime_error("Burst rate must be greater than the average rate"
+                            "\nsettrafficshaping \"send|receive\" \"burst\" \"average\"");       
+      }
+      
+    if (strCommand == "send")
+      {
+        sendShaper.set(burst*1024,ave*1024);
+      }
+    else  // must be receive b/c strCommand was validate to be one of the two above.
+      {
+        receiveShaper.set(burst*1024,ave*1024);        
+      }
+      
+    return Value::null;
 }
 
 Value addnode(const Array& params, bool fHelp)
