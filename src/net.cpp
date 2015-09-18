@@ -17,6 +17,7 @@
 #include "ui_interface.h"
 #include "crypto/common.h"
 #include "ipgroups.h"
+#include "leakybucket.h"
 
 #ifdef WIN32
 #include <string.h>
@@ -107,6 +108,11 @@ boost::condition_variable messageHandlerCondition;
 // Signals for message handling
 static CNodeSignals g_signals;
 CNodeSignals& GetNodeSignals() { return g_signals; }
+
+// Variables for traffic shaping
+CLeakyBucket receiveShaper(DEFAULT_MAX_RECV_BURST,DEFAULT_AVE_RECV);
+CLeakyBucket sendShaper(DEFAULT_MAX_SEND_BURST,DEFAULT_AVE_SEND);
+boost::chrono::steady_clock CLeakyBucket::clock;
 
 void AddOneShot(string strDest)
 {
@@ -650,12 +656,16 @@ void SocketSendData(CNode *pnode)
     while (it != pnode->vSendMsg.end()) {
         const CSerializeData &data = *it;
         assert(data.size() > pnode->nSendOffset);
-        int nBytes = send(pnode->hSocket, &data[pnode->nSendOffset], data.size() - pnode->nSendOffset, MSG_NOSIGNAL | MSG_DONTWAIT);
+        
+        int amt2Send = min((int64_t)(data.size() - pnode->nSendOffset), sendShaper.available(SEND_SHAPER_MIN_FRAG));
+        if (amt2Send==0) break;
+        int nBytes = send(pnode->hSocket, &data[pnode->nSendOffset], amt2Send, MSG_NOSIGNAL | MSG_DONTWAIT);
         if (nBytes > 0) {
             pnode->nLastSend = GetTime();
             pnode->nSendBytes += nBytes;
             pnode->nSendOffset += nBytes;
             pnode->RecordBytesSent(nBytes);
+            bool empty = !sendShaper.leak(nBytes);
             if (pnode->nSendOffset == data.size()) {
                 pnode->nSendOffset = 0;
                 pnode->nSendSize -= data.size();
@@ -664,6 +674,7 @@ void SocketSendData(CNode *pnode)
                 // could not send full message; stop sending more
                 break;
             }
+            if (empty) break;  // Exceeded our send budget, stop sending more
         } else {
             if (nBytes < 0) {
                 // error
@@ -691,8 +702,10 @@ static list<CNode*> vNodesDisconnected;
 void ThreadSocketHandler()
 {
     unsigned int nPrevNodeCount = 0;
+    int progress;  // This variable is incremented if something happens.  If it is zero at the bottom of the loop, we delay.  This solves spin loop issues where the select does not block but no bytes can be transferred (traffic shaping limited, for example).
     while (true)
     {
+        progress = 0;
         //
         // Disconnect nodes
         //
@@ -950,14 +963,17 @@ void ThreadSocketHandler()
             if (FD_ISSET(pnode->hSocket, &fdsetRecv) || FD_ISSET(pnode->hSocket, &fdsetError))
             {
                 TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                if (lockRecv)
+                int amt2Recv = receiveShaper.available(RECV_SHAPER_MIN_FRAG);
+                if (lockRecv&&amt2Recv)
                 {
                     {
-                        // typical socket buffer is 8K-64K
-                        char pchBuf[0x10000];
+                        progress++;
+                        int amt = min(amt2Recv,MAX_RECV_CHUNK);
+                        char pchBuf[amt];
                         int nBytes = recv(pnode->hSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
                         if (nBytes > 0)
-                        {
+                        {                          
+                            receiveShaper.leak(nBytes);
                             if (!pnode->ReceiveMsgBytes(pchBuf, nBytes))
                                 pnode->CloseSocketDisconnect();
                             pnode->nLastRecv = GetTime();
@@ -994,8 +1010,11 @@ void ThreadSocketHandler()
             if (FD_ISSET(pnode->hSocket, &fdsetSend))
             {
                 TRY_LOCK(pnode->cs_vSend, lockSend);
-                if (lockSend)
+                if (lockSend && sendShaper.try_leak(0))
+                {
+                    progress++;
                     SocketSendData(pnode);
+                }
             }
 
             //
@@ -1031,6 +1050,9 @@ void ThreadSocketHandler()
             BOOST_FOREACH(CNode* pnode, vNodesCopy)
                 pnode->Release();
         }
+
+        if (progress == 0)  // Nothing happened even though select did not block.  So slow us down.
+            MilliSleep(50);
     }
 }
 
