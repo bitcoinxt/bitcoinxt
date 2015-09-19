@@ -1,4 +1,4 @@
-// Copyright (c) 2011-2013 The Bitcoin Core developers
+// Copyright (c) 2011-2015 The Bitcoin Core and Bitcoin XT developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,6 +15,7 @@
 
 #include "main.h" // for MAX_SCRIPTCHECK_THREADS
 #include "netbase.h"
+#include "net.h"  // for access to the network traffic shapers
 #include "txdb.h" // for -dbcache defaults
 
 #ifdef ENABLE_WALLET
@@ -22,6 +23,7 @@
 #endif
 
 #include <boost/thread.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <QDataWidgetMapper>
 #include <QDir>
@@ -112,11 +114,63 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
 
     /* setup/change UI elements when proxy IP is invalid/valid */
     connect(this, SIGNAL(proxyIpChecks(QValidatedLineEdit *, int)), this, SLOT(doProxyIpChecks(QValidatedLineEdit *, int)));
+
+    uint64_t max,ave;
+    sendShaper.get(&max,&ave);
+    bool enabled = (ave != LONG_MAX);
+    ui->sendShapingEnable->setChecked(enabled);
+    ui->sendBurstSlider->setRange(0,400);
+    ui->sendAveSlider->setRange(0,400);
+    ui->recvBurstSlider->setRange(0,400);
+    ui->recvAveSlider->setRange(0,400);
+
+    connect(ui->sendBurstSlider, SIGNAL(valueChanged(int)), this, SLOT(shapingSliderChanged()));
+    connect(ui->sendAveSlider, SIGNAL(valueChanged(int)), this, SLOT(shapingSliderChanged()));
+    connect(ui->recvBurstSlider, SIGNAL(valueChanged(int)), this, SLOT(shapingSliderChanged()));
+    connect(ui->recvAveSlider, SIGNAL(valueChanged(int)), this, SLOT(shapingSliderChanged()));
+
+    if (enabled)
+      {
+	ui->sendBurstEdit->setText(QString(boost::lexical_cast<std::string>(max/1024).c_str()));
+	ui->sendAveEdit->setText(QString(boost::lexical_cast<std::string>(ave/1024).c_str()));
+        ui->sendBurstSlider->setValue(max/1024);
+        ui->sendAveSlider->setValue(ave/1024);
+      }
+
+    receiveShaper.get(&max,&ave);
+    enabled = (ave != LONG_MAX);
+    ui->recvShapingEnable->setChecked(enabled);
+    if (enabled)
+      {
+	ui->recvBurstEdit->setText(QString(boost::lexical_cast<std::string>(max/1024).c_str()));
+	ui->recvAveEdit->setText(QString(boost::lexical_cast<std::string>(ave/1024).c_str()));
+        ui->recvBurstSlider->setValue(max/1024);
+        ui->recvAveSlider->setValue(ave/1024);
+      }
+    
+
+    
 }
 
 OptionsDialog::~OptionsDialog()
 {
     delete ui;
+}
+
+
+void OptionsDialog::shapingSliderChanged(void)
+{
+    int val = ui->sendBurstSlider->value();
+    ui->sendBurstEdit->setText(QString(boost::lexical_cast<std::string>(val).c_str()));
+
+    val = ui->sendAveSlider->value();
+    ui->sendAveEdit->setText(QString(boost::lexical_cast<std::string>(val).c_str()));
+
+    val = ui->recvBurstSlider->value();
+    ui->recvBurstEdit->setText(QString(boost::lexical_cast<std::string>(val).c_str()));
+
+    val = ui->recvAveSlider->value();
+    ui->recvAveEdit->setText(QString(boost::lexical_cast<std::string>(val).c_str()));  
 }
 
 void OptionsDialog::setModel(OptionsModel *model)
@@ -223,6 +277,40 @@ void OptionsDialog::on_resetButton_clicked()
 void OptionsDialog::on_okButton_clicked()
 {
     mapper->submit();
+
+    if (ui->sendShapingEnable->isChecked())
+      {
+	uint64_t burst, ave;
+	sendShaper.get(&burst, &ave);  // Get the original values
+
+        QString s = ui->sendBurstEdit->text();  // Get the changed value
+        bool ok=false;
+        int t = s.toInt(&ok); // try to convert to an int
+        if (ok && t>=0) burst = t*1024;    // if conversion worked, then use the new value
+
+        s = ui->sendAveEdit->text();  // Do the same with the average
+        t = s.toInt(&ok); 
+        if (ok && t>=0) ave = t*1024;
+
+        sendShaper.set(burst,ave);  // Set the new (or old) burst and average
+      }
+    else sendShaper.disable();
+
+    if (ui->recvShapingEnable->isChecked())
+      {
+	uint64_t burst, ave;
+	receiveShaper.get(&burst, &ave);  
+        QString s = ui->recvBurstEdit->text();
+        bool ok=false;
+        int t = s.toInt(&ok);  //boost::lexical_cast<uint64_t>(s.data());
+        if (ok && t>=0) burst = t*1024;
+        s = ui->recvAveEdit->text();
+        t = s.toInt(&ok); //boost::lexical_cast<uint64_t>(s.data());
+	if (ok && t>=0) ave = t*1024;
+        receiveShaper.set(burst,ave);
+      }
+    else receiveShaper.disable();
+  
     accept();
 }
 
