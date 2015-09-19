@@ -1,4 +1,4 @@
-// Copyright (c) 2009-2013 The Bitcoin Core developers
+// Copyright (c) 2015 The Bitcoin XT developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -55,6 +55,22 @@ public:
             // set the initial level to either what is specified by the user or to the maximum  
             level = (startLevel < max) ? startLevel : max;
         }
+
+        // Stop the operation of this leaky bucket (always return available tokens)
+        // use "set" to restart
+        void disable(void)
+	{
+  	  fill = LONG_MAX;
+          max = LONG_MAX;
+	}
+
+        // Access the values in this bucket
+        void get(uint64_t* maxp, uint64_t* fillp, uint64_t* levelp=NULL)
+	{
+	  if (maxp) *maxp = max;
+          if (fillp) *fillp = fill;
+          if (levelp) *levelp = level;
+	}
 
         // Change the settings of the leaky bucket
         void set(uint64_t maxp, uint64_t fillp)

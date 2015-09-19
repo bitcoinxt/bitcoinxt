@@ -963,12 +963,13 @@ void ThreadSocketHandler()
             if (FD_ISSET(pnode->hSocket, &fdsetRecv) || FD_ISSET(pnode->hSocket, &fdsetError))
             {
                 TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                int amt2Recv = receiveShaper.available(RECV_SHAPER_MIN_FRAG);
-                if (lockRecv&&amt2Recv)
+                int64_t amt2Recv = receiveShaper.available(RECV_SHAPER_MIN_FRAG);
+                if (lockRecv&&(amt2Recv>0))
                 {
                     {
                         progress++;
-                        int amt = min(amt2Recv,MAX_RECV_CHUNK);
+                        // max of min makes sure amt is in a range reasonable for buffer allocation
+                        int64_t amt = max((int64_t)1,min(amt2Recv,MAX_RECV_CHUNK));
                         char pchBuf[amt];
                         int nBytes = recv(pnode->hSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
                         if (nBytes > 0)

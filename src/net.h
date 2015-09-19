@@ -51,7 +51,7 @@ static const unsigned int MAX_INV_SZ = 50000;
 /** The maximum number of new addresses to accumulate before announcing. */
 static const unsigned int MAX_ADDR_TO_SEND = 1000;
 /** The maximum # of bytes to receive at once */
-static const int MAX_RECV_CHUNK = 256*1024;
+static const int64_t MAX_RECV_CHUNK = 256*1024;
 
 /** -listen default */
 static const bool DEFAULT_LISTEN = true;
