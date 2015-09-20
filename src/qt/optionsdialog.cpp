@@ -227,6 +227,13 @@ void OptionsDialog::setMapper()
     mapper->addMapping(ui->proxyIp, OptionsModel::ProxyIP);
     mapper->addMapping(ui->proxyPort, OptionsModel::ProxyPort);
 
+    mapper->addMapping(ui->sendShapingEnable, OptionsModel::UseSendShaping);
+    mapper->addMapping(ui->sendBurstEdit, OptionsModel::SendBurst);
+    mapper->addMapping(ui->sendAveEdit, OptionsModel::SendAve);
+    mapper->addMapping(ui->recvShapingEnable, OptionsModel::UseReceiveShaping);
+    mapper->addMapping(ui->recvBurstEdit, OptionsModel::ReceiveBurst);
+    mapper->addMapping(ui->recvAveEdit, OptionsModel::ReceiveAve);
+    
     /* Window */
 #ifndef Q_OS_MAC
     mapper->addMapping(ui->minimizeToTray, OptionsModel::MinimizeToTray);
@@ -278,6 +285,8 @@ void OptionsDialog::on_okButton_clicked()
 {
     mapper->submit();
 
+    if (0)  // probably not needed anymore because using options model now
+      {
     if (ui->sendShapingEnable->isChecked())
       {
 	uint64_t burst, ave;
@@ -310,7 +319,8 @@ void OptionsDialog::on_okButton_clicked()
         receiveShaper.set(burst,ave);
       }
     else receiveShaper.disable();
-  
+      }
+    
     accept();
 }
 

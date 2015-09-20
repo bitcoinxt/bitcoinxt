@@ -97,6 +97,55 @@ void OptionsModel::Init()
 #endif
 
     // Network
+
+    if (!settings.contains("fUseReceiveShaping"))
+        settings.setValue("fUseReceiveShaping", DEFAULT_AVE_RECV != LONG_MAX);
+    if (!settings.contains("fUseSendShaping"))
+        settings.setValue("fUseSendShaping", DEFAULT_AVE_RECV != LONG_MAX);
+    
+    if (!settings.contains("nReceiveBurst"))
+        settings.setValue("nReceiveBurst", DEFAULT_MAX_RECV_BURST/1024);
+    if (!settings.contains("nReceiveAve"))
+        settings.setValue("nReceiveAve", DEFAULT_AVE_RECV == LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_RECV / 1024));
+    if (!settings.contains("nSendBurst"))
+        settings.setValue("nSendBurst", DEFAULT_MAX_SEND_BURST/1024);
+    if (!settings.contains("nSendAve"))
+        settings.setValue("nSendAve", DEFAULT_AVE_SEND == LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_SEND / 1024));
+
+    // Set the shapers to values loaded from configuration
+    bool inUse = settings.value("fUseReceiveShaping").toBool();
+    int64_t burstArg = GetArg("-receiveburst", -1);
+    int64_t aveArg = GetArg("-receiveave", -1);
+    
+    if (inUse || burstArg >= 0 || aveArg >=0 )  // If configuration says the shaper is used or the user put something on the command line then turn on the shaper
+        {
+          int64_t burstKB = settings.value("nReceiveBurst").toInt();
+          int64_t aveKB = settings.value("nReceiveAve").toInt();
+          // Accept command line overrides
+          if (burstArg >= 0) burstKB = burstArg;
+          if (aveArg >= 0) aveKB = aveArg;
+          if (burstArg < aveArg) burstArg = aveArg;  // Correct improper relationship -- burst must be >= average.
+          receiveShaper.set(burstKB*1024,aveKB*1024);
+        }
+    else receiveShaper.disable();
+
+    inUse = settings.value("fUseSendShaping").toBool();
+    burstArg = GetArg("-sendburst", -1);
+    aveArg = GetArg("-sendave", -1);
+    
+    if (inUse)
+        {
+          int64_t burstKB = settings.value("nSendBurst").toInt();
+          int64_t aveKB = settings.value("nSendAve").toInt();
+          // Accept command line overrides
+          if (burstArg >= 0) burstKB = burstArg;
+          if (aveArg >= 0) aveKB = aveArg;
+          if (burstArg < aveArg) burstArg = aveArg;  // Correct improper relationship -- burst must be >= average.
+          sendShaper.set(burstKB*1024,aveKB*1024);
+        }
+    else sendShaper.disable();
+        
+    
     if (!settings.contains("fUseUPnP"))
         settings.setValue("fUseUPnP", DEFAULT_UPNP);
     if (!SoftSetBoolArg("-upnp", settings.value("fUseUPnP").toBool()))
@@ -196,6 +245,18 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
             return settings.value("nThreadsScriptVerif");
         case Listen:
             return settings.value("fListen");
+        case UseReceiveShaping:
+            return settings.value("fUseReceiveShaping");
+        case UseSendShaping:
+            return settings.value("fUseSendShaping");          
+        case ReceiveBurst:
+            return settings.value("nReceiveBurst");
+        case ReceiveAve:
+            return settings.value("nReceiveAve");
+        case SendBurst:
+            return settings.value("nSendBurst");
+        case SendAve:
+            return settings.value("nSendAve");
         default:
             return QVariant();
         }
@@ -207,6 +268,8 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
 bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, int role)
 {
     bool successful = true; /* set to false on parse error */
+    bool changeSendShaper=false;
+    bool changeReceiveShaper=false;
     if(role == Qt::EditRole)
     {
         QSettings settings;
@@ -306,11 +369,68 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
                 setRestartRequired(true);
             }
             break;
+        case UseReceiveShaping:
+            if (settings.value("fUseReceiveShaping") != value) {
+                settings.setValue("fUseReceiveShaping",value);
+                changeReceiveShaper = true;
+            }
+            break;
+        case UseSendShaping:
+            if (settings.value("fUseSendShaping") != value) {
+                settings.setValue("fUseSendShaping",value);
+                changeSendShaper = true;
+            }
+            break;
+        case ReceiveBurst:
+            if (settings.value("nReceiveBurst") != value) {
+                settings.setValue("nReceiveBurst",value);
+                changeReceiveShaper = true;
+            }
+            break;
+        case ReceiveAve:
+            if (settings.value("nReceiveAve") != value) {
+                settings.setValue("nReceiveAve",value);
+                changeReceiveShaper = true;
+            }
+            break;
+        case SendBurst:
+            if (settings.value("nSendBurst") != value) {
+                settings.setValue("nSendBurst",value);
+                changeSendShaper = true;
+            }
+            break;
+        case SendAve:
+            if (settings.value("nSendAve") != value) {
+                settings.setValue("nSendAve",value);
+                changeSendShaper = true;
+            }
+            break;
         default:
             break;
         }
-    }
+    
 
+        if (changeReceiveShaper) {
+          if (settings.value("fUseReceiveShaping").toBool()) {
+            int64_t burst = 1024 * settings.value("nReceiveBurst").toInt();
+            int64_t ave = 1024 * settings.value("nReceiveAve").toInt();                    
+            receiveShaper.set(burst, ave);
+          }
+          else
+            receiveShaper.disable();
+        }
+
+        if (changeSendShaper) {
+          if (settings.value("fUseSendShaping").toBool()) {
+            int64_t burst = 1024 * settings.value("nSendBurst").toInt();
+            int64_t ave = 1024 * settings.value("nSendAve").toInt();                    
+            sendShaper.set(burst, ave);
+          }
+          else
+            sendShaper.disable();
+        }
+    }
+    
     emit dataChanged(index, index);
 
     return successful;

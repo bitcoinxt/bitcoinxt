@@ -1675,10 +1675,6 @@ void static Discover(boost::thread_group& threadGroup)
 
 void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
 {
-    // Init network shapers
-    receiveShaper.set(GetArg("-receiveburst", DEFAULT_MAX_RECV_BURST/1024)*1024, GetArg("-receiveavg", DEFAULT_AVE_RECV/1024)*1024);
-    sendShaper.set(GetArg("-sendburst", DEFAULT_MAX_SEND_BURST/1024)*1024, GetArg("-sendavg", DEFAULT_AVE_SEND/1024)*1024);
-
     uiInterface.InitMessage(_("Loading addresses..."));
     // Load addresses for peers.dat
     int64_t nStart = GetTimeMillis();
