@@ -19,6 +19,7 @@
 #include "uint256.h"
 #include "utilstrencodings.h"
 #include "ipgroups.h"
+#include "leakybucket.h"
 
 #include <deque>
 #include <stdint.h>
@@ -49,6 +50,9 @@ static const int TIMEOUT_INTERVAL = 20 * 60;
 static const unsigned int MAX_INV_SZ = 50000;
 /** The maximum number of new addresses to accumulate before announcing. */
 static const unsigned int MAX_ADDR_TO_SEND = 1000;
+/** The maximum # of bytes to receive at once */
+static const int64_t MAX_RECV_CHUNK = 256*1024;
+
 /** -listen default */
 static const bool DEFAULT_LISTEN = true;
 /** -upnp default */
@@ -59,6 +63,11 @@ static const bool DEFAULT_UPNP = false;
 #endif
 /** The maximum number of entries in mapAskFor */
 static const size_t MAPASKFOR_MAX_SZ = MAX_INV_SZ;
+
+// These variables for traffic shaping need to be globally scoped so the GUI and CLI can adjust the parameters
+extern CLeakyBucket receiveShaper;
+extern CLeakyBucket sendShaper;
+
 
 unsigned int ReceiveFloodSize();
 unsigned int SendBufferSize();
