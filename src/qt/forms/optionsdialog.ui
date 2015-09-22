@@ -328,6 +328,12 @@
              <verstretch>0</verstretch>
             </sizepolicy>
            </property>
+           <property name="maximumSize">
+            <size>
+             <width>55</width>
+             <height>16777215</height>
+            </size>
+           </property>
            <property name="baseSize">
             <size>
              <width>64</width>
@@ -351,7 +357,14 @@
           </widget>
          </item>
          <item>
-          <widget class="QLineEdit" name="sendAveEdit"/>
+          <widget class="QLineEdit" name="sendAveEdit">
+           <property name="maximumSize">
+            <size>
+             <width>55</width>
+             <height>16777215</height>
+            </size>
+           </property>
+          </widget>
          </item>
          <item>
           <widget class="QSlider" name="sendAveSlider">
@@ -379,7 +392,14 @@
           </widget>
          </item>
          <item>
-          <widget class="QLineEdit" name="recvBurstEdit"/>
+          <widget class="QLineEdit" name="recvBurstEdit">
+           <property name="maximumSize">
+            <size>
+             <width>55</width>
+             <height>16777215</height>
+            </size>
+           </property>
+          </widget>
          </item>
          <item>
           <widget class="QSlider" name="recvBurstSlider">
@@ -396,7 +416,14 @@
           </widget>
          </item>
          <item>
-          <widget class="QLineEdit" name="recvAveEdit"/>
+          <widget class="QLineEdit" name="recvAveEdit">
+           <property name="maximumSize">
+            <size>
+             <width>55</width>
+             <height>16777215</height>
+            </size>
+           </property>
+          </widget>
          </item>
          <item>
           <widget class="QSlider" name="recvAveSlider">
@@ -406,6 +433,13 @@
           </widget>
          </item>
         </layout>
+       </item>
+       <item>
+        <widget class="QLabel" name="errorText">
+         <property name="text">
+          <string/>
+         </property>
+        </widget>
        </item>
        <item>
         <spacer name="verticalSpacer_Network">

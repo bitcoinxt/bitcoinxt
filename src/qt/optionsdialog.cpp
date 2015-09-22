@@ -37,10 +37,15 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     ui(new Ui::OptionsDialog),
     model(0),
     mapper(0),
-    fProxyIpValid(true)
+    fProxyIpValid(true),
+    portValidator(1,65536,this),
+    burstValidator(0,100000000, this),
+    sendAveValidator(0,100000000,this),
+    recvAveValidator(0,100000000,this)
 {
     ui->setupUi(this);
-
+    sendAveValidator.initialize(ui->sendBurstEdit,ui->errorText);
+    recvAveValidator.initialize(ui->recvBurstEdit,ui->errorText);
     /* Main elements init */
     ui->databaseCache->setMinimum(nMinDbCache);
     ui->databaseCache->setMaximum(nMaxDbCache);
@@ -54,7 +59,7 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
 
     ui->proxyIp->setEnabled(false);
     ui->proxyPort->setEnabled(false);
-    ui->proxyPort->setValidator(new QIntValidator(1, 65535, this));
+    ui->proxyPort->setValidator(&portValidator); //new QIntValidator(1, 65535, this));
 
     connect(ui->connectSocks, SIGNAL(toggled(bool)), ui->proxyIp, SLOT(setEnabled(bool)));
     connect(ui->connectSocks, SIGNAL(toggled(bool)), ui->proxyPort, SLOT(setEnabled(bool)));
@@ -119,16 +124,26 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     sendShaper.get(&max,&ave);
     bool enabled = (ave != LONG_MAX);
     ui->sendShapingEnable->setChecked(enabled);
-    ui->sendBurstSlider->setRange(0,400);
-    ui->sendAveSlider->setRange(0,400);
-    ui->recvBurstSlider->setRange(0,400);
-    ui->recvAveSlider->setRange(0,400);
+    ui->sendBurstSlider->setRange(0,1000);  // The slider is just for convenience so setting their ranges to what is commonly chosen
+    ui->sendAveSlider->setRange(0,1000);
+    ui->recvBurstSlider->setRange(0,1000);
+    ui->recvAveSlider->setRange(0,1000);
 
+    ui->sendBurstEdit->setValidator(&burstValidator);
+    ui->recvBurstEdit->setValidator(&burstValidator);
+    ui->sendAveEdit->setValidator(&sendAveValidator);
+    ui->recvAveEdit->setValidator(&recvAveValidator);
+   
     connect(ui->sendBurstSlider, SIGNAL(valueChanged(int)), this, SLOT(shapingSliderChanged()));
     connect(ui->sendAveSlider, SIGNAL(valueChanged(int)), this, SLOT(shapingSliderChanged()));
     connect(ui->recvBurstSlider, SIGNAL(valueChanged(int)), this, SLOT(shapingSliderChanged()));
     connect(ui->recvAveSlider, SIGNAL(valueChanged(int)), this, SLOT(shapingSliderChanged()));
 
+    connect(ui->recvAveEdit, SIGNAL(editingFinished()), this, SLOT(shapingAveEditFinished()));
+    connect(ui->sendAveEdit, SIGNAL(editingFinished()), this, SLOT(shapingAveEditFinished()));
+    connect(ui->recvBurstEdit, SIGNAL(editingFinished()), this, SLOT(shapingMaxEditFinished()));
+    connect(ui->sendBurstEdit, SIGNAL(editingFinished()), this, SLOT(shapingMaxEditFinished()));
+   
     if (enabled)
       {
 	ui->sendBurstEdit->setText(QString(boost::lexical_cast<std::string>(max/1024).c_str()));
@@ -155,6 +170,60 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
 OptionsDialog::~OptionsDialog()
 {
     delete ui;
+}
+
+
+
+void OptionsDialog::shapingAveEditFinished(void)
+{
+    bool ok,ok2=false;
+
+    // If the user adjusted the average to be higher than the max, then auto-bump the max up to = the average
+    int maxVal = ui->sendBurstEdit->text().toInt(&ok); 
+    int aveVal = ui->sendAveEdit->text().toInt(&ok2);
+    if (ok && ok2)
+      {
+        if (maxVal < aveVal)
+          {
+            ui->sendBurstEdit->setText(ui->sendAveEdit->text());
+          }
+      }
+    
+    maxVal = ui->recvBurstEdit->text().toInt(&ok); 
+    aveVal = ui->recvAveEdit->text().toInt(&ok2);
+    if (ok && ok2)
+      {
+        if (maxVal < aveVal) 
+          {
+            ui->recvBurstEdit->setText(ui->recvAveEdit->text());
+          }
+      } 
+}
+
+void OptionsDialog::shapingMaxEditFinished(void)
+{
+    bool ok,ok2=false;
+
+    // If the user adjusted the max to be lower than the average, then move the average down
+    int maxVal = ui->sendBurstEdit->text().toInt(&ok); 
+    int aveVal = ui->sendAveEdit->text().toInt(&ok2);
+    if (ok && ok2)
+      {
+        if (maxVal < aveVal)
+          {
+            ui->sendAveEdit->setText(ui->sendBurstEdit->text()); // I use the string text here just so I don't have to convert back from int to string
+          }
+      }
+    
+    maxVal = ui->recvBurstEdit->text().toInt(&ok); 
+    aveVal = ui->recvAveEdit->text().toInt(&ok2);
+    if (ok && ok2)
+      {
+        if (maxVal < aveVal) 
+          {
+            ui->recvAveEdit->setText(ui->recvBurstEdit->text());  // I use the string text here just so I don't have to convert back from int to string
+          }
+      } 
 }
 
 
@@ -283,44 +352,7 @@ void OptionsDialog::on_resetButton_clicked()
 
 void OptionsDialog::on_okButton_clicked()
 {
-    mapper->submit();
-
-    if (0)  // probably not needed anymore because using options model now
-      {
-    if (ui->sendShapingEnable->isChecked())
-      {
-	uint64_t burst, ave;
-	sendShaper.get(&burst, &ave);  // Get the original values
-
-        QString s = ui->sendBurstEdit->text();  // Get the changed value
-        bool ok=false;
-        int t = s.toInt(&ok); // try to convert to an int
-        if (ok && t>=0) burst = t*1024;    // if conversion worked, then use the new value
-
-        s = ui->sendAveEdit->text();  // Do the same with the average
-        t = s.toInt(&ok); 
-        if (ok && t>=0) ave = t*1024;
-
-        sendShaper.set(burst,ave);  // Set the new (or old) burst and average
-      }
-    else sendShaper.disable();
-
-    if (ui->recvShapingEnable->isChecked())
-      {
-	uint64_t burst, ave;
-	receiveShaper.get(&burst, &ave);  
-        QString s = ui->recvBurstEdit->text();
-        bool ok=false;
-        int t = s.toInt(&ok);  //boost::lexical_cast<uint64_t>(s.data());
-        if (ok && t>=0) burst = t*1024;
-        s = ui->recvAveEdit->text();
-        t = s.toInt(&ok); //boost::lexical_cast<uint64_t>(s.data());
-	if (ok && t>=0) ave = t*1024;
-        receiveShaper.set(burst,ave);
-      }
-    else receiveShaper.disable();
-      }
-    
+    mapper->submit();    
     accept();
 }
 
@@ -383,4 +415,29 @@ bool OptionsDialog::eventFilter(QObject *object, QEvent *event)
         }
     }
     return QDialog::eventFilter(object, event);
+}
+
+QValidator::State LessThanValidator::validate(QString & input, int & pos) const
+{
+  QValidator::State ret =  QIntValidator::validate(input, pos);
+  bool clearError=true;
+  if (ret == QValidator::Acceptable)
+    {
+      if (other)
+        {
+          bool ok,ok2=false;
+          int otherVal = other->text().toInt(&ok); // try to convert to an int
+          int myVal = input.toInt(&ok2);
+          if (ok && ok2)
+            {
+              if (myVal > otherVal)
+                {
+                clearError = false;
+                if (errorDisplay) errorDisplay->setText("<span style=\"color:#aa0000;\">Average must be less than or equal Maximum</span>");
+                }
+            }
+        }
+    }
+  if (clearError&&errorDisplay) errorDisplay->setText("");
+  return ret;
 }

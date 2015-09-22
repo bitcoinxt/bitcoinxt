@@ -6,9 +6,12 @@
 #define BITCOIN_QT_OPTIONSDIALOG_H
 
 #include <QDialog>
+#include <QIntValidator>
 
 class OptionsModel;
 class QValidatedLineEdit;
+class QLineEdit;
+class QLabel;
 
 QT_BEGIN_NAMESPACE
 class QDataWidgetMapper;
@@ -17,6 +20,30 @@ QT_END_NAMESPACE
 namespace Ui {
 class OptionsDialog;
 }
+
+/** Ensures that one edit box is always less than another */
+class LessThanValidator: public QIntValidator
+{
+    QLineEdit* other;
+    QLabel* errorDisplay;
+    
+    public:
+    LessThanValidator(int minimum, int maximum, QObject * parent = 0):
+        QIntValidator(minimum, maximum, parent), other(NULL),errorDisplay(NULL)
+        {
+        }
+
+        // This cannot be part of the constructor because these widgets may not be created at construction time.
+        void initialize(QLineEdit* otherp,QLabel* errorDisplayp) 
+        {
+            other=otherp;
+            errorDisplay=errorDisplayp;
+        }
+        
+    
+    virtual State validate(QString & input, int & pos) const;
+    
+};
 
 /** Preferences dialog. */
 class OptionsDialog : public QDialog
@@ -47,8 +74,10 @@ private slots:
     void showRestartWarning(bool fPersistent = false);
     void clearStatusLabel();
     void doProxyIpChecks(QValidatedLineEdit *pUiProxyIp, int nProxyPort);
-    void shapingSliderChanged();
-
+    void shapingSliderChanged();  // Pushes the traffic shaping slider changes into the traffic shaping edit boxes
+    void shapingMaxEditFinished(void);  // auto-corrects cases where max is lower then average
+    void shapingAveEditFinished(void);  // auto-corrects cases where max is lower then average
+    
 signals:
     void proxyIpChecks(QValidatedLineEdit *pUiProxyIp, int nProxyPort);
 
@@ -57,6 +86,11 @@ private:
     OptionsModel *model;
     QDataWidgetMapper *mapper;
     bool fProxyIpValid;
+
+    QIntValidator portValidator;
+    QIntValidator burstValidator;
+    LessThanValidator sendAveValidator;
+    LessThanValidator recvAveValidator;
 };
 
 #endif // BITCOIN_QT_OPTIONSDIALOG_H

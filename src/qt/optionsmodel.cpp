@@ -112,6 +112,31 @@ void OptionsModel::Init()
     if (!settings.contains("nSendAve"))
         settings.setValue("nSendAve", DEFAULT_AVE_SEND == LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_SEND / 1024));
 
+    bool inUse = settings.value("fUseReceiveShaping").toBool();
+    int64_t burstKB = settings.value("nReceiveBurst").toInt();
+    int64_t aveKB = settings.value("nReceiveAve").toInt();
+
+    std::string avg = QString::number(inUse ? aveKB : LONG_MAX).toStdString();
+    std::string burst = QString::number(inUse ? burstKB : LONG_MAX).toStdString();
+
+    if (!SoftSetArg("-receiveavg", avg))
+        addOverriddenOption("-receiveavg");
+    if (!SoftSetArg("-receiveburst", burst))
+        addOverriddenOption("-receiveburst");
+
+    inUse = settings.value("fUseSendShaping").toBool();
+    burstKB = settings.value("nSendBurst").toInt();
+    aveKB = settings.value("nSendAve").toInt();
+
+    avg = QString::number(inUse ? aveKB : LONG_MAX).toStdString();
+    burst = QString::number(inUse ? burstKB : LONG_MAX).toStdString();
+
+    if (!SoftSetArg("-sendavg", avg))
+        addOverriddenOption("-sendavg");
+    if (!SoftSetArg("-sendburst", burst))
+        addOverriddenOption("-sendburst");
+    
+#if 0    
     // Set the shapers to values loaded from configuration
     bool inUse = settings.value("fUseReceiveShaping").toBool();
     int64_t burstArg = GetArg("-receiveburst", -1);
@@ -144,7 +169,7 @@ void OptionsModel::Init()
           sendShaper.set(burstKB*1024,aveKB*1024);
         }
     else sendShaper.disable();
-        
+#endif        
     
     if (!settings.contains("fUseUPnP"))
         settings.setValue("fUseUPnP", DEFAULT_UPNP);
