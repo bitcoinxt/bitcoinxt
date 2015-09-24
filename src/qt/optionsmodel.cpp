@@ -134,42 +134,7 @@ void OptionsModel::Init()
     if (!SoftSetArg("-sendavg", avg))
         addOverriddenOption("-sendavg");
     if (!SoftSetArg("-sendburst", burst))
-        addOverriddenOption("-sendburst");
-    
-#if 0    
-    // Set the shapers to values loaded from configuration
-    bool inUse = settings.value("fUseReceiveShaping").toBool();
-    int64_t burstArg = GetArg("-receiveburst", -1);
-    int64_t aveArg = GetArg("-receiveave", -1);
-    
-    if (inUse || burstArg >= 0 || aveArg >=0 )  // If configuration says the shaper is used or the user put something on the command line then turn on the shaper
-        {
-          int64_t burstKB = settings.value("nReceiveBurst").toInt();
-          int64_t aveKB = settings.value("nReceiveAve").toInt();
-          // Accept command line overrides
-          if (burstArg >= 0) burstKB = burstArg;
-          if (aveArg >= 0) aveKB = aveArg;
-          if (burstArg < aveArg) burstArg = aveArg;  // Correct improper relationship -- burst must be >= average.
-          receiveShaper.set(burstKB*1024,aveKB*1024);
-        }
-    else receiveShaper.disable();
-
-    inUse = settings.value("fUseSendShaping").toBool();
-    burstArg = GetArg("-sendburst", -1);
-    aveArg = GetArg("-sendave", -1);
-    
-    if (inUse)
-        {
-          int64_t burstKB = settings.value("nSendBurst").toInt();
-          int64_t aveKB = settings.value("nSendAve").toInt();
-          // Accept command line overrides
-          if (burstArg >= 0) burstKB = burstArg;
-          if (aveArg >= 0) aveKB = aveArg;
-          if (burstArg < aveArg) burstArg = aveArg;  // Correct improper relationship -- burst must be >= average.
-          sendShaper.set(burstKB*1024,aveKB*1024);
-        }
-    else sendShaper.disable();
-#endif        
+        addOverriddenOption("-sendburst");    
     
     if (!settings.contains("fUseUPnP"))
         settings.setValue("fUseUPnP", DEFAULT_UPNP);
