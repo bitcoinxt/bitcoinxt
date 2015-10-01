@@ -300,7 +300,7 @@
        <item>
         <widget class="QLabel" name="bandwidth">
          <property name="text">
-          <string>Bandwidth Restrictions (check to enable):</string>
+          <string>Bandwidth Restrictions in KBytes (check to enable):</string>
          </property>
         </widget>
        </item>

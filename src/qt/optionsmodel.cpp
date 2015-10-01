@@ -113,8 +113,8 @@ void OptionsModel::Init()
         settings.setValue("nSendAve", DEFAULT_AVE_SEND == LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_SEND / 1024));
 
     bool inUse = settings.value("fUseReceiveShaping").toBool();
-    int64_t burstKB = settings.value("nReceiveBurst").toInt();
-    int64_t aveKB = settings.value("nReceiveAve").toInt();
+    int64_t burstKB = settings.value("nReceiveBurst").toLongLong();
+    int64_t aveKB = settings.value("nReceiveAve").toLongLong();
 
     std::string avg = QString::number(inUse ? aveKB : LONG_MAX).toStdString();
     std::string burst = QString::number(inUse ? burstKB : LONG_MAX).toStdString();
@@ -125,8 +125,8 @@ void OptionsModel::Init()
         addOverriddenOption("-receiveburst");
 
     inUse = settings.value("fUseSendShaping").toBool();
-    burstKB = settings.value("nSendBurst").toInt();
-    aveKB = settings.value("nSendAve").toInt();
+    burstKB = settings.value("nSendBurst").toLongLong();
+    aveKB = settings.value("nSendAve").toLongLong();
 
     avg = QString::number(inUse ? aveKB : LONG_MAX).toStdString();
     burst = QString::number(inUse ? burstKB : LONG_MAX).toStdString();
@@ -402,8 +402,8 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
 
         if (changeReceiveShaper) {
           if (settings.value("fUseReceiveShaping").toBool()) {
-            int64_t burst = 1024 * settings.value("nReceiveBurst").toInt();
-            int64_t ave = 1024 * settings.value("nReceiveAve").toInt();                    
+            int64_t burst = 1024 * settings.value("nReceiveBurst").toLongLong();
+            int64_t ave = 1024 * settings.value("nReceiveAve").toLongLong();                    
             receiveShaper.set(burst, ave);
           }
           else
@@ -412,8 +412,8 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
 
         if (changeSendShaper) {
           if (settings.value("fUseSendShaping").toBool()) {
-            int64_t burst = 1024 * settings.value("nSendBurst").toInt();
-            int64_t ave = 1024 * settings.value("nSendAve").toInt();                    
+            int64_t burst = 1024 * settings.value("nSendBurst").toLongLong();
+            int64_t ave = 1024 * settings.value("nSendAve").toLongLong();                    
             sendShaper.set(burst, ave);
           }
           else
