@@ -2,6 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include <boost/lexical_cast.hpp>
+
 #if defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
 #endif
@@ -104,11 +106,11 @@ void OptionsModel::Init()
         settings.setValue("fUseSendShaping", DEFAULT_AVE_RECV != LONG_MAX);
     
     if (!settings.contains("nReceiveBurst"))
-        settings.setValue("nReceiveBurst", DEFAULT_MAX_RECV_BURST/1024);
+      settings.setValue("nReceiveBurst", (qint64)DEFAULT_MAX_RECV_BURST/1024);
     if (!settings.contains("nReceiveAve"))
         settings.setValue("nReceiveAve", DEFAULT_AVE_RECV == LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_RECV / 1024));
     if (!settings.contains("nSendBurst"))
-        settings.setValue("nSendBurst", DEFAULT_MAX_SEND_BURST/1024);
+      settings.setValue("nSendBurst", (qint64) DEFAULT_MAX_SEND_BURST/1024);
     if (!settings.contains("nSendAve"))
         settings.setValue("nSendAve", DEFAULT_AVE_SEND == LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_SEND / 1024));
 
@@ -128,8 +130,8 @@ void OptionsModel::Init()
     burstKB = settings.value("nSendBurst").toLongLong();
     aveKB = settings.value("nSendAve").toLongLong();
 
-    avg = QString::number(inUse ? aveKB : LONG_MAX).toStdString();
-    burst = QString::number(inUse ? burstKB : LONG_MAX).toStdString();
+    avg = boost::lexical_cast<std::string>(inUse ? aveKB : LONG_MAX);
+    burst = boost::lexical_cast<std::string>(inUse ? burstKB : LONG_MAX);
 
     if (!SoftSetArg("-sendavg", avg))
         addOverriddenOption("-sendavg");

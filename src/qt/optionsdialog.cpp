@@ -249,7 +249,7 @@ void OptionsDialog::shapingSliderChanged(void)
 
     // The slider is imprecise compared to the edit box.  So we only want to change the edit box if the slider's change is larger than its imprecision.
     if (bwEdit2Slider(cur) != sval)
-      ui->sendBurstEdit->setText(QString(boost::lexical_cast<std::string>(val).c_str()));
+      ui->sendBurstEdit->setText(QString::number(val));
 
     sval = ui->sendAveSlider->value();
     val=bwSlider2Edit(sval);  // Transform the slider linear position into a bandwidth
