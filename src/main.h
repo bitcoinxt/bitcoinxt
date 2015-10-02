@@ -73,6 +73,8 @@ static const unsigned int DEFAULT_DESCENDANT_LIMIT = 1000;
 static const unsigned int DEFAULT_DESCENDANT_SIZE_LIMIT = 2500;
 /** Minimum number of max-sized blocks in blk?????.dat files */
 static const unsigned int MIN_BLOCKFILE_BLOCKS = 128;
+/** Default for -mempoolexpiry, expiration time for mempool transactions in hours */
+static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 72;
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
 static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
