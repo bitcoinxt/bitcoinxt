@@ -17,32 +17,31 @@ QT_BEGIN_NAMESPACE
 class QDataWidgetMapper;
 QT_END_NAMESPACE
 
-namespace Ui {
+namespace Ui
+{
 class OptionsDialog;
 }
 
 /** Ensures that one edit box is always less than another */
-class LessThanValidator: public QIntValidator
+class LessThanValidator : public QIntValidator
 {
     QLineEdit* other;
     QLabel* errorDisplay;
-    
-    public:
-    LessThanValidator(int minimum, int maximum, QObject * parent = 0):
-        QIntValidator(minimum, maximum, parent), other(NULL),errorDisplay(NULL)
-        {
-        }
 
-        // This cannot be part of the constructor because these widgets may not be created at construction time.
-        void initialize(QLineEdit* otherp,QLabel* errorDisplayp) 
-        {
-            other=otherp;
-            errorDisplay=errorDisplayp;
-        }
-        
-    
-    virtual State validate(QString & input, int & pos) const;
-    
+public:
+    LessThanValidator(int minimum, int maximum, QObject* parent = 0) : QIntValidator(minimum, maximum, parent), other(NULL), errorDisplay(NULL)
+    {
+    }
+
+    // This cannot be part of the constructor because these widgets may not be created at construction time.
+    void initialize(QLineEdit* otherp, QLabel* errorDisplayp)
+    {
+        other = otherp;
+        errorDisplay = errorDisplayp;
+    }
+
+
+    virtual State validate(QString& input, int& pos) const;
 };
 
 /** Preferences dialog. */
@@ -51,14 +50,14 @@ class OptionsDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit OptionsDialog(QWidget *parent, bool enableWallet);
+    explicit OptionsDialog(QWidget* parent, bool enableWallet);
     ~OptionsDialog();
 
-    void setModel(OptionsModel *model);
+    void setModel(OptionsModel* model);
     void setMapper();
 
 protected:
-    bool eventFilter(QObject *object, QEvent *event);
+    bool eventFilter(QObject* object, QEvent* event);
 
 private slots:
     /* enable OK button */
@@ -73,18 +72,18 @@ private slots:
 
     void showRestartWarning(bool fPersistent = false);
     void clearStatusLabel();
-    void doProxyIpChecks(QValidatedLineEdit *pUiProxyIp, int nProxyPort);
-    void shapingSliderChanged();  // Pushes the traffic shaping slider changes into the traffic shaping edit boxes
-    void shapingMaxEditFinished(void);  // auto-corrects cases where max is lower then average
-    void shapingAveEditFinished(void);  // auto-corrects cases where max is lower then average
-    
+    void doProxyIpChecks(QValidatedLineEdit* pUiProxyIp, int nProxyPort);
+    void shapingSliderChanged();       // Pushes the traffic shaping slider changes into the traffic shaping edit boxes
+    void shapingMaxEditFinished(void); // auto-corrects cases where max is lower then average
+    void shapingAveEditFinished(void); // auto-corrects cases where max is lower then average
+
 signals:
-    void proxyIpChecks(QValidatedLineEdit *pUiProxyIp, int nProxyPort);
+    void proxyIpChecks(QValidatedLineEdit* pUiProxyIp, int nProxyPort);
 
 private:
-    Ui::OptionsDialog *ui;
-    OptionsModel *model;
-    QDataWidgetMapper *mapper;
+    Ui::OptionsDialog* ui;
+    OptionsModel* model;
+    QDataWidgetMapper* mapper;
     bool fProxyIpValid;
 
     QIntValidator portValidator;

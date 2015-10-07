@@ -32,30 +32,29 @@
 #include <QMessageBox>
 #include <QTimer>
 
-inline int64_t bwEdit2Slider(int64_t x) { return sqrt(x*100); }
-inline int64_t bwSlider2Edit(int64_t x) { return x*x/100; }
+inline int64_t bwEdit2Slider(int64_t x) { return sqrt(x * 100); }
+inline int64_t bwSlider2Edit(int64_t x) { return x * x / 100; }
 
-OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
-    QDialog(parent),
-    ui(new Ui::OptionsDialog),
-    model(0),
-    mapper(0),
-    fProxyIpValid(true),
-    portValidator(1,65536,this),
-    burstValidator(0,100000000, this),
-    sendAveValidator(0,100000000,this),
-    recvAveValidator(0,100000000,this)
+OptionsDialog::OptionsDialog(QWidget* parent, bool enableWallet) : QDialog(parent),
+                                                                   ui(new Ui::OptionsDialog),
+                                                                   model(0),
+                                                                   mapper(0),
+                                                                   fProxyIpValid(true),
+                                                                   portValidator(1, 65536, this),
+                                                                   burstValidator(0, 100000000, this),
+                                                                   sendAveValidator(0, 100000000, this),
+                                                                   recvAveValidator(0, 100000000, this)
 {
     ui->setupUi(this);
-    sendAveValidator.initialize(ui->sendBurstEdit,ui->errorText);
-    recvAveValidator.initialize(ui->recvBurstEdit,ui->errorText);
+    sendAveValidator.initialize(ui->sendBurstEdit, ui->errorText);
+    recvAveValidator.initialize(ui->recvBurstEdit, ui->errorText);
     /* Main elements init */
     ui->databaseCache->setMinimum(nMinDbCache);
     ui->databaseCache->setMaximum(nMaxDbCache);
     ui->threadsScriptVerif->setMinimum(-(int)boost::thread::hardware_concurrency());
     ui->threadsScriptVerif->setMaximum(MAX_SCRIPTCHECK_THREADS);
 
-    /* Network elements init */
+/* Network elements init */
 #ifndef USE_UPNP
     ui->mapPortUpnp->setEnabled(false);
 #endif
@@ -69,7 +68,7 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
 
     ui->proxyIp->installEventFilter(this);
 
-    /* Window elements init */
+/* Window elements init */
 #ifdef Q_OS_MAC
     /* remove Window tab on Mac */
     ui->tabWidget->removeTab(ui->tabWidget->indexOf(ui->tabWindow));
@@ -83,13 +82,11 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     /* Display elements init */
     QDir translations(":translations");
     ui->lang->addItem(QString("(") + tr("default") + QString(")"), QVariant(""));
-    foreach(const QString &langStr, translations.entryList())
-    {
+    foreach (const QString& langStr, translations.entryList()) {
         QLocale locale(langStr);
 
         /** check if the locale name consists of 2 parts (language_country) */
-        if(langStr.contains("_"))
-        {
+        if (langStr.contains("_")) {
 #if QT_VERSION >= 0x040800
             /** display language strings as "native language - native country (locale name)", e.g. "Deutsch - Deutschland (de)" */
             ui->lang->addItem(locale.nativeLanguageName() + QString(" - ") + locale.nativeCountryName() + QString(" (") + langStr + QString(")"), QVariant(langStr));
@@ -97,9 +94,7 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
             /** display language strings as "language - country (locale name)", e.g. "German - Germany (de)" */
             ui->lang->addItem(QLocale::languageToString(locale.language()) + QString(" - ") + QLocale::countryToString(locale.country()) + QString(" (") + langStr + QString(")"), QVariant(langStr));
 #endif
-        }
-        else
-        {
+        } else {
 #if QT_VERSION >= 0x040800
             /** display language strings as "native language (locale name)", e.g. "Deutsch (de)" */
             ui->lang->addItem(locale.nativeLanguageName() + QString(" (") + langStr + QString(")"), QVariant(langStr));
@@ -121,22 +116,22 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     mapper->setOrientation(Qt::Vertical);
 
     /* setup/change UI elements when proxy IP is invalid/valid */
-    connect(this, SIGNAL(proxyIpChecks(QValidatedLineEdit *, int)), this, SLOT(doProxyIpChecks(QValidatedLineEdit *, int)));
+    connect(this, SIGNAL(proxyIpChecks(QValidatedLineEdit*, int)), this, SLOT(doProxyIpChecks(QValidatedLineEdit*, int)));
 
-    uint64_t max,ave;
-    sendShaper.get(&max,&ave);
+    uint64_t max, ave;
+    sendShaper.get(&max, &ave);
     bool enabled = (ave != LONG_MAX);
     ui->sendShapingEnable->setChecked(enabled);
-    ui->sendBurstSlider->setRange(0,1000);  // The slider is just for convenience so setting their ranges to what is commonly chosen
-    ui->sendAveSlider->setRange(0,1000);
-    ui->recvBurstSlider->setRange(0,1000);
-    ui->recvAveSlider->setRange(0,1000);
+    ui->sendBurstSlider->setRange(0, 1000); // The slider is just for convenience so setting their ranges to what is commonly chosen
+    ui->sendAveSlider->setRange(0, 1000);
+    ui->recvBurstSlider->setRange(0, 1000);
+    ui->recvAveSlider->setRange(0, 1000);
 
     ui->sendBurstEdit->setValidator(&burstValidator);
     ui->recvBurstEdit->setValidator(&burstValidator);
     ui->sendAveEdit->setValidator(&sendAveValidator);
     ui->recvAveEdit->setValidator(&recvAveValidator);
-   
+
     connect(ui->sendBurstSlider, SIGNAL(valueChanged(int)), this, SLOT(shapingSliderChanged()));
     connect(ui->sendAveSlider, SIGNAL(valueChanged(int)), this, SLOT(shapingSliderChanged()));
     connect(ui->recvBurstSlider, SIGNAL(valueChanged(int)), this, SLOT(shapingSliderChanged()));
@@ -146,28 +141,23 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     connect(ui->sendAveEdit, SIGNAL(editingFinished()), this, SLOT(shapingAveEditFinished()));
     connect(ui->recvBurstEdit, SIGNAL(editingFinished()), this, SLOT(shapingMaxEditFinished()));
     connect(ui->sendBurstEdit, SIGNAL(editingFinished()), this, SLOT(shapingMaxEditFinished()));
-   
-    if (enabled)
-      {
-	ui->sendBurstEdit->setText(QString(boost::lexical_cast<std::string>(max/1024).c_str()));
-	ui->sendAveEdit->setText(QString(boost::lexical_cast<std::string>(ave/1024).c_str()));
-        ui->sendBurstSlider->setValue(bwEdit2Slider(max/1024));
-        ui->sendAveSlider->setValue(bwEdit2Slider(ave/1024));
-      }
 
-    receiveShaper.get(&max,&ave);
+    if (enabled) {
+        ui->sendBurstEdit->setText(QString(boost::lexical_cast<std::string>(max / 1024).c_str()));
+        ui->sendAveEdit->setText(QString(boost::lexical_cast<std::string>(ave / 1024).c_str()));
+        ui->sendBurstSlider->setValue(bwEdit2Slider(max / 1024));
+        ui->sendAveSlider->setValue(bwEdit2Slider(ave / 1024));
+    }
+
+    receiveShaper.get(&max, &ave);
     enabled = (ave != LONG_MAX);
     ui->recvShapingEnable->setChecked(enabled);
-    if (enabled)
-      {
-	ui->recvBurstEdit->setText(QString(boost::lexical_cast<std::string>(max/1024).c_str()));
-	ui->recvAveEdit->setText(QString(boost::lexical_cast<std::string>(ave/1024).c_str()));
-        ui->recvBurstSlider->setValue(bwEdit2Slider(max/1024));
-	ui->recvAveSlider->setValue(bwEdit2Slider(ave/1024));
-      }
-    
-
-    
+    if (enabled) {
+        ui->recvBurstEdit->setText(QString(boost::lexical_cast<std::string>(max / 1024).c_str()));
+        ui->recvAveEdit->setText(QString(boost::lexical_cast<std::string>(ave / 1024).c_str()));
+        ui->recvBurstSlider->setValue(bwEdit2Slider(max / 1024));
+        ui->recvAveSlider->setValue(bwEdit2Slider(ave / 1024));
+    }
 }
 
 OptionsDialog::~OptionsDialog()
@@ -176,66 +166,58 @@ OptionsDialog::~OptionsDialog()
 }
 
 
-
 void OptionsDialog::shapingAveEditFinished(void)
 {
-    bool ok,ok2=false;
+    bool ok, ok2 = false;
 
     // If the user adjusted the average to be higher than the max, then auto-bump the max up to = the average
-    int maxVal = ui->sendBurstEdit->text().toInt(&ok); 
+    int maxVal = ui->sendBurstEdit->text().toInt(&ok);
     int aveVal = ui->sendAveEdit->text().toInt(&ok2);
 
-    if (ok && ok2)
-      {
+    if (ok && ok2) {
         ui->sendAveSlider->setValue(bwEdit2Slider(aveVal));
-        if (maxVal < aveVal)
-          {
+        if (maxVal < aveVal) {
             ui->sendBurstEdit->setText(ui->sendAveEdit->text());
             ui->sendBurstSlider->setValue(bwEdit2Slider(aveVal));
-          }
-      }
-    
-    maxVal = ui->recvBurstEdit->text().toInt(&ok); 
+        }
+    }
+
+    maxVal = ui->recvBurstEdit->text().toInt(&ok);
     aveVal = ui->recvAveEdit->text().toInt(&ok2);
-    if (ok && ok2)
-      {
+    if (ok && ok2) {
         ui->recvAveSlider->setValue(bwEdit2Slider(aveVal));
-        if (maxVal < aveVal) 
-          {
+        if (maxVal < aveVal) {
             ui->recvBurstEdit->setText(ui->recvAveEdit->text());
             ui->recvBurstSlider->setValue(bwEdit2Slider(aveVal));
-          }
-      } 
+        }
+    }
 }
 
 void OptionsDialog::shapingMaxEditFinished(void)
 {
-    bool ok,ok2=false;
+    bool ok, ok2 = false;
 
     // If the user adjusted the max to be lower than the average, then move the average down
-    int maxVal = ui->sendBurstEdit->text().toInt(&ok); 
+    int maxVal = ui->sendBurstEdit->text().toInt(&ok);
     int aveVal = ui->sendAveEdit->text().toInt(&ok2);
-    if (ok && ok2)
-      {
-        ui->sendBurstSlider->setValue(bwEdit2Slider(maxVal));  // Move the slider based on the edit box change
-        if (maxVal < aveVal)  // If the max was changed to be lower than the average, bump the average down to the maximum, because having an ave > the max makes no sense.
-          {
+    if (ok && ok2) {
+        ui->sendBurstSlider->setValue(bwEdit2Slider(maxVal)); // Move the slider based on the edit box change
+        if (maxVal < aveVal)                                  // If the max was changed to be lower than the average, bump the average down to the maximum, because having an ave > the max makes no sense.
+        {
             ui->sendAveEdit->setText(ui->sendBurstEdit->text()); // I use the string text here just so I don't have to convert back from int to string
-            ui->sendAveSlider->setValue(bwEdit2Slider(maxVal)); 
-          }
-      }
-    
-    maxVal = ui->recvBurstEdit->text().toInt(&ok); 
+            ui->sendAveSlider->setValue(bwEdit2Slider(maxVal));
+        }
+    }
+
+    maxVal = ui->recvBurstEdit->text().toInt(&ok);
     aveVal = ui->recvAveEdit->text().toInt(&ok2);
-    if (ok && ok2)
-      {
-        ui->recvBurstSlider->setValue(bwEdit2Slider(maxVal));  // Move the slider based on the edit box change
-        if (maxVal < aveVal) 
-          {
-            ui->recvAveEdit->setText(ui->recvBurstEdit->text());  // I use the string text here just so I don't have to convert back from int to string
-            ui->recvAveSlider->setValue(bwEdit2Slider(maxVal)); 
-          }
-      } 
+    if (ok && ok2) {
+        ui->recvBurstSlider->setValue(bwEdit2Slider(maxVal)); // Move the slider based on the edit box change
+        if (maxVal < aveVal) {
+            ui->recvAveEdit->setText(ui->recvBurstEdit->text()); // I use the string text here just so I don't have to convert back from int to string
+            ui->recvAveSlider->setValue(bwEdit2Slider(maxVal));
+        }
+    }
 }
 
 
@@ -244,38 +226,37 @@ void OptionsDialog::shapingSliderChanged(void)
     // When the sliders change, I want to update the edit box.  Rather then have the pain of making a separate function for every slider, I just set them all whenever one changes.
 
     int64_t sval = ui->sendBurstSlider->value();
-    int64_t val=bwSlider2Edit(sval);  // Transform the slider linear position into a bandwidth in Kb
+    int64_t val = bwSlider2Edit(sval); // Transform the slider linear position into a bandwidth in Kb
     int64_t cur = ui->sendBurstEdit->text().toLongLong();
 
     // The slider is imprecise compared to the edit box.  So we only want to change the edit box if the slider's change is larger than its imprecision.
     if (bwEdit2Slider(cur) != sval)
-      ui->sendBurstEdit->setText(QString::number(val));
+        ui->sendBurstEdit->setText(QString::number(val));
 
     sval = ui->sendAveSlider->value();
-    val=bwSlider2Edit(sval);  // Transform the slider linear position into a bandwidth
+    val = bwSlider2Edit(sval); // Transform the slider linear position into a bandwidth
     cur = ui->sendAveEdit->text().toLongLong();
     if (bwEdit2Slider(cur) != sval)
-      ui->sendAveEdit->setText(QString(boost::lexical_cast<std::string>(val).c_str()));
+        ui->sendAveEdit->setText(QString(boost::lexical_cast<std::string>(val).c_str()));
 
     sval = ui->recvBurstSlider->value();
-    val=bwSlider2Edit(sval);  // Transform the slider linear position into a bandwidth
+    val = bwSlider2Edit(sval); // Transform the slider linear position into a bandwidth
     cur = ui->recvBurstEdit->text().toLongLong();
     if (bwEdit2Slider(cur) != sval)
-      ui->recvBurstEdit->setText(QString(boost::lexical_cast<std::string>(val).c_str()));
+        ui->recvBurstEdit->setText(QString(boost::lexical_cast<std::string>(val).c_str()));
 
     sval = ui->recvAveSlider->value();
-    val=bwSlider2Edit(sval);  // Transform the slider linear position into a bandwidth
+    val = bwSlider2Edit(sval); // Transform the slider linear position into a bandwidth
     cur = ui->recvAveEdit->text().toLongLong();
     if (bwEdit2Slider(cur) != sval)
-      ui->recvAveEdit->setText(QString(boost::lexical_cast<std::string>(val).c_str()));  
+        ui->recvAveEdit->setText(QString(boost::lexical_cast<std::string>(val).c_str()));
 }
 
-void OptionsDialog::setModel(OptionsModel *model)
+void OptionsDialog::setModel(OptionsModel* model)
 {
     this->model = model;
 
-    if(model)
-    {
+    if (model) {
         /* check if client restart is needed and show persistent message */
         if (model->isRestartRequired())
             showRestartWarning(true);
@@ -302,7 +283,7 @@ void OptionsDialog::setModel(OptionsModel *model)
     connect(ui->connectSocks, SIGNAL(clicked(bool)), this, SLOT(showRestartWarning()));
     /* Display */
     connect(ui->lang, SIGNAL(valueChanged()), this, SLOT(showRestartWarning()));
-    connect(ui->thirdPartyTxUrls, SIGNAL(textChanged(const QString &)), this, SLOT(showRestartWarning()));
+    connect(ui->thirdPartyTxUrls, SIGNAL(textChanged(const QString&)), this, SLOT(showRestartWarning()));
 }
 
 void OptionsDialog::setMapper()
@@ -330,8 +311,8 @@ void OptionsDialog::setMapper()
     mapper->addMapping(ui->recvShapingEnable, OptionsModel::UseReceiveShaping);
     mapper->addMapping(ui->recvBurstEdit, OptionsModel::ReceiveBurst);
     mapper->addMapping(ui->recvAveEdit, OptionsModel::ReceiveAve);
-    
-    /* Window */
+
+/* Window */
 #ifndef Q_OS_MAC
     mapper->addMapping(ui->minimizeToTray, OptionsModel::MinimizeToTray);
     mapper->addMapping(ui->minimizeOnClose, OptionsModel::MinimizeOnClose);
@@ -346,7 +327,7 @@ void OptionsDialog::setMapper()
 void OptionsDialog::enableOkButton()
 {
     /* prevent enabling of the OK button when data modified, if there is an invalid proxy address present */
-    if(fProxyIpValid)
+    if (fProxyIpValid)
         setOkButtonState(true);
 }
 
@@ -362,14 +343,11 @@ void OptionsDialog::setOkButtonState(bool fState)
 
 void OptionsDialog::on_resetButton_clicked()
 {
-    if(model)
-    {
+    if (model) {
         // confirmation dialog
-        QMessageBox::StandardButton btnRetVal = QMessageBox::question(this, tr("Confirm options reset"),
-            tr("Client restart required to activate changes.") + "<br><br>" + tr("Client will be shut down. Do you want to proceed?"),
-            QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
+        QMessageBox::StandardButton btnRetVal = QMessageBox::question(this, tr("Confirm options reset"), tr("Client restart required to activate changes.") + "<br><br>" + tr("Client will be shut down. Do you want to proceed?"), QMessageBox::Yes | QMessageBox::Cancel, QMessageBox::Cancel);
 
-        if(btnRetVal == QMessageBox::Cancel)
+        if (btnRetVal == QMessageBox::Cancel)
             return;
 
         /* reset all options and close GUI */
@@ -380,7 +358,7 @@ void OptionsDialog::on_resetButton_clicked()
 
 void OptionsDialog::on_okButton_clicked()
 {
-    mapper->submit();    
+    mapper->submit();
     accept();
 }
 
@@ -393,12 +371,9 @@ void OptionsDialog::showRestartWarning(bool fPersistent)
 {
     ui->statusLabel->setStyleSheet("QLabel { color: red; }");
 
-    if(fPersistent)
-    {
+    if (fPersistent) {
         ui->statusLabel->setText(tr("Client restart required to activate changes."));
-    }
-    else
-    {
+    } else {
         ui->statusLabel->setText(tr("This change would require a client restart."));
         // clear non-persistent status label after 10 seconds
         // Todo: should perhaps be a class attribute, if we extend the use of statusLabel
@@ -411,7 +386,7 @@ void OptionsDialog::clearStatusLabel()
     ui->statusLabel->clear();
 }
 
-void OptionsDialog::doProxyIpChecks(QValidatedLineEdit *pUiProxyIp, int nProxyPort)
+void OptionsDialog::doProxyIpChecks(QValidatedLineEdit* pUiProxyIp, int nProxyPort)
 {
     Q_UNUSED(nProxyPort);
 
@@ -419,53 +394,46 @@ void OptionsDialog::doProxyIpChecks(QValidatedLineEdit *pUiProxyIp, int nProxyPo
     CService addrProxy;
 
     /* Check for a valid IPv4 / IPv6 address */
-    if (!(fProxyIpValid = LookupNumeric(strAddrProxy.c_str(), addrProxy)))
-    {
+    if (!(fProxyIpValid = LookupNumeric(strAddrProxy.c_str(), addrProxy))) {
         disableOkButton();
         pUiProxyIp->setValid(false);
         ui->statusLabel->setStyleSheet("QLabel { color: red; }");
         ui->statusLabel->setText(tr("The supplied proxy address is invalid."));
-    }
-    else
-    {
+    } else {
         enableOkButton();
         ui->statusLabel->clear();
     }
 }
 
-bool OptionsDialog::eventFilter(QObject *object, QEvent *event)
+bool OptionsDialog::eventFilter(QObject* object, QEvent* event)
 {
-    if(event->type() == QEvent::FocusOut)
-    {
-        if(object == ui->proxyIp)
-        {
+    if (event->type() == QEvent::FocusOut) {
+        if (object == ui->proxyIp) {
             emit proxyIpChecks(ui->proxyIp, ui->proxyPort->text().toInt());
         }
     }
     return QDialog::eventFilter(object, event);
 }
 
-QValidator::State LessThanValidator::validate(QString & input, int & pos) const
+QValidator::State LessThanValidator::validate(QString& input, int& pos) const
 {
-  QValidator::State ret =  QIntValidator::validate(input, pos);
-  bool clearError=true;
-  if (ret == QValidator::Acceptable)
-    {
-      if (other)
-        {
-          bool ok,ok2=false;
-          int otherVal = other->text().toInt(&ok); // try to convert to an int
-          int myVal = input.toInt(&ok2);
-          if (ok && ok2)
-            {
-              if (myVal > otherVal)
-                {
-                clearError = false;
-                if (errorDisplay) errorDisplay->setText("<span style=\"color:#aa0000;\">Average must be less than or equal Maximum</span>");
+    QValidator::State ret = QIntValidator::validate(input, pos);
+    bool clearError = true;
+    if (ret == QValidator::Acceptable) {
+        if (other) {
+            bool ok, ok2 = false;
+            int otherVal = other->text().toInt(&ok); // try to convert to an int
+            int myVal = input.toInt(&ok2);
+            if (ok && ok2) {
+                if (myVal > otherVal) {
+                    clearError = false;
+                    if (errorDisplay)
+                        errorDisplay->setText("<span style=\"color:#aa0000;\">Average must be less than or equal Maximum</span>");
                 }
             }
         }
     }
-  if (clearError&&errorDisplay) errorDisplay->setText("");
-  return ret;
+    if (clearError && errorDisplay)
+        errorDisplay->setText("");
+    return ret;
 }

@@ -28,13 +28,12 @@
 #include <QSettings>
 #include <QStringList>
 
-OptionsModel::OptionsModel(QObject *parent) :
-    QAbstractListModel(parent)
+OptionsModel::OptionsModel(QObject* parent) : QAbstractListModel(parent)
 {
     Init();
 }
 
-void OptionsModel::addOverriddenOption(const std::string &option)
+void OptionsModel::addOverriddenOption(const std::string& option)
 {
     strOverriddenByCommandLine += QString::fromStdString(option) + "=" + QString::fromStdString(mapArgs[option]) + " ";
 }
@@ -90,7 +89,7 @@ void OptionsModel::Init()
     if (!SoftSetArg("-par", settings.value("nThreadsScriptVerif").toString().toStdString()))
         addOverriddenOption("-par");
 
-    // Wallet
+// Wallet
 #ifdef ENABLE_WALLET
     if (!settings.contains("bSpendZeroConfChange"))
         settings.setValue("bSpendZeroConfChange", true);
@@ -104,13 +103,13 @@ void OptionsModel::Init()
         settings.setValue("fUseReceiveShaping", DEFAULT_AVE_RECV != LONG_MAX);
     if (!settings.contains("fUseSendShaping"))
         settings.setValue("fUseSendShaping", DEFAULT_AVE_RECV != LONG_MAX);
-    
+
     if (!settings.contains("nReceiveBurst"))
-      settings.setValue("nReceiveBurst", (qint64)DEFAULT_MAX_RECV_BURST/1024);
+        settings.setValue("nReceiveBurst", (qint64)DEFAULT_MAX_RECV_BURST / 1024);
     if (!settings.contains("nReceiveAve"))
         settings.setValue("nReceiveAve", DEFAULT_AVE_RECV == LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_RECV / 1024));
     if (!settings.contains("nSendBurst"))
-      settings.setValue("nSendBurst", (qint64) DEFAULT_MAX_SEND_BURST/1024);
+        settings.setValue("nSendBurst", (qint64)DEFAULT_MAX_SEND_BURST / 1024);
     if (!settings.contains("nSendAve"))
         settings.setValue("nSendAve", DEFAULT_AVE_SEND == LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_SEND / 1024));
 
@@ -136,8 +135,8 @@ void OptionsModel::Init()
     if (!SoftSetArg("-sendavg", avg))
         addOverriddenOption("-sendavg");
     if (!SoftSetArg("-sendburst", burst))
-        addOverriddenOption("-sendburst");    
-    
+        addOverriddenOption("-sendburst");
+
     if (!settings.contains("fUseUPnP"))
         settings.setValue("fUseUPnP", DEFAULT_UPNP);
     if (!SoftSetBoolArg("-upnp", settings.value("fUseUPnP").toBool()))
@@ -155,7 +154,7 @@ void OptionsModel::Init()
     // Only try to set -proxy, if user has enabled fUseProxy
     if (settings.value("fUseProxy").toBool() && !SoftSetArg("-proxy", settings.value("addrProxy").toString().toStdString()))
         addOverriddenOption("-proxy");
-    else if(!settings.value("fUseProxy").toBool() && !GetArg("-proxy", "").empty())
+    else if (!settings.value("fUseProxy").toBool() && !GetArg("-proxy", "").empty())
         addOverriddenOption("-proxy");
 
     // Display
@@ -179,19 +178,17 @@ void OptionsModel::Reset()
         GUIUtil::SetStartOnSystemStartup(false);
 }
 
-int OptionsModel::rowCount(const QModelIndex & parent) const
+int OptionsModel::rowCount(const QModelIndex& parent) const
 {
     return OptionIDRowCount;
 }
 
 // read QSettings values and return them
-QVariant OptionsModel::data(const QModelIndex & index, int role) const
+QVariant OptionsModel::data(const QModelIndex& index, int role) const
 {
-    if(role == Qt::EditRole)
-    {
+    if (role == Qt::EditRole) {
         QSettings settings;
-        switch(index.row())
-        {
+        switch (index.row()) {
         case StartAtStartup:
             return GUIUtil::GetStartOnSystemStartup();
         case MinimizeToTray:
@@ -240,7 +237,7 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
         case UseReceiveShaping:
             return settings.value("fUseReceiveShaping");
         case UseSendShaping:
-            return settings.value("fUseSendShaping");          
+            return settings.value("fUseSendShaping");
         case ReceiveBurst:
             return settings.value("nReceiveBurst");
         case ReceiveAve:
@@ -257,16 +254,14 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
 }
 
 // write QSettings values
-bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, int role)
+bool OptionsModel::setData(const QModelIndex& index, const QVariant& value, int role)
 {
     bool successful = true; /* set to false on parse error */
-    bool changeSendShaper=false;
-    bool changeReceiveShaper=false;
-    if(role == Qt::EditRole)
-    {
+    bool changeSendShaper = false;
+    bool changeReceiveShaper = false;
+    if (role == Qt::EditRole) {
         QSettings settings;
-        switch(index.row())
-        {
+        switch (index.row()) {
         case StartAtStartup:
             successful = GUIUtil::SetStartOnSystemStartup(value.toBool());
             break;
@@ -300,8 +295,7 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
                 settings.setValue("addrProxy", strNewValue);
                 setRestartRequired(true);
             }
-        }
-        break;
+        } break;
         case ProxyPort: {
             // contains current IP at index 0 and current port at index 1
             QStringList strlIpPort = settings.value("addrProxy").toString().split(":", QString::SkipEmptyParts);
@@ -312,8 +306,7 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
                 settings.setValue("addrProxy", strNewValue);
                 setRestartRequired(true);
             }
-        }
-        break;
+        } break;
 #ifdef ENABLE_WALLET
         case SpendZeroConfChange:
             if (settings.value("bSpendZeroConfChange") != value) {
@@ -363,76 +356,73 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
             break;
         case UseReceiveShaping:
             if (settings.value("fUseReceiveShaping") != value) {
-                settings.setValue("fUseReceiveShaping",value);
+                settings.setValue("fUseReceiveShaping", value);
                 changeReceiveShaper = true;
             }
             break;
         case UseSendShaping:
             if (settings.value("fUseSendShaping") != value) {
-                settings.setValue("fUseSendShaping",value);
+                settings.setValue("fUseSendShaping", value);
                 changeSendShaper = true;
             }
             break;
         case ReceiveBurst:
             if (settings.value("nReceiveBurst") != value) {
-                settings.setValue("nReceiveBurst",value);
+                settings.setValue("nReceiveBurst", value);
                 changeReceiveShaper = true;
             }
             break;
         case ReceiveAve:
             if (settings.value("nReceiveAve") != value) {
-                settings.setValue("nReceiveAve",value);
+                settings.setValue("nReceiveAve", value);
                 changeReceiveShaper = true;
             }
             break;
         case SendBurst:
             if (settings.value("nSendBurst") != value) {
-                settings.setValue("nSendBurst",value);
+                settings.setValue("nSendBurst", value);
                 changeSendShaper = true;
             }
             break;
         case SendAve:
             if (settings.value("nSendAve") != value) {
-                settings.setValue("nSendAve",value);
+                settings.setValue("nSendAve", value);
                 changeSendShaper = true;
             }
             break;
         default:
             break;
         }
-    
+
 
         if (changeReceiveShaper) {
-          if (settings.value("fUseReceiveShaping").toBool()) {
-            int64_t burst = 1024 * settings.value("nReceiveBurst").toLongLong();
-            int64_t ave = 1024 * settings.value("nReceiveAve").toLongLong();                    
-            receiveShaper.set(burst, ave);
-          }
-          else
-            receiveShaper.disable();
+            if (settings.value("fUseReceiveShaping").toBool()) {
+                int64_t burst = 1024 * settings.value("nReceiveBurst").toLongLong();
+                int64_t ave = 1024 * settings.value("nReceiveAve").toLongLong();
+                receiveShaper.set(burst, ave);
+            } else
+                receiveShaper.disable();
         }
 
         if (changeSendShaper) {
-          if (settings.value("fUseSendShaping").toBool()) {
-            int64_t burst = 1024 * settings.value("nSendBurst").toLongLong();
-            int64_t ave = 1024 * settings.value("nSendAve").toLongLong();                    
-            sendShaper.set(burst, ave);
-          }
-          else
-            sendShaper.disable();
+            if (settings.value("fUseSendShaping").toBool()) {
+                int64_t burst = 1024 * settings.value("nSendBurst").toLongLong();
+                int64_t ave = 1024 * settings.value("nSendAve").toLongLong();
+                sendShaper.set(burst, ave);
+            } else
+                sendShaper.disable();
         }
     }
-    
+
     emit dataChanged(index, index);
 
     return successful;
 }
 
 /** Updates current unit in memory, settings and emits displayUnitChanged(newUnit) signal */
-void OptionsModel::setDisplayUnit(const QVariant &value)
+void OptionsModel::setDisplayUnit(const QVariant& value)
 {
-    if (!value.isNull())
-    {
+    if (!value.isNull()) {
         QSettings settings;
         nDisplayUnit = value.toInt();
         settings.setValue("nDisplayUnit", nDisplayUnit);
@@ -451,8 +441,7 @@ bool OptionsModel::getProxySettings(QNetworkProxy& proxy) const
         proxy.setPort(curProxy.proxy.GetPort());
 
         return true;
-    }
-    else
+    } else
         proxy.setType(QNetworkProxy::NoProxy);
 
     return false;
