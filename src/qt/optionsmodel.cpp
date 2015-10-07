@@ -100,25 +100,25 @@ void OptionsModel::Init()
     // Network
 
     if (!settings.contains("fUseReceiveShaping"))
-        settings.setValue("fUseReceiveShaping", DEFAULT_AVE_RECV != LONG_MAX);
+        settings.setValue("fUseReceiveShaping", DEFAULT_AVE_RECV != LONG_LONG_MAX);
     if (!settings.contains("fUseSendShaping"))
-        settings.setValue("fUseSendShaping", DEFAULT_AVE_RECV != LONG_MAX);
+        settings.setValue("fUseSendShaping", DEFAULT_AVE_SEND != LONG_LONG_MAX);
 
     if (!settings.contains("nReceiveBurst"))
         settings.setValue("nReceiveBurst", (qint64)DEFAULT_MAX_RECV_BURST / 1024);
     if (!settings.contains("nReceiveAve"))
-        settings.setValue("nReceiveAve", DEFAULT_AVE_RECV == LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_RECV / 1024));
+        settings.setValue("nReceiveAve", DEFAULT_AVE_RECV == LONG_LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_RECV / 1024));
     if (!settings.contains("nSendBurst"))
         settings.setValue("nSendBurst", (qint64)DEFAULT_MAX_SEND_BURST / 1024);
     if (!settings.contains("nSendAve"))
-        settings.setValue("nSendAve", DEFAULT_AVE_SEND == LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_SEND / 1024));
+        settings.setValue("nSendAve", DEFAULT_AVE_SEND == LONG_LONG_MAX ? 200 : static_cast<int>(DEFAULT_AVE_SEND / 1024));
 
     bool inUse = settings.value("fUseReceiveShaping").toBool();
     int64_t burstKB = settings.value("nReceiveBurst").toLongLong();
     int64_t aveKB = settings.value("nReceiveAve").toLongLong();
 
-    std::string avg = QString::number(inUse ? aveKB : LONG_MAX).toStdString();
-    std::string burst = QString::number(inUse ? burstKB : LONG_MAX).toStdString();
+    std::string avg = QString::number(inUse ? aveKB : LONG_LONG_MAX).toStdString();
+    std::string burst = QString::number(inUse ? burstKB : LONG_LONG_MAX).toStdString();
 
     if (!SoftSetArg("-receiveavg", avg))
         addOverriddenOption("-receiveavg");
@@ -129,8 +129,8 @@ void OptionsModel::Init()
     burstKB = settings.value("nSendBurst").toLongLong();
     aveKB = settings.value("nSendAve").toLongLong();
 
-    avg = boost::lexical_cast<std::string>(inUse ? aveKB : LONG_MAX);
-    burst = boost::lexical_cast<std::string>(inUse ? burstKB : LONG_MAX);
+    avg = boost::lexical_cast<std::string>(inUse ? aveKB : LONG_LONG_MAX);
+    burst = boost::lexical_cast<std::string>(inUse ? burstKB : LONG_LONG_MAX);
 
     if (!SoftSetArg("-sendavg", avg))
         addOverriddenOption("-sendavg");

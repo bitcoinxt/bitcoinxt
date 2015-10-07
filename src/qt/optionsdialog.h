@@ -73,9 +73,10 @@ private slots:
     void showRestartWarning(bool fPersistent = false);
     void clearStatusLabel();
     void doProxyIpChecks(QValidatedLineEdit* pUiProxyIp, int nProxyPort);
-    void shapingSliderChanged();       // Pushes the traffic shaping slider changes into the traffic shaping edit boxes
-    void shapingMaxEditFinished(void); // auto-corrects cases where max is lower then average
-    void shapingAveEditFinished(void); // auto-corrects cases where max is lower then average
+    void shapingSliderChanged();         // Pushes the traffic shaping slider changes into the traffic shaping edit boxes
+    void shapingMaxEditFinished(void);   // auto-corrects cases where max is lower then average
+    void shapingAveEditFinished(void);   // auto-corrects cases where max is lower then average
+    void shapingEnableChanged(bool val); // Pushes the traffic shaping slider changes into the traffic shaping edit boxes
 
 signals:
     void proxyIpChecks(QValidatedLineEdit* pUiProxyIp, int nProxyPort);
