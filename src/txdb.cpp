@@ -104,8 +104,8 @@ bool CCoinsViewDB::GetStats(CCoinsStats &stats) const {
     /* It seems that there are no "const iterators" for LevelDB.  Since we
        only need read operations on it, use a const-cast to get around
        that restriction.  */
-    boost::scoped_ptr<leveldb::Iterator> pcursor(const_cast<CLevelDBWrapper*>(&db)->NewIterator());
-    pcursor->SeekToFirst();
+    std::unique_ptr<CLevelDBIterator> pcursor(const_cast<CLevelDBWrapper*>(&db)->NewIterator());
+    pcursor->Seek('c');
 
     CHashWriter ss(SER_GETHASH, PROTOCOL_VERSION);
     stats.hashBlock = GetBestBlock();
@@ -113,22 +113,10 @@ bool CCoinsViewDB::GetStats(CCoinsStats &stats) const {
     CAmount nTotalAmount = 0;
     while (pcursor->Valid()) {
         boost::this_thread::interruption_point();
-        try {
-            leveldb::Slice slKey = pcursor->key();
-            CDataStream ssKey(slKey.data(), slKey.data()+slKey.size(), SER_DISK, CLIENT_VERSION);
-            char chType;
-            ssKey >> chType;
-            if (chType == DB_COINS) {
-                leveldb::Slice slValue = pcursor->value();
-                CDataStream ssValue(slValue.data(), slValue.data()+slValue.size(), SER_DISK, CLIENT_VERSION);
-                CCoins coins;
-                ssValue >> coins;
-                uint256 txhash;
-                ssKey >> txhash;
-                ss << txhash;
-                ss << VARINT(coins.nVersion);
-                ss << (coins.fCoinBase ? 'c' : 'n');
-                ss << VARINT(coins.nHeight);
+        std::pair<char, uint256> key;
+        CCoins coins;
+        if (pcursor->GetKey(key) && key.first == 'c') {
+            if (pcursor->GetValue(coins)) {
                 stats.nTransactions++;
                 for (unsigned int i=0; i<coins.vout.size(); i++) {
                     const CTxOut &out = coins.vout[i];
@@ -139,13 +127,15 @@ bool CCoinsViewDB::GetStats(CCoinsStats &stats) const {
                         nTotalAmount += out.nValue;
                     }
                 }
-                stats.nSerializedSize += 32 + slValue.size();
+                stats.nSerializedSize += 32 + pcursor->GetKeySize();
                 ss << VARINT(0);
+            } else {
+                return error("CCoinsViewDB::GetStats() : unable to read value");
             }
-            pcursor->Next();
-        } catch (const std::exception& e) {
-            return error("%s: Deserialize or I/O error - %s", __func__, e.what());
+        } else {
+            break;
         }
+        pcursor->Next();
     }
     stats.nHeight = mapBlockIndex.find(GetBestBlock())->second->nHeight;
     stats.hashSerialized = ss.GetHash();
@@ -190,26 +180,17 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
 
 bool CBlockTreeDB::LoadBlockIndexGuts()
 {
-    boost::scoped_ptr<leveldb::Iterator> pcursor(NewIterator());
+    std::unique_ptr<CLevelDBIterator> pcursor(NewIterator());
 
-    CDataStream ssKeySet(SER_DISK, CLIENT_VERSION);
-    ssKeySet << make_pair(DB_BLOCK_INDEX, uint256());
-    pcursor->Seek(ssKeySet.str());
+    pcursor->Seek(make_pair('b', uint256()));
 
     // Load mapBlockIndex
     while (pcursor->Valid()) {
         boost::this_thread::interruption_point();
-        try {
-            leveldb::Slice slKey = pcursor->key();
-            CDataStream ssKey(slKey.data(), slKey.data()+slKey.size(), SER_DISK, CLIENT_VERSION);
-            char chType;
-            ssKey >> chType;
-            if (chType == DB_BLOCK_INDEX) {
-                leveldb::Slice slValue = pcursor->value();
-                CDataStream ssValue(slValue.data(), slValue.data()+slValue.size(), SER_DISK, CLIENT_VERSION);
-                CDiskBlockIndex diskindex;
-                ssValue >> diskindex;
-
+        std::pair<char, uint256> key;
+        if (pcursor->GetKey(key) && key.first == 'b') {
+            CDiskBlockIndex diskindex;
+            if (pcursor->GetValue(diskindex)) {
                 // Construct block index object
                 CBlockIndex* pindexNew = InsertBlockIndex(diskindex.GetBlockHash());
                 pindexNew->pprev          = InsertBlockIndex(diskindex.hashPrev);
@@ -233,10 +214,10 @@ bool CBlockTreeDB::LoadBlockIndexGuts()
 
                 pcursor->Next();
             } else {
-                break; // if shutdown requested or finished loading block index
+                return error("LoadBlockIndex() : failed to read value");
             }
-        } catch (const std::exception& e) {
-            return error("%s: Deserialize or I/O error - %s", __func__, e.what());
+        } else {
+            break;
         }
     }
 
