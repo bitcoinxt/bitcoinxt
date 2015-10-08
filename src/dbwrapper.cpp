@@ -138,6 +138,13 @@ bool CDBWrapper::WriteBatch(CDBBatch& batch, bool fSync)
     return true;
 }
 
+bool CDBWrapper::IsEmpty()
+{
+    std::unique_ptr<CDBIterator> it(NewIterator());
+    it->SeekToFirst();
+    return !(it->Valid());
+}
+
 // Taken from future release of DBWrapper
 const std::string CDBWrapper::OBFUSCATE_KEY_KEY("\000obfuscate_key", 14);
 
