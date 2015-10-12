@@ -96,7 +96,7 @@ static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 2 * 1024 * 1024;
 /** The number of block heights to choke spam transactions over */
 static const unsigned int MAX_BLOCK_SIZE_MULTIPLYER = 3;
 /** The minimum value possible for -limitfreerelay when rate limiting */
-static unsigned int MIN_LIMIT_FREE_RELAY = 2;
+static const unsigned int MIN_LIMIT_FREE_RELAY = 2;
 
 struct BlockHasher
 {

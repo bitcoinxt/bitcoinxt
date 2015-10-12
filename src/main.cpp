@@ -1012,7 +1012,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     if (pfMissingInputs)
         *pfMissingInputs = false;
 
-    int64_t maxBlockSize = Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load());
+    uint64_t maxBlockSize = Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load());
 
     if (!CheckTransaction(tx, state, maxBlockSize))
         return error("AcceptToMemoryPool: CheckTransaction failed");
@@ -1162,7 +1162,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
         else if(poolBytes < maxBlockSize * MAX_BLOCK_SIZE_MULTIPLYER){
             // Gradually choke off what is considered a free transaction
-            feeCutoff = (minRelayTxFee/1000) * (poolBytes-maxBlockSize)/(maxBlockSize * (MAX_BLOCK_SIZE_MULTIPLYER-1));
+            feeCutoff = (minRelayTxFee/1000) * (poolBytes - maxBlockSize) / (maxBlockSize * (MAX_BLOCK_SIZE_MULTIPLYER-1));
 
             // Gradually choke off the nFreeLimit as well but leave at least minFreeLimit
             // So that some free transactions can still get through
@@ -1175,7 +1175,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             nFreeLimit = MIN_LIMIT_FREE_RELAY;
         }
 
-        double satoshiPerByte = nFees/nSize;
+        double satoshiPerByte = ((double)nFees)/nSize;
         LogPrint("mempool",
                  "MempoolBytes:%d  LimitFreeRelay:%d  FeeCutOff:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d  TxFees:%d\n",
                   poolBytes,nFreeLimit,feeCutoff,satoshiPerByte, nSize, nFees);
