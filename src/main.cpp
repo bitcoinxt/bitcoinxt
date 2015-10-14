@@ -34,6 +34,10 @@
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/thread.hpp>
 
+#include <boost/lexical_cast.hpp>
+#include <iostream>
+#include <string>
+
 using namespace std;
 
 #if defined(NDEBUG)
@@ -1008,7 +1012,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     if (pfMissingInputs)
         *pfMissingInputs = false;
 
-    int64_t maxBlockSize = Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load());
+    uint64_t maxBlockSize = Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load());
 
     if (!CheckTransaction(tx, state, maxBlockSize))
         return error("AcceptToMemoryPool: CheckTransaction failed");
@@ -1136,21 +1140,55 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "insufficient priority");
         }
 
-        // Continuously rate-limit free (really, very-low-fee) transactions
-        // This mitigates 'penny-flooding' -- sending thousands of free transactions just to
-        // be annoying or make others' transactions take longer to confirm.
-        if (fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize))
+        /* Continuously rate-limit free (really, very-low-fee) transactions
+         * This mitigates 'penny-flooding' -- sending thousands of free transactions just to
+         * be annoying or make others' transactions take longer to confirm. */
+
+        static uint8_t nLimitFreeRelay = GetArg("-limitfreerelay", 15);
+        static double minRelayTxFee = boost::lexical_cast<double>(GetArg("-minrelaytxfee","0.00007501")) * 100000000;
+        
+        // get current memory pool size
+        uint64_t poolBytes = pool.GetTotalTxSize();
+
+	// Calculate feeCutoff in satoshis per byte:
+	//   When the feeCutoff is larger than the satoshiPerByte of the 
+	//   current transaction then spam blocking will be in effect. However
+	//   Some free transactions will still get through based on -limitfreerelay
+        float feeCutoff;
+        uint8_t nFreeLimit;
+        if (poolBytes < maxBlockSize){
+            feeCutoff = 0;
+            nFreeLimit = nLimitFreeRelay;
+        }
+        else if(poolBytes < maxBlockSize * MAX_BLOCK_SIZE_MULTIPLYER){
+            // Gradually choke off what is considered a free transaction
+            feeCutoff = (minRelayTxFee/1000) * (poolBytes - maxBlockSize) / (maxBlockSize * (MAX_BLOCK_SIZE_MULTIPLYER-1));
+
+            // Gradually choke off the nFreeLimit as well but leave at least minFreeLimit
+            // So that some free transactions can still get through
+            nFreeLimit = nLimitFreeRelay - ((nLimitFreeRelay - MIN_LIMIT_FREE_RELAY) * (poolBytes-maxBlockSize) / (maxBlockSize * (MAX_BLOCK_SIZE_MULTIPLYER-1)));
+            if (nFreeLimit < MIN_LIMIT_FREE_RELAY)
+                nFreeLimit = MIN_LIMIT_FREE_RELAY;
+        }
+        else{
+            feeCutoff = minRelayTxFee/1000;
+            nFreeLimit = MIN_LIMIT_FREE_RELAY;
+        }
+
+        double satoshiPerByte = ((double)nFees)/nSize;
+        LogPrint("mempool",
+                 "MempoolBytes:%d  LimitFreeRelay:%d  FeeCutOff:%.4g  FeesSatoshiPerByte:%.4g  TxBytes:%d  TxFees:%d\n",
+                  poolBytes,nFreeLimit,feeCutoff,satoshiPerByte, nSize, nFees);
+        if (fLimitFree && (satoshiPerByte < feeCutoff))
         {
             static double dFreeCount;
             static int64_t nLastFreeTime;
-            static int64_t nFreeLimit = GetArg("-limitfreerelay", 15);
-
             // At default rate it would take over a month to fill 1GB
             if (RateLimitExceeded(dFreeCount, nLastFreeTime, nFreeLimit, nSize))
                 return state.DoS(0, error("AcceptToMemoryPool : free transaction rejected by rate limiter"),
-                                 REJECT_INSUFFICIENTFEE, "rate limited free transaction");
-
+                       REJECT_INSUFFICIENTFEE, "rate limited free transaction");
             LogPrint("mempool", "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount+nSize);
+            dFreeCount += nSize;
         }
 
         if (fRejectAbsurdFee && nFees > ::minRelayTxFee.GetFee(nSize) * 10000)
