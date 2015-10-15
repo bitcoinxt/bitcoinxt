@@ -101,6 +101,7 @@ BITCOIN_CORE_H = \
   ipgroups.h \
   key.h \
   keystore.h \
+  leakybucket.h \
   leveldbwrapper.h \
   limitedmap.h \
   main.h \
@@ -183,6 +184,7 @@ libbitcoin_server_a_SOURCES = \
   checkpoints.cpp \
   init.cpp \
   ipgroups.cpp \
+  leakybucket.cpp \
   leveldbwrapper.cpp \
   main.cpp \
   merkleblock.cpp \
