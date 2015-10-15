@@ -1,4 +1,5 @@
 // Copyright (c) 2011-2013 The Bitcoin Core developers
+// Copyright (c) 2015 The Bitcoin XT developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -22,6 +23,7 @@
 #endif
 
 #include <boost/thread.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include <QDataWidgetMapper>
 #include <QDir>
@@ -172,6 +174,13 @@ void OptionsDialog::setMapper()
     mapper->addMapping(ui->connectSocks, OptionsModel::ProxyUse);
     mapper->addMapping(ui->proxyIp, OptionsModel::ProxyIP);
     mapper->addMapping(ui->proxyPort, OptionsModel::ProxyPort);
+
+    mapper->addMapping(ui->sendShapingEnable, OptionsModel::UseSendShaping);
+    mapper->addMapping(ui->sendBurstSpinbox, OptionsModel::SendBurst);
+    mapper->addMapping(ui->sendAveSpinbox, OptionsModel::SendAve);
+    mapper->addMapping(ui->recvShapingEnable, OptionsModel::UseReceiveShaping);
+    mapper->addMapping(ui->receiveBurstSpinbox, OptionsModel::ReceiveBurst);
+    mapper->addMapping(ui->recvAveSpinbox, OptionsModel::ReceiveAve);
 
     /* Window */
 #ifndef Q_OS_MAC

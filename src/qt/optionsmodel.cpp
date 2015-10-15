@@ -1,4 +1,5 @@
 // Copyright (c) 2011-2014 The Bitcoin Core developers
+// Copyright (c) 2015 The Bitcoin XT developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -25,6 +26,8 @@
 #include <QNetworkProxy>
 #include <QSettings>
 #include <QStringList>
+
+#include <boost/lexical_cast.hpp>
 
 OptionsModel::OptionsModel(QObject *parent) :
     QAbstractListModel(parent)
@@ -97,6 +100,45 @@ void OptionsModel::Init()
 #endif
 
     // Network
+
+    if (!settings.contains("fUseReceiveShaping"))
+        settings.setValue("fUseReceiveShaping", false);
+    if (!settings.contains("fUseSendShaping"))
+        settings.setValue("fUseSendShaping", false);
+
+    if (!settings.contains("nReceiveBurst"))
+        settings.setValue("nReceiveBurst", 300); // %
+    if (!settings.contains("nReceiveAve"))
+        settings.setValue("nReceiveAve", 500); // KB/s
+    if (!settings.contains("nSendBurst"))
+        settings.setValue("nSendBurst", 200); // %
+    if (!settings.contains("nSendAve"))
+        settings.setValue("nSendAve", 150); // KB/s
+
+    bool inUse = settings.value("fUseReceiveShaping").toBool();
+    int aveKB = settings.value("nReceiveAve").toInt();
+    int burstPercent = settings.value("nReceiveBurst").toInt();
+
+    std::string avg = boost::lexical_cast<std::string>(inUse ? aveKB : 0);
+    std::string burst = boost::lexical_cast<std::string>(inUse ? (aveKB * burstPercent / 100) : 0);
+
+    if (!SoftSetArg("-receiveavg", avg))
+        addOverriddenOption("-receiveavg");
+    if (!SoftSetArg("-receiveburst", burst))
+        addOverriddenOption("-receiveburst");
+
+    inUse = settings.value("fUseSendShaping").toBool();
+    aveKB = settings.value("nSendAve").toInt();
+    burstPercent = settings.value("nSendBurst").toInt();
+
+    avg = boost::lexical_cast<std::string>(inUse ? aveKB : 0);
+    burst = boost::lexical_cast<std::string>(inUse ? (aveKB * burstPercent / 100) : 0);
+
+    if (!SoftSetArg("-sendavg", avg))
+        addOverriddenOption("-sendavg");
+    if (!SoftSetArg("-sendburst", burst))
+        addOverriddenOption("-sendburst");
+
     if (!settings.contains("fUseUPnP"))
         settings.setValue("fUseUPnP", DEFAULT_UPNP);
     if (!SoftSetBoolArg("-upnp", settings.value("fUseUPnP").toBool()))
@@ -196,6 +238,18 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
             return settings.value("nThreadsScriptVerif");
         case Listen:
             return settings.value("fListen");
+        case UseReceiveShaping:
+            return settings.value("fUseReceiveShaping");
+        case UseSendShaping:
+            return settings.value("fUseSendShaping");
+        case ReceiveBurst:
+            return settings.value("nReceiveBurst");
+        case ReceiveAve:
+            return settings.value("nReceiveAve");
+        case SendBurst:
+            return settings.value("nSendBurst");
+        case SendAve:
+            return settings.value("nSendAve");
         default:
             return QVariant();
         }
@@ -207,6 +261,8 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
 bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, int role)
 {
     bool successful = true; /* set to false on parse error */
+    bool changeSendShaper = false;
+    bool changeReceiveShaper = false;
     if(role == Qt::EditRole)
     {
         QSettings settings;
@@ -306,8 +362,70 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
                 setRestartRequired(true);
             }
             break;
+        case UseReceiveShaping:
+            if (settings.value("fUseReceiveShaping") != value) {
+                settings.setValue("fUseReceiveShaping",value);
+                changeReceiveShaper = true;
+            }
+            break;
+        case UseSendShaping:
+            if (settings.value("fUseSendShaping") != value) {
+                settings.setValue("fUseSendShaping",value);
+                changeSendShaper = true;
+            }
+            break;
+        case ReceiveBurst:
+            if (settings.value("nReceiveBurst") != value) {
+                settings.setValue("nReceiveBurst",value);
+                changeReceiveShaper = true;
+            }
+            break;
+        case ReceiveAve:
+            if (settings.value("nReceiveAve") != value) {
+                settings.setValue("nReceiveAve",value);
+                changeReceiveShaper = true;
+            }
+            break;
+        case SendBurst:
+            if (settings.value("nSendBurst") != value) {
+                settings.setValue("nSendBurst",value);
+                changeSendShaper = true;
+            }
+            break;
+        case SendAve:
+            if (settings.value("nSendAve") != value) {
+                settings.setValue("nSendAve",value);
+                changeSendShaper = true;
+            }
+            break;
         default:
             break;
+        }
+
+        if (changeReceiveShaper) {
+            extern CLeakyBucket receiveShaper;
+            if (settings.value("fUseReceiveShaping").toBool()) {
+                int ave = 1000 * settings.value("nReceiveAve").toInt();
+                int burst = ave * settings.value("nReceiveBurst").toInt() / 100;
+                receiveShaper.set(burst, ave);
+            }
+            else
+            {
+                receiveShaper.disable();
+            }
+        }
+
+        if (changeSendShaper) {
+            extern CLeakyBucket sendShaper;
+            if (settings.value("fUseSendShaping").toBool()) {
+                int ave = 1000 * settings.value("nSendAve").toInt();
+                int burst = ave * settings.value("nSendBurst").toInt() / 100;
+                sendShaper.set(burst, ave);
+            }
+            else
+            {
+                sendShaper.disable();
+            }
         }
     }
 
