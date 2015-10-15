@@ -15,6 +15,7 @@
 #include "version.h"
 
 #include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "json/json_spirit_value.h"
 
@@ -163,6 +164,112 @@ Value getpeerinfo(const Array& params, bool fHelp)
     }
 
     return ret;
+}
+
+Value gettrafficshaping(const Array& params, bool fHelp)
+{
+    string strCommand;
+    if (params.size() == 1)
+    {
+        strCommand = params[0].get_str();
+    }
+
+    if (fHelp || params.size() != 0)
+        throw runtime_error(
+            "gettrafficshaping"
+            "\nReturns the current settings for the network send and receive bandwidth and burst in KB per second.\n"
+            "\nArguments: None\n"
+            "\nResult:\n"
+            "  {\n"
+            "    \"sendburst\": n,    (string) The average send bandwidth in KB/sec\n"
+            "    \"send\": n,         (string) The maximum send bandwidth in KB/sec\n"
+            "    \"receiveburst\": n  (string) The maximum receive bandwidth in KB/sec\n"
+            "    \"recveive\": n,     (string) The average receive bandwidth in KB/sec\n"
+            "  }\n"
+            "\nExamples:\n"
+                + HelpExampleCli("gettrafficshaping", "")
+                + HelpExampleRpc("gettrafficshaping", "")
+            );
+
+    Object ret;
+    int max, ave;
+    extern CLeakyBucket sendShaper;
+
+    sendShaper.get(&max,&ave);
+    ret.push_back(Pair("sendburst", max / 1000));
+    ret.push_back(Pair("send", ave / 1000));
+    extern CLeakyBucket receiveShaper;
+    receiveShaper.get(&max,&ave);
+    ret.push_back(Pair("receiveburst", max / 1000));
+    ret.push_back(Pair("receive", ave / 1000));
+    return ret;
+}
+
+Value settrafficshaping(const Array& params, bool fHelp)
+{
+    bool disable = false;
+    bool badArg = false;
+    string strCommand;
+    CLeakyBucket* bucket = NULL;
+    if (params.size() >= 2)
+    {
+        extern CLeakyBucket receiveShaper;
+        extern CLeakyBucket sendShaper;
+        strCommand = params[0].get_str();
+        if (strCommand=="send") bucket = &sendShaper;
+        if (strCommand=="receive") bucket = &receiveShaper;
+        if (strCommand=="recv") bucket = &receiveShaper;
+    }
+    if (params.size() == 2)
+    {
+        if (params[1].get_str() == "disable")
+            disable=true;
+        else
+            badArg = true;
+    }
+    else if (params.size() != 3)
+        badArg = true;
+
+    if (fHelp || badArg || bucket==NULL)
+        throw runtime_error(
+            "settrafficshaping \"send|receive\" \"burstKB\" \"averageKB\""
+            "\nSets the network send or receive bandwidth and burst in KB per second.\n"
+            "\nArguments:\n"
+            "1. \"send|receive\"     (string, required) Are you setting the transmit or receive bandwidth\n"
+            "2. \"burst\"  (integer, required) Specify the maximum burst size in KB/sec (actual max will be 1 packet larger than this number)\n"
+            "2. \"average\"  (integer, required) Specify the average throughput in KB/sec\n"
+            "\nExamples:\n"
+            + HelpExampleCli("settrafficshaping", "\"receive\" 10000 1000")
+            + HelpExampleCli("settrafficshaping", "\"receive\" disable")
+            + HelpExampleRpc("settrafficshaping", "\"receive\" 10000 1000")
+        );
+
+    if (disable)
+    {
+        if (bucket) bucket->disable();
+    }
+    else
+    {
+        int burst;
+        int ave;
+        if (params[1].type() == json_spirit::int_type)
+            burst = params[1].get_int();
+        else
+            burst = boost::lexical_cast<int>(params[1].get_str());
+
+        if (params[2].type() == json_spirit::int_type)
+            ave = params[2].get_int();
+        else
+            ave = boost::lexical_cast<int>(params[2].get_str());
+
+        if (burst < ave)
+            throw runtime_error("Burst rate must be greater than the average rate"
+                    "\nsettrafficshaping \"send|receive\" \"burst\" \"average\"");
+
+        bucket->set(burst * 1000, ave * 1000);
+    }
+
+    return Value::null;
 }
 
 Value addnode(const Array& params, bool fHelp)

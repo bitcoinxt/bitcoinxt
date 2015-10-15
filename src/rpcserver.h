@@ -149,6 +149,9 @@ extern void EnsureWalletIsUnlocked();
 extern json_spirit::Value getconnectioncount(const json_spirit::Array& params, bool fHelp); // in rpcnet.cpp
 extern json_spirit::Value getpeerinfo(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value ping(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value settrafficshaping(const json_spirit::Array& params, bool fHelp);
+extern json_spirit::Value gettrafficshaping(const json_spirit::Array& params, bool fHelp);
+
 extern json_spirit::Value addnode(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getaddednodeinfo(const json_spirit::Array& params, bool fHelp);
 extern json_spirit::Value getnettotals(const json_spirit::Array& params, bool fHelp);
