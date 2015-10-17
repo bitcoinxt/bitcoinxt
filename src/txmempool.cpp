@@ -14,6 +14,7 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "version.h"
+#include "random.h"
 
 using namespace std;
 
@@ -236,6 +237,42 @@ void CTxMemPool::evictRandom(std::list<CTransaction>& evicted)
     // There is a small chance nothing will be evicted if the mempool is mostly
     // prioritised transactions. That's OK.
 }
+
+void CTxMemPool::evictRandomBytewise(std::list<CTransaction>& evicted)
+    // Find random transaction, weighted by size
+    // This code uses a hack to avoid searching through the whole mempool.
+    // It picks a random transaction, then scans for a random number of bytes
+    // (not to exceed 1 MB or the mempool size) and evicts the transaction 
+    // that is the random number of bytes away from the start
+{
+    uint64_t maxScanBytes;
+    uint64_t target;
+    uint64_t cursor;
+    // maxScanBytes should be larger than the biggest transaction
+    // but small enough to not slow down this method
+    maxScanBytes = 100000ull < GetTotalTxSize() ? 100000ull : GetTotalTxSize();
+    target = GetRand(maxScanBytes);
+
+    LOCK(cs);
+    if (mapTx.empty())
+        return;
+    for (int i = 0; i < 11; i++) {
+        cursor = 0;
+        map<uint256, CTxMemPoolEntry>::iterator it = mapTx.lower_bound(GetRandHash());
+        while (cursor < target)
+        {
+            if (it == mapTx.end())
+                it = mapTx.begin();
+            it++;
+            cursor += it->second.GetTxSize();
+        }
+        if (mapDeltas.find(it->first) != mapDeltas.end())
+            continue;  // prioritised: try again
+        remove(it->second.GetTx(), evicted, true);
+        return;
+    }
+}
+
 
 void CTxMemPool::clear()
 {
