@@ -530,8 +530,12 @@ void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx, unsigned i
     }
     BOOST_FOREACH(const CTransaction& tx, vtx)
     {
-        std::list<CTransaction> dummy;
-        remove(tx, dummy, false);
+        txiter it = mapTx.find(tx.GetHash());
+        if (it != mapTx.end()) {
+            setEntries stage;
+            stage.insert(it);
+            RemoveStaged(stage);
+        }
         removeConflicts(tx, conflicts);
         ClearPrioritisation(tx.GetHash());
     }
