@@ -430,6 +430,13 @@ public:
     bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock);
 
     /**
+     * Check if we have the given utxo already loaded in this cache.
+     * The semantics are the same as HaveCoin(), but no calls to
+     * the backing CCoinsView are made.
+     */
+    bool HaveCoinsInCache(const COutPoint &outpoint) const;
+
+    /**
      * Return a reference to Coin in the cache, or a pruned one if not found. This is
      * more efficient than GetCoins. Modifications to other cache entries are
      * allowed while accessing the returned pointer.

@@ -154,6 +154,11 @@ bool CCoinsViewCache::HaveCoins(const COutPoint &outpoint) const {
     return (it != cacheCoins.end() && !it->second.coins.IsPruned());
 }
 
+bool CCoinsViewCache::HaveCoinsInCache(const COutPoint &outpoint) const {
+    CCoinsMap::const_iterator it = cacheCoins.find(outpoint);
+    return it != cacheCoins.end();
+}
+
 uint256 CCoinsViewCache::GetBestBlock() const {
     if (hashBlock.IsNull())
         hashBlock = base->GetBestBlock();
