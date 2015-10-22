@@ -456,6 +456,12 @@ public:
      */
     bool Flush();
 
+    /**
+     * Removes the UTXO with the given outpoint from the cache, if it is
+     * not modified.
+     */
+    void Uncache(const COutPoint &outpoint);
+
     //! Calculate the size of the cache (in number of transaction outputs)
     unsigned int GetCacheSize() const;
 
