@@ -34,11 +34,11 @@ static const int64_t nMaxBlockDBAndTxIndexCache = 1024;
 //! Max memory allocated to coin DB specific cache (MiB)
 static const int64_t nMaxCoinsDBCache = 8;
 
-/** CCoinsView backed by the LevelDB coin database (chainstate/) */
+/** CCoinsView backed by the coin database (chainstate/) */
 class CCoinsViewDB : public CCoinsView
 {
 protected:
-    CLevelDBWrapper db;
+    CDBWrapper db;
 public:
     CCoinsViewDB(size_t nCacheSize, bool &isObfuscated, bool fMemory = false, bool fWipe = false);
 
@@ -50,7 +50,7 @@ public:
 };
 
 /** Access to the block database (blocks/index/) */
-class CBlockTreeDB : public CLevelDBWrapper
+class CBlockTreeDB : public CDBWrapper
 {
 public:
     CBlockTreeDB(size_t nCacheSize, bool &isObfuscated, bool fMemory = false, bool fWipe = false);
