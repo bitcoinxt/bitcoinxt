@@ -3,7 +3,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <boost/foreach.hpp>
-#include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/algorithm/string.hpp>
 #ifdef WIN32
@@ -21,14 +20,13 @@
 #include "torips.h"
 #include "utilstrencodings.h"
 #include "util.h"
+#include "curl_wrapper.h"
 
 using namespace std;
 
 CCriticalSection cs_groups;
 static vector<CIPGroup> groups;
 
-// As of July 2015 the Tor IPs document is only 169kb in size so this is plenty.
-static const size_t MAX_DOWNLOAD_SIZE = 1024 * 1024;
 static const int OPEN_PROXY_PRIORITY = -10;
 
 
@@ -56,16 +54,6 @@ CIPGroupData FindGroupForIP(CNetAddr ip) {
     return CIPGroupData();
 }
 
-static size_t CurlData(void *ptr, size_t size, size_t nmemb, void *user_ptr) {
-    string *data = static_cast<string*>(user_ptr);
-    string buf(static_cast<const char *>(ptr), size*nmemb);
-    size_t realsize = size * nmemb;
-    if (data->size() + realsize > MAX_DOWNLOAD_SIZE)
-        return 0;  // Abort.
-    data->append(buf);
-    return realsize;
-}
-
 vector<CSubNet> ParseIPData(string input) {
     vector<string> lines;
     vector<CSubNet> results;
@@ -84,27 +72,6 @@ vector<CSubNet> ParseIPData(string input) {
     }
     return results;
 }
-
-struct CurlWrapper {
-    CURL *handle;
-
-    CurlWrapper() {
-        CURLcode rv = curl_global_init(CURL_GLOBAL_ALL);
-        if (rv != CURLE_OK) {
-            LogPrintf("libcurl failed to initialize, cannot load IP priority data: %s\n", curl_easy_strerror(rv));
-            handle = NULL;
-        } else {
-            handle = curl_easy_init();
-        }
-    }
-
-    ~CurlWrapper() {
-        if (handle != NULL) {
-            curl_easy_cleanup(handle);
-            curl_global_cleanup();
-        }
-    }
-};
 
 // Hack around the fact that some platforms, especially on Linux, have root stores
 // that openssl/curl can't find by default. This is the root cert used by check.torproject.org
@@ -163,47 +130,15 @@ static CURLcode ssl_context_setup(CURL *curl, void *sslctx, void *param) {
 }
 
 static CIPGroup *LoadIPDataFromWeb(const string &url, const string &groupname, int priority) {
-    string data;
+    try {
+        std::auto_ptr<CurlWrapper> curlWrapper = MakeCurl();
+        curl_easy_setopt(curlWrapper->getHandle(), CURLOPT_SSL_CTX_FUNCTION, &ssl_context_setup);
 
-    CurlWrapper curlWrapper;
-    CURL *curl = curlWrapper.handle;
-    if (curl == NULL)
-        return NULL;
-
-    // If -curl-verbose is specified, debug info and headers will be printed to stderr.
-    curl_easy_setopt(curl, CURLOPT_VERBOSE, GetBoolArg("-curl-verbose", false) ? 1L : 0L);
-    curl_easy_setopt(curl, CURLOPT_HEADER, 0L);
-    curl_easy_setopt(curl, CURLOPT_NOPROGRESS, 1L);
-    curl_easy_setopt(curl, CURLOPT_NOSIGNAL, 1L);
-    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);   // Follow redirects
-    curl_easy_setopt(curl, CURLOPT_USERAGENT, "Bitcoin XT");
-    curl_easy_setopt(curl, CURLOPT_FORBID_REUSE, 1L);   // Don't use up sockets on the target website unnecessarily.
-    curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, &CurlData);
-    curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
-    curl_easy_setopt(curl, CURLOPT_SSL_CTX_FUNCTION, &ssl_context_setup);
-    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-
-    // curl/openssl seem to know how to use the platform CA store on win/mac.
-#if !defined(WIN32) && !defined(MAC_OSX)
-    // On Linux/BSD/etc try a couple of places we know CA bundles are often kept.
-    if (boost::filesystem::exists(boost::filesystem::path("/etc/ssl/certs/ca-certificates.crt"))) {
-        curl_easy_setopt(curl, CURLOPT_CAINFO, "/etc/ssl/certs/ca-certificates.crt");
-    } else if (boost::filesystem::exists(boost::filesystem::path("/etc/ssl/certs/ca-bundle.crt"))) {
-        curl_easy_setopt(curl, CURLOPT_CAINFO, "/etc/ssl/certs/ca-bundle.crt");
-    } else {
-        // Disable use of the system CA store :( We can't simply present our hard coded cert to be used in addition
-        // because the curl API just doesn't support that. It's one or the other. Our callback function will configure
-        // the cert used by the website as of the time of writing.
-        curl_easy_setopt(curl, CURLOPT_CAPATH, NULL);
-        curl_easy_setopt(curl, CURLOPT_CAINFO, NULL);
-    }
-#endif
-
-    // This will block until the download is done.
-    CURLcode rv = curl_easy_perform(curl);
-    if (rv == CURLE_OK) {
+        // This will block until the download is done.
+        std::string res = curlWrapper->fetchURL(url);
         LogPrintf("IP list download succeeded from %s\n", url.c_str());
-        vector<CSubNet> subnets = ParseIPData(data);
+
+        vector<CSubNet> subnets = ParseIPData(res);
         if (subnets.size() > 0) {
             CIPGroup *ipGroup = new CIPGroup;
             ipGroup->header.name = groupname;
@@ -211,8 +146,10 @@ static CIPGroup *LoadIPDataFromWeb(const string &url, const string &groupname, i
             ipGroup->subnets.assign(subnets.begin(), subnets.end());
             return ipGroup;
         }
-    } else {
-        LogPrintf("Failed to download IP priority data from %s: %s\n", url.c_str(), curl_easy_strerror(rv));
+    }
+    catch (const curl_error& e) {
+        LogPrintf("Failed to download IP priority data from %s: %s\n",
+                e.url.c_str(), e.what());
     }
     return NULL;
 }
