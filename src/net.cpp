@@ -81,6 +81,7 @@ static std::vector<ListenSocket> vhListenSocket;
 CAddrMan addrman;
 int nMaxConnections = 125;
 bool fAddressesInitialized = false;
+std::string strSubVersion;
 
 vector<CNode*> vNodes;
 CCriticalSection cs_vNodes;
@@ -432,10 +433,10 @@ void CNode::PushVersion()
     if (IsStealthMode()) {
         uint64_t services = NODE_NETWORK;
         PushMessage("version", 70002, services, nTime, addrYou, addrMe,
-                nLocalHostNonce, FormatSubVersion("Satoshi", CLIENT_VERSION, std::vector<string>(), ""), nBestHeight, true);        
+                nLocalHostNonce, strSubVersion, nBestHeight, true);
     } else {
         PushMessage("version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
-                nLocalHostNonce, FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, std::vector<string>(), CLIENT_VERSION_XT_SUBVER), nBestHeight, true);
+                nLocalHostNonce, strSubVersion, nBestHeight, true);
     }
 }
 
