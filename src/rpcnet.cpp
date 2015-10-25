@@ -15,6 +15,7 @@
 #include "version.h"
 
 #include <boost/foreach.hpp>
+#include <boost/lexical_cast.hpp>
 
 #include "json/json_spirit_value.h"
 
@@ -29,15 +30,14 @@ Value getconnectioncount(const Array& params, bool fHelp)
             "\nReturns the number of connections to other nodes.\n"
             "\nbResult:\n"
             "n          (numeric) The connection count\n"
-            "\nExamples:\n"
-            + HelpExampleCli("getconnectioncount", "")
-            + HelpExampleRpc("getconnectioncount", "")
-        );
+            "\nExamples:\n" +
+            HelpExampleCli("getconnectioncount", "") + HelpExampleRpc("getconnectioncount", ""));
 
     LOCK2(cs_main, cs_vNodes);
 
     return (int)vNodes.size();
 }
+
 
 Value ping(const Array& params, bool fHelp)
 {
@@ -47,15 +47,13 @@ Value ping(const Array& params, bool fHelp)
             "\nRequests that a ping be sent to all other nodes, to measure ping time.\n"
             "Results provided in getpeerinfo, pingtime and pingwait fields are decimal seconds.\n"
             "Ping command is handled in queue with all other commands, so it measures processing backlog, not just network ping.\n"
-            "\nExamples:\n"
-            + HelpExampleCli("ping", "")
-            + HelpExampleRpc("ping", "")
-        );
+            "\nExamples:\n" +
+            HelpExampleCli("ping", "") + HelpExampleRpc("ping", ""));
 
     // Request that each node send a ping during next message processing pass
     LOCK2(cs_main, cs_vNodes);
 
-    BOOST_FOREACH(CNode* pNode, vNodes) {
+    BOOST_FOREACH (CNode* pNode, vNodes) {
         pNode->fPingQueued = true;
     }
 
@@ -68,7 +66,7 @@ static void CopyNodeStats(std::vector<CNodeStats>& vstats)
 
     LOCK(cs_vNodes);
     vstats.reserve(vNodes.size());
-    BOOST_FOREACH(CNode* pnode, vNodes) {
+    BOOST_FOREACH (CNode* pnode, vNodes) {
         CNodeStats stats;
         pnode->copyStats(stats);
         vstats.push_back(stats);
@@ -110,10 +108,8 @@ Value getpeerinfo(const Array& params, bool fHelp)
             "  }\n"
             "  ,...\n"
             "]\n"
-            "\nExamples:\n"
-            + HelpExampleCli("getpeerinfo", "")
-            + HelpExampleRpc("getpeerinfo", "")
-        );
+            "\nExamples:\n" +
+            HelpExampleCli("getpeerinfo", "") + HelpExampleRpc("getpeerinfo", ""));
 
     LOCK(cs_main);
 
@@ -122,7 +118,7 @@ Value getpeerinfo(const Array& params, bool fHelp)
 
     Array ret;
 
-    BOOST_FOREACH(const CNodeStats& stats, vstats) {
+    BOOST_FOREACH (const CNodeStats& stats, vstats) {
         Object obj;
         CNodeStateStats statestats;
         bool fStateStats = GetNodeStateStats(stats.nodeid, statestats);
@@ -152,7 +148,7 @@ Value getpeerinfo(const Array& params, bool fHelp)
             obj.push_back(Pair("synced_headers", statestats.nSyncHeight));
             obj.push_back(Pair("synced_blocks", statestats.nCommonHeight));
             Array heights;
-            BOOST_FOREACH(int height, statestats.vHeightInFlight) {
+            BOOST_FOREACH (int height, statestats.vHeightInFlight) {
                 heights.push_back(height);
             }
             obj.push_back(Pair("inflight", heights));
@@ -163,6 +159,106 @@ Value getpeerinfo(const Array& params, bool fHelp)
     }
 
     return ret;
+}
+
+Value gettrafficshaping(const Array& params, bool fHelp)
+{
+    string strCommand;
+    if (params.size() == 1) {
+        strCommand = params[0].get_str();
+    }
+
+    if (fHelp || (params.size() != 0))
+        throw runtime_error(
+            "gettrafficshaping"
+            "\nReturns the current settings for the network send and receive bandwidth and burst in kilobytes per second.\n"
+            "\nArguments: None\n"
+            "\nResult:\n"
+            "  {\n"
+            "    \"sendBurst\" : 40,   (string) The maximum send bandwidth in Kbytes/sec\n"
+            "    \"sendAve\" : 30,   (string) The average send bandwidth in Kbytes/sec\n"
+            "    \"recvBurst\" : 20,   (string) The maximum receive bandwidth in Kbytes/sec\n"
+            "    \"recvAve\" : 10,   (string) The average receive bandwidth in Kbytes/sec\n"
+            "  }\n"
+            "\n NOTE: if the send and/or recv parameters do not exist, shaping in that direction is disabled.\n"
+            "\nExamples:\n" +
+            HelpExampleCli("gettrafficshaping", "") + HelpExampleRpc("gettrafficshaping", ""));
+    Object ret;
+    int64_t max, ave;
+    sendShaper.get(&max, &ave);
+    if (ave != LONG_MAX) {
+        ret.push_back(Pair("sendBurst", max / 1024));
+        ret.push_back(Pair("sendAve", ave / 1024));
+    }
+    receiveShaper.get(&max, &ave);
+    if (ave != LONG_MAX) {
+        ret.push_back(Pair("recvBurst", max / 1024));
+        ret.push_back(Pair("recvAve", ave / 1024));
+    }
+    return ret;
+}
+
+Value settrafficshaping(const Array& params, bool fHelp)
+{
+    bool disable = false;
+    bool badArg = false;
+    string strCommand;
+    CLeakyBucket* bucket = NULL;
+    if (params.size() >= 2) {
+        strCommand = params[0].get_str();
+        if (strCommand == "send")
+            bucket = &sendShaper;
+        if (strCommand == "receive")
+            bucket = &receiveShaper;
+        if (strCommand == "recv")
+            bucket = &receiveShaper;
+    }
+    if (params.size() == 2) {
+        if (params[1].get_str() == "disable")
+            disable = true;
+        else
+            badArg = true;
+    } else if (params.size() != 3)
+        badArg = true;
+
+    if (fHelp || badArg || bucket == NULL)
+        throw runtime_error(
+            "settrafficshaping \"send|receive\" \"burstKB\" \"averageKB\""
+            "\nSets the network send or receive bandwidth and burst in kilobytes per second.\n"
+            "\nArguments:\n"
+            "1. \"send|receive\"     (string, required) Are you setting the transmit or receive bandwidth\n"
+            "2. \"burst\"  (integer, required) Specify the maximum burst size in Kbytes/sec (actual max will be 1 packet larger than this number)\n"
+            "2. \"average\"  (integer, required) Specify the average throughput in Kbytes/sec\n"
+            "\nExamples:\n" +
+            HelpExampleCli("settrafficshaping", "\"receive\" 10000 1024") + HelpExampleCli("settrafficshaping", "\"receive\" disable") + HelpExampleRpc("settrafficshaping", "\"receive\" 10000 1024"));
+
+    if (disable) {
+        if (bucket)
+            bucket->disable();
+    } else {
+        uint64_t burst;
+        uint64_t ave;
+        if (params[1].is_uint64())
+            burst = params[1].get_uint64();
+        else {
+            string temp = params[1].get_str();
+            burst = boost::lexical_cast<uint64_t>(temp);
+        }
+        if (params[2].is_uint64())
+            ave = params[2].get_uint64();
+        else {
+            string temp = params[2].get_str();
+            ave = boost::lexical_cast<uint64_t>(temp);
+        }
+        if (burst < ave) {
+            throw runtime_error("Burst rate must be greater than the average rate"
+                                "\nsettrafficshaping \"send|receive\" \"burst\" \"average\"");
+        }
+
+        bucket->set(burst * 1024, ave * 1024);
+    }
+
+    return Value::null;
 }
 
 Value addnode(const Array& params, bool fHelp)
@@ -179,15 +275,12 @@ Value addnode(const Array& params, bool fHelp)
             "\nArguments:\n"
             "1. \"node\"     (string, required) The node (see getpeerinfo for nodes)\n"
             "2. \"command\"  (string, required) 'add' to add a node to the list, 'remove' to remove a node from the list, 'onetry' to try a connection to the node once\n"
-            "\nExamples:\n"
-            + HelpExampleCli("addnode", "\"192.168.0.6:8333\" \"onetry\"")
-            + HelpExampleRpc("addnode", "\"192.168.0.6:8333\", \"onetry\"")
-        );
+            "\nExamples:\n" +
+            HelpExampleCli("addnode", "\"192.168.0.6:8333\" \"onetry\"") + HelpExampleRpc("addnode", "\"192.168.0.6:8333\", \"onetry\""));
 
     string strNode = params[0].get_str();
 
-    if (strCommand == "onetry")
-    {
+    if (strCommand == "onetry") {
         CAddress addr;
         OpenNetworkConnection(addr, NULL, strNode.c_str());
         return Value::null;
@@ -195,18 +288,15 @@ Value addnode(const Array& params, bool fHelp)
 
     LOCK(cs_vAddedNodes);
     vector<string>::iterator it = vAddedNodes.begin();
-    for(; it != vAddedNodes.end(); it++)
+    for (; it != vAddedNodes.end(); it++)
         if (strNode == *it)
             break;
 
-    if (strCommand == "add")
-    {
+    if (strCommand == "add") {
         if (it != vAddedNodes.end())
             throw JSONRPCError(RPC_CLIENT_NODE_ALREADY_ADDED, "Error: Node already added");
         vAddedNodes.push_back(strNode);
-    }
-    else if(strCommand == "remove")
-    {
+    } else if (strCommand == "remove") {
         if (it == vAddedNodes.end())
             throw JSONRPCError(RPC_CLIENT_NODE_NOT_ADDED, "Error: Node has not been added.");
         vAddedNodes.erase(it);
@@ -242,28 +332,21 @@ Value getaddednodeinfo(const Array& params, bool fHelp)
             "  }\n"
             "  ,...\n"
             "]\n"
-            "\nExamples:\n"
-            + HelpExampleCli("getaddednodeinfo", "true")
-            + HelpExampleCli("getaddednodeinfo", "true \"192.168.0.201\"")
-            + HelpExampleRpc("getaddednodeinfo", "true, \"192.168.0.201\"")
-        );
+            "\nExamples:\n" +
+            HelpExampleCli("getaddednodeinfo", "true") + HelpExampleCli("getaddednodeinfo", "true \"192.168.0.201\"") + HelpExampleRpc("getaddednodeinfo", "true, \"192.168.0.201\""));
 
     bool fDns = params[0].get_bool();
 
     list<string> laddedNodes(0);
-    if (params.size() == 1)
-    {
+    if (params.size() == 1) {
         LOCK(cs_vAddedNodes);
-        BOOST_FOREACH(string& strAddNode, vAddedNodes)
+        BOOST_FOREACH (string& strAddNode, vAddedNodes)
             laddedNodes.push_back(strAddNode);
-    }
-    else
-    {
+    } else {
         string strNode = params[1].get_str();
         LOCK(cs_vAddedNodes);
-        BOOST_FOREACH(string& strAddNode, vAddedNodes)
-            if (strAddNode == strNode)
-            {
+        BOOST_FOREACH (string& strAddNode, vAddedNodes)
+            if (strAddNode == strNode) {
                 laddedNodes.push_back(strAddNode);
                 break;
             }
@@ -272,10 +355,8 @@ Value getaddednodeinfo(const Array& params, bool fHelp)
     }
 
     Array ret;
-    if (!fDns)
-    {
-        BOOST_FOREACH(string& strAddNode, laddedNodes)
-        {
+    if (!fDns) {
+        BOOST_FOREACH (string& strAddNode, laddedNodes) {
             Object obj;
             obj.push_back(Pair("addednode", strAddNode));
             ret.push_back(obj);
@@ -284,13 +365,11 @@ Value getaddednodeinfo(const Array& params, bool fHelp)
     }
 
     list<pair<string, vector<CService> > > laddedAddreses(0);
-    BOOST_FOREACH(string& strAddNode, laddedNodes)
-    {
+    BOOST_FOREACH (string& strAddNode, laddedNodes) {
         vector<CService> vservNode(0);
-        if(Lookup(strAddNode.c_str(), vservNode, Params().GetDefaultPort(), fNameLookup, 0))
+        if (Lookup(strAddNode.c_str(), vservNode, Params().GetDefaultPort(), fNameLookup, 0))
             laddedAddreses.push_back(make_pair(strAddNode, vservNode));
-        else
-        {
+        else {
             Object obj;
             obj.push_back(Pair("addednode", strAddNode));
             obj.push_back(Pair("connected", false));
@@ -300,21 +379,18 @@ Value getaddednodeinfo(const Array& params, bool fHelp)
     }
 
     LOCK(cs_vNodes);
-    for (list<pair<string, vector<CService> > >::iterator it = laddedAddreses.begin(); it != laddedAddreses.end(); it++)
-    {
+    for (list<pair<string, vector<CService> > >::iterator it = laddedAddreses.begin(); it != laddedAddreses.end(); it++) {
         Object obj;
         obj.push_back(Pair("addednode", it->first));
 
         Array addresses;
         bool fConnected = false;
-        BOOST_FOREACH(CService& addrNode, it->second)
-        {
+        BOOST_FOREACH (CService& addrNode, it->second) {
             bool fFound = false;
             Object node;
             node.push_back(Pair("address", addrNode.ToString()));
-            BOOST_FOREACH(CNode* pnode, vNodes)
-                if (pnode->addr == addrNode)
-                {
+            BOOST_FOREACH (CNode* pnode, vNodes)
+                if (pnode->addr == addrNode) {
                     fFound = true;
                     fConnected = true;
                     node.push_back(Pair("connected", pnode->fInbound ? "inbound" : "outbound"));
@@ -345,10 +421,8 @@ Value getnettotals(const Array& params, bool fHelp)
             "  \"totalbytessent\": n,   (numeric) Total bytes sent\n"
             "  \"timemillis\": t        (numeric) Total cpu time\n"
             "}\n"
-            "\nExamples:\n"
-            + HelpExampleCli("getnettotals", "")
-            + HelpExampleRpc("getnettotals", "")
-       );
+            "\nExamples:\n" +
+            HelpExampleCli("getnettotals", "") + HelpExampleRpc("getnettotals", ""));
 
     Object obj;
     obj.push_back(Pair("totalbytesrecv", CNode::GetTotalBytesRecv()));
@@ -360,10 +434,9 @@ Value getnettotals(const Array& params, bool fHelp)
 static Array GetNetworksInfo()
 {
     Array networks;
-    for(int n=0; n<NET_MAX; ++n)
-    {
+    for (int n = 0; n < NET_MAX; ++n) {
         enum Network network = static_cast<enum Network>(n);
-        if(network == NET_UNROUTABLE)
+        if (network == NET_UNROUTABLE)
             continue;
         proxyType proxy;
         Object obj;
@@ -411,28 +484,25 @@ Value getnetworkinfo(const Array& params, bool fHelp)
             "  ,...\n"
             "  ]\n"
             "}\n"
-            "\nExamples:\n"
-            + HelpExampleCli("getnetworkinfo", "")
-            + HelpExampleRpc("getnetworkinfo", "")
-        );
+            "\nExamples:\n" +
+            HelpExampleCli("getnetworkinfo", "") + HelpExampleRpc("getnetworkinfo", ""));
 
     LOCK(cs_main);
 
     Object obj;
-    obj.push_back(Pair("version",       CLIENT_VERSION));
+    obj.push_back(Pair("version", CLIENT_VERSION));
     obj.push_back(Pair("subversion",
-        FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, std::vector<string>())));
-    obj.push_back(Pair("protocolversion",PROTOCOL_VERSION));
-    obj.push_back(Pair("localservices",       strprintf("%016x", nLocalServices)));
-    obj.push_back(Pair("timeoffset",    GetTimeOffset()));
-    obj.push_back(Pair("connections",   (int)vNodes.size()));
-    obj.push_back(Pair("networks",      GetNetworksInfo()));
-    obj.push_back(Pair("relayfee",      ValueFromAmount(::minRelayTxFee.GetFeePerK())));
+                       FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, std::vector<string>())));
+    obj.push_back(Pair("protocolversion", PROTOCOL_VERSION));
+    obj.push_back(Pair("localservices", strprintf("%016x", nLocalServices)));
+    obj.push_back(Pair("timeoffset", GetTimeOffset()));
+    obj.push_back(Pair("connections", (int)vNodes.size()));
+    obj.push_back(Pair("networks", GetNetworksInfo()));
+    obj.push_back(Pair("relayfee", ValueFromAmount(::minRelayTxFee.GetFeePerK())));
     Array localAddresses;
     {
         LOCK(cs_mapLocalHost);
-        BOOST_FOREACH(const PAIRTYPE(CNetAddr, LocalServiceInfo) &item, mapLocalHost)
-        {
+        BOOST_FOREACH (const PAIRTYPE(CNetAddr, LocalServiceInfo) & item, mapLocalHost) {
             Object rec;
             rec.push_back(Pair("address", item.first.ToString()));
             rec.push_back(Pair("port", item.second.nPort));
