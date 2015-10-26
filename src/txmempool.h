@@ -85,6 +85,7 @@ private:
     int64_t feeDelta; //! Local modification to support prioritization
     bool spendsCoinbase; //! keep track of transactions that spend a coinbase
     LockPoints lockPoints; //! Track the height and time at which tx was final
+    unsigned int sigOpCount; //! Legacy sig ops plus P2SH sig op count
 
     // Information about descendants of this transaction that are in the
     // mempool; if we remove this transaction we must remove all of these
@@ -103,7 +104,8 @@ private:
 public:
     CTxMemPoolEntry(const CTransaction& _tx, const CAmount& _nFee,
                     int64_t _nTime, double _dPriority, unsigned int _nHeight,
-                    bool poolHasNoInputsOf, bool spendsCoinbase, LockPoints lp);
+                    bool poolHasNoInputsOf, bool spendsCoinbase, LockPoints lp,
+                    unsigned int nSigOps);
     CTxMemPoolEntry(const CTxMemPoolEntry& other);
 
     const CTransaction& GetTx() const { return this->tx; }
@@ -115,6 +117,7 @@ public:
     bool WasClearAtEntry() const { return hadNoDependencies; }
     int64_t GetFeeDelta() const { return feeDelta; }
     int64_t GetModifiedFee() const { return nFee + feeDelta; }
+    unsigned int GetSigOpCount() const { return sigOpCount; }
     size_t DynamicMemoryUsage() const { return nUsageSize; }
     const LockPoints& GetLockPoints() const { return lockPoints; }
 

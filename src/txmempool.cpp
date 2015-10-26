@@ -21,10 +21,10 @@ using namespace std;
 CTxMemPoolEntry::CTxMemPoolEntry(const CTransaction& _tx, const CAmount& _nFee,
                                  int64_t _nTime, double _dPriority, unsigned int _nHeight,
                                  bool poolHasNoInputsOf, bool _spendsCoinbase,
-                                 LockPoints lp):
+                                 LockPoints lp, unsigned int _sigOps):
         tx(_tx), nFee(_nFee), nTime(_nTime), dPriority(_dPriority), nHeight(_nHeight),
         hadNoDependencies(poolHasNoInputsOf), spendsCoinbase(_spendsCoinbase),
-        lockPoints(lp)
+        lockPoints(lp), sigOpCount(_sigOps)
 {
     nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
     nModSize = tx.CalculateModifiedSize(nTxSize);
