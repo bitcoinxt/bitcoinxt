@@ -201,10 +201,10 @@ class CompareTxMemPoolEntryByAncestorFee
 public:
     bool operator()(const CTxMemPoolEntry& a, const CTxMemPoolEntry& b)
     {
-        double aFees = a.GetFeesWithAncestors();
+        double aFees = a.GetFee();
         double aSize = a.GetSizeWithAncestors();
 
-        double bFees = b.GetFeesWithAncestors();
+        double bFees = b.GetFee();
         double bSize = b.GetSizeWithAncestors();
 
         // Avoid division by rewriting (a/b > c/d) as (a*d > c*b).
@@ -446,6 +446,9 @@ public:
      *    look up parents from mapLinks. Must be true for entries not in the mempool
      */
     bool CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntries &setAncestors, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString, bool fSearchForParents = true);
+
+    /** Remove transactions from the mempool until its dynamic size is <= sizelimit. */
+    void TrimToSize(size_t sizelimit);
 
     /** Expire all transaction (and their dependencies) in the mempool older than time. Return the number of removed transactions. */
     int Expire(int64_t time);

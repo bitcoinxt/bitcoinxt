@@ -869,3 +869,15 @@ const CTxMemPool::setEntries & CTxMemPool::GetMemPoolChildren(txiter entry) cons
     assert(it != mapLinks.end());
     return it->second.children;
 }
+
+void CTxMemPool::TrimToSize(size_t sizelimit) {
+    LOCK(cs);
+
+    while (DynamicMemoryUsage() > sizelimit) {
+        indexed_transaction_set::nth_index<3>::type::iterator it = mapTx.get<3>().end();
+        setEntries stage;
+        it--;
+        CalculateDescendants(mapTx.project<0>(it), stage);
+        RemoveStaged(stage, false);
+    }
+}

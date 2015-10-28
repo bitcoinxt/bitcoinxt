@@ -71,6 +71,8 @@ static const unsigned int DEFAULT_ANCESTOR_SIZE_LIMIT = 900;
 static const unsigned int DEFAULT_DESCENDANT_LIMIT = 1000;
 /** Default for -limitdescendantsize, maximum kilobytes of in-mempool descendants */
 static const unsigned int DEFAULT_DESCENDANT_SIZE_LIMIT = 2500;
+/** Default for -maxmempool, maximum megabytes of mempool memory usage */
+static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE = 300;
 /** Minimum number of max-sized blocks in blk?????.dat files */
 static const unsigned int MIN_BLOCKFILE_BLOCKS = 128;
 /** Default for -mempoolexpiry, expiration time for mempool transactions in hours */

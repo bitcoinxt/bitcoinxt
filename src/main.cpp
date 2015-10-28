@@ -1222,6 +1222,18 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         {
             // Store transaction in memory
         	pool.addUnchecked(hash, entry, setAncestors, !IsInitialBlockDownload());
+
+            if (!fOverrideMempoolLimit) {
+                // Expire
+                int expired = pool.Expire(GetTime() - GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+                if (expired != 0)
+                    LogPrint("mempool", "Expired %i transactions from the memory pool\n", expired);
+
+                // Trim
+                pool.TrimToSize(GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000);
+                if (!pool.exists(tx.GetHash()))
+                    return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool full");
+            }
         }
     }
 
