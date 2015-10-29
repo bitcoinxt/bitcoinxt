@@ -295,14 +295,14 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
     tx1.vout.resize(1);
     tx1.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx1.vout[0].nValue = 10 * COIN;
-    pool.addUnchecked(tx1.GetHash(), CTxMemPoolEntry(tx1, 10000LL, 0, 10.0, 1, true));
+    pool.addUnchecked(tx1.GetHash(), CTxMemPoolEntry(tx1, 10000LL, 0, 10.0, 1, true, false));
 
     /* highest fee */
     CMutableTransaction tx2 = CMutableTransaction();
     tx2.vout.resize(1);
     tx2.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx2.vout[0].nValue = 2 * COIN;
-    pool.addUnchecked(tx2.GetHash(), CTxMemPoolEntry(tx2, 20000LL, 0, 9.0, 1, true));
+    pool.addUnchecked(tx2.GetHash(), CTxMemPoolEntry(tx2, 20000LL, 0, 9.0, 1, true, false));
     uint64_t tx2Size = ::GetSerializeSize(tx2, SER_NETWORK, PROTOCOL_VERSION);
 
     /* lowest fee */
@@ -310,21 +310,21 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
     tx3.vout.resize(1);
     tx3.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx3.vout[0].nValue = 5 * COIN;
-    pool.addUnchecked(tx3.GetHash(), CTxMemPoolEntry(tx3, 0LL, 0, 100.0, 1, true));
+    pool.addUnchecked(tx3.GetHash(), CTxMemPoolEntry(tx3, 0LL, 0, 100.0, 1, true, false));
 
     /* 2nd highest fee */
     CMutableTransaction tx4 = CMutableTransaction();
     tx4.vout.resize(1);
     tx4.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx4.vout[0].nValue = 6 * COIN;
-    pool.addUnchecked(tx4.GetHash(), CTxMemPoolEntry(tx4, 15000LL, 0, 1.0, 1, true));
+    pool.addUnchecked(tx4.GetHash(), CTxMemPoolEntry(tx4, 15000LL, 0, 1.0, 1, true, false));
 
     /* equal fee rate to tx1, but newer */
     CMutableTransaction tx5 = CMutableTransaction();
     tx5.vout.resize(1);
     tx5.vout[0].scriptPubKey = CScript() << OP_11 << OP_EQUAL;
     tx5.vout[0].nValue = 11 * COIN;
-    pool.addUnchecked(tx5.GetHash(), CTxMemPoolEntry(tx5, 10000LL, 1, 10.0, 1, true));
+    pool.addUnchecked(tx5.GetHash(), CTxMemPoolEntry(tx5, 10000LL, 1, 10.0, 1, true, false));
     BOOST_CHECK_EQUAL(pool.size(), 5);
 
     std::vector<std::string> sortedOrder;
@@ -344,7 +344,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
     tx6.vout[0].nValue = 20 * COIN;
     uint64_t tx6Size = ::GetSerializeSize(tx6, SER_NETWORK, PROTOCOL_VERSION);
 
-    pool.addUnchecked(tx6.GetHash(), CTxMemPoolEntry(tx6, 0LL, 1, 10.0, 1, true));
+    pool.addUnchecked(tx6.GetHash(), CTxMemPoolEntry(tx6, 0LL, 1, 10.0, 1, true, false));
     BOOST_CHECK_EQUAL(pool.size(), 6);
     sortedOrder.push_back(tx6.GetHash().ToString());
     CheckSort<3>(pool, sortedOrder);
@@ -361,7 +361,7 @@ BOOST_AUTO_TEST_CASE(MempoolAncestorIndexingTest)
     /* set the fee to just below tx2's feerate when including ancestor */
     CAmount fee = (20000/tx2Size)*(tx7Size + tx6Size) - 1;
 
-    CTxMemPoolEntry entry7(tx7, fee, 2, 10.0, 1, true);
+    CTxMemPoolEntry entry7(tx7, fee, 2, 10.0, 1, false, false);
     pool.addUnchecked(tx7.GetHash(), entry7);
     BOOST_CHECK_EQUAL(pool.size(), 7);
     sortedOrder.insert(sortedOrder.begin()+1, tx7.GetHash().ToString());

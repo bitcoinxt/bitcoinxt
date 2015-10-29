@@ -67,6 +67,7 @@ private:
     unsigned int nHeight; //! Chain height when entering the mempool
     bool hadNoDependencies; //! Not dependent on any other txs when it entered the mempool
     int64_t feeDelta; //! Local modification to support prioritization
+    bool spendsCoinbase; //! keep track of transactions that spend a coinbase
 
     // Information about descendants of this transaction that are in the
     // mempool; if we remove this transaction we must remove all of these
@@ -84,7 +85,8 @@ private:
 
 public:
     CTxMemPoolEntry(const CTransaction& _tx, const CAmount& _nFee,
-                    int64_t _nTime, double _dPriority, unsigned int _nHeight, bool poolHasNoInputsOf = false);
+                    int64_t _nTime, double _dPriority, unsigned int _nHeight,
+                    bool poolHasNoInputsOf, bool spendsCoinbase);
     CTxMemPoolEntry(const CTxMemPoolEntry& other);
 
     const CTransaction& GetTx() const { return this->tx; }
@@ -112,6 +114,8 @@ public:
     uint64_t GetCountWithAncestors() const { return nCountWithAncestors; }
     uint64_t GetSizeWithAncestors() const { return nSizeWithAncestors; }
     CAmount GetFeesWithAncestors() const { return nFeesWithAncestors; }
+
+    bool GetSpendsCoinbase() const { return spendsCoinbase; }
 };
 
 // Helpers for modifying CTxMemPool::mapTx, which is a boost multi_index.

@@ -90,8 +90,11 @@ TestingSetup::~TestingSetup()
 }
 
 CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(CMutableTransaction &tx, CTxMemPool *pool) {
-    return CTxMemPoolEntry(tx, nFee, nTime, dPriority, nHeight,
-                           pool ? pool->HasNoInputsOf(tx) : hadNoDependencies);
+    CTransaction txn(tx);
+    bool hasNoDependencies = pool ? pool->HasNoInputsOf(tx) : hadNoDependencies;
+
+    return CTxMemPoolEntry(txn, nFee, nTime, dPriority, nHeight,
+                           hasNoDependencies, spendsCoinbase);
 }
 
 void Shutdown(void* parg)

@@ -15,7 +15,7 @@ BOOST_FIXTURE_TEST_SUITE(policyestimator_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(BlockPolicyEstimates)
 {
-    CTxMemPool mpool(CFeeRate(1000));
+    CTxMemPool mpool(CFeeRate(0));
     TestMemPoolEntryHelper entry;
     CAmount basefee(2000);
     double basepri = 1e6;
