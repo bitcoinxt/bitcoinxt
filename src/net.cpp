@@ -8,7 +8,7 @@
 #endif
 
 #include "net.h"
-
+#include "main.h"
 #include "addrman.h"
 #include "chainparams.h"
 #include "clientversion.h"
@@ -427,8 +427,16 @@ void CNode::PushVersion()
         LogPrint("net", "send version message: version %d, blocks=%d, us=%s, them=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), addrYou.ToString(), id);
     else
         LogPrint("net", "send version message: version %d, blocks=%d, us=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), id);
-    PushMessage("version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
+
+    // Stealth mode: pretend to be like Bitcoin Core to hide from DoS attackers.
+    if (IsStealthMode()) {
+        uint64_t services = NODE_NETWORK;
+        PushMessage("version", 70002, services, nTime, addrYou, addrMe,
+                nLocalHostNonce, FormatSubVersion("Satoshi", CLIENT_VERSION, std::vector<string>(), ""), nBestHeight, true);        
+    } else {
+        PushMessage("version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
                 nLocalHostNonce, FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, std::vector<string>(), CLIENT_VERSION_XT_SUBVER), nBestHeight, true);
+    }
 }
 
 
@@ -868,6 +876,11 @@ void ThreadSocketHandler()
                 {
                     // Calculate the priority of the new IP to see if we should drop it immediately (normal) or kick
                     // one of the other peers out to make room for it.
+
+                    // TODO: Lower the priority of an IP as it establishes more connections.
+                    // The goal is to force an attacker to spread out in order to get lots of priority.
+
+                    // See if this IP has static prio data from a group.
                     CIPGroupData ipgroup = FindGroupForIP(addr);
 
                     bool disconnected = false;
@@ -875,10 +888,11 @@ void ThreadSocketHandler()
                         LOCK(cs_vNodes);
                         BOOST_FOREACH(CNode *n, vNodes)
                         {
-                            int nodePriority = n->ipgroup.priority;
+                            CIPGroupData ngroup = FindGroupForIP(n->addr);
+                            int nodePriority = ngroup.priority;
                             if (nodePriority < ipgroup.priority) {
                                 LogPrintf("Connection slots exhausted, evicting peer %d with priority %d (group %s) to free up resources\n",
-                                          n->id, nodePriority, n->ipgroup.name == "" ? string("default") : n->ipgroup.name);
+                                          n->id, nodePriority, ngroup.name == "" ? string("default") : ngroup.name);
                                 n->fDisconnect = true;
                                 disconnected = true;
                                 // Leave shouldConnect = true to allow this socket through.
@@ -1040,10 +1054,14 @@ void ThreadMapPort()
 #ifndef UPNPDISCOVER_SUCCESS
     /* miniupnpc 1.5 */
     devlist = upnpDiscover(2000, multicastif, minissdpdpath, 0);
-#else
+#elif MINIUPNPC_API_VERSION < 14
     /* miniupnpc 1.6 */
     int error = 0;
     devlist = upnpDiscover(2000, multicastif, minissdpdpath, 0, 0, &error);
+#else
+    /* miniupnpc 1.9.20150730 */
+    int error = 0;
+    devlist = upnpDiscover(2000, multicastif, minissdpdpath, 0, 0, 2, &error);
 #endif
 
     struct UPNPUrls urls;
@@ -1659,8 +1677,6 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (pnodeLocalHost == NULL)
         pnodeLocalHost = new CNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), nLocalServices));
 
-    InitIPGroups(&scheduler);
-
     Discover(threadGroup);
 
     //
@@ -1674,6 +1690,9 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     // Map ports with UPnP
     MapPort(GetBoolArg("-upnp", DEFAULT_UPNP));
+
+    // Download or load data that's useful for prioritising traffic by IP address.
+    InitIPGroups(&scheduler);
 
     // Send and receive from sockets, accept connections
     threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "net", &ThreadSocketHandler));
@@ -1996,7 +2015,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
         id = nLastNodeId++;
     }
 
-    ipgroup = FindGroupForIP(CNetAddr(addr.ToStringIP()));
+    CIPGroupData ipgroup = FindGroupForIP(CNetAddr(addr.ToStringIP()));
     std::string strIpGroup = ipgroup.name != "" ? tfm::format("(group %s)", ipgroup.name) : "";
     if (fLogIPs)
         LogPrint("net", "Added connection to %s peer=%d %s\n", addrName, id, strIpGroup);

@@ -185,6 +185,8 @@ bool LoadBlockIndex();
 void UnloadBlockIndex();
 /** Process protocol messages received from a given node */
 bool ProcessMessages(CNode* pfrom);
+/** Process a single message from a given node */
+bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv, int64_t nTimeReceived);
 /**
  * Send queued protocol messages to be sent to a give node.
  *
@@ -552,5 +554,8 @@ private:
     uint64_t t;
 };
 extern SizeForkTime sizeForkTime;
+
+// In stealth mode, pretend to be Bitcoin Core to hide from DoS attackers.
+bool IsStealthMode();
 
 #endif // BITCOIN_MAIN_H

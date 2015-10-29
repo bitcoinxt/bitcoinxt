@@ -1,0 +1,9 @@
+#!/bin/sh -e
+
+# stop and disable bitcoinxtd service if systemctl exists and is executable
+if [ -x "/bin/systemctl" ]; then
+    echo "Stopping bitcoinxtd.service"
+    /bin/systemctl stop bitcoinxtd.service
+    echo "Disabling bitcoinxtd.service"
+    /bin/systemctl disable bitcoinxtd.service
+fi

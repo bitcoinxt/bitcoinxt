@@ -287,10 +287,6 @@ public:
     CBloomFilter* pfilter;
     int nRefCount;
     NodeId id;
-
-    // IP group
-    CIPGroupData ipgroup;
-
 protected:
 
     // Denial-of-service detection/prevention

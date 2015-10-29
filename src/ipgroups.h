@@ -7,6 +7,8 @@
 
 #include "netbase.h"
 
+#define IP_PRIO_SRC_FLAG_NAME "-ip-priority-source"
+
 class CScheduler;
 
 // A group of logically related IP addresses. Useful for banning or deprioritising
@@ -31,6 +33,7 @@ struct CIPGroup {
 // Returns NULL if the IP does not belong to any group.
 CIPGroupData FindGroupForIP(CNetAddr ip);
 
+void InitIPGroupsFromCommandLine();
 void InitIPGroups(CScheduler *scheduler);
 
 #endif //BITCOIN_CIPGROUPS_H
