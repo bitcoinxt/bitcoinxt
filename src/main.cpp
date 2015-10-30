@@ -25,7 +25,6 @@
 #include "validationinterface.h"
 
 #include <sstream>
-#include <boost/chrono.hpp>
 
 #include <boost/dynamic_bitset.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -1198,7 +1197,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
             // Default max mempool size: 50 blocks-worth of transactions
             int64_t nDefaultMaxBytes = 50 * (int64_t)(maxBlockSize);
-            int64_t nMaxPoolBytes = GetArg("-maxmempoolbytes", nDefaultMaxBytes);
+            // approx 2.75 in-memory bytes per serialized tx byte
+            int64_t nMaxPoolBytes = GetArg("-maxmempoolbytes", nDefaultMaxBytes) * 100 / 275; 
 
             if (nMaxPoolTx <= 0) { // Zero or negative: don't limit
                 pool.addUnchecked(hash, entry, !IsInitialBlockDownload());
@@ -1242,9 +1242,6 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                     return false;
             }
             if (nMaxPoolBytes > 0 && (int64_t)pool.GetTotalTxSize() > nMaxPoolBytes) {
-                boost::chrono::high_resolution_clock::time_point t1;
-                boost::chrono::high_resolution_clock::time_point t2;
-                t1 = boost::chrono::high_resolution_clock::now();
                 list<CTransaction> evicted;
                 pool.evictRandomBytewise(evicted);
                 BOOST_FOREACH(const CTransaction &etx, evicted) {
@@ -1253,9 +1250,6 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                         etx.GetHash().ToString());
                     SyncWithWallets(etx, NULL, false);
                 }
-                t2 = boost::chrono::high_resolution_clock::now();
-                boost::chrono::nanoseconds ns = boost::chrono::duration_cast<boost::chrono::nanoseconds>(t2-t1);
-                LogPrint("mempool", "Bytewise evictions took %lli ns\n", ((long long)(ns.count())));
                 if (!pool.exists(hash))
                     return false;
 

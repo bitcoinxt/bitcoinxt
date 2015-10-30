@@ -276,11 +276,6 @@ void CTxMemPool::evictRandomBytewise(std::list<CTransaction>& evicted)
         bool pr1 = (mapDeltas.find(tx1.first) != mapDeltas.end());
         bool pr2 = (mapDeltas.find(tx2.first) != mapDeltas.end());
 
-        LogPrint("mempool", "Eviction candidate 1: %i byte %i satoshi %s\n", 
-                        tx1.second.GetTxSize(), tx1.second.GetFee(), tx1.first.ToString());
-        LogPrint("mempool", "Eviction candidate 2: %i byte %i satoshi %s\n", 
-                        tx2.second.GetTxSize(), tx2.second.GetFee(), tx2.first.ToString());
-
         if (pr1 && pr2) continue; // prioritized, try again
         if (!tx1.second.GetTxSize() || !tx2.second.GetTxSize()) continue; // probably unnecessary
 
