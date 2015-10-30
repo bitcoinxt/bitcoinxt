@@ -370,6 +370,9 @@ bool MarkBlockAsReceived(const uint256& hash) {
     AssertLockHeld(cs_main);
     map<uint256, pair<NodeId, list<QueuedBlock>::iterator> >::iterator itInFlight = mapBlocksInFlight.find(hash);
     if (itInFlight != mapBlocksInFlight.end()) {
+        int64_t getdataTime = itInFlight->second.second->nTime;
+        int64_t now = GetTimeMicros();
+        LogPrint("relayperf", "Received block %s in %.2f seconds\n", hash.ToString(), (now - getdataTime) / 1000000.0);
         NodeStatePtr state(itInFlight->second.first);
         nQueuedValidatedHeaders -= itInFlight->second.second->fValidatedHeaders;
         state->nBlocksInFlightValidHeaders -= itInFlight->second.second->fValidatedHeaders;
