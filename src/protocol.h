@@ -150,8 +150,8 @@ public:
 enum {
     MSG_TX = 1,
     MSG_BLOCK,
-    // Nodes may always request a MSG_FILTERED_BLOCK in a getdata, however,
-    // MSG_FILTERED_BLOCK should not appear in any invs except as a part of getdata.
+    // A filtered block is a CMerkleBlock structure, in which a list of hashes in the merkle tree is provided instead
+    // of the entire block contents.
     MSG_FILTERED_BLOCK,
 };
 
