@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "consensus/consensus.h"
 #include "consensus/validation.h"
 #include "main.h"
 #include "miner.h"
@@ -229,7 +230,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.nLockTime = chainActive.Tip()->nHeight+1;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
-    BOOST_CHECK(!CheckFinalTx(tx));
+    BOOST_CHECK(!CheckFinalTx(tx, LOCKTIME_MEDIAN_TIME_PAST));
 
     // time locked
     tx2.vin.resize(1);
@@ -243,7 +244,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx2.nLockTime = chainActive.Tip()->GetMedianTimePast()+1;
     hash = tx2.GetHash();
     mempool.addUnchecked(hash, entry.Time(GetTime()).SpendsCoinbase(true).FromTx(tx2));
-    BOOST_CHECK(!CheckFinalTx(tx2));
+    BOOST_CHECK(!CheckFinalTx(tx2, LOCKTIME_MEDIAN_TIME_PAST));
 
     BOOST_CHECK(pblocktemplate = CreateNewBlock(scriptPubKey));
 
@@ -261,7 +262,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     //BOOST_CHECK(CheckFinalTx(tx2));
 
     BOOST_CHECK(pblocktemplate = CreateNewBlock(scriptPubKey));
-    BOOST_CHECK_EQUAL(pblocktemplate->block.vtx.size(), 3);
+    BOOST_CHECK_EQUAL(pblocktemplate->block.vtx.size(), 2);
     delete pblocktemplate;
 
     chainActive.Tip()->nHeight--;
