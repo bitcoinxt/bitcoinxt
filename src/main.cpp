@@ -1196,7 +1196,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             int64_t nMaxPoolTx = GetArg("-maxmempooltx", nDefaultMax);
 
             // Default max mempool size: 50 blocks-worth of transactions
-            int64_t nDefaultMaxBytes = 50 * (int64_t)(maxBlockSize) * 100 / 275;
+            int64_t nDefaultMaxBytes = 50 * (int64_t)(maxBlockSize) * 275 / 100;
             // approx 2.75 in-memory bytes per serialized tx byte
             int64_t nMaxPoolBytes = GetArg("-maxmempoolbytes", nDefaultMaxBytes) * 100 / 275; 
 
