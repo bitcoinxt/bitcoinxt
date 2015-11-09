@@ -12,6 +12,7 @@
 #include "clientversion.h"
 #include "main.h"
 #include "net.h"
+#include "txmempool.h"
 #include "ui_interface.h"
 #include "util.h"
 #include "options.h"
@@ -94,6 +95,16 @@ QDateTime ClientModel::getLastBlockDate() const
     return QDateTime::fromTime_t(Params().GenesisBlock().GetBlockTime()); // Genesis block's time of current network
 }
 
+long ClientModel::getMempoolSize() const
+{
+    return mempool.size();
+}
+
+size_t ClientModel::getMempoolDynamicUsage() const
+{
+    return mempool.DynamicMemoryUsage();
+}
+
 double ClientModel::getVerificationProgress() const
 {
     LOCK(cs_main);
@@ -128,6 +139,7 @@ void ClientModel::updateTimer()
         Q_EMIT numBlocksChanged(newNumBlocks, newBlockDate);
     }
 
+    Q_EMIT mempoolSizeChanged(getMempoolSize(), getMempoolDynamicUsage());
     Q_EMIT bytesChanged(getTotalBytesRecv(), getTotalBytesSent());
 }
 
