@@ -107,7 +107,6 @@ testScriptsExt = [
     'receivedby.py',
     'reindex.py',
     'rpcbind_test.py',
-#   'script_test.py',
     'smartfees.py',
     'maxblocksinflight.py',
     'invalidblockrequest.py',
