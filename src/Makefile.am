@@ -113,6 +113,7 @@ BITCOIN_CORE_H = \
   net.h \
   netbase.h \
   noui.h \
+  options.h \
   policy/fees.h \
   pow.h \
   primitives/block.h \
@@ -193,6 +194,7 @@ libbitcoin_server_a_SOURCES = \
   miner.cpp \
   net.cpp \
   noui.cpp \
+  options.cpp \
   policy/fees.cpp \
   pow.cpp \
   rest.cpp \
@@ -288,6 +290,7 @@ libbitcoin_util_a_SOURCES = \
   compat/glibc_sanity.cpp \
   compat/glibcxx_sanity.cpp \
   compat/strnlen.cpp \
+  options.cpp \
   random.cpp \
   rpcprotocol.cpp \
   support/cleanse.cpp \
