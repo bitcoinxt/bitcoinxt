@@ -435,7 +435,10 @@ void CNode::PushVersion()
 
     // Stealth mode: pretend to be like Bitcoin Core to hide from DoS attackers.
     if (Opt().IsStealthMode()) {
-        uint64_t services = NODE_NETWORK;
+        uint64_t services = 0;
+        if (nLocalServices & NODE_NETWORK)
+            services = NODE_NETWORK;
+
         PushMessage("version", 70002, services, nTime, addrYou, addrMe,
                 nLocalHostNonce, XTSubVersion(), nBestHeight, true);
     } else {
