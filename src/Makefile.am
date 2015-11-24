@@ -80,7 +80,6 @@ endif
 BITCOIN_CORE_H = \
   addrdb.h \
   addrman.h \
-  arith_uint256.h \
   base58.h \
   blockannounce.h \
   blockheaderprocessor.h \
@@ -105,9 +104,7 @@ BITCOIN_CORE_H = \
   compat/sanity.h \
   compressor.h \
   consensus/consensus.h \
-  consensus/params.h \
   consensus/tx_verify.h \
-  consensus/validation.h \
   core_io.h \
   curl_wrapper.h \
   compactblockprocessor.h \
@@ -140,7 +137,6 @@ BITCOIN_CORE_H = \
   policy/fees.h \
   policy/policy.h \
   pow.h \
-  primitives/block.h \
   process_xthinblock.h \
   protocol.h \
   random.h \
@@ -302,6 +298,10 @@ libbitcoin_consensus_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_consensus_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_consensus_a_SOURCES = \
   amount.h \
+  arith_uint256.cpp \
+  arith_uint256.h \
+  consensus/params.h \
+  consensus/validation.h \
   hash.cpp \
   hash.h \
   primitives/block.cpp \
@@ -330,7 +330,6 @@ libbitcoin_common_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_common_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_common_a_SOURCES = \
   amount.cpp \
-  arith_uint256.cpp \
   base58.cpp \
   cashaddr.cpp \
   cashaddrenc.cpp \
@@ -344,7 +343,6 @@ libbitcoin_common_a_SOURCES = \
   keystore.cpp \
   netbase.cpp \
   nodestate.cpp \
-  primitives/block.cpp \
   protocol.cpp \
   scheduler.cpp \
   script/sign.cpp \
