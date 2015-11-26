@@ -2624,6 +2624,9 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
         if(connman)
             connman->SetBestHeight(nNewHeight);
 
+        // Notify external listeners about the new tip.
+        uiInterface.NotifyBlockTip(fInitialDownload, pindexNewTip);
+
         if (connman && !fInitialDownload) {
             std::vector<uint256> hashesToAnnounce
                 = findHeadersToAnnounce(pindexFork, pindexNewTip);
@@ -2645,8 +2648,6 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
                         pnode->PushBlockHash(h);
                 });
             // Notify external listeners about the new tip.
-            if (!hashesToAnnounce.empty())
-                uiInterface.NotifyBlockTip(hashesToAnnounce.front());
         }
         if (nStopAtHeight && pindexNewTip && pindexNewTip->nHeight >= nStopAtHeight) StartShutdown();
     } while(pindexNewTip != pindexMostWork);
