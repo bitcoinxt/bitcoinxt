@@ -11,7 +11,6 @@
 #include "hash.h"
 #include "leakybucket.h"
 #include "limitedmap.h"
-#include "mruset.h"
 #include "netbase.h"
 #include "protocol.h"
 #include "random.h"
