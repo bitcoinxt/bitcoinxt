@@ -543,3 +543,49 @@ def get_bip9_status(node, key):
         if row['id'] == key:
             return row
     raise IndexError ('key:"%s" not found' % key)
+
+def create_confirmed_utxos(fee, node, count, age=101):
+    node.generate(int(0.5*count) + age)
+    utxos = node.listunspent()
+    iterations = count - len(utxos)
+    addr1 = node.getnewaddress()
+    addr2 = node.getnewaddress()
+    if iterations <= 0:
+        return utxos
+    for _ in range(iterations):
+        t = utxos.pop()
+        inputs = []
+        inputs.append({ "txid" : t["txid"], "vout" : t["vout"]})
+        outputs = {}
+        send_value = t['amount'] - fee
+        outputs[addr1] = satoshi_round(send_value / 2)
+        outputs[addr2] = satoshi_round(send_value / 2)
+        raw_tx = node.createrawtransaction(inputs, outputs)
+        signed_tx = node.signrawtransaction(
+            raw_tx, None, None, "ALL|FORKID")["hex"]
+        txid = node.sendrawtransaction(signed_tx)
+
+    while (node.getmempoolinfo()['size'] > 0):
+        node.generate(1)
+
+    utxos = node.listunspent()
+    assert(len(utxos) >= count)
+    return utxos
+
+def create_lots_of_big_transactions(node, txouts, utxos, num, fee):
+    addr = node.getnewaddress()
+    txids = []
+    for _ in range(num):
+        t = utxos.pop()
+        inputs = [{"txid":t["txid"], "vout":t["vout"]}]
+        outputs = {}
+        change = t['amount'] - fee
+        outputs[addr] = satoshi_round(change)
+        rawtx = node.createrawtransaction(inputs, outputs)
+        newtx = rawtx[0:92]
+        newtx = newtx + txouts
+        newtx = newtx + rawtx[94:]
+        signresult = node.signrawtransaction(newtx, None, None, "NONE|FORKID")
+        txid = node.sendrawtransaction(signresult["hex"], True)
+        txids.append(txid)
+    return txids
