@@ -94,7 +94,7 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(CMutableTransaction &tx, CTxMemPo
     bool hasNoDependencies = pool ? pool->HasNoInputsOf(tx) : hadNoDependencies;
 
     return CTxMemPoolEntry(txn, nFee, nTime, dPriority, nHeight,
-                           hasNoDependencies, spendsCoinbase);
+                           hasNoDependencies, spendsCoinbase, lp);
 }
 
 void Shutdown(void* parg)

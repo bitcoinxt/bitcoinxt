@@ -20,9 +20,11 @@ using namespace std;
 
 CTxMemPoolEntry::CTxMemPoolEntry(const CTransaction& _tx, const CAmount& _nFee,
                                  int64_t _nTime, double _dPriority, unsigned int _nHeight,
-                                 bool poolHasNoInputsOf, bool _spendsCoinbase):
-    tx(_tx), nFee(_nFee), nTime(_nTime), dPriority(_dPriority), nHeight(_nHeight),
-    hadNoDependencies(poolHasNoInputsOf), spendsCoinbase(_spendsCoinbase)
+                                 bool poolHasNoInputsOf, bool _spendsCoinbase,
+                                 LockPoints lp):
+        tx(_tx), nFee(_nFee), nTime(_nTime), dPriority(_dPriority), nHeight(_nHeight),
+        hadNoDependencies(poolHasNoInputsOf), spendsCoinbase(_spendsCoinbase),
+        lockPoints(lp)
 {
     nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
     nModSize = tx.CalculateModifiedSize(nTxSize);
@@ -56,6 +58,11 @@ CTxMemPoolEntry::GetPriority(unsigned int currentHeight) const
 void CTxMemPoolEntry::UpdateFeeDelta(int64_t newFeeDelta)
 {
     feeDelta = newFeeDelta;
+}
+
+void CTxMemPoolEntry::UpdateLockPoints(const LockPoints& lp)
+{
+    lockPoints = lp;
 }
 
 // Update the given tx for any in-mempool descendants.
@@ -525,7 +532,11 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
     list<CTransaction> transactionsToRemove;
     for (indexed_transaction_set::const_iterator it = mapTx.begin(); it != mapTx.end(); it++) {
         const CTransaction& tx = it->GetTx();
-        if (!CheckFinalTx(tx, flags) || !CheckSequenceLocks(tx, flags)) {
+        LockPoints lp = it->GetLockPoints();
+        bool validLP =  TestLockPointValidity(&lp);
+        if (!CheckFinalTx(tx, flags) || !CheckSequenceLocks(tx, flags, &lp, validLP)) {
+            // Note if CheckSequenceLocks fails the LockPoints may still be invalid
+            // So it's critical that we remove the tx and not depend on the LockPoints.
             transactionsToRemove.push_back(tx);
         } else if (it->GetSpendsCoinbase()) {
             BOOST_FOREACH(const CTxIn& txin, tx.vin) {
@@ -539,6 +550,9 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
                     break;
                 }
             }
+        }
+        if (!validLP) {
+            mapTx.modify(it, update_lock_points(lp));
         }
     }
     BOOST_FOREACH(const CTransaction& tx, transactionsToRemove) {
