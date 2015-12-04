@@ -57,7 +57,6 @@ The test:
 class TestNode(NodeConnCB):
     def __init__(self):
         NodeConnCB.__init__(self)
-        self.create_callback_map()
         self.connection = None
 
     def add_connection(self, conn):
