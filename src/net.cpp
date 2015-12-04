@@ -978,7 +978,7 @@ void ThreadSocketHandler()
                         // max of min makes sure amt is in a range reasonable for buffer allocation
                         const int amt = max(1, min(amt2Recv, MAX_RECV_CHUNK));
                         char *pchBuf = new char[amt];
-                        int nBytes = recv(pnode->hSocket, pchBuf, sizeof(pchBuf), MSG_DONTWAIT);
+                        int nBytes = recv(pnode->hSocket, pchBuf, amt, MSG_DONTWAIT);
                         if (nBytes > 0)
                         {
                             receiveShaper.consume(nBytes);
