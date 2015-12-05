@@ -21,6 +21,8 @@ class DoubleSpendRelay(BitcoinTestFramework):
     # [0,1] <--> [2] <--> [3]
     #
     def setup_network(self):
+        #This test requires mocktime
+        enable_mocktime()
         self.is_network_split = False
         self.nodes = []
         for i in range(0,4):
