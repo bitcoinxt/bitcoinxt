@@ -6,7 +6,7 @@
 
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import *
-from test_framework.comptool import TestManager, TestInstance
+from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.mininode import *
 from test_framework.blocktools import *
 import logging
@@ -25,7 +25,7 @@ re-requested.
 # Use the ComparisonTestFramework with 1 node: only use --testbinary.
 class InvalidBlockRequestTest(ComparisonTestFramework):
 
-    ''' Can either run this test as 1 node with expected answers, or two and compare them. 
+    ''' Can either run this test as 1 node with expected answers, or two and compare them.
         Change the "outcome" variable from each TestInstance object to only do the comparison. '''
     def __init__(self):
         self.num_nodes = 1
@@ -70,7 +70,7 @@ class InvalidBlockRequestTest(ComparisonTestFramework):
         Now we use merkle-root malleability to generate an invalid block with
         same blockheader.
         Manufacture a block with 3 transactions (coinbase, spend of prior
-        coinbase, spend of that spend).  Duplicate the 3rd transaction to 
+        coinbase, spend of that spend).  Duplicate the 3rd transaction to
         leave merkle root and blockheader unchanged but invalidate the block.
         '''
         block2 = create_block(self.tip, create_coinbase(), self.block_time)
@@ -94,7 +94,7 @@ class InvalidBlockRequestTest(ComparisonTestFramework):
         assert(block2_orig.vtx != block2.vtx)
 
         self.tip = block2.sha256
-        yield TestInstance([[block2, False], [block2_orig, True]])
+        yield TestInstance([[block2, RejectResult(16,'bad-txns-duplicate')], [block2_orig, True]])
 
         '''
         Make sure that a totally screwed up block is not valid.
@@ -108,7 +108,7 @@ class InvalidBlockRequestTest(ComparisonTestFramework):
         block3.rehash()
         block3.solve()
 
-        yield TestInstance([[block3, False]])
+        yield TestInstance([[block3, RejectResult(16,'bad-cb-amount')]])
 
 
 if __name__ == '__main__':

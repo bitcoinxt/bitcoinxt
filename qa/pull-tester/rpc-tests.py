@@ -93,7 +93,9 @@ testScripts = [
     'walletbackup.py',
     'p2p-versionbits-warning.py',
     'decodescript.py',
-    'sendheaders.py'
+    'sendheaders.py',
+    'invalidblockrequest.py',
+    'invalidtxrequest.py'
 ]
 testScriptsExt = [
 # Needs update for BCC.
@@ -116,7 +118,6 @@ testScriptsExt = [
     'rpcbind_test.py',
     'smartfees.py',
     'maxblocksinflight.py',
-    'invalidblockrequest.py',
     'rawtransactions.py',
     'p2p-acceptblock.py',
     'p2p-compactblocks.py',
