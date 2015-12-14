@@ -18,6 +18,7 @@
 #include "main.h"
 #include "miner.h"
 #include "net.h"
+#include "options.h"
 #include "rpcserver.h"
 #include "script/standard.h"
 #include "scheduler.h"
@@ -325,6 +326,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-seednode=<ip>", _("Connect to a node to retrieve peer addresses, and disconnect"));
     strUsage += HelpMessageOpt("-stealth-mode", _("Make this node act like a Bitcoin Core node from the wire perspective"));
     strUsage += HelpMessageOpt("-timeout=<n>", strprintf(_("Specify connection timeout in milliseconds (minimum: 1, default: %d)"), DEFAULT_CONNECT_TIMEOUT));
+    strUsage += HelpMessageOpt("-uacomment", _("Add a comment into the user agent visible to other nodes"));
 #ifdef USE_UPNP
 #if USE_UPNP
     strUsage += HelpMessageOpt("-upnp", _("Use UPnP to map the listening port (default: 1 when listening)"));
@@ -977,6 +979,17 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // ********************************************************* Step 6: network initialization
 
     RegisterNodeSignals(GetNodeSignals());
+
+    try { Opt().UAComment(true /* validate */); }
+    catch (const std::invalid_argument& e) {
+        return InitError(e.what());
+    }
+
+    if (XTSubVersion().size() > MAX_SUBVERSION_LENGTH)
+        return InitError(strprintf(
+            "Total length of network version string %i exceeds maximum of %i characters. "
+            "Reduce size of uacomment or hide platform details.",
+            XTSubVersion().size(), MAX_SUBVERSION_LENGTH));
 
     if (mapArgs.count("-onlynet")) {
         std::set<enum Network> nets;

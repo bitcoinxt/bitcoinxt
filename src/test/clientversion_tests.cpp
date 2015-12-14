@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <boost/test/unit_test.hpp>
+#include <boost/assign/list_of.hpp>
 
 #include "clientversion.h"
 #include "options.h"
@@ -28,8 +29,15 @@ struct DummyArgGetter : public ArgGetter {
         return def;
     }
 
+    virtual std::vector<std::string> GetMultiArgs(const std::string& arg) {
+        if (arg == "-uacomment")
+            return uacomment;
+        return std::vector<std::string>();
+    }
+
     bool stealthmode;
     bool hideplatform;
+    std::vector<std::string> uacomment;
 };
 
 bool OsInStr(const std::string& version) {
@@ -71,6 +79,33 @@ BOOST_AUTO_TEST_CASE(xtsubversion_stealthmode)
 
     argPtr->stealthmode = false;
     BOOST_CHECK(XTSubVersion().find("XT") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(xtsubversion_uacomment)
+{
+    std::auto_ptr<DummyArgGetter> arg(new DummyArgGetter);
+    DummyArgGetter* argPtr = arg.get();
+    std::auto_ptr<ArgReset> argraii
+        = SetDummyArgGetter(std::auto_ptr<ArgGetter>(arg.release()));
+
+    argPtr->hideplatform = true;
+
+    // no comments
+    BOOST_CHECK(XTSubVersion().find("(") == std::string::npos);
+
+    // only uacomments
+    argPtr->uacomment = boost::assign::list_of("hello")("world");
+    BOOST_CHECK(XTSubVersion().find("(hello; world)") != std::string::npos);
+
+#if BOOST_VERSION >= 105500
+    // combines with platform
+    argPtr->hideplatform = false;
+    BOOST_CHECK(XTSubVersion().find("(hello; world; ") != std::string::npos);
+#endif
+
+    // allowed in stealth-mode
+    argPtr->stealthmode = true;
+    BOOST_CHECK(XTSubVersion().find("(hello; world)") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_SUITE_END()
