@@ -198,8 +198,9 @@ class WalletTest (BitcoinTestFramework):
         self.nodes[1].sendrawtransaction(txObjNotBroadcasted['hex'])
         self.nodes[1].generate(1)
         self.sync_all()
+        node_2_bal += 2
         txObjNotBroadcasted = self.nodes[0].gettransaction(txIdNotBroadcasted)
-        assert_equal(self.nodes[2].getbalance(), node_2_bal + Decimal('2')) #should not be
+        assert_equal(self.nodes[2].getbalance(), node_2_bal)
 
         #create another tx
         txIdNotBroadcasted  = self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), 2)
@@ -215,9 +216,10 @@ class WalletTest (BitcoinTestFramework):
 
         self.nodes[0].generate(1)
         sync_blocks(self.nodes)
+        node_2_bal += 2
 
         #tx should be added to balance because after restarting the nodes tx should be broadcastet
-        assert_equal(self.nodes[2].getbalance(), node_2_bal + Decimal('4')) #should not be
+        assert_equal(self.nodes[2].getbalance(), node_2_bal)
 
         #send a tx with value in a string (PR#6380 +)
         txId  = self.nodes[0].sendtoaddress(self.nodes[2].getnewaddress(), "2")
@@ -249,6 +251,27 @@ class WalletTest (BitcoinTestFramework):
             errorString = e.error['message']
 
         assert_equal("not an integer" in errorString, True)
+
+        #check if wallet or blochchain maintenance changes the balance
+        self.sync_all()
+        self.nodes[0].generate(1)
+        self.sync_all()
+        balance_nodes = [self.nodes[i].getbalance() for i in range(3)]
+
+        maintenance = [
+            '-rescan',
+            '-reindex',
+            '-zapwallettxes=1',
+            '-zapwallettxes=2',
+            '-salvagewallet',
+        ]
+        for m in maintenance:
+            print("check %s" % m)
+            stop_nodes(self.nodes)
+            wait_bitcoinds()
+            self.nodes = start_nodes(3, self.options.tmpdir, [[m]] * 3)
+            assert_equal(balance_nodes, [self.nodes[i].getbalance() for i in range(3)])
+
 
 if __name__ == '__main__':
     WalletTest ().main ()
