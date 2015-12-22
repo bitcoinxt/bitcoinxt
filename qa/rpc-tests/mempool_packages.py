@@ -7,6 +7,7 @@
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
+from test_framework.mininode import COIN
 
 def satoshi_round(amount):
     return  Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
@@ -66,12 +67,11 @@ class MempoolPackagesTest(BitcoinTestFramework):
         descendant_count = 1
         descendant_fees = 0
         descendant_size = 0
-        SATOSHIS = 100000000
 
         for x in reversed(chain):
             assert_equal(mempool[x]['descendantcount'], descendant_count)
             descendant_fees += mempool[x]['fee']
-            assert_equal(mempool[x]['descendantfees'], SATOSHIS*descendant_fees)
+            assert_equal(mempool[x]['descendantfees'], descendant_fees * COIN)
             descendant_size += mempool[x]['size']
             assert_equal(mempool[x]['descendantsize'], descendant_size)
             descendant_count += 1
@@ -175,7 +175,7 @@ class MempoolPackagesTest(BitcoinTestFramework):
         signedtx = self.nodes[0].signrawtransaction(rawtx)
         txid = self.nodes[0].sendrawtransaction(signedtx['hex'])
         sync_mempools(self.nodes)
-        
+
         # Now try to disconnect the tip on each node...
         self.nodes[1].invalidateblock(self.nodes[1].getbestblockhash())
         self.nodes[0].invalidateblock(self.nodes[0].getbestblockhash())
