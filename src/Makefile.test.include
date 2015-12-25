@@ -63,6 +63,7 @@ BITCOIN_TESTS =\
   test/pmt_tests.cpp \
   test/policyestimator_tests.cpp \
   test/pow_tests.cpp \
+  test/processmessage_tests.cpp \
   test/ReceiveMsgBytes_tests.cpp \
   test/rpc_tests.cpp \
   test/sanity_tests.cpp \
@@ -76,6 +77,7 @@ BITCOIN_TESTS =\
   test/skiplist_tests.cpp \
   test/test_bitcoin.cpp \
   test/test_bitcoin.h \
+  test/thinblockbuilder_tests.cpp \
   test/timedata_tests.cpp \
   test/transaction_tests.cpp \
   test/uint256_tests.cpp \

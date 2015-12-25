@@ -295,11 +295,8 @@ public:
     int nRefCount;
     NodeId id;
 
-    // If we've received a thin block from this peer, it's stored here until we have enough data to complete it.
-    CBlock thinBlock;
-    std::vector<uint256> thinBlockHashes;
-    int thinBlockWaitingForTxns;   // if -1 then not currently waiting
-    uint64_t thinBlockNonce;    // the nonce we expect to find in a pong message marking end of tx data.
+    // the nonce we expect to find in a pong message marking end of thin block tx data.
+    uint64_t thinBlockNonce;
 
 protected:
 
@@ -642,6 +639,11 @@ public:
 
     static uint64_t GetTotalBytesRecv();
     static uint64_t GetTotalBytesSent();
+
+    // Node (probably) supports filter_* commands
+    bool SupportsBloom() const;
+
+    bool SupportsThinBlocks() const;
 };
 
 

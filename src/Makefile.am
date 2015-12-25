@@ -118,6 +118,7 @@ BITCOIN_CORE_H = \
   pow.h \
   primitives/block.h \
   primitives/transaction.h \
+  process_merkleblock.h \
   protocol.h \
   pubkey.h \
   random.h \
@@ -138,6 +139,7 @@ BITCOIN_CORE_H = \
   support/cleanse.h \
   support/pagelocker.h \
   sync.h \
+  thinblockbuilder.h \
   threadsafety.h \
   timedata.h \
   tinyformat.h \
@@ -197,6 +199,7 @@ libbitcoin_server_a_SOURCES = \
   options.cpp \
   policy/fees.cpp \
   pow.cpp \
+  process_merkleblock.cpp \
   rest.cpp \
   rpcblockchain.cpp \
   rpcmining.cpp \
@@ -205,6 +208,7 @@ libbitcoin_server_a_SOURCES = \
   rpcrawtransaction.cpp \
   rpcserver.cpp \
   script/sigcache.cpp \
+  thinblockbuilder.cpp \
   timedata.cpp \
   txdb.cpp \
   txmempool.cpp \
