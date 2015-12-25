@@ -5,7 +5,7 @@ suites:
 - "trusty"
 architectures:
 - "amd64"
-packages: 
+packages:
 - "g++"
 - "git-core"
 - "pkg-config"
@@ -20,7 +20,9 @@ packages:
 - "libbz2-dev"
 - "ca-certificates"
 - "python"
-reference_datetime: "2016-01-01 00:00:00"
+- "python-dev"
+- "python-setuptools"
+- "fonts-tuffy"
 remotes:
 - "url": "https://github.com/bitcoinxt/bitcoinxt.git"
   "dir": "bitcoin"
