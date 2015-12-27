@@ -66,6 +66,7 @@ private:
     double dPriority; //! Priority when entering the mempool
     unsigned int nHeight; //! Chain height when entering the mempool
     bool hadNoDependencies; //! Not dependent on any other txs when it entered the mempool
+    int64_t feeDelta; //! Local modification to support prioritization
 
     // Information about descendants of this transaction that are in the
     // mempool; if we remove this transaction we must remove all of these
@@ -93,12 +94,16 @@ public:
     int64_t GetTime() const { return nTime; }
     unsigned int GetHeight() const { return nHeight; }
     bool WasClearAtEntry() const { return hadNoDependencies; }
+    int64_t GetFeeDelta() const { return feeDelta; }
+    int64_t GetModifiedFee() const { return nFee + feeDelta; }
     size_t DynamicMemoryUsage() const { return nUsageSize; }
 
     // Adjusts the descendant state, if this entry is not dirty.
     void UpdateDescendantState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount);
     // Adjusts the ancestor state
     void UpdateAncestorState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount);
+    // Updates the fee delta
+    void UpdateFeeDelta(int64_t feeDelta);
 
     uint64_t GetCountWithDescendants() const { return nCountWithDescendants; }
     uint64_t GetSizeWithDescendants() const { return nSizeWithDescendants; }
@@ -138,6 +143,16 @@ struct update_ancestor_state
         int64_t modifySize;
         CAmount modifyFee;
         int64_t modifyCount;
+};
+
+struct update_fee_delta
+{
+    update_fee_delta(int64_t _feeDelta) : feeDelta(_feeDelta) { }
+
+    void operator() (CTxMemPoolEntry &e) { e.UpdateFeeDelta(feeDelta); }
+
+private:
+    int64_t feeDelta;
 };
 
 // extracts a TxMemPoolEntry's transaction hash
@@ -201,6 +216,14 @@ class CompareTxMemPoolEntryByAncestorFee
 public:
     bool operator()(const CTxMemPoolEntry& a, const CTxMemPoolEntry& b)
     {
+        // Fee delta is used to prefer local transactions
+        double aFeeDelta = a.GetFeeDelta();
+        double bFeeDelta = b.GetFeeDelta();
+
+        if (aFeeDelta != bFeeDelta) {
+            return aFeeDelta > bFeeDelta;
+        }
+
         double aFees = a.GetFee();
         double aSize = a.GetSizeWithAncestors();
 
@@ -211,11 +234,11 @@ public:
         double f1 = aFees * bSize;
         double f2 = aSize * bFees;
 
-        if (f1 == f2) {
-            return a.GetTime() < b.GetTime();
+        if (f1 != f2) {
+            return f1 > f2;
         }
 
-        return f1 > f2;
+        return a.GetTime() < b.GetTime();
     }
 };
 

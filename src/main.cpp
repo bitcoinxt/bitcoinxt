@@ -1220,6 +1220,11 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
         else
         {
+            // Set a fee delta to protect local wallet transactions from mempool size-based eviction
+            if (!fLimitFree) {
+                pool.PrioritiseTransaction(hash, hash.ToString(), 0, 1);
+            }
+
             // Store transaction in memory
         	pool.addUnchecked(hash, entry, setAncestors, !IsInitialBlockDownload());
 
