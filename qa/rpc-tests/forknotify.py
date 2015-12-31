@@ -35,9 +35,9 @@ class ForkNotifyTest(BitcoinTestFramework):
                                 ["-blockversion=211"]))
         connect_nodes(self.nodes[1], 0)
 
-        # Node2 mines block.version=0x20000007 blocks
+        # Node2 mines block.version=5 blocks
         self.nodes.append(start_node(2, self.options.tmpdir,
-                            ["-blockversion=%d"%(0x20000007,)]))
+                            ["-blockversion=%d"%(5,)]))
         connect_nodes(self.nodes[2], 0)
 
         self.is_network_split = False

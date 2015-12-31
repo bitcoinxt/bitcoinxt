@@ -18,7 +18,7 @@
 // These must match parameters in chainparams.cpp
 static const uint64_t EARLIEST_FORK_TIME = 1452470400; // 11 Jan 2016
 static const uint32_t MAXSIZE_PREFORK = 1000*1000;
-static const uint32_t MAXSIZE_POSTFORK = 8*1000*1000;
+static const uint32_t MAXSIZE_POSTFORK = 2*1000*1000;
 static const uint64_t SIZE_DOUBLE_EPOCH = 60*60*24*365*2; // two years
 
 BOOST_FIXTURE_TEST_SUITE(block_size_tests, TestingSetup)

@@ -60,8 +60,8 @@ public:
         // Then, if miner consensus: 8MB max, doubling every two years
         consensus.nMaxSizePreFork = 1000*1000; // 1MB max pre-fork
         consensus.nSizeDoubleEpoch = 60*60*24*365*2; // two years
-        consensus.nMaxSizeBase = 8*1000*1000; // 8MB
-        consensus.nMaxSizeDoublings = 10;
+        consensus.nMaxSizeBase = 2*1000*1000; // 2MB
+        consensus.nMaxSizeDoublings = 2;
         consensus.nActivateSizeForkMajority = 750; // 75% of hashpower to activate fork
         consensus.nSizeForkGracePeriod = 60*60*24*14; // two week grace period after activation
 

@@ -11,7 +11,7 @@
 #include "uint256.h"
 
 /** Blocks with version fields that have these bits set activate the bigger-block fork */
-const unsigned int SIZE_FORK_VERSION = 0x20000007;
+const unsigned int SIZE_FORK_VERSION = 5;
 
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work

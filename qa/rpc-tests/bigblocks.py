@@ -15,7 +15,7 @@ CACHE_DIR = "cache_bigblock"
 
 # regression test / testnet fork params:
 FORK_TIME = 1438387200
-FORK_BLOCK_VERSION = 0x20000007
+FORK_BLOCK_VERSION = 5
 FORK_GRACE_PERIOD = 60*60*24
 
 class BigBlockTest(BitcoinTestFramework):
