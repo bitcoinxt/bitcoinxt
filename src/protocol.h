@@ -76,6 +76,11 @@ enum {
     // See BIP 64 for details on how this is implemented.
     NODE_GETUTXO = (1 << 1),
 
+    // NODE_BLOOM means the node is capable and willing to handle bloom-filtered connections.
+    // All nodes with protocol version < 70011 support bloom-filter without advertising this bit.
+    // Core nodes with protocol >= 70011 do not support bloom-filter unless this bit is advertised.
+    NODE_BLOOM = (1 << 2)
+
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
     // isn't getting used, or one not being used much, and notify the
     // bitcoin-development mailing list. Remember that service bits are just

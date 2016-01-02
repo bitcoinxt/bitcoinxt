@@ -70,7 +70,7 @@ namespace {
 //
 bool fDiscover = true;
 bool fListen = true;
-uint64_t nLocalServices = NODE_NETWORK | NODE_GETUTXO;
+uint64_t nLocalServices = NODE_NETWORK | NODE_GETUTXO | NODE_BLOOM;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfReachable[NET_MAX] = {};
