@@ -169,7 +169,7 @@ bool StartHTTPRPC()
 
     assert(EventBase());
     httpRPCTimerInterface = new HTTPRPCTimerInterface(EventBase());
-    RPCRegisterTimerInterface(httpRPCTimerInterface);
+    RPCSetTimerInterface(httpRPCTimerInterface);
     return true;
 }
 
@@ -183,7 +183,7 @@ void StopHTTPRPC()
     LogPrint("rpc", "Stopping HTTP RPC server\n");
     UnregisterHTTPHandler("/", true);
     if (httpRPCTimerInterface) {
-        RPCUnregisterTimerInterface(httpRPCTimerInterface);
+        RPCUnsetTimerInterface(httpRPCTimerInterface);
         delete httpRPCTimerInterface;
         httpRPCTimerInterface = 0;
     }
