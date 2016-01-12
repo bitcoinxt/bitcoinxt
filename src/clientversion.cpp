@@ -5,8 +5,14 @@
 #include "clientversion.h"
 
 #include "tinyformat.h"
+#include "options.h"
 
 #include <string>
+#include <boost/version.hpp>
+
+#if BOOST_VERSION >= 105500 // Boost 1.55 or newer
+#include <boost/predef.h>
+#endif
 
 /**
  * Name of client reported in the 'version' message. Report the same name
@@ -83,6 +89,39 @@ static std::string FormatVersion(int nVersion)
         return strprintf("%d.%d.%d.%d", nVersion / 1000000, (nVersion / 10000) % 100, (nVersion / 100) % 100, nVersion % 100);
 }
 
+std::vector<std::string> GetPlatformDetails() {
+    std::vector<std::string> platform;
+#if BOOST_VERSION >= 105500
+
+    // Check OS
+#if BOOST_OS_BSD
+    platform.push_back("BSD");
+#elif BOOST_OS_LINUX
+    platform.push_back("Linux");
+#elif BOOST_OS_MACOS
+    platform.push_back("Mac OS");
+#elif BOOST_OS_WINDOWS
+    platform.push_back("Windows");
+#else
+    platform.push_back("Unknown OS");
+#endif
+
+    // Check arch
+#if BOOST_ARCH_X86_32
+    platform.push_back("x86");
+#elif BOOST_ARCH_X86_64
+    platform.push_back("x86_64");
+#elif BOOST_ARCH_ARM
+    platform.push_back("arm");
+#else
+    platform.push_back("Unknown arch");
+#endif
+    return platform;
+#else // too old boost
+    return std::vector<std::string>();
+#endif
+}
+
 std::string FormatFullVersion()
 {
     return CLIENT_BUILD;
@@ -106,4 +145,19 @@ std::string FormatSubVersion(const std::string& name, int nClientVersion, const 
     }
     ss << "/";
     return ss.str();
+}
+
+/**
+ * The default Bitcoin XT subversion field according to BIP 14 spec
+ */
+std::string XTSubVersion()
+{
+    if (Opt().IsStealthMode())
+        return FormatSubVersion("Satoshi", CLIENT_VERSION, std::vector<std::string>(), "");
+
+    std::vector<std::string> comments;
+    if (!Opt().HidePlatform())
+        comments = GetPlatformDetails();
+
+    return FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, comments, CLIENT_VERSION_XT_SUBVER);
 }

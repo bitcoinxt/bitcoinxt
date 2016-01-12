@@ -555,7 +555,4 @@ private:
 };
 extern SizeForkTime sizeForkTime;
 
-// In stealth mode, pretend to be Bitcoin Core to hide from DoS attackers.
-bool IsStealthMode();
-
 #endif // BITCOIN_MAIN_H

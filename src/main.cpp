@@ -23,6 +23,7 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
+#include "options.h"
 
 #include <sstream>
 
@@ -215,10 +216,6 @@ static CBloomFilter doubleSpendFilter;
 void InitRespendFilter() {
     seed_insecure_rand();
     doubleSpendFilter = CBloomFilter(MAX_DOUBLESPEND_BLOOM, 0.01, insecure_rand(), BLOOM_UPDATE_NONE);
-}
-
-bool IsStealthMode() {
-    return GetBoolArg("-stealth-mode", false);
 }
 
 //////////////////////////////////////////////////////////////////////////////
@@ -1209,7 +1206,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                 doubleSpendFilter.clear();
             doubleSpendFilter.insert(relayForOutpoint);
 
-            if (!IsStealthMode())
+            if (!Opt().IsStealthMode())
                 RelayTransaction(tx);
         }
         else
@@ -4579,7 +4576,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             // Ignore duplicate advertisements for the same item from the same peer. This check
             // prevents a peer from constantly promising to deliver an item that it never does,
             // thus blinding us to new transactions and blocks.
-            if (!IsStealthMode() && !pfrom->AddInventoryKnown(inv))
+            if (!Opt().IsStealthMode() && !pfrom->AddInventoryKnown(inv))
                 continue;
 
             bool fAlreadyHave = AlreadyHave(inv);
@@ -4727,7 +4724,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
     else if (strCommand == "getutxos")
     {
-        if (!IsStealthMode()) {
+        if (!Opt().IsStealthMode()) {
             bool fCheckMemPool;
             vector<COutPoint> vOutPoints;
             vRecv >> fCheckMemPool;
