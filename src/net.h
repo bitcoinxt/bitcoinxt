@@ -52,6 +52,8 @@ static const unsigned int MAX_INV_SZ = 50000;
 static const unsigned int MAX_ADDR_TO_SEND = 1000;
 /** The maximum # of bytes to receive at once */
 static const int MAX_RECV_CHUNK = 256*1024;
+/** Maximum length of strSubVer in `version` message */
+static const unsigned int MAX_SUBVERSION_LENGTH = 256;
 
 /** -listen default */
 static const bool DEFAULT_LISTEN = true;

@@ -3,13 +3,14 @@
 
 #include <string>
 #include <memory>
+#include <vector>
 
 struct Opt {
     Opt();
 
     bool IsStealthMode();
     bool HidePlatform();
-
+    std::vector<std::string> UAComment(bool validate = false);
 };
 
 //
@@ -18,6 +19,7 @@ struct Opt {
 
 struct ArgGetter {
     virtual bool GetBool(const std::string& arg, bool def) = 0;
+    virtual std::vector<std::string> GetMultiArgs(const std::string& arg) = 0;
 };
 
 struct ArgReset {

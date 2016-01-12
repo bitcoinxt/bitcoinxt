@@ -152,12 +152,15 @@ std::string FormatSubVersion(const std::string& name, int nClientVersion, const 
  */
 std::string XTSubVersion()
 {
-    if (Opt().IsStealthMode())
-        return FormatSubVersion("Satoshi", CLIENT_VERSION, std::vector<std::string>(), "");
+    std::vector<std::string> comments = Opt().UAComment();
 
-    std::vector<std::string> comments;
-    if (!Opt().HidePlatform())
-        comments = GetPlatformDetails();
+    if (Opt().IsStealthMode())
+        return FormatSubVersion("Satoshi", CLIENT_VERSION, comments, "");
+
+    if (!Opt().HidePlatform()) {
+        std::vector<std::string> p = GetPlatformDetails();
+        comments.insert(comments.end(), p.begin(), p.end());
+    }
 
     return FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, comments, CLIENT_VERSION_XT_SUBVER);
 }
