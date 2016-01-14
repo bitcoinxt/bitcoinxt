@@ -197,8 +197,77 @@ namespace {
         int64_t nTime;  //! Time of "getdata" request in microseconds.
         bool fValidatedHeaders;  //! Whether this block has validated headers at the time of request.
         int64_t nTimeDisconnect; //! The timeout for this block request (for disconnecting a slow peer)
+        NodeId node;
     };
-    map<uint256, pair<NodeId, list<QueuedBlock>::iterator> > mapBlocksInFlight;
+    typedef list<QueuedBlock>::iterator QueuedBlockPtr;
+
+    struct InFlightIndex {
+        void erase(const QueuedBlockPtr& ptr) {
+            vector<QueuedBlockPtr>::iterator pos
+                = std::find(inFlight.begin(), inFlight.end(), ptr);
+
+            if (pos == inFlight.end()) {
+                LogPrintf("Warn: queued block ptr not found, can't erase");
+                return;
+            }
+
+            inFlight.erase(pos);
+        }
+
+        void erase(NodeId nodeid, const uint256& block) {
+            typedef std::vector<QueuedBlockPtr>::iterator auto_;
+            for (auto_ b = inFlight.begin(); b != inFlight.end(); ++b) {
+                if ((*b)->node == nodeid && (*b)->hash == block) {
+                    inFlight.erase(b);
+                    return;
+                }
+            }
+        }
+
+        void insert(const QueuedBlockPtr& queued) {
+            inFlight.push_back(queued);
+        }
+
+        bool isInFlight(const uint256& block) const {
+            typedef std::vector<QueuedBlockPtr>::const_iterator auto_;
+            for (auto_ b = inFlight.begin(); b != inFlight.end(); ++b)
+                if ((*b)->hash == block)
+                    return true;
+            return false;
+        }
+
+        std::set<NodeId> nodesWithQueued(const uint256& block) {
+            std::set<NodeId> ids;
+
+            typedef std::vector<QueuedBlockPtr>::const_iterator auto_;
+            std::vector<QueuedBlockPtr> queued = queuedPtrsFor(block);
+            for (auto_ b = queued.begin(); b != queued.end(); ++b)
+                ids.insert((*b)->node);
+
+            return ids;
+        }
+
+        std::vector<QueuedBlockPtr> queuedPtrsFor(uint256 block) {
+            std::vector<QueuedBlockPtr> q;
+
+            typedef std::vector<QueuedBlockPtr>::const_iterator auto_;
+            for (auto_ b = inFlight.begin(); b != inFlight.end(); ++b) {
+                if ((*b)->hash != block)
+                    continue;
+                q.push_back(*b);
+            }
+            return q;
+        }
+
+        void clear() {
+            inFlight.clear();
+        }
+
+        private:
+            vector<QueuedBlockPtr> inFlight;
+
+    };
+    InFlightIndex blocksInFlight;
 
     /** Number of blocks in flight with validated headers. */
     int nQueuedValidatedHeaders = 0;
@@ -422,7 +491,7 @@ void FinalizeNode(NodeId nodeid) {
     }
 
     BOOST_FOREACH(const QueuedBlock& entry, state->vBlocksInFlight)
-        mapBlocksInFlight.erase(entry.hash);
+        blocksInFlight.erase(nodeid, entry.hash);
     EraseOrphansFor(nodeid);
     nPreferredDownload -= state->fPreferredDownload;
 
@@ -433,41 +502,42 @@ void FinalizeNode(NodeId nodeid) {
 // Returns a bool indicating whether we requested this block.
 bool MarkBlockAsReceived(const uint256& hash) {
     AssertLockHeld(cs_main);
-    map<uint256, pair<NodeId, list<QueuedBlock>::iterator> >::iterator itInFlight = mapBlocksInFlight.find(hash);
-    if (itInFlight != mapBlocksInFlight.end()) {
-        int64_t getdataTime = itInFlight->second.second->nTime;
+    if (!blocksInFlight.isInFlight(hash))
+        return false;
+
+    std::vector<QueuedBlockPtr> queued = blocksInFlight.queuedPtrsFor(hash);
+    typedef std::vector<QueuedBlockPtr>::const_iterator auto_;
+    for (auto_ q = queued.begin(); q != queued.end(); ++q) {
+
+        int64_t getdataTime = (*q)->nTime;
         int64_t now = GetTimeMicros();
-        LogPrint("relayperf", "Received block %s in %.2f seconds\n", hash.ToString(), (now - getdataTime) / 1000000.0);
-        NodeStatePtr state(itInFlight->second.first);
-        nQueuedValidatedHeaders -= itInFlight->second.second->fValidatedHeaders;
-        state->nBlocksInFlightValidHeaders -= itInFlight->second.second->fValidatedHeaders;
-        state->vBlocksInFlight.erase(itInFlight->second.second);
+        LogPrint("relayperf", "Received block %s %.2f seconds after requesting it from peer %d\n", hash.ToString(), (now - getdataTime) / 1000000.0, ((*q)->node));
+        NodeStatePtr state((*q)->node);
+        nQueuedValidatedHeaders -= (*q)->fValidatedHeaders;
+        state->nBlocksInFlightValidHeaders -= (*q)->fValidatedHeaders;
+        state->vBlocksInFlight.erase(*q);
         state->nBlocksInFlight--;
         state->nStallingSince = 0;
-        mapBlocksInFlight.erase(itInFlight);
-        thinblockmgr.removeIfExists(hash);
-        return true;
+        blocksInFlight.erase(*q);
     }
-    return false;
+    thinblockmgr.removeIfExists(hash);
+    return !queued.empty();
 }
 
 // Requires cs_main.
 void MarkBlockAsInFlight(NodeId nodeid, const uint256& hash, const Consensus::Params& consensusParams, CBlockIndex *pindex = NULL) {
     AssertLockHeld(cs_main);
 
-    // Make sure it's not listed somewhere already.
-    MarkBlockAsReceived(hash);
-
     NodeStatePtr state(nodeid);
     assert(!state.IsNull());
 
     int64_t nNow = GetTimeMicros();
-    QueuedBlock newentry = {hash, pindex, nNow, pindex != NULL, GetBlockTimeout(nNow, nQueuedValidatedHeaders, consensusParams)};
+    QueuedBlock newentry = {hash, pindex, nNow, pindex != NULL, GetBlockTimeout(nNow, nQueuedValidatedHeaders, consensusParams), nodeid};
     nQueuedValidatedHeaders += newentry.fValidatedHeaders;
     list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
     state->nBlocksInFlight++;
     state->nBlocksInFlightValidHeaders += newentry.fValidatedHeaders;
-    mapBlocksInFlight[hash] = std::make_pair(nodeid, it);
+    blocksInFlight.insert(it);
 }
 
 /** Check whether the last unknown block a peer advertized is not yet known. */
@@ -524,7 +594,7 @@ CBlockIndex* LastCommonAncestor(CBlockIndex* pa, CBlockIndex* pb) {
 
 /** Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
  *  at most count entries. */
-void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex*>& vBlocks, NodeId& nodeStaller) {
+void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex*>& vBlocks, std::set<NodeId>& nodeStaller) {
     if (count == 0)
         return;
 
@@ -560,7 +630,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
     // download that next block if the window were 1 larger.
     int nWindowEnd = state->pindexLastCommonBlock->nHeight + BLOCK_DOWNLOAD_WINDOW;
     int nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
-    NodeId waitingfor = -1;
+    std::set<NodeId> waitingfor;
     while (pindexWalk->nHeight < nMaxHeight) {
         // Read up to 128 (or more, if more blocks than that are needed) successors of pindexWalk (towards
         // pindexBestKnownBlock) into vToFetch. We fetch 128, because CBlockIndex::GetAncestor may be as expensive
@@ -585,11 +655,11 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
             if (pindex->nStatus & BLOCK_HAVE_DATA || chainActive.Contains(pindex)) {
                 if (pindex->nChainTx)
                     state->pindexLastCommonBlock = pindex;
-            } else if (mapBlocksInFlight.count(pindex->GetBlockHash()) == 0) {
+            } else if (!blocksInFlight.isInFlight(pindex->GetBlockHash())) {
                 // The block is not already downloaded, and not yet in flight.
                 if (pindex->nHeight > nWindowEnd) {
                     // We reached the end of the window.
-                    if (vBlocks.size() == 0 && waitingfor != nodeid) {
+                    if (vBlocks.size() == 0 && !waitingfor.count(nodeid)) {
                         // We aren't able to fetch anything, but we would be if the download window was one larger.
                         nodeStaller = waitingfor;
                     }
@@ -599,9 +669,9 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
                 if (vBlocks.size() == count) {
                     return;
                 }
-            } else if (waitingfor == -1) {
+            } else if (waitingfor.empty()) {
                 // This is the first already-in-flight block.
-                waitingfor = mapBlocksInFlight[pindex->GetBlockHash()].first;
+                waitingfor = blocksInFlight.nodesWithQueued(pindex->GetBlockHash());
             }
         }
     }
@@ -3748,7 +3818,7 @@ void UnloadBlockIndex()
     nLastBlockFile = 0;
     nBlockSequenceId = 1;
     mapBlockSource.clear();
-    mapBlocksInFlight.clear();
+    blocksInFlight.clear();
     nQueuedValidatedHeaders = 0;
     nPreferredDownload = 0;
     setDirtyBlockIndex.clear();
@@ -4252,7 +4322,7 @@ bool AlmostSynced() {
 }
 
 bool FullBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, NodeId id) {
-    if (mapBlocksInFlight.count(inv.hash))
+    if (blocksInFlight.isInFlight(inv.hash))
         return false; // Already requested from a peer.
 
     if (!AlmostSynced())
@@ -4296,7 +4366,7 @@ bool ThinBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, NodeId id) {
 
     nodestate->thinblock->setToWork(inv.hash);
 
-    return !mapBlocksInFlight.count(inv.hash);
+    return !blocksInFlight.isInFlight(inv.hash);
 }
 
 // Handle "inv" message of type MSG_BLOCK
@@ -4323,7 +4393,7 @@ void ProcessInvMsgBlock(CNode* pfrom, CInv inv, std::vector<CInv>& toFetch) {
     // doing this will result in the received block being rejected as an orphan in case it is
     // not a direct successor.
 
-    if (headerFromMultiple || !mapBlocksInFlight.count(inv.hash)) {
+    if (headerFromMultiple || !blocksInFlight.isInFlight(inv.hash)) {
         pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), inv.hash);
         LogPrint("net", "getheaders (%d) %s to peer=%d\n",
                 pindexBestHeader->nHeight, inv.hash.ToString(), pfrom->id);
@@ -5850,8 +5920,8 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         vector<CInv> vGetData;
         if (!pto->fDisconnect && !pto->fClient && (fFetch || !IsInitialBlockDownload()) && statePtr->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
             vector<CBlockIndex*> vToDownload;
-            NodeId staller = -1;
-            FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - statePtr->nBlocksInFlight, vToDownload, staller);
+            std::set<NodeId> stallers;
+            FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - statePtr->nBlocksInFlight, vToDownload, stallers);
             BOOST_FOREACH(CBlockIndex *pindex, vToDownload) {
                 int type = ThinBlocksActive(pto)
                     ? MSG_FILTERED_BLOCK
@@ -5862,10 +5932,13 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                 LogPrint("net", "Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
                     pindex->nHeight, pto->id);
             }
-            if (statePtr->nBlocksInFlight == 0 && staller != -1) {
-                if (NodeStatePtr(staller)->nStallingSince == 0) {
-                    NodeStatePtr(staller)->nStallingSince = nNow;
-                    LogPrint("net", "Stall started peer=%d\n", staller);
+            if (statePtr->nBlocksInFlight == 0 && !stallers.empty()) {
+                typedef set<NodeId>::const_iterator auto_;
+                for (auto_ n = stallers.begin(); n != stallers.end(); ++n) {
+                    if (NodeStatePtr(*n)->nStallingSince == 0) {
+                        NodeStatePtr(*n)->nStallingSince = nNow;
+                        LogPrint("net", "Stall started peer=%d\n", *n);
+                    }
                 }
             }
         }
