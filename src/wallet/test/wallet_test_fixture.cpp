@@ -1,6 +1,6 @@
 #include "wallet/test/wallet_test_fixture.h"
 
-#include "rpcserver.h"
+#include "rpc/server.h"
 #include "wallet/db.h"
 #include "wallet/wallet.h"
 #include "init.h" // pwalletMain

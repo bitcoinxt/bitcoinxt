@@ -12,7 +12,7 @@
 #include "merkleblock.h"
 #include "net.h"
 #include "primitives/transaction.h"
-#include "rpcserver.h"
+#include "rpc/server.h"
 #include "script/script.h"
 #include "script/script_error.h"
 #include "script/sign.h"
