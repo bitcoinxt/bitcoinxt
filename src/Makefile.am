@@ -99,6 +99,7 @@ BITCOIN_CORE_H = \
   eccryptoverify.h \
   ecwrapper.h \
   hash.h \
+  inflightindex.h \
   init.h \
   ipgroups.h \
   key.h \
@@ -187,6 +188,7 @@ libbitcoin_server_a_SOURCES = \
   chain.cpp \
   checkpoints.cpp \
   curl_wrapper.cpp \
+  inflightindex.cpp \
   init.cpp \
   ipgroups.cpp \
   leakybucket.cpp \

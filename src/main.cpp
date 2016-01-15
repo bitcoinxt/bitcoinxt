@@ -12,6 +12,7 @@
 #include "checkpoints.h"
 #include "checkqueue.h"
 #include "consensus/validation.h"
+#include "inflightindex.h"
 #include "init.h"
 #include "merkleblock.h"
 #include "net.h"
@@ -190,83 +191,6 @@ namespace {
     boost::scoped_ptr<CRollingBloomFilter> recentRejects;
     uint256 hashRecentRejectsChainTip;
 
-    /** Blocks that are in flight, and that are in the queue to be downloaded. Protected by cs_main. */
-    struct QueuedBlock {
-        uint256 hash;
-        CBlockIndex *pindex;  //! Optional.
-        int64_t nTime;  //! Time of "getdata" request in microseconds.
-        bool fValidatedHeaders;  //! Whether this block has validated headers at the time of request.
-        int64_t nTimeDisconnect; //! The timeout for this block request (for disconnecting a slow peer)
-        NodeId node;
-    };
-    typedef list<QueuedBlock>::iterator QueuedBlockPtr;
-
-    struct InFlightIndex {
-        void erase(const QueuedBlockPtr& ptr) {
-            vector<QueuedBlockPtr>::iterator pos
-                = std::find(inFlight.begin(), inFlight.end(), ptr);
-
-            if (pos == inFlight.end()) {
-                LogPrintf("Warn: queued block ptr not found, can't erase");
-                return;
-            }
-
-            inFlight.erase(pos);
-        }
-
-        void erase(NodeId nodeid, const uint256& block) {
-            typedef std::vector<QueuedBlockPtr>::iterator auto_;
-            for (auto_ b = inFlight.begin(); b != inFlight.end(); ++b) {
-                if ((*b)->node == nodeid && (*b)->hash == block) {
-                    inFlight.erase(b);
-                    return;
-                }
-            }
-        }
-
-        void insert(const QueuedBlockPtr& queued) {
-            inFlight.push_back(queued);
-        }
-
-        bool isInFlight(const uint256& block) const {
-            typedef std::vector<QueuedBlockPtr>::const_iterator auto_;
-            for (auto_ b = inFlight.begin(); b != inFlight.end(); ++b)
-                if ((*b)->hash == block)
-                    return true;
-            return false;
-        }
-
-        std::set<NodeId> nodesWithQueued(const uint256& block) {
-            std::set<NodeId> ids;
-
-            typedef std::vector<QueuedBlockPtr>::const_iterator auto_;
-            std::vector<QueuedBlockPtr> queued = queuedPtrsFor(block);
-            for (auto_ b = queued.begin(); b != queued.end(); ++b)
-                ids.insert((*b)->node);
-
-            return ids;
-        }
-
-        std::vector<QueuedBlockPtr> queuedPtrsFor(uint256 block) {
-            std::vector<QueuedBlockPtr> q;
-
-            typedef std::vector<QueuedBlockPtr>::const_iterator auto_;
-            for (auto_ b = inFlight.begin(); b != inFlight.end(); ++b) {
-                if ((*b)->hash != block)
-                    continue;
-                q.push_back(*b);
-            }
-            return q;
-        }
-
-        void clear() {
-            inFlight.clear();
-        }
-
-        private:
-            vector<QueuedBlockPtr> inFlight;
-
-    };
     InFlightIndex blocksInFlight;
 
     /** Number of blocks in flight with validated headers. */
