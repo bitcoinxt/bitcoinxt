@@ -1,4 +1,4 @@
-// Copyright (c) 2015 The Bitcoin XT developers
+// Copyright (c) 2015-2016 The Bitcoin XT developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifndef BITCOIN_THINBLOCKBUILDER_H
@@ -25,6 +25,7 @@ inline TxFinder::~TxFinder() { }
 
 const size_t NOT_BUILDING = -1;
 
+// Assembles a block from it's merkle block and the individual transactions.
 class ThinBlockBuilder {
     public:
         ThinBlockBuilder(const CMerkleBlock& m, const TxFinder& txFinder);
@@ -65,15 +66,24 @@ struct ThinBlockFinishedCallb {
 };
 inline ThinBlockFinishedCallb::~ThinBlockFinishedCallb() { }
 
+// We call this to erase the nodes
+// in flight block queue item.
+struct InFlightEraser {
+    virtual void operator()(NodeId, const uint256& block) = 0;
+    virtual ~InFlightEraser() = 0;
+};
+inline InFlightEraser::~InFlightEraser() { }
+
 class ThinBlockWorker;
 
 // Keeps state of active thin block downloads.
 class ThinBlockManager : boost::noncopyable {
     public:
 
-        ThinBlockManager(std::auto_ptr<ThinBlockFinishedCallb> callb);
+        ThinBlockManager(std::auto_ptr<ThinBlockFinishedCallb> callb,
+                std::auto_ptr<InFlightEraser> inFlightEraser);
         void addWorker(const uint256& block, ThinBlockWorker& w);
-        void delWorker(ThinBlockWorker& w);
+        void delWorker(ThinBlockWorker& w, NodeId);
         int numWorkers(const uint256& block) const;
 
         void buildStub(const CMerkleBlock& m, const TxFinder& txFinder);
@@ -90,13 +100,16 @@ class ThinBlockManager : boost::noncopyable {
         };
         std::map<uint256, ActiveBuilder> builders;
         std::auto_ptr<ThinBlockFinishedCallb> finishedCallb;
+        std::auto_ptr<InFlightEraser> inFlightEraser;
 
         void finishBlock(const uint256& h);
 };
 
+// Each peer we're connected to can work on one thin block
+// at a time. This keeps track of the thin block a peer is working on.
 class ThinBlockWorker : boost::noncopyable {
     public:
-        ThinBlockWorker(ThinBlockManager& m, const uint256& block, NodeId);
+        ThinBlockWorker(ThinBlockManager& m, NodeId);
 
         ~ThinBlockWorker();
 

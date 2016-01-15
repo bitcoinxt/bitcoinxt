@@ -123,8 +123,9 @@ void ThinBlockBuilder::reset() {
 }
 
 ThinBlockManager::ThinBlockManager(
-        std::auto_ptr<ThinBlockFinishedCallb> callb) :
-    finishedCallb(callb.release())
+        std::auto_ptr<ThinBlockFinishedCallb> callb,
+        std::auto_ptr<InFlightEraser> inFlightEraser) :
+    finishedCallb(callb.release()), inFlightEraser(inFlightEraser.release())
 { }
 
 void ThinBlockManager::addWorker(const uint256& block, ThinBlockWorker& w) {
@@ -133,14 +134,17 @@ void ThinBlockManager::addWorker(const uint256& block, ThinBlockWorker& w) {
     builders[block].workers.insert(&w);
 }
 
-void ThinBlockManager::delWorker(ThinBlockWorker& w) {
+void ThinBlockManager::delWorker(ThinBlockWorker& w, NodeId nodeId) {
     typedef std::map<uint256, ActiveBuilder>::iterator auto_;
     for (auto_ a = builders.begin(); a != builders.end(); ++a) {
         if (!a->second.workers.erase(&w))
-            continue;
+            continue; // not working on block.
 
         if (a->second.workers.empty())
             builders.erase(a);
+
+        InFlightEraser& erase = *inFlightEraser;
+        erase(nodeId, a->first);
 
         return;
     }
@@ -235,16 +239,13 @@ void ThinBlockManager::finishBlock(const uint256& h) {
 }
 
 
-ThinBlockWorker::ThinBlockWorker(ThinBlockManager& m, const uint256& block,
-        NodeId nodeID) :
-    manager(m), block(block), isReRequesting(false), node(nodeID)
+ThinBlockWorker::ThinBlockWorker(ThinBlockManager& m, NodeId nodeID) :
+    manager(m), isReRequesting(false), node(nodeID)
 {
-    if (!block.IsNull())
-        manager.addWorker(block, *this);
 }
 
 ThinBlockWorker::~ThinBlockWorker() {
-    manager.delWorker(*this);
+    manager.delWorker(*this, node);
 }
 
 bool ThinBlockWorker::addTx(const CTransaction& tx) {
@@ -260,7 +261,9 @@ uint256 ThinBlockWorker::blockHash() const {
 }
 
 void ThinBlockWorker::setAvailable() {
-    manager.delWorker(*this);
+    if (isAvailable())
+        return;
+    manager.delWorker(*this, node);
     block.SetNull();
     isReRequesting = false;
 }
@@ -279,10 +282,11 @@ bool ThinBlockWorker::isStubBuilt() const {
 }
 
 void ThinBlockWorker::setToWork(const uint256& newblock) {
+    assert(!newblock.IsNull());
     if (newblock == block)
         return;
 
-    manager.delWorker(*this);
+    manager.delWorker(*this, node);
     block = newblock;
     isReRequesting = false;
     manager.addWorker(newblock, *this);

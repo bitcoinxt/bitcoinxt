@@ -7,6 +7,7 @@
 #include "merkleblock.h"
 #include "chainparams.h"
 #include "util.h" // for fPrintToDebugLog
+#include "inflightindex.h"
 #include <boost/test/unit_test_suite.hpp>
 #include <boost/test/test_tools.hpp>
 
@@ -38,13 +39,18 @@ struct DummyCallb : ThinBlockFinishedCallb {
     virtual void operator()(const CBlock&, const std::vector<NodeId>&) { }
 };
 
+struct DummyInFlightEraser : public InFlightEraser {
+    virtual void operator()(NodeId, const uint256& hash) { }
+};
+
 CBlock Block1();
 
 struct MerkleblockSetup {
 
     MerkleblockSetup() :
         mstream(SER_NETWORK, PROTOCOL_VERSION),
-        tmgr(std::auto_ptr<ThinBlockFinishedCallb>(new DummyCallb))
+        tmgr(std::auto_ptr<ThinBlockFinishedCallb>(new DummyCallb),
+             std::auto_ptr<InFlightEraser>(new DummyInFlightEraser))
     {
         CBloomFilter emptyFilter;
         mblock = CMerkleBlock(Block1(), emptyFilter);
@@ -69,7 +75,8 @@ BOOST_AUTO_TEST_CASE(ignore_if_has_block_data) {
     // Add block to mapBlockIndex (so we already have it)
     DummyBlockIndexEntry dummyEntry(mblock.header.GetHash());
 
-    ThinBlockWorker worker(tmgr, mblock.header.GetHash(), 42);
+    ThinBlockWorker worker(tmgr, 42);
+    worker.setToWork(mblock.header.GetHash());
     ProcessMerkleBlock(pfrom, mstream, worker, NullFinder());
 
     // peer should not be working on anything
@@ -82,7 +89,8 @@ BOOST_AUTO_TEST_CASE(ditches_old_block) {
     // provided a new one, we should switch it over to the new one.
     uint256 dummyhash;
     dummyhash.SetHex("0xBADF00D");
-    ThinBlockWorker worker(tmgr, dummyhash, 42);
+    ThinBlockWorker worker(tmgr, 42);
+    worker.setToWork(dummyhash);
     ProcessMerkleBlock(pfrom, mstream, worker, NullFinder());
 
     BOOST_CHECK_EQUAL(mblock.header.GetHash().ToString(),
@@ -93,8 +101,8 @@ BOOST_AUTO_TEST_CASE(ditches_old_block) {
 
 struct DummyWorker : public ThinBlockWorker {
 
-    DummyWorker(ThinBlockManager& m, const uint256& b, NodeId i) :
-        ThinBlockWorker(m, b, i), isBuilt(false), buildStubCalled(false)
+    DummyWorker(ThinBlockManager& m, NodeId i) :
+        ThinBlockWorker(m, i), isBuilt(false), buildStubCalled(false)
     { }
     virtual void buildStub(
         const CMerkleBlock& m, const TxFinder& txFinder) {
@@ -109,7 +117,8 @@ struct DummyWorker : public ThinBlockWorker {
 
 
 BOOST_AUTO_TEST_CASE(dont_rebuild_stub) {
-    DummyWorker worker(tmgr, mblock.header.GetHash(), 42);
+    DummyWorker worker(tmgr, 42);
+    worker.setToWork(mblock.header.GetHash());
     worker.isBuilt = true;
     ProcessMerkleBlock(pfrom, mstream, worker, NullFinder());
 
@@ -118,7 +127,8 @@ BOOST_AUTO_TEST_CASE(dont_rebuild_stub) {
 }
 
 BOOST_AUTO_TEST_CASE(build_stub) {
-    DummyWorker worker(tmgr, mblock.header.GetHash(), 42);
+    DummyWorker worker(tmgr, 42);
+    worker.setToWork(mblock.header.GetHash());
     worker.isBuilt = false;
     ProcessMerkleBlock(pfrom, mstream, worker, NullFinder());
 

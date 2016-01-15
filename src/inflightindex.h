@@ -31,6 +31,7 @@ struct InFlightIndex {
     bool isInFlight(const uint256& block) const;
     std::set<NodeId> nodesWithQueued(const uint256& block) const;
     std::vector<QueuedBlockPtr> queuedPtrsFor(const uint256& block) const;
+    QueuedBlockPtr queuedItem(NodeId, const uint256& block) const;
     void clear();
 
     private:

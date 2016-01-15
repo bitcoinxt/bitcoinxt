@@ -59,6 +59,15 @@ std::vector<QueuedBlockPtr> InFlightIndex::queuedPtrsFor(const uint256& block) c
     return q;
 }
 
+QueuedBlockPtr InFlightIndex::queuedItem(NodeId id, const uint256& block) const {
+    typedef std::vector<QueuedBlockPtr>::const_iterator auto_;
+    for (auto_ b = inFlight.begin(); b != inFlight.end(); ++b)
+        if ((*b)->node == id && (*b)->hash == block)
+            return *b;
+
+    return QueuedBlockPtr();
+}
+
 void InFlightIndex::clear() {
     inFlight.clear();
 }

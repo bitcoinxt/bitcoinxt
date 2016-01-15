@@ -39,18 +39,19 @@ void ProcessMerkleBlock(CNode& pfrom, CDataStream& vRecv,
     uint256 hash = merkleBlock.header.GetHash();
     pfrom.AddInventoryKnown(CInv(MSG_BLOCK, hash));
 
-    if (HaveBlockData(hash)) {
-        LogPrint("thin", "already had block %s, "
-            "ignoring merkleblock (peer %d)\n",
-            hash.ToString(), pfrom.id);
-        worker.setAvailable();
-        return;
-    }
 
     if (!worker.isAvailable() && worker.blockHash() != hash)
         LogPrint("thin", "expected peer %d to be working on %s, "
                 "but received block %s, switching peer to new block\n",
                 pfrom.id, worker.blockStr(), hash.ToString());
+
+    if (HaveBlockData(hash)) {
+        LogPrint("thin", "already had block %s, "
+                "ignoring merkleblock (peer %d)\n",
+                hash.ToString(), pfrom.id);
+        worker.setAvailable();
+        return;
+    }
 
     worker.setToWork(hash);
 

@@ -218,7 +218,8 @@ bool UsingThinBlocks() {
     return GetBoolArg("-use-thin-blocks", false);
 }
 
-/// Never request full block when we're cought up with the block chain.
+/// Avoid requesting full block when we're cought up with the block chain.
+/// Wait a short while for a thin block supporting node to announce it.
 bool AvoidFullBlocks() {
     return GetArg("-use-thin-blocks", 1) == 2;
 }
@@ -246,7 +247,12 @@ class OnBlockFinished : public ThinBlockFinishedCallb {
                 const std::vector<NodeId>& ids);
 };
 
-ThinBlockManager thinblockmgr(std::auto_ptr<ThinBlockFinishedCallb>(new OnBlockFinished()));
+struct InFlightEraserImpl : public InFlightEraser {
+    virtual void operator()(NodeId, const uint256& block);
+};
+ThinBlockManager thinblockmgr(
+        std::auto_ptr<ThinBlockFinishedCallb>(new OnBlockFinished()), 
+        std::auto_ptr<InFlightEraser>(new InFlightEraserImpl()));
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -314,7 +320,7 @@ struct CNodeState {
         nBlocksInFlightValidHeaders = 0;
         fPreferredDownload = false;
         thinBlockRerequesting = false;
-        thinblock.reset(new ThinBlockWorker(thinblockmgr, uint256(), id));
+        thinblock.reset(new ThinBlockWorker(thinblockmgr, id));
     }
 
 };
@@ -432,17 +438,10 @@ bool MarkBlockAsReceived(const uint256& hash) {
     std::vector<QueuedBlockPtr> queued = blocksInFlight.queuedPtrsFor(hash);
     typedef std::vector<QueuedBlockPtr>::const_iterator auto_;
     for (auto_ q = queued.begin(); q != queued.end(); ++q) {
-
-        int64_t getdataTime = (*q)->nTime;
-        int64_t now = GetTimeMicros();
-        LogPrint("relayperf", "Received block %s %.2f seconds after requesting it from peer %d\n", hash.ToString(), (now - getdataTime) / 1000000.0, ((*q)->node));
-        NodeStatePtr state((*q)->node);
-        nQueuedValidatedHeaders -= (*q)->fValidatedHeaders;
-        state->nBlocksInFlightValidHeaders -= (*q)->fValidatedHeaders;
-        state->vBlocksInFlight.erase(*q);
-        state->nBlocksInFlight--;
-        state->nStallingSince = 0;
-        blocksInFlight.erase(*q);
+        // Thin block downloads already have their queued item erased.
+        // Need to erase full block downloads here.
+        InFlightEraserImpl erase;
+        erase((*q)->node, hash);
     }
     thinblockmgr.removeIfExists(hash);
     return !queued.empty();
@@ -681,6 +680,28 @@ void OnBlockFinished::rejectAndPunish(const CValidationState& state,
     }
 }
 
+void InFlightEraserImpl::operator()(NodeId node, const uint256& hash) {
+    LOCK(cs_main);
+    QueuedBlockPtr q = blocksInFlight.queuedItem(node, hash);
+    if (q == QueuedBlockPtr()) {
+        LogPrint("relayperf", "Received block %s that was not marked as in flight from peer %d\n");
+        return;
+    }
+
+    NodeStatePtr state(q->node);
+    assert(!state.IsNull());
+    nQueuedValidatedHeaders -= q->fValidatedHeaders;
+    state->nBlocksInFlightValidHeaders -= q->fValidatedHeaders;
+    state->vBlocksInFlight.erase(q);
+    state->nBlocksInFlight--;
+    state->nStallingSince = 0;
+    blocksInFlight.erase(q);
+
+    int64_t getdataTime = q->nTime;
+    int64_t now = GetTimeMicros();
+    LogPrint("relayperf", "Received block %s %.2f seconds after requesting it from peer %d\n",
+            hash.ToString(), (now - getdataTime) / 1000000.0, (node));
+}
 
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
     NodeStatePtr state(nodeid);
@@ -4265,9 +4286,6 @@ bool ThinBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, NodeId id) {
     if (!AlmostSynced())
         return false;
 
-    // Thin blocks are only counted towards MAX_BLOCKS_IN_TRANSIT_PER_PEER
-    // for the first peer we request from. Maybe non should. Maby all.
-
     NodeStatePtr nodestate(id);
     if (!nodestate->thinblock->isAvailable()) {
         LogPrint("thin", "peer %d is busy, won't req %s\n",
@@ -4290,7 +4308,7 @@ bool ThinBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, NodeId id) {
 
     nodestate->thinblock->setToWork(inv.hash);
 
-    return !blocksInFlight.isInFlight(inv.hash);
+    return true;
 }
 
 // Handle "inv" message of type MSG_BLOCK
