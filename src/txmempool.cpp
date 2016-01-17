@@ -14,6 +14,7 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "version.h"
+#include "random.h"
 
 using namespace std;
 
@@ -236,6 +237,61 @@ void CTxMemPool::evictRandom(std::list<CTransaction>& evicted)
     // There is a small chance nothing will be evicted if the mempool is mostly
     // prioritised transactions. That's OK.
 }
+
+void CTxMemPool::evictRandomBytewise(std::list<CTransaction>& evicted)
+    // Find random transaction, weighted by size
+    // This code uses a hack to avoid searching through the whole mempool.
+    // It picks a random transaction, then scans for a random number of bytes
+    // (not to exceed 1 MB or the mempool size) and evicts the transaction 
+    // that is the random number of bytes away from the start
+{
+    uint64_t maxScanBytes;
+    uint64_t target1;
+    uint64_t target2;
+    uint64_t cursor;
+    std::pair<uint256, CTxMemPoolEntry> tx1;
+    std::pair<uint256, CTxMemPoolEntry> tx2;
+    // maxScanBytes should be larger than the biggest transaction
+    // but small enough to not slow down this method
+    maxScanBytes = 100000ull < GetTotalTxSize() ? 100000ull : GetTotalTxSize();
+
+    LOCK(cs);
+    if (mapTx.empty())
+        return;
+    for (int i = 0; i < 4; i++) {
+
+        target1 = GetRand(maxScanBytes-1)+1;
+        target2 = GetRand(maxScanBytes-1)+1;
+        cursor = 0;
+        map<uint256, CTxMemPoolEntry>::iterator it = mapTx.lower_bound(GetRandHash());
+        while (cursor < target1 || cursor < target2)
+        {
+            if (it == mapTx.end())
+                it = mapTx.begin();
+            it++;
+            cursor += it->second.GetTxSize();
+            if (cursor >= target1 && target1) { tx1.first = it->first; tx1.second = it->second; target1 = 0; }
+            if (cursor >= target2 && target2) { tx2.first = it->first; tx2.second = it->second; target2 = 0; }
+        }
+        bool pr1 = (mapDeltas.find(tx1.first) != mapDeltas.end());
+        bool pr2 = (mapDeltas.find(tx2.first) != mapDeltas.end());
+
+        if (pr1 && pr2) continue; // prioritized, try again
+        if (!tx1.second.GetTxSize() || !tx2.second.GetTxSize()) continue; // probably unnecessary
+
+        if (pr1) { remove(tx2.second.GetTx(), evicted, true); return; }
+        if (pr2) { remove(tx1.second.GetTx(), evicted, true); return; }
+
+        if (tx1.second.GetFee()/tx1.second.GetTxSize() < tx2.second.GetFee()/tx2.second.GetTxSize()) {
+            remove(tx1.second.GetTx(), evicted, true);
+        } else {
+            remove(tx2.second.GetTx(), evicted, true);
+        }
+        return;
+    }
+    LogPrint("mempool", "Failed to evict any transactions in CTxMemPool::evictRandomBytewise\n");
+}
+
 
 void CTxMemPool::clear()
 {

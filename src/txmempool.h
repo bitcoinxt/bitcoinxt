@@ -123,6 +123,7 @@ public:
     // evicted. If the memory pool is full of prioritised transactions, there is
     // a chance it will evict nothing.
     void evictRandom(std::list<CTransaction>& evicted);
+    void evictRandomBytewise(std::list<CTransaction>& evicted);
     void clear();
     void queryHashes(std::vector<uint256>& vtxid);
     void pruneSpent(const uint256& hash, CCoins &coins);

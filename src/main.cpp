@@ -1215,6 +1215,11 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             int64_t nDefaultMax = 25 * (int64_t)(maxBlockSize / 500);
             int64_t nMaxPoolTx = GetArg("-maxmempooltx", nDefaultMax);
 
+            // Default max mempool size: 50 blocks-worth of transactions
+            int64_t nDefaultMaxBytes = 50 * (int64_t)(maxBlockSize) * 275 / 100;
+            // approx 2.75 in-memory bytes per serialized tx byte
+            int64_t nMaxPoolBytes = GetArg("-maxmempoolbytes", nDefaultMaxBytes) * 100 / 275; 
+
             if (nMaxPoolTx <= 0) { // Zero or negative: don't limit
                 pool.addUnchecked(hash, entry, !IsInitialBlockDownload());
             }
@@ -1250,11 +1255,24 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                 list<CTransaction> evicted;
                 pool.evictRandom(evicted);
                 BOOST_FOREACH(const CTransaction &etx, evicted) {
-                    LogPrint("mempool", "mempool full, evicted %s\n", etx.GetHash().ToString());
+                    LogPrint("mempool", "mempool tx count full, evicted %s\n", etx.GetHash().ToString());
                     SyncWithWallets(etx, NULL, false);
                 }
                 if (!pool.exists(hash))
                     return false;
+            }
+            if (nMaxPoolBytes > 0 && (int64_t)pool.GetTotalTxSize() > nMaxPoolBytes) {
+                list<CTransaction> evicted;
+                pool.evictRandomBytewise(evicted);
+                BOOST_FOREACH(const CTransaction &etx, evicted) {
+                    LogPrint("mempool", "mempool size full, evicted %i byte %s\n", 
+                        etx.GetSerializeSize(SER_NETWORK, CTransaction::CURRENT_VERSION), 
+                        etx.GetHash().ToString());
+                    SyncWithWallets(etx, NULL, false);
+                }
+                if (!pool.exists(hash))
+                    return false;
+
             }
         }
     }
