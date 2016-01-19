@@ -509,4 +509,7 @@ extern CCoinsViewCache *pcoinsTip;
 /** Global variable that points to the active block tree (protected by cs_main) */
 extern CBlockTreeDB *pblocktree;
 
+/** Maximum size of a block */
+unsigned int MaxBlockSize(uint32_t nBlockTime);
+
 #endif // BITCOIN_MAIN_H
