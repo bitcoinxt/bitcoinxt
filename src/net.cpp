@@ -70,7 +70,7 @@ namespace {
 //
 bool fDiscover = true;
 bool fListen = true;
-uint64_t nLocalServices = NODE_NETWORK | NODE_GETUTXO;
+uint64_t nLocalServices = NODE_NETWORK | NODE_GETUTXO | NODE_BLOOM;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfReachable[NET_MAX] = {};
@@ -1852,6 +1852,17 @@ void RelayTransaction(const CTransaction& tx, const CDataStream& ss)
     }
 }
 
+bool FindTransactionInRelayMap(uint256 hash, CTransaction &out) {
+    LOCK(cs_mapRelay);
+    CInv inv(MSG_TX, hash);
+    map<CInv, CDataStream>::iterator mi = mapRelay.find(inv);
+    if (mi != mapRelay.end()) {
+        (*mi).second >> out;
+        return true;
+    }
+    return false;
+}
+
 void CNode::RecordBytesRecv(uint64_t bytes)
 {
     LOCK(cs_totalBytesRecv);
@@ -2018,7 +2029,7 @@ unsigned int SendBufferSize() { return 1000*GetArg("-maxsendbuffer", 1*1000); }
 CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fInboundIn) :
     ssSend(SER_NETWORK, INIT_PROTO_VERSION),
     addrKnown(5000, 0.001),
-    setInventoryKnown(SendBufferSize() / 1000)
+    filterInventoryKnown(50000, 0.000001)
 {
     nServices = 0;
     hSocket = hSocketIn;
@@ -2036,6 +2047,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     fWhitelisted = false;
     fOneShot = false;
     fClient = false; // set by version message
+    thinBlockNonce = 0;
     fInbound = fInboundIn;
     fNetworkNode = false;
     fSuccessfullyConnected = false;
@@ -2045,6 +2057,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     nSendOffset = 0;
     hashContinue = uint256();
     nStartingHeight = -1;
+    filterInventoryKnown.reset();
     fGetAddr = false;
     fRelayTxes = false;
     pfilter = new CBloomFilter();
@@ -2161,4 +2174,21 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         SocketSendData(this);
 
     LEAVE_CRITICAL_SECTION(cs_vSend);
+}
+
+bool CNode::SupportsBloom() const {
+    return nVersion < NO_BLOOM_VERSION || nServices & NODE_BLOOM;
+}
+
+bool CNode::SupportsThinBlocks() const {
+    if (!SupportsBloom())
+        return false;
+
+    // Before Bitcoin Core PR #7100 and Bitcoin XT PR #109 peers would
+    // only track 1000 inv entries in filterInventoryKnown - causing them
+    // to send us a lot more txs than we require for thin blocks.
+
+    // Some pre-releases of Bitcoin Core 0.12 have >= NO_BLOOM_VERSION, without
+    // this fix, so those will be a false positive.
+    return nVersion >= NO_BLOOM_VERSION;
 }

@@ -11,7 +11,6 @@
 #include "hash.h"
 #include "leakybucket.h"
 #include "limitedmap.h"
-#include "mruset.h"
 #include "netbase.h"
 #include "protocol.h"
 #include "random.h"
@@ -31,6 +30,7 @@
 #include <boost/filesystem/path.hpp>
 #include <boost/foreach.hpp>
 #include <boost/signals2/signal.hpp>
+#include <primitives/block.h>
 
 class CAddrMan;
 class CBlockIndex;
@@ -294,6 +294,10 @@ public:
     CBloomFilter* pfilter;
     int nRefCount;
     NodeId id;
+
+    // the nonce we expect to find in a pong message marking end of thin block tx data.
+    uint64_t thinBlockNonce;
+
 protected:
 
     // Denial-of-service detection/prevention
@@ -320,7 +324,7 @@ public:
     std::set<uint256> setKnown;
 
     // inventory based relay
-    mruset<CInv> setInventoryKnown;
+    CRollingBloomFilter filterInventoryKnown;
     std::vector<CInv> vInventoryToSend;
     CCriticalSection cs_inventory;
     std::multimap<int64_t, CInv> mapAskFor;
@@ -417,7 +421,10 @@ public:
     {
         {
             LOCK(cs_inventory);
-            return setInventoryKnown.insert(inv).second;
+            if (filterInventoryKnown.contains(inv.hash))
+                return false;
+            filterInventoryKnown.insert(inv.hash);
+            return true;
         }
     }
 
@@ -425,7 +432,7 @@ public:
     {
         {
             LOCK(cs_inventory);
-            if (!setInventoryKnown.count(inv))
+            if (!filterInventoryKnown.contains(inv.hash))
                 vInventoryToSend.push_back(inv);
         }
     }
@@ -632,6 +639,11 @@ public:
 
     static uint64_t GetTotalBytesRecv();
     static uint64_t GetTotalBytesSent();
+
+    // Node (probably) supports filter_* commands
+    bool SupportsBloom() const;
+
+    bool SupportsThinBlocks() const;
 };
 
 
@@ -639,6 +651,8 @@ public:
 class CTransaction;
 void RelayTransaction(const CTransaction& tx);
 void RelayTransaction(const CTransaction& tx, const CDataStream& ss);
+
+bool FindTransactionInRelayMap(uint256 hash, CTransaction &out);
 
 /** Access to the (IP) address database (peers.dat) */
 class CAddrDB

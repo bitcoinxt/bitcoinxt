@@ -12,6 +12,7 @@
 #include "checkpoints.h"
 #include "checkqueue.h"
 #include "consensus/validation.h"
+#include "inflightindex.h"
 #include "init.h"
 #include "merkleblock.h"
 #include "net.h"
@@ -24,8 +25,11 @@
 #include "utilmoneystr.h"
 #include "validationinterface.h"
 #include "options.h"
+#include "thinblockbuilder.h"
+#include "process_merkleblock.h"
 
 #include <sstream>
+#include <algorithm>
 
 #include <boost/dynamic_bitset.hpp>
 #include <boost/algorithm/string/replace.hpp>
@@ -182,20 +186,12 @@ namespace {
      * million to make it highly unlikely for users to have issues with this
      * filter.
      *
-     * Memory used: 1.7MB
+     * Memory used: 1.3 MB
      */
     boost::scoped_ptr<CRollingBloomFilter> recentRejects;
     uint256 hashRecentRejectsChainTip;
 
-    /** Blocks that are in flight, and that are in the queue to be downloaded. Protected by cs_main. */
-    struct QueuedBlock {
-        uint256 hash;
-        CBlockIndex *pindex;  //! Optional.
-        int64_t nTime;  //! Time of "getdata" request in microseconds.
-        bool fValidatedHeaders;  //! Whether this block has validated headers at the time of request.
-        int64_t nTimeDisconnect; //! The timeout for this block request (for disconnecting a slow peer)
-    };
-    map<uint256, pair<NodeId, list<QueuedBlock>::iterator> > mapBlocksInFlight;
+    InFlightIndex blocksInFlight;
 
     /** Number of blocks in flight with validated headers. */
     int nQueuedValidatedHeaders = 0;
@@ -217,6 +213,46 @@ void InitRespendFilter() {
     seed_insecure_rand();
     doubleSpendFilter = CBloomFilter(MAX_DOUBLESPEND_BLOOM, 0.01, insecure_rand(), BLOOM_UPDATE_NONE);
 }
+
+bool UsingThinBlocks() {
+    return GetBoolArg("-use-thin-blocks", false);
+}
+
+/// Avoid requesting full block when we're cought up with the block chain.
+/// Wait a short while for a thin block supporting node to announce it.
+bool AvoidFullBlocks() {
+    return GetArg("-use-thin-blocks", 1) == 2;
+}
+
+
+int ThinBlocksMaxParallel() {
+    return GetArg("-thin-blocks-max-parallel", 3);
+}
+
+class OnBlockFinished : public ThinBlockFinishedCallb {
+    public:
+        OnBlockFinished();
+        OnBlockFinished(const std::string& strCommand);
+
+        virtual void operator()(const CBlock& block, const std::vector<NodeId>& ids);
+
+    private:
+
+        const std::string strCommand;
+
+        bool hasWhitelistedNode(const std::vector<NodeId>& ids) const;
+        CNode* pickBlockSource(const std::vector<NodeId>& ids);
+        void updateRecentTxs(const CBlock& block, const std::vector<NodeId>& ids);
+        void rejectAndPunish(const CValidationState& state, const uint256& hash,
+                const std::vector<NodeId>& ids);
+};
+
+struct InFlightEraserImpl : public InFlightEraser {
+    virtual void operator()(NodeId, const uint256& block);
+};
+ThinBlockManager thinblockmgr(
+        std::auto_ptr<ThinBlockFinishedCallb>(new OnBlockFinished()), 
+        std::auto_ptr<InFlightEraser>(new InFlightEraserImpl()));
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -266,7 +302,12 @@ struct CNodeState {
     //! Whether we consider this a preferred download peer.
     bool fPreferredDownload;
 
-    CNodeState() {
+    //! the thin block the node is currently providing to us
+    boost::shared_ptr<ThinBlockWorker> thinblock;
+    std::set<uint256> recentThinBlockTx;
+    bool thinBlockRerequesting;
+
+    CNodeState(NodeId id) {
         fCurrentlyConnected = false;
         nMisbehavior = 0;
         fShouldBan = false;
@@ -278,7 +319,10 @@ struct CNodeState {
         nBlocksInFlight = 0;
         nBlocksInFlightValidHeaders = 0;
         fPreferredDownload = false;
+        thinBlockRerequesting = false;
+        thinblock.reset(new ThinBlockWorker(thinblockmgr, id));
     }
+
 };
 
 // Class that maintains per-node state, and
@@ -293,7 +337,7 @@ private:
 public:
     static void insert(NodeId nodeid, const CNode *pnode) {
         LOCK(cs_mapNodeState);
-        CNodeState &state = mapNodeState.insert(std::make_pair(nodeid, CNodeState())).first->second;
+        CNodeState &state = mapNodeState.insert(std::make_pair(nodeid, CNodeState(nodeid))).first->second;
         state.name = pnode->addrName;
         state.address = pnode->addr;
     }
@@ -377,7 +421,7 @@ void FinalizeNode(NodeId nodeid) {
     }
 
     BOOST_FOREACH(const QueuedBlock& entry, state->vBlocksInFlight)
-        mapBlocksInFlight.erase(entry.hash);
+        blocksInFlight.erase(nodeid, entry.hash);
     EraseOrphansFor(nodeid);
     nPreferredDownload -= state->fPreferredDownload;
 
@@ -388,37 +432,35 @@ void FinalizeNode(NodeId nodeid) {
 // Returns a bool indicating whether we requested this block.
 bool MarkBlockAsReceived(const uint256& hash) {
     AssertLockHeld(cs_main);
-    map<uint256, pair<NodeId, list<QueuedBlock>::iterator> >::iterator itInFlight = mapBlocksInFlight.find(hash);
-    if (itInFlight != mapBlocksInFlight.end()) {
-        NodeStatePtr state(itInFlight->second.first);
-        nQueuedValidatedHeaders -= itInFlight->second.second->fValidatedHeaders;
-        state->nBlocksInFlightValidHeaders -= itInFlight->second.second->fValidatedHeaders;
-        state->vBlocksInFlight.erase(itInFlight->second.second);
-        state->nBlocksInFlight--;
-        state->nStallingSince = 0;
-        mapBlocksInFlight.erase(itInFlight);
-        return true;
+    if (!blocksInFlight.isInFlight(hash))
+        return false;
+
+    std::vector<QueuedBlockPtr> queued = blocksInFlight.queuedPtrsFor(hash);
+    typedef std::vector<QueuedBlockPtr>::const_iterator auto_;
+    for (auto_ q = queued.begin(); q != queued.end(); ++q) {
+        // Thin block downloads already have their queued item erased.
+        // Need to erase full block downloads here.
+        InFlightEraserImpl erase;
+        erase((*q)->node, hash);
     }
-    return false;
+    thinblockmgr.removeIfExists(hash);
+    return !queued.empty();
 }
 
 // Requires cs_main.
 void MarkBlockAsInFlight(NodeId nodeid, const uint256& hash, const Consensus::Params& consensusParams, CBlockIndex *pindex = NULL) {
     AssertLockHeld(cs_main);
 
-    // Make sure it's not listed somewhere already.
-    MarkBlockAsReceived(hash);
-
     NodeStatePtr state(nodeid);
     assert(!state.IsNull());
 
     int64_t nNow = GetTimeMicros();
-    QueuedBlock newentry = {hash, pindex, nNow, pindex != NULL, GetBlockTimeout(nNow, nQueuedValidatedHeaders, consensusParams)};
+    QueuedBlock newentry = {hash, pindex, nNow, pindex != NULL, GetBlockTimeout(nNow, nQueuedValidatedHeaders, consensusParams), nodeid};
     nQueuedValidatedHeaders += newentry.fValidatedHeaders;
     list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
     state->nBlocksInFlight++;
     state->nBlocksInFlightValidHeaders += newentry.fValidatedHeaders;
-    mapBlocksInFlight[hash] = std::make_pair(nodeid, it);
+    blocksInFlight.insert(it);
 }
 
 /** Check whether the last unknown block a peer advertized is not yet known. */
@@ -475,7 +517,7 @@ CBlockIndex* LastCommonAncestor(CBlockIndex* pa, CBlockIndex* pb) {
 
 /** Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
  *  at most count entries. */
-void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex*>& vBlocks, NodeId& nodeStaller) {
+void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex*>& vBlocks, std::set<NodeId>& nodeStaller) {
     if (count == 0)
         return;
 
@@ -511,7 +553,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
     // download that next block if the window were 1 larger.
     int nWindowEnd = state->pindexLastCommonBlock->nHeight + BLOCK_DOWNLOAD_WINDOW;
     int nMaxHeight = std::min<int>(state->pindexBestKnownBlock->nHeight, nWindowEnd + 1);
-    NodeId waitingfor = -1;
+    std::set<NodeId> waitingfor;
     while (pindexWalk->nHeight < nMaxHeight) {
         // Read up to 128 (or more, if more blocks than that are needed) successors of pindexWalk (towards
         // pindexBestKnownBlock) into vToFetch. We fetch 128, because CBlockIndex::GetAncestor may be as expensive
@@ -536,11 +578,11 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
             if (pindex->nStatus & BLOCK_HAVE_DATA || chainActive.Contains(pindex)) {
                 if (pindex->nChainTx)
                     state->pindexLastCommonBlock = pindex;
-            } else if (mapBlocksInFlight.count(pindex->GetBlockHash()) == 0) {
+            } else if (!blocksInFlight.isInFlight(pindex->GetBlockHash())) {
                 // The block is not already downloaded, and not yet in flight.
                 if (pindex->nHeight > nWindowEnd) {
                     // We reached the end of the window.
-                    if (vBlocks.size() == 0 && waitingfor != nodeid) {
+                    if (vBlocks.size() == 0 && !waitingfor.count(nodeid)) {
                         // We aren't able to fetch anything, but we would be if the download window was one larger.
                         nodeStaller = waitingfor;
                     }
@@ -550,15 +592,116 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
                 if (vBlocks.size() == count) {
                     return;
                 }
-            } else if (waitingfor == -1) {
+            } else if (waitingfor.empty()) {
                 // This is the first already-in-flight block.
-                waitingfor = mapBlocksInFlight[pindex->GetBlockHash()].first;
+                waitingfor = blocksInFlight.nodesWithQueued(pindex->GetBlockHash());
             }
         }
     }
 }
 
 } // anon namespace
+
+OnBlockFinished::OnBlockFinished() { }
+OnBlockFinished::OnBlockFinished(const std::string& strCommand) : strCommand(strCommand) { }
+
+void OnBlockFinished::operator()(const CBlock& block, const std::vector<NodeId>& ids) {
+    AssertLockHeld(cs_main);
+    CBlock copy(block);
+    CValidationState state;
+    ProcessNewBlock(state, pickBlockSource(ids), &copy,
+            hasWhitelistedNode(ids), NULL);
+    updateRecentTxs(block, ids);
+    rejectAndPunish(state, block.GetHash(), ids);
+}
+
+/// Did a whitelisted node help with this block?
+bool OnBlockFinished::hasWhitelistedNode(const std::vector<NodeId>& ids) const {
+    LOCK(cs_vNodes);
+    BOOST_FOREACH(CNode* pnode, vNodes) {
+        if (std::find(ids.begin(), ids.end(), pnode->id) == ids.end())
+            continue;
+        if (pnode->fWhitelisted)
+            return true;
+    }
+    return false;
+}
+
+/// Pick a node to be block source.
+/// FIXME: All nodes should be marked as source.
+CNode* OnBlockFinished::pickBlockSource(const std::vector<NodeId>& ids) {
+    LOCK(cs_vNodes);
+    BOOST_FOREACH(CNode* pnode, vNodes) {
+        if (std::find(ids.begin(), ids.end(), pnode->id) == ids.end())
+            continue;
+        return pnode;
+    }
+    return NULL;
+}
+
+void OnBlockFinished::updateRecentTxs(const CBlock& block, const std::vector<NodeId>& ids) {
+    // Store hases of block with node, so we can ignore late tx messages
+    std::set<uint256> txs;
+    typedef std::vector<CTransaction>::const_iterator auto__;
+    for (auto__ t = block.vtx.begin(); t != block.vtx.end(); ++t)
+        txs.insert(t->GetHash());
+
+    typedef std::vector<NodeId>::const_iterator auto_;
+    for (auto_ n = ids.begin(); n != ids.end(); ++n) {
+        NodeStatePtr ns(*n);
+        if (ns.IsNull()) continue;
+        ns->recentThinBlockTx = txs;
+    }
+}
+
+void OnBlockFinished::rejectAndPunish(const CValidationState& state,
+        const uint256& hash, const std::vector<NodeId>& ids) {
+    int dos;
+    if (!state.IsInvalid(dos))
+        return;
+
+    const std::string reason = state.GetRejectReason();
+
+    LogPrintf("Invalid block due to %s\n", reason.c_str());
+
+    LOCK(cs_vNodes);
+    BOOST_FOREACH(CNode* pnode, vNodes) {
+        if (std::find(ids.begin(), ids.end(), pnode->id) == ids.end())
+            continue;
+
+        if (!strCommand.empty())
+            pnode->PushMessage("reject", strCommand, state.GetRejectCode(),
+                    reason.substr(0, MAX_REJECT_MESSAGE_LENGTH), hash);
+        if (dos <= 0)
+            continue;
+
+        AssertLockHeld(cs_main);
+        Misbehaving(pnode->id, dos);
+    }
+}
+
+void InFlightEraserImpl::operator()(NodeId node, const uint256& hash) {
+    LOCK(cs_main);
+    QueuedBlockPtr q = blocksInFlight.queuedItem(node, hash);
+    if (q == QueuedBlockPtr()) {
+        LogPrint("relayperf", "Received block %s that was not marked as in flight from peer %d\n");
+        return;
+    }
+
+    NodeStatePtr state(q->node);
+    assert(!state.IsNull());
+    nQueuedValidatedHeaders -= q->fValidatedHeaders;
+    state->nBlocksInFlightValidHeaders -= q->fValidatedHeaders;
+    state->vBlocksInFlight.erase(q);
+    state->nBlocksInFlight--;
+    state->nStallingSince = 0;
+    blocksInFlight.erase(q);
+
+    int64_t getdataTime = q->nTime;
+    int64_t now = GetTimeMicros();
+    LogPrint("relayperf", "Received block %s %.2f seconds after requesting it from peer %d\n",
+            hash.ToString(), (now - getdataTime) / 1000000.0, (node));
+}
 
 bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
     NodeStatePtr state(nodeid);
@@ -1032,9 +1175,15 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         return error("AcceptToMemoryPool: CheckTransaction failed");
 
     // Coinbase is only valid in a block, not as a loose transaction
-    if (tx.IsCoinBase())
-        return state.DoS(100, error("AcceptToMemoryPool: coinbase as individual tx"),
+    if (tx.IsCoinBase()) {
+        // FIXME: In some cases we request a merkleblock, but the node provides another
+        // merkleblock first, followed by the one we expect. Only that we don't expect
+        // the one we requested first anymore (because it provided another).
+        // Don't ban it for sending us the coinbase of the block we requested.
+        int dos = UsingThinBlocks() ? 10 : 100;
+        return state.DoS(dos, error("AcceptToMemoryPool: coinbase as individual tx"),
                          REJECT_INVALID, "coinbase");
+    }
 
     // Rather not work on nonstandard transactions (unless -testnet/-regtest)
     string reason;
@@ -1401,8 +1550,10 @@ bool IsInitialBlockDownload()
         return false;
     bool state = (chainActive.Height() < pindexBestHeader->nHeight - 24 * 6 ||
             pindexBestHeader->GetBlockTime() < GetTime() - 24 * 60 * 60);
-    if (!state)
+    if (!state) {
         lockIBDState = true;
+        LogPrintf("No longer initial block download\n");
+    }
     return state;
 }
 
@@ -3612,7 +3763,7 @@ void UnloadBlockIndex()
     nLastBlockFile = 0;
     nBlockSequenceId = 1;
     mapBlockSource.clear();
-    mapBlocksInFlight.clear();
+    blocksInFlight.clear();
     nQueuedValidatedHeaders = 0;
     nPreferredDownload = 0;
     setDirtyBlockIndex.clear();
@@ -4105,6 +4256,111 @@ bool static AlreadyHave(const CInv& inv)
     return true;
 }
 
+namespace processinv {
+
+bool WeWantBlock(const uint256& block) {
+    return !(IsInitialBlockDownload() || mapBlockIndex.count(block));
+}
+
+bool AlmostSynced() {
+    return chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - Params().GetConsensus().nPowTargetSpacing * 20;
+}
+
+bool FullBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, NodeId id) {
+    if (blocksInFlight.isInFlight(inv.hash))
+        return false; // Already requested from a peer.
+
+    if (!AlmostSynced())
+        return false;
+
+    NodeStatePtr nodestate(id);
+    if (nodestate->nBlocksInFlight >= MAX_BLOCKS_IN_TRANSIT_PER_PEER)
+        return false;
+
+    toFetch.push_back(inv);
+    return true;
+}
+
+bool ThinBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, NodeId id) {
+
+    if (!AlmostSynced())
+        return false;
+
+    NodeStatePtr nodestate(id);
+    if (!nodestate->thinblock->isAvailable()) {
+        LogPrint("thin", "peer %d is busy, won't req %s\n",
+            id, inv.hash.ToString());
+        return false;
+    }
+
+    int numDownloading = thinblockmgr.numWorkers(inv.hash);
+    if (numDownloading >= ThinBlocksMaxParallel()) {
+        LogPrint("thin", "max parallel thin req reached, not req %s from peer %d\n",
+                inv.hash.ToString(), id);
+        return false;
+    }
+
+    LogPrint("thin", "requesting %s from peer %d (%d of %d parallel)\n",
+            inv.hash.ToString(), id, (numDownloading + 1), ThinBlocksMaxParallel());
+    CInv thinFetchInv(inv);
+    thinFetchInv.type = MSG_FILTERED_BLOCK;
+    toFetch.push_back(thinFetchInv);
+
+    nodestate->thinblock->setToWork(inv.hash);
+
+    return true;
+}
+
+// Handle "inv" message of type MSG_BLOCK
+void ProcessInvMsgBlock(CNode* pfrom, CInv inv, std::vector<CInv>& toFetch) {
+    AssertLockHeld(cs_main);
+    UpdateBlockAvailability(pfrom->GetId(), inv.hash);
+
+    if (!WeWantBlock(inv.hash))
+        return;
+
+    // Headers must arrive before data. We can't know if headers from the first
+    // node has reached us before block from the second node, so as long as we
+    // haven't yet received  headers, we'll request if from all to enforce correct sequence.
+    // Receiving duplicate headers is fine.
+    bool headerFromMultiple = UsingThinBlocks() && pfrom->SupportsThinBlocks()
+        && thinblockmgr.numWorkers(inv.hash) < ThinBlocksMaxParallel();
+
+    // First request the headers preceding the announced block. In the normal fully-synced
+    // case where a new block is announced that succeeds the current tip (no reorganization),
+    // there are no such headers.
+    // Secondly, and only when we are close to being synced, we request the announced block directly,
+    // to avoid an extra round-trip. Note that we must *first* ask for the headers, so by the
+    // time the block arrives, the header chain leading up to it is already validated. Not
+    // doing this will result in the received block being rejected as an orphan in case it is
+    // not a direct successor.
+
+    if (headerFromMultiple || !blocksInFlight.isInFlight(inv.hash)) {
+        pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), inv.hash);
+        LogPrint("net", "getheaders (%d) %s to peer=%d\n",
+                pindexBestHeader->nHeight, inv.hash.ToString(), pfrom->id);
+    }
+
+    bool markAsInFlight = false;
+    if (pfrom->SupportsThinBlocks() && UsingThinBlocks())
+        markAsInFlight = ThinBlockDownload(inv, toFetch, pfrom->id);
+
+    else if (AvoidFullBlocks()) {
+        LogPrint("thin", "avoiding full blocks, not requesting %s from %d\n",
+                inv.hash.ToString(), pfrom->id);
+        return;
+    }
+    else {
+        LogPrint("thin", "full block download of %s from %d\n",
+                inv.hash.ToString(), pfrom->id);
+        markAsInFlight = FullBlockDownload(inv, toFetch, pfrom->id);
+    }
+
+    if (markAsInFlight)
+        MarkBlockAsInFlight(pfrom->id, inv.hash, Params().GetConsensus());
+}
+} // ns processinv
+
 void static ProcessGetData(CNode* pfrom)
 {
     std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
@@ -4169,8 +4425,7 @@ void static ProcessGetData(CNode* pfrom)
                             // however we MUST always provide at least what the remote peer needs
                             typedef std::pair<unsigned int, uint256> PairType;
                             BOOST_FOREACH(PairType& pair, merkleBlock.vMatchedTxn)
-                                if (!pfrom->setInventoryKnown.count(CInv(MSG_TX, pair.second)))
-                                    pfrom->PushMessage("tx", block.vtx[pair.first]);
+                                pfrom->PushMessage("tx", block.vtx[pair.first]);
                         }
                         // else
                             // no response
@@ -4327,9 +4582,41 @@ bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, ve
 }
 
 
+// Looks for a transaction in our various pools and buffers.
+// Used for reconstructing thin blocks.
+struct TxFinderImpl : public TxFinder {
+
+    CTransaction operator()(const uint256& hash) const {
+        AssertLockHeld(cs_main);
+        CTransaction tx;
+
+        if (mempool.lookup(hash, tx))
+            return tx;
+
+        if (mapOrphanTransactions.count(hash))
+            return mapOrphanTransactions[hash].tx;
+
+        // if not found, tx is left alone.
+        try {
+            FindTransactionInRelayMap(hash, tx);
+        }
+        catch (const std::ios_base::failure& e) {
+            LogPrint("Exception '%s' in FindTransactionInRelayMap ignored\n", e.what());
+            return CTransaction();
+        }
+
+        return tx;
+    }
+};
+
+// Activate thin blocks only if we're not doing bulk downloads (it's faster to use ordinary block messages when
+// catching up with the block chain).
+bool ThinBlocksActive(CNode* n) {
+    return !IsInitialBlockDownload() && UsingThinBlocks() && n->SupportsThinBlocks();
+}
+
 bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived)
 {
-    const CChainParams& chainparams = Params();
     RandAddSeedPerfmon();
     LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
@@ -4385,6 +4672,14 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         if (nNonce == nLocalHostNonce && nNonce > 1)
         {
             LogPrintf("connected to self at %s, disconnecting\n", pfrom->addr.ToString());
+            pfrom->fDisconnect = true;
+            return true;
+        }
+
+        // Disconnect outbound connection if we need bloom filter,
+        // but peer does not provide it.
+        if (UsingThinBlocks() && !pfrom->fInbound && !pfrom->SupportsThinBlocks()) {
+            LogPrintf("peer %d does not support thin blocks, disconnecting\n", pfrom->id);
             pfrom->fDisconnect = true;
             return true;
         }
@@ -4465,6 +4760,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         int64_t nTimeOffset = nTime - GetTime();
         pfrom->nTimeOffset = nTimeOffset;
         AddTimeData(pfrom->addr, nTimeOffset);
+
+        if (ThinBlocksActive(pfrom))
+        {
+            LogPrint("thin", "Enabling thin blocks on peer %d\n", pfrom->id);
+            pfrom->PushMessage("filterload", CBloomFilter());
+	}
     }
 
 
@@ -4586,27 +4887,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                 pfrom->AskFor(inv);
 
             if (inv.type == MSG_BLOCK) {
-                UpdateBlockAvailability(pfrom->GetId(), inv.hash);
-                if (!fAlreadyHave && !fImporting && !fReindex && !mapBlocksInFlight.count(inv.hash)) {
-                    // First request the headers preceding the announced block. In the normal fully-synced
-                    // case where a new block is announced that succeeds the current tip (no reorganization),
-                    // there are no such headers.
-                    // Secondly, and only when we are close to being synced, we request the announced block directly,
-                    // to avoid an extra round-trip. Note that we must *first* ask for the headers, so by the
-                    // time the block arrives, the header chain leading up to it is already validated. Not
-                    // doing this will result in the received block being rejected as an orphan in case it is
-                    // not a direct successor.
-                    pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), inv.hash);
-                    NodeStatePtr nodestate(pfrom->GetId());
-                    if (chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - chainparams.GetConsensus().nPowTargetSpacing * 20 &&
-                        nodestate->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
-                        vToFetch.push_back(inv);
-                        // Mark block as in flight already, even though the actual "getdata" message only goes out
-                        // later (within the same cs_main lock, though).
-                        MarkBlockAsInFlight(pfrom->GetId(), inv.hash, chainparams.GetConsensus());
-                    }
-                    LogPrint("net", "getheaders (%d) %s to peer=%d\n", pindexBestHeader->nHeight, inv.hash.ToString(), pfrom->id);
-                }
+                processinv::ProcessInvMsgBlock(pfrom, inv, vToFetch);
             }
 
             // Track requests for our stuff
@@ -4752,114 +5033,121 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         LOCK(cs_main);
 
-        bool fMissingInputs = false;
-        CValidationState state;
+        NodeStatePtr nodestate(pfrom->GetId());
 
-        mapAlreadyAskedFor.erase(inv);
+        bool tryMempool = nodestate->thinblock->isAvailable() || !nodestate->thinblock->addTx(tx);
 
-        if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
-        {
-            mempool.check(pcoinsTip);
-            RelayTransaction(tx);
-            vWorkQueue.push_back(inv.hash);
+        // tx may belong to recently finished thin block. In that case
+        // we don't want to try mempool, node may get banned for sending is coinbase tx.
+        tryMempool = tryMempool && !nodestate->recentThinBlockTx.count(tx.GetHash());
 
-            LogPrint("mempool", "AcceptToMemoryPool: peer=%d %s: accepted %s (poolsz %u)\n",
-                pfrom->id, pfrom->cleanSubVer,
-                tx.GetHash().ToString(),
-                mempool.size());
+        if (tryMempool) {
+            bool fMissingInputs = false;
+            CValidationState state;
 
-            // Recursively process any orphan transactions that depended on this one
-            set<NodeId> setMisbehaving;
-            for (unsigned int i = 0; i < vWorkQueue.size(); i++)
+            mapAlreadyAskedFor.erase(inv);
+        
+            if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
             {
-                map<uint256, set<uint256> >::iterator itByPrev = mapOrphanTransactionsByPrev.find(vWorkQueue[i]);
-                if (itByPrev == mapOrphanTransactionsByPrev.end())
-                    continue;
-                for (set<uint256>::iterator mi = itByPrev->second.begin();
-                     mi != itByPrev->second.end();
-                     ++mi)
+                mempool.check(pcoinsTip);
+                RelayTransaction(tx);
+                vWorkQueue.push_back(inv.hash);
+
+                LogPrint("mempool", "AcceptToMemoryPool: peer=%d %s: accepted %s (poolsz %u)\n",
+                    pfrom->id, pfrom->cleanSubVer,
+                    tx.GetHash().ToString(),
+                    mempool.size());
+
+                // Recursively process any orphan transactions that depended on this one
+                set<NodeId> setMisbehaving;
+                for (unsigned int i = 0; i < vWorkQueue.size(); i++)
                 {
-                    const uint256& orphanHash = *mi;
-                    const CTransaction& orphanTx = mapOrphanTransactions[orphanHash].tx;
-                    NodeId fromPeer = mapOrphanTransactions[orphanHash].fromPeer;
-                    bool fMissingInputs2 = false;
-                    // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
-                    // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
-                    // anyone relaying LegitTxX banned)
-                    CValidationState stateDummy;
-
-
-                    if (setMisbehaving.count(fromPeer))
+                    map<uint256, set<uint256> >::iterator itByPrev = mapOrphanTransactionsByPrev.find(vWorkQueue[i]);
+                    if (itByPrev == mapOrphanTransactionsByPrev.end())
                         continue;
-                    if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
+                    for (set<uint256>::iterator mi = itByPrev->second.begin();
+                         mi != itByPrev->second.end();
+                         ++mi)
                     {
-                        LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
-                        RelayTransaction(orphanTx);
-                        vWorkQueue.push_back(orphanHash);
-                        vEraseQueue.push_back(orphanHash);
-                    }
-                    else if (!fMissingInputs2)
-                    {
-                        int nDos = 0;
-                        if (stateDummy.IsInvalid(nDos) && nDos > 0)
+                        const uint256& orphanHash = *mi;
+                        const CTransaction& orphanTx = mapOrphanTransactions[orphanHash].tx;
+                        NodeId fromPeer = mapOrphanTransactions[orphanHash].fromPeer;
+                        bool fMissingInputs2 = false;
+                        // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
+                        // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
+                        // anyone relaying LegitTxX banned)
+                        CValidationState stateDummy;
+
+
+                        if (setMisbehaving.count(fromPeer))
+                            continue;
+                        if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
                         {
-                            // Punish peer that gave us an invalid orphan tx
-                            Misbehaving(fromPeer, nDos);
-                            setMisbehaving.insert(fromPeer);
-                            LogPrint("mempool", "   invalid orphan tx %s\n", orphanHash.ToString());
+                            LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
+                            RelayTransaction(orphanTx);
+                            vWorkQueue.push_back(orphanHash);
+                            vEraseQueue.push_back(orphanHash);
                         }
-                        // Has inputs but not accepted to mempool
-                        // Probably non-standard or insufficient fee/priority
-                        LogPrint("mempool", "   removed orphan tx %s\n", orphanHash.ToString());
-                        vEraseQueue.push_back(orphanHash);
-                        assert(recentRejects);
-                        recentRejects->insert(orphanHash);
+                        else if (!fMissingInputs2)
+                        {
+                            int nDos = 0;
+                            if (stateDummy.IsInvalid(nDos) && nDos > 0)
+                            {
+                                // Punish peer that gave us an invalid orphan tx
+                                Misbehaving(fromPeer, nDos);
+                                setMisbehaving.insert(fromPeer);
+                                LogPrint("mempool", "   invalid orphan tx %s\n", orphanHash.ToString());
+                            }
+                            // Has inputs but not accepted to mempool
+                            // Probably non-standard or insufficient fee/priority
+                            LogPrint("mempool", "   removed orphan tx %s\n", orphanHash.ToString());
+                            vEraseQueue.push_back(orphanHash);
+                            assert(recentRejects);
+                            recentRejects->insert(orphanHash);
+                        }
+                        mempool.check(pcoinsTip);
                     }
-                    mempool.check(pcoinsTip);
+                }
+                BOOST_FOREACH(uint256 hash, vEraseQueue)
+                    EraseOrphanTx(hash);
+            }
+            else if (fMissingInputs)
+            {
+                AddOrphanTx(tx, pfrom->GetId());
+
+                // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
+                unsigned int nMaxOrphanTx = (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
+                unsigned int nEvicted = LimitOrphanTxSize(nMaxOrphanTx);
+                if (nEvicted > 0)
+                    LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
+            } else {
+                assert(recentRejects);
+                recentRejects->insert(tx.GetHash());
+
+                if (pfrom->fWhitelisted) {
+                    // Always relay transactions received from whitelisted peers, even
+                    // if they were rejected from the mempool, allowing the node to
+                    // function as a gateway for nodes hidden behind it.
+                    //
+                    // FIXME: This includes invalid transactions, which means a
+                    // whitelisted peer could get us banned! We may want to change
+                    // that.
+                    RelayTransaction(tx);
                 }
             }
-
-            BOOST_FOREACH(uint256 hash, vEraseQueue)
-                EraseOrphanTx(hash);
-        }
-        else if (fMissingInputs)
-        {
-            AddOrphanTx(tx, pfrom->GetId());
-
-            // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
-            unsigned int nMaxOrphanTx = (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
-            unsigned int nEvicted = LimitOrphanTxSize(nMaxOrphanTx);
-            if (nEvicted > 0)
-                LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
-        } else {
-            assert(recentRejects);
-            recentRejects->insert(tx.GetHash());
-
-            if (pfrom->fWhitelisted) {
-                // Always relay transactions received from whitelisted peers, even
-                // if they were rejected from the mempool, allowing the node to
-                // function as a gateway for nodes hidden behind it.
-                //
-                // FIXME: This includes invalid transactions, which means a
-                // whitelisted peer could get us banned! We may want to change
-                // that.
-                RelayTransaction(tx);
+            int nDoS = 0;
+            if (state.IsInvalid(nDoS))
+            {
+                LogPrint("mempool", "%s from peer=%d %s was not accepted into the memory pool: %s\n", tx.GetHash().ToString(),
+                    pfrom->id, pfrom->cleanSubVer,
+                    state.GetRejectReason());
+                pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
+                                   state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
+                if (nDoS > 0)
+                    Misbehaving(pfrom->GetId(), nDoS);
             }
         }
-        int nDoS = 0;
-        if (state.IsInvalid(nDoS))
-        {
-            LogPrint("mempool", "%s from peer=%d %s was not accepted into the memory pool: %s\n", tx.GetHash().ToString(),
-                pfrom->id, pfrom->cleanSubVer,
-                state.GetRejectReason());
-            pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
-                               state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
-            if (nDoS > 0)
-                Misbehaving(pfrom->GetId(), nDoS);
-        }
     }
-
-
     else if (strCommand == "headers" && !fImporting && !fReindex) // Ignore headers received while importing
     {
         std::vector<CBlockHeader> headers;
@@ -4913,30 +5201,49 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         CheckBlockIndex();
     }
+    else if (strCommand == "merkleblock" && !fImporting && !fReindex) // Ignore blocks received while importing
+    {
+        try {
+            LOCK(cs_main);
+            NodeStatePtr nodestate(pfrom->id);
+            ProcessMerkleBlock(*pfrom, vRecv, *(nodestate->thinblock), TxFinderImpl());
+        }
+        catch (...) {
+            LogPrintf("Unexpected error receiving merkleblock from %d\n", pfrom->id);
+            LOCK(cs_main);
+            NodeStatePtr nodestate(pfrom->id);
+            nodestate->thinblock->setAvailable();
+            Misbehaving(pfrom->GetId(), 10); // FIXME: Is this DoS policy reasonable? May not be pfrom's fault.
+            throw;
+        }
 
+    }
     else if (strCommand == "block" && !fImporting && !fReindex) // Ignore blocks received while importing
     {
         CBlock block;
         vRecv >> block;
 
         CInv inv(MSG_BLOCK, block.GetHash());
-        LogPrint("net", "received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
+        LogPrintf("received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
 
         pfrom->AddInventoryKnown(inv);
 
-        CValidationState state;
-        // Process all blocks from whitelisted peers, even if not requested.
-        ProcessNewBlock(state, pfrom, &block, pfrom->fWhitelisted, NULL);
-        int nDoS;
-        if (state.IsInvalid(nDoS)) {
-            pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
-                               state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
-            if (nDoS > 0) {
-                LOCK(cs_main);
-                Misbehaving(pfrom->GetId(), nDoS);
+        OnBlockFinished callb(strCommand);
+        callb(block, std::vector<NodeId>(1, pfrom->id));
+
+        // If we have received a block that's near to the current time, then switch to downloading thin blocks
+        // to save bandwidth and reduce block download times (if we haven't already switched).
+        if (ThinBlocksActive(pfrom)) {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode* pnode, vNodes)
+            {
+                if (!pnode->SupportsThinBlocks())
+                    continue;
+
+                LogPrint("thin", "Enabling thin blocks on peer %d\n", pnode->id);
+                pnode->PushMessage("filterload", CBloomFilter());
             }
         }
-
     }
 
 
@@ -5033,6 +5340,53 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                         bPingFinished = true;
                         sProblem = "Nonce zero";
                     }
+                }
+            } else if (pfrom->thinBlockNonce == nonce) {
+                // This marks the end of the transactions we've received. If we get this and we have NOT been able to
+                // finish reassembling the block, we need to re-request the transactions we're missing: this should
+                // only happen if we download a transaction and then delete it from memory.
+                LOCK(cs_main);
+
+                NodeStatePtr nodestate(pfrom->id);
+                ThinBlockWorker& thinblock = *(nodestate->thinblock);
+
+                // If it the thin block is finished, it the worker will be null.
+                //
+                // If node sends us headers, does not send us a merkleblock, but sends us a pong,
+                // it will have a worker without a thin block stub.
+                std::vector<uint256> txsMissing;
+                if (thinblock.isAvailable() || !thinblock.isStubBuilt())
+                    txsMissing = std::vector<uint256>();
+                else
+                    txsMissing = thinblock.getTxsMissing();
+                bool reRequest = txsMissing.size();
+                bool giveUp = reRequest && nodestate->thinBlockRerequesting;
+
+                if (giveUp) {
+                    LogPrintf("Re-reqested transactions for thin block %s from %d, peer did not follow up. Disconnecting peer.\n",
+                            thinblock.blockStr(), pfrom->id);
+                    pfrom->fDisconnect = true;
+                    // FIXME: Disconnecting is a too harsh. We should probably
+                    // just clean up block and let the peer stay connected.
+                }
+                else if (reRequest) {
+                    LogPrint("thin", "Missing %d transactions for thin block %s, re-requesting (consider adjusting relay policies)\n",
+                            txsMissing.size(), thinblock.blockStr());
+
+                    std::vector<CInv> hashesToReRequest;
+                    typedef std::vector<uint256>::const_iterator auto_;
+
+                    for (auto_ m = txsMissing.begin(); m != txsMissing.end(); ++m) {
+                        hashesToReRequest.push_back(CInv(MSG_TX, *m));
+                        LogPrintf("Re-requesting tx %s\n", m->ToString());
+                    }
+                    assert(hashesToReRequest.size() > 0);
+                    nodestate->thinBlockRerequesting = true;
+                    pfrom->PushMessage("getdata", hashesToReRequest);
+                    pfrom->PushMessage("ping", pfrom->thinBlockNonce);
+                }
+                else {
+                    nodestate->thinBlockRerequesting = false;
                 }
             } else {
                 sProblem = "Unsolicited pong without ping";
@@ -5433,7 +5787,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             vInvWait.reserve(pto->vInventoryToSend.size());
             BOOST_FOREACH(const CInv& inv, pto->vInventoryToSend)
             {
-                if (pto->setInventoryKnown.count(inv))
+                if (pto->filterInventoryKnown.contains(inv.hash))
                     continue;
 
                 // trickle out tx inv to protect privacy
@@ -5454,9 +5808,9 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     }
                 }
 
-                // returns true if wasn't already contained in the set
-                if (pto->setInventoryKnown.insert(inv).second)
+                if (!pto->filterInventoryKnown.contains(inv.hash))
                 {
+                    pto->filterInventoryKnown.insert(inv.hash);
                     vInv.push_back(inv);
                     if (vInv.size() >= 1000)
                     {
@@ -5508,18 +5862,25 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         vector<CInv> vGetData;
         if (!pto->fDisconnect && !pto->fClient && (fFetch || !IsInitialBlockDownload()) && statePtr->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
             vector<CBlockIndex*> vToDownload;
-            NodeId staller = -1;
-            FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - statePtr->nBlocksInFlight, vToDownload, staller);
+            std::set<NodeId> stallers;
+            FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - statePtr->nBlocksInFlight, vToDownload, stallers);
             BOOST_FOREACH(CBlockIndex *pindex, vToDownload) {
-                vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
+                int type = ThinBlocksActive(pto)
+                    ? MSG_FILTERED_BLOCK
+                    : MSG_BLOCK;
+
+                vGetData.push_back(CInv(type, pindex->GetBlockHash()));
                 MarkBlockAsInFlight(pto->GetId(), pindex->GetBlockHash(), consensusParams, pindex);
                 LogPrint("net", "Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
                     pindex->nHeight, pto->id);
             }
-            if (statePtr->nBlocksInFlight == 0 && staller != -1) {
-                if (NodeStatePtr(staller)->nStallingSince == 0) {
-                    NodeStatePtr(staller)->nStallingSince = nNow;
-                    LogPrint("net", "Stall started peer=%d\n", staller);
+            if (statePtr->nBlocksInFlight == 0 && !stallers.empty()) {
+                typedef set<NodeId>::const_iterator auto_;
+                for (auto_ n = stallers.begin(); n != stallers.end(); ++n) {
+                    if (NodeStatePtr(*n)->nStallingSince == 0) {
+                        NodeStatePtr(*n)->nStallingSince = nNow;
+                        LogPrint("net", "Stall started peer=%d\n", *n);
+                    }
                 }
             }
         }

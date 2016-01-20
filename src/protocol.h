@@ -76,6 +76,11 @@ enum {
     // See BIP 64 for details on how this is implemented.
     NODE_GETUTXO = (1 << 1),
 
+    // NODE_BLOOM means the node is capable and willing to handle bloom-filtered connections.
+    // All nodes with protocol version < 70011 support bloom-filter without advertising this bit.
+    // Core nodes with protocol >= 70011 do not support bloom-filter unless this bit is advertised.
+    NODE_BLOOM = (1 << 2)
+
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
     // isn't getting used, or one not being used much, and notify the
     // bitcoin-development mailing list. Remember that service bits are just
@@ -150,8 +155,8 @@ public:
 enum {
     MSG_TX = 1,
     MSG_BLOCK,
-    // Nodes may always request a MSG_FILTERED_BLOCK in a getdata, however,
-    // MSG_FILTERED_BLOCK should not appear in any invs except as a part of getdata.
+    // A filtered block is a CMerkleBlock structure, in which a list of hashes in the merkle tree is provided instead
+    // of the entire block contents.
     MSG_FILTERED_BLOCK,
 };
 
