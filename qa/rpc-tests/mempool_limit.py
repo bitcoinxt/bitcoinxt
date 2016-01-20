@@ -1,119 +1,132 @@
 #!/usr/bin/env python2
-# Copyright (c) 2014 The Bitcoin Core developers
+# Copyright (c) 2014-2015 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#
-# Test -maxmempooltx limit-number-of-transactions-in-mempool
-# code
-#
+# Test mempool limiting together/eviction with the wallet
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
-import os
-import shutil
-import time
 
-class MempoolCoinbaseTest(BitcoinTestFramework):
+class MempoolLimitTest(BitcoinTestFramework):
+
+    def satoshi_round(self, amount):
+        return  Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
+
+    def __init__(self):
+        # Some pre-processing to create a bunch of OP_RETURN txouts to insert into transactions we create
+        # So we have big transactions (and therefore can't fit very many into each block)
+        # create one script_pubkey
+        script_pubkey = "6a4d0200" #OP_RETURN OP_PUSH2 512 bytes
+        for i in xrange (512):
+            script_pubkey = script_pubkey + "01"
+        # concatenate 128 txouts of above script_pubkey which we'll insert before the txout for change
+        self.txouts = "81"
+        for k in xrange(128):
+            # add txout value
+            self.txouts = self.txouts + "0000000000000000"
+            # add length of script_pubkey
+            self.txouts = self.txouts + "fd0402"
+            # add script_pubkey
+            self.txouts = self.txouts + script_pubkey
+
+    def create_confirmed_utxos(self, count):
+        self.nodes[0].generate(int(0.5*count)+102)
+        sync_blocks(self.nodes[:2])
+        utxos = self.nodes[0].listunspent()
+        iterations = count - len(utxos)
+        addr1 = self.nodes[0].getnewaddress()
+        addr2 = self.nodes[0].getnewaddress()
+        if iterations <= 0:
+            return utxos
+        for i in xrange(iterations):
+            t = utxos.pop()
+            fee = self.relayfee
+            inputs = []
+            inputs.append({ "txid" : t["txid"], "vout" : t["vout"]})
+            outputs = {}
+            send_value = t['amount'] - fee
+            outputs[addr1] = self.satoshi_round(send_value/2)
+            outputs[addr2] = self.satoshi_round(send_value/2)
+            raw_tx = self.nodes[0].createrawtransaction(inputs, outputs)
+            signed_tx = self.nodes[0].signrawtransaction(raw_tx, None, None, "NONE")["hex"]
+            txid = self.nodes[0].sendrawtransaction(signed_tx)
+
+        while (self.nodes[0].getmempoolinfo()['size'] > 0):
+            self.nodes[0].generate(1)
+
+        sync_blocks(self.nodes[:2])
+
+        utxos = self.nodes[0].listunspent()
+        assert(len(utxos) >= count)
+        return utxos
+
+    def create_lots_of_big_transactions(self, utxos, fee):
+        addr = self.nodes[0].getnewaddress()
+        txids = []
+        for i in xrange(len(utxos)):
+            t = utxos.pop()
+            inputs = []
+            inputs.append({ "txid" : t["txid"], "vout" : t["vout"]})
+            outputs = {}
+            send_value = t['amount'] - fee
+            outputs[addr] = self.satoshi_round(send_value)
+            rawtx = self.nodes[0].createrawtransaction(inputs, outputs)
+            newtx = rawtx[0:92]
+            newtx = newtx + self.txouts
+            newtx = newtx + rawtx[94:]
+            signresult = self.nodes[0].signrawtransaction(newtx, None, None, "NONE")
+            txid = self.nodes[0].sendrawtransaction(signresult["hex"], True)
+            txids.append(txid)
+        return txids
 
     def setup_network(self):
-        # Three nodes
-        args = ["-maxmempooltx=11", "-checkmempool", "-debug=mempool"]
         self.nodes = []
-        self.nodes.append(start_node(0, self.options.tmpdir, args))
-        self.nodes.append(start_node(1, self.options.tmpdir, args))
-        self.nodes.append(start_node(2, self.options.tmpdir, args))
-        connect_nodes_bi(self.nodes, 0, 1)
-        connect_nodes_bi(self.nodes, 0, 2)
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-spendzeroconfchange=0", "-debug"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-maxmempool=5", "-spendzeroconfchange=0", "-debug"]))
+        connect_nodes(self.nodes[0], 1)
         self.is_network_split = False
+        self.sync_all()
+        self.relayfee = self.nodes[0].getnetworkinfo()['relayfee']
 
-    def create_tx(self, from_txid, to_address, amount, node=0):
-        inputs = [{ "txid" : from_txid, "vout" : 0}]
-        outputs = { to_address : amount }
-        rawtx = self.nodes[node].createrawtransaction(inputs, outputs)
-        signresult = self.nodes[node].signrawtransaction(rawtx)
-        assert_equal(signresult["complete"], True)
-        return signresult["hex"]
+    def setup_chain(self):
+        print("Initializing test directory "+self.options.tmpdir)
+        initialize_chain_clean(self.options.tmpdir, 2)
 
     def run_test(self):
-        node0_address = self.nodes[0].getnewaddress()
-        node1_address = self.nodes[1].getnewaddress()
+        txids = []
+        utxos = self.create_confirmed_utxos(130)
 
-        # 20 transactions
-        b = [ self.nodes[0].getblockhash(n) for n in range(1, 21) ]
-        coinbase_txids = [ self.nodes[0].getblock(h)['tx'][0] for h in b ]
-        spends1_raw = [ self.create_tx(txid, node0_address, 50) for txid in coinbase_txids ]
-        spends1_id = [ self.nodes[0].sendrawtransaction(tx) for tx in spends1_raw ]
+        #create a mempool tx that will be evicted by node 1
+        us0 = utxos.pop()
+        inputs = [{ "txid" : us0["txid"], "vout" : us0["vout"]}]
+        outputs = {self.nodes[0].getnewaddress() : us0['amount'] - self.relayfee}
+        tx = self.nodes[0].createrawtransaction(inputs, outputs)
+        txFS = self.nodes[0].signrawtransaction(tx, None, None, "NONE")
+        txid0 = self.nodes[0].sendrawtransaction(txFS['hex'])
+        self.nodes[0].lockunspent(True, [us0])
 
-        # -maxmempooltx doesn't evict transactions submitted via sendrawtransaction:
-        assert_equal(len(self.nodes[0].getrawmempool()), 20)
+        #create a mempool tx that will NOT be evicted by node 1 (because submitted there)
+        us1 = utxos.pop()
+        inputs = [{ "txid" : us1["txid"], "vout" : us1["vout"]}]
+        outputs = {self.nodes[0].getnewaddress() : us1['amount'] - self.relayfee}
+        tx = self.nodes[0].createrawtransaction(inputs, outputs)
+        txFS = self.nodes[0].signrawtransaction(tx, None, None, "NONE")
+        txid1 = self.nodes[1].sendrawtransaction(txFS['hex'])
+        self.nodes[0].lockunspent(True, [us1])
 
-        # ... and doesn't evict sendtoaddress() transactions:
-        spends1_id.append(self.nodes[0].sendtoaddress(node0_address, 50))
-        assert_equal(len(self.nodes[0].getrawmempool()), 21)
+        sync_mempools(self.nodes[:2])
 
-        time.sleep(1) # wait just a bit for node0 to send transactions to node1
+        #and now for the spam
+        base_fee = self.relayfee*1000
+        for i in xrange (4):
+            txids.append([])
+            txids[i] = self.create_lots_of_big_transactions(utxos[30*i:30*i+30], (i+1)*base_fee)
 
-        # ... node1's mempool should be limited
-        assert(len(self.nodes[1].getrawmempool()) <= 11)
-
-        # have other node create five transactions...
-        node1_txids = []
-        for i in range(5):
-            node1_txids.append(self.nodes[1].sendtoaddress(node1_address, 50))
-
-        # it's mempool should be limited, but should contain those txids:
-        node1_txs = set(self.nodes[1].getrawmempool())
-        assert(node1_txs.issuperset(node1_txids))
-        # The first send-to-self is guaranteed to evict another of node0's transaction.
-        # The second (and subsequent) might try (and fail) to evict the first
-        # send-to-self, in which case the mempool size can be bigger than -maxmempooltx
-        assert(len(self.nodes[1].getrawmempool()) <= 11+4)
-
-        time.sleep(1)
-
-        # node0's mempool should still have all its transactions:
-        node0_txs = set(self.nodes[0].getrawmempool())
-        assert(node0_txs.issuperset(spends1_id))
-
-
-        # Have each node mine a block, should empty mempools:
-        blocks = []
-        blocks.extend(self.nodes[0].generate(1))
-        sync_blocks(self.nodes)      
-        blocks.extend(self.nodes[1].generate(1))
-        sync_blocks(self.nodes)      
-
-        assert_equal(len(self.nodes[0].getrawmempool()), 0)
-        assert_equal(len(self.nodes[1].getrawmempool()), 0)
-
-        # Second test:
-        #    eviction of long chains of dependent transactions
-        parent_ids = [spends1_id[0], node1_txids[0]]
-        send_addresses = [node0_address, node1_address]
-        chained_ids = [[],[]]
-        send_amount = 50
-        for i in range(5):
-            send_amount = send_amount-0.001 # send with sufficient fee
-            for node in range(2):
-                raw = self.create_tx(parent_ids[node], send_addresses[node], send_amount, node)
-                parent_ids[node] = self.nodes[node].sendrawtransaction(raw)
-                chained_ids[node].append(parent_ids[node])
-
-        sync_mempools(self.nodes) # Wait for all ten txns in all mempools
-        assert_equal(len(self.nodes[2].getrawmempool()), 10)
-
-        # Have both nodes generate high-priority transactions to exercise chained-transaction-eviction
-        # code
-        tx_ids = [[],[]]
-        for i in range(3):
-            for node in range(2):
-                tx_ids[node].append(self.nodes[node].sendtoaddress(send_addresses[node], 25))
-
-        # Give a little time for transactions to make their way to node2, it's mempool should
-        # remain under limit
-        time.sleep(1)
-        assert(len(self.nodes[2].getrawmempool()) <= 11)
+        time.sleep(3)
+        # txid0 should have been evicted by node 1, but txid1 should have been protected
+        assert(txid0 not in self.nodes[1].getrawmempool())
+        assert(txid1 in self.nodes[1].getrawmempool())
 
 if __name__ == '__main__':
-    MempoolCoinbaseTest().main()
+    MempoolLimitTest().main()

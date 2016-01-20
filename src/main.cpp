@@ -1022,15 +1022,13 @@ static bool RespendRelayExceeded(const CTransaction& doubleSpend)
 }
 
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
-                        bool* pfMissingInputs, bool fRejectAbsurdFee)
+                        bool* pfMissingInputs, bool fOverrideMempoolLimit, bool fRejectAbsurdFee)
 {
     AssertLockHeld(cs_main);
     if (pfMissingInputs)
         *pfMissingInputs = false;
 
-    int64_t maxBlockSize = Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load());
-
-    if (!CheckTransaction(tx, state, maxBlockSize))
+    if (!CheckTransaction(tx, state, Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load())))
         return error("AcceptToMemoryPool: CheckTransaction failed");
 
     // Coinbase is only valid in a block, not as a loose transaction
@@ -1178,6 +1176,17 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                          hash.ToString(),
                          nFees, ::minRelayTxFee.GetFee(nSize) * 10000);
 
+        // Calculate in-mempool ancestors, up to a limit.
+        CTxMemPool::setEntries setAncestors;
+        size_t nLimitAncestors = GetArg("-limitancestorcount", DEFAULT_ANCESTOR_LIMIT);
+        size_t nLimitAncestorSize = GetArg("-limitancestorsize", DEFAULT_ANCESTOR_SIZE_LIMIT)*1000;
+        size_t nLimitDescendants = GetArg("-limitdescendantcount", DEFAULT_DESCENDANT_LIMIT);
+        size_t nLimitDescendantSize = GetArg("-limitdescendantsize", DEFAULT_DESCENDANT_SIZE_LIMIT)*1000;
+        std::string errString;
+        if (!pool.CalculateMemPoolAncestors(entry, setAncestors, nLimitAncestors, nLimitAncestorSize, nLimitDescendants, nLimitDescendantSize, errString)) {
+            return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false);
+        }
+
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS, true, NULL))
@@ -1211,50 +1220,24 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
         else
         {
-            // Default max mempool #tx: 25-blocks-worth of 500-byte transactions:
-            int64_t nDefaultMax = 25 * (int64_t)(maxBlockSize / 500);
-            int64_t nMaxPoolTx = GetArg("-maxmempooltx", nDefaultMax);
+            // Set a fee delta to protect local wallet transactions from mempool size-based eviction
+            if (!fLimitFree) {
+                pool.PrioritiseTransaction(hash, hash.ToString(), 0, 1);
+            }
 
-            if (nMaxPoolTx <= 0) { // Zero or negative: don't limit
-                pool.addUnchecked(hash, entry, !IsInitialBlockDownload());
-            }
-            // fLimitFree is false when transactions are submitted from the wallet
-            // code or RPC send commands. We always want to add them to the pool,
-            // and want to prioritise them so they're never evicted:
-            else if (!fLimitFree) {
-                pool.addUnchecked(hash, entry, !IsInitialBlockDownload());
-                CAmount unused;
-                pool.PrioritiseTransaction(hash, hash.ToString(), AllowFreeThreshold(), unused);
-            }
-            // Mempool not full:
-            else if ((int64_t)pool.size() < nMaxPoolTx) {
-                pool.addUnchecked(hash, entry, !IsInitialBlockDownload());
-            }
-            else { // Mempool full...
-                static int64_t lastEstimate = 0; // Only call estimateFee every 10 minutes
-                static CFeeRate highFee;
-                if (entry.GetTime()-lastEstimate > 600) {
-                    lastEstimate = entry.GetTime();
-                    highFee = pool.estimateFee(2);
-                }
-                if (dPriority < AllowFreeThreshold() && CFeeRate(nFees, nSize) < highFee) {
-                    // Low-priority, low-fee: dropped immediately
-                    LogPrint("mempool", "mempool full, dropped %s\n", hash.ToString());
-                    SyncWithWallets(tx, NULL, false); // Let wallet know it exists
-                    return false;
-                }
-                // High enough priority/fee: add to pool, we'll evict somebody below
-                pool.addUnchecked(hash, entry, !IsInitialBlockDownload());
-            }
-            if (nMaxPoolTx > 0 && (int64_t)pool.size() > nMaxPoolTx) {
-                list<CTransaction> evicted;
-                pool.evictRandom(evicted);
-                BOOST_FOREACH(const CTransaction &etx, evicted) {
-                    LogPrint("mempool", "mempool full, evicted %s\n", etx.GetHash().ToString());
-                    SyncWithWallets(etx, NULL, false);
-                }
-                if (!pool.exists(hash))
-                    return false;
+            // Store transaction in memory
+        	pool.addUnchecked(hash, entry, setAncestors, !IsInitialBlockDownload());
+
+            if (!fOverrideMempoolLimit) {
+                // Expire
+                int expired = pool.Expire(GetTime() - GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+                if (expired != 0)
+                    LogPrint("mempool", "Expired %i transactions from the memory pool\n", expired);
+
+                // Trim
+                pool.TrimToSize(GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000);
+                if (!pool.exists(tx.GetHash()))
+                    return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool full");
             }
         }
     }
@@ -2348,7 +2331,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
     }
 }
 
-/** Disconnect chainActive's tip. */
+/** Disconnect chainActive's tip. You want to manually re-limit mempool size after this */
 bool static DisconnectTip(CValidationState &state) {
     CBlockIndex *pindexDelete = chainActive.Tip();
     assert(pindexDelete);
@@ -2370,13 +2353,23 @@ bool static DisconnectTip(CValidationState &state) {
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
     // Resurrect mempool transactions from the disconnected block.
+    std::vector<uint256> vHashUpdate;
     BOOST_FOREACH(const CTransaction &tx, block.vtx) {
         // ignore validation errors in resurrected transactions
         list<CTransaction> removed;
         CValidationState stateDummy;
-        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, NULL))
-            mempool.remove(tx, removed, true);
+        if (tx.IsCoinBase() || !AcceptToMemoryPool(mempool, stateDummy, tx, false, NULL, true)) {
+            mempool.removeRecursive(tx, removed);
+        } else if (mempool.exists(tx.GetHash())) {
+            vHashUpdate.push_back(tx.GetHash());
+        }
     }
+    // AcceptToMemoryPool/addUnchecked all assume that new mempool entries have
+    // no in-mempool children, which is generally not true when adding
+    // previously-confirmed transactions back to the mempool.
+    // UpdateTransactionsFromBlock finds descendants of any transactions in this
+    // block that were added back and cleans up the mempool state.
+    mempool.UpdateTransactionsFromBlock(vHashUpdate);
     mempool.removeCoinbaseSpends(pcoinsTip, pindexDelete->nHeight);
     mempool.check(pcoinsTip);
 
@@ -2547,9 +2540,11 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
 
     // Disconnect active blocks which are no longer in the best chain.
+    bool fBlocksDisconnected = false;
     while (chainActive.Tip() && chainActive.Tip() != pindexFork) {
         if (!DisconnectTip(state))
             return false;
+        fBlocksDisconnected = true;
     }
 
     // Build list of new blocks to connect.
@@ -2594,6 +2589,9 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
         }
     }
     }
+
+    if (fBlocksDisconnected)
+        mempool.TrimToSize(GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000);
 
     // Callbacks/notifications for a new best chain.
     if (fInvalidFound)
@@ -2681,6 +2679,8 @@ bool InvalidateBlock(CValidationState& state, CBlockIndex *pindex) {
             return false;
         }
     }
+
+    mempool.TrimToSize(GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000);
 
     // The resulting new best tip may not be in setBlockIndexCandidates anymore, so
     // add it again.
@@ -4766,7 +4766,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             LogPrint("mempool", "AcceptToMemoryPool: peer=%d %s: accepted %s (poolsz %u)\n",
                 pfrom->id, pfrom->cleanSubVer,
                 tx.GetHash().ToString(),
-                mempool.mapTx.size());
+                mempool.size());
 
             // Recursively process any orphan transactions that depended on this one
             set<NodeId> setMisbehaving;

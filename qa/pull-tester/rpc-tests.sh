@@ -43,6 +43,7 @@ testScriptsExt=(
     'getblocktemplate_proposals.py'
     'txn_clone.py --mineblock'
     'txn_doublespend.py --mineblock'
+    'mempool_limit.py'
     'pruning.py'
     'forknotify.py'
     'invalidateblock.py'
@@ -57,6 +58,7 @@ testScriptsExt=(
     'rawtransactions.py'
 #    'forknotify.py'
     'p2p-acceptblock.py'
+    'mempool_packages.py'
 );
 
 extArg="-extended"
