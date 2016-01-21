@@ -4256,10 +4256,16 @@ bool static AlreadyHave(const CInv& inv)
     return true;
 }
 
+// Activate thin blocks only if we're not doing bulk downloads (it's faster to use ordinary block messages when
+// catching up with the block chain).
+bool ThinBlocksActive(CNode* n) {
+    return !IsInitialBlockDownload() && UsingThinBlocks() && n->SupportsThinBlocks();
+}
+
 namespace processinv {
 
 bool WeWantBlock(const uint256& block) {
-    return !(IsInitialBlockDownload() || mapBlockIndex.count(block));
+    return !mapBlockIndex.count(block);
 }
 
 bool AlmostSynced() {
@@ -4323,7 +4329,7 @@ void ProcessInvMsgBlock(CNode* pfrom, CInv inv, std::vector<CInv>& toFetch) {
     // node has reached us before block from the second node, so as long as we
     // haven't yet received  headers, we'll request if from all to enforce correct sequence.
     // Receiving duplicate headers is fine.
-    bool headerFromMultiple = UsingThinBlocks() && pfrom->SupportsThinBlocks()
+    bool headerFromMultiple = ThinBlocksActive(pfrom)
         && thinblockmgr.numWorkers(inv.hash) < ThinBlocksMaxParallel();
 
     // First request the headers preceding the announced block. In the normal fully-synced
@@ -4342,7 +4348,7 @@ void ProcessInvMsgBlock(CNode* pfrom, CInv inv, std::vector<CInv>& toFetch) {
     }
 
     bool markAsInFlight = false;
-    if (pfrom->SupportsThinBlocks() && UsingThinBlocks())
+    if (ThinBlocksActive(pfrom))
         markAsInFlight = ThinBlockDownload(inv, toFetch, pfrom->id);
 
     else if (AvoidFullBlocks()) {
@@ -4608,12 +4614,6 @@ struct TxFinderImpl : public TxFinder {
         return tx;
     }
 };
-
-// Activate thin blocks only if we're not doing bulk downloads (it's faster to use ordinary block messages when
-// catching up with the block chain).
-bool ThinBlocksActive(CNode* n) {
-    return !IsInitialBlockDownload() && UsingThinBlocks() && n->SupportsThinBlocks();
-}
 
 bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived)
 {
