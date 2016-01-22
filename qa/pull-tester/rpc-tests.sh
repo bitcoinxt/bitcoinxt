@@ -35,6 +35,7 @@ testScripts=(
     'walletbackup.py'
 );
 testScriptsExt=(
+    'bigblocks.py'
     'bipdersig-p2p.py'
     'bip65-cltv-p2p.py'
     'bip65-cltv.py'

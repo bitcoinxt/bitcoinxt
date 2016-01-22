@@ -512,4 +512,7 @@ extern CBlockTreeDB *pblocktree;
 /** Maximum size of a block */
 unsigned int MaxBlockSize(uint32_t nBlockTime);
 
+/** What forks we are expressing support for */
+uint32_t ForkBits(uint32_t nTime);
+
 #endif // BITCOIN_MAIN_H

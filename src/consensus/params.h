@@ -25,6 +25,13 @@ struct Params {
     int64_t nPowTargetSpacing;
     int64_t nPowTargetTimespan;
     int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
+
+    /** 2MB fork activation parameters */
+    int nActivateSizeForkMajority;
+    int64_t nSizeForkGracePeriod;
+
+    int ActivateSizeForkMajority() const { return nActivateSizeForkMajority; }
+    int64_t SizeForkGracePeriod() const { return nSizeForkGracePeriod; }
 };
 } // namespace Consensus
 
