@@ -201,6 +201,9 @@ Value getrawmempool(const Array& params, bool fHelp)
             info.push_back(Pair("height", (int)e.GetHeight()));
             info.push_back(Pair("startingpriority", e.GetPriority(e.GetHeight())));
             info.push_back(Pair("currentpriority", e.GetPriority(chainActive.Height())));
+            info.push_back(Pair("descendantcount", e.GetCountWithDescendants()));
+            info.push_back(Pair("descendantsize", e.GetSizeWithDescendants()));
+            info.push_back(Pair("descendantfees", e.GetFeesWithDescendants()));
             const CTransaction& tx = e.GetTx();
             set<string> setDepends;
             BOOST_FOREACH(const CTxIn& txin, tx.vin)
