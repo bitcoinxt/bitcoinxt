@@ -98,10 +98,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
     if(!pblocktemplate.get())
         return NULL;
     CBlock *pblock = &pblocktemplate->block; // pointer for convenience
-
-    uint64_t maxAccurateSigops = chainparams.GetConsensus().MaxBlockAccurateSigops(pblock->GetBlockTime(), sizeForkTime.load());
-    uint64_t maxSighashBytes = chainparams.GetConsensus().MaxBlockSighashBytes(pblock->GetBlockTime(), sizeForkTime.load());
-    BlockValidationResourceTracker resourceTracker(maxAccurateSigops, maxSighashBytes);
+    BlockValidationResourceTracker resourceTracker(std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max());
 
     // -regtest only: allow overriding block.nVersion with
     // -blockversion=N to test forking scenarios
@@ -260,7 +257,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
 
             // Legacy limits on sigOps:
             unsigned int nTxSigOps = GetLegacySigOpCount(tx);
-            if (nBlockSigOps + nTxSigOps >= chainparams.GetConsensus().MaxBlockLegacySigops(nBlockTime, sizeForkTime.load()))
+            if (nBlockSigOps + nTxSigOps >= chainparams.GetConsensus().MaxBlockSigops(nBlockTime, sizeForkTime.load()))
                 continue;
 
             // Skip free transactions if we're past the minimum block size:
@@ -287,7 +284,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             CAmount nTxFees = view.GetValueIn(tx)-tx.GetValueOut();
 
             nTxSigOps += GetP2SHSigOpCount(tx, view);
-            if (nBlockSigOps + nTxSigOps >= chainparams.GetConsensus().MaxBlockLegacySigops(nBlockTime, sizeForkTime.load()))
+            if (nBlockSigOps + nTxSigOps >= chainparams.GetConsensus().MaxBlockSigops(nBlockTime, sizeForkTime.load()))
                 continue;
 
             // Note that flags: we don't want to set mempool/IsStandard()
@@ -295,25 +292,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             // create only contains transactions that are valid in new blocks.
             CValidationState state;
             if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true, &resourceTracker))
-            {
-                // If CheckInputs fails because adding the transaction would hit
-                // per-block limits on sigops or sighash bytes, stop building the block
-                // right away. It is _possible_ we have another transaction in the mempool
-                // that wouldn't trigger the limits, but that case isn't worth optimizing
-                // for, because those limits are very difficult to hit with a mempool full of
-                // transactions that pass the IsStandard() test.
-                if (!resourceTracker.IsWithinLimits())
-                    break; // stop before adding this transaction to the block
-                else
-                    // If CheckInputs fails for some other reason,
-                    // continue to consider other transactions for inclusion
-                    // in this block. This should almost never happen-- it
-                    // could theoretically happen if a timelocked transaction
-                    // entered the mempool after the lock time, but then the
-                    // blockchain re-orgs to a more-work chain with a lower
-                    // height or time.
-                    continue;
-            }
+                continue;
 
             UpdateCoins(tx, state, view, nHeight);
 
