@@ -187,9 +187,7 @@ static void MutateTxAddInput(CMutableTransaction& tx, const string& strInput)
     uint256 txid(uint256S(strTxid));
 
     static const unsigned int minTxOutSz = 9;
-    // Don't know if the block size fork has activated yet or not;
-    // assume it has if after the earliest possible fork time.
-    unsigned int maxVout = Params().GetConsensus().MaxBlockSize(GetTime(), GetTime()) / minTxOutSz;
+    static const unsigned int maxVout = MAX_BLOCK_SIZE / minTxOutSz;
 
     // extract and validate vout
     string strVout = strInput.substr(pos + 1, string::npos);

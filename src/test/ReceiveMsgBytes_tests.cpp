@@ -11,7 +11,6 @@
 #include "net.h"
 #include "pow.h"
 #include "serialize.h"
-#include "timedata.h"
 #include "util.h"
 
 #include "test/test_bitcoin.h"
@@ -79,8 +78,7 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
     s << block;
 
     // Test: too large
-    size_t maxBlockSize = Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load());
-    s.resize(maxBlockSize+headerLen+1);
+    s.resize(MAX_PROTOCOL_MESSAGE_LENGTH+headerLen+1);
     CNetMessage::FinalizeHeader(s);
 
     BOOST_CHECK(!testNode.ReceiveMsgBytes(&s[0], s.size()));
@@ -88,7 +86,7 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
     testNode.vRecvMsg.clear();
 
     // Test: exactly at max:
-    s.resize(maxBlockSize+headerLen);
+    s.resize(MAX_PROTOCOL_MESSAGE_LENGTH+headerLen);
     CNetMessage::FinalizeHeader(s);
 
     BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size()));

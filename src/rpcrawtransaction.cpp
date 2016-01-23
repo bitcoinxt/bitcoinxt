@@ -298,8 +298,7 @@ Value verifytxoutproof(const Array& params, bool fHelp)
     Array res;
 
     vector<uint256> vMatch;
-    uint64_t nMaxTransactions = Params().GetConsensus().MaxBlockSize(merkleBlock.GetBlockTime(), sizeForkTime.load())/60; // 60 bytes == min tx size
-    if (merkleBlock.txn.ExtractMatches(nMaxTransactions, vMatch) != merkleBlock.header.hashMerkleRoot)
+    if (merkleBlock.txn.ExtractMatches(vMatch) != merkleBlock.header.hashMerkleRoot)
         return res;
 
     LOCK(cs_main);
