@@ -57,6 +57,7 @@ public:
         // Allow bigger blocks if:
         consensus.nActivateSizeForkMajority = 750; // 75% of hashpower to activate fork
         consensus.nSizeForkGracePeriod = 60*60*24*28; // four week grace period after activation
+        consensus.nSizeForkExpiration = 1514764800; // 2018-01-01 00:00:00 GMT
 
         /**
          * Build the genesis block. Note that the output of its generation
@@ -157,6 +158,7 @@ public:
 
         consensus.nActivateSizeForkMajority = 75; // 75 of 100 to activate fork
         consensus.nSizeForkGracePeriod = 60*60*24; // 1-day grace period
+        consensus.nSizeForkExpiration = 1514764800; // 2018-01-01 00:00:00 GMT
 
         //! Modify the testnet genesis block so the timestamp is valid for a later start.
         genesis.nTime = 1296688602;

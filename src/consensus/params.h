@@ -29,9 +29,11 @@ struct Params {
     /** 2MB fork activation parameters */
     int nActivateSizeForkMajority;
     int64_t nSizeForkGracePeriod;
+    int64_t nSizeForkExpiration;
 
     int ActivateSizeForkMajority() const { return nActivateSizeForkMajority; }
     int64_t SizeForkGracePeriod() const { return nSizeForkGracePeriod; }
+    int64_t SizeForkExpiration() const { return nSizeForkExpiration; }
 };
 } // namespace Consensus
 

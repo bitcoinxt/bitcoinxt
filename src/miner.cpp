@@ -101,11 +101,6 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
     CBlock *pblock = &pblocktemplate->block; // pointer for convenience
     ValidationCostTracker resourceTracker(std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max());
 
-    // -regtest only: allow overriding block.nVersion with
-    // -blockversion=N to test forking scenarios
-    if (Params().MineBlocksOnDemand())
-        pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
-
     // Create coinbase tx
     CMutableTransaction txNew;
     txNew.vin.resize(1);
@@ -128,7 +123,11 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         pblock->nTime = GetAdjustedTime();
         CCoinsViewCache view(pcoinsTip);
 
-        pblock->nVersion = BASE_VERSION | ForkBits(pblock->nTime);
+        pblock->nVersion = BASE_VERSION;
+        // Vote for 2 MB until the vote expiration time
+        if (pblock->nTime <= chainparams.GetConsensus().SizeForkExpiration())
+            pblock->nVersion |= FORK_BIT_2MB;
+
         // -regtest only: allow overriding block.nVersion with
         // -blockversion=N to test forking scenarios
         if (Params().MineBlocksOnDemand())

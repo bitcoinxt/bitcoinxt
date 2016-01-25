@@ -564,7 +564,4 @@ uint32_t MaxBlockSighash(uint32_t nBlockTime);
 /** Maximum number of legacy sigops in a block */
 uint32_t MaxLegacySigops(uint32_t nBlockTime);
 
-/** What forks we are expressing support for */
-uint32_t ForkBits(uint32_t nTime);
-
 #endif // BITCOIN_MAIN_H

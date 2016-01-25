@@ -97,7 +97,7 @@ static bool SanityCheckMessage(CNode* peer, const CNetMessage& msg);
  * at the same time. A simple >= version field is used for forks that
  * predate this proposal.
  */
-static bool IsSuperMajority(int versionOrBitmask, const CBlockIndex* pstart, unsigned nRequired, const Consensus::Params& consensusParams, bool useBitMask = true);
+static bool IsSuperMajority(int versionOrBitmask, const CBlockIndex* pstart, unsigned nRequired, const Consensus::Params& consensusParams, bool useBitMask=false);
 static void CheckBlockIndex();
 
 /** Constant stuff for coinbase transactions we create: */
@@ -2109,9 +2109,15 @@ static int64_t nTimeTotal = 0;
 
 static bool DidBlockTriggerSizeFork(const CBlock &block, const CBlockIndex *pindex, const CChainParams &chainparams)
 {
-    if ((block.nVersion & FORK_BIT_2MB) != FORK_BIT_2MB)
-        return false;
     if (pblocktree->ForkBitActivated(FORK_BIT_2MB) != uint256())
+        return false; // Already active
+    if (block.nTime > chainparams.GetConsensus().SizeForkExpiration()) {
+        // 2MB vote failed: this code is obsolete
+        strMiscWarning = _("Warning: This version is obsolete; upgrade required!");
+        CAlert::Notify(strMiscWarning, true);
+        return false;
+    }
+    if ((block.nVersion & FORK_BIT_2MB) != FORK_BIT_2MB)
         return false;
     return IsSuperMajority(FORK_BIT_2MB, pindex, chainparams.GetConsensus().ActivateSizeForkMajority(), chainparams.GetConsensus(), true /* use bitmask */);
 }
@@ -2452,9 +2458,11 @@ void static UpdateTip(CBlockIndex *pindexNew) {
     {
         int nUpgraded = 0;
         const CBlockIndex* pindex = chainActive.Tip();
+        int32_t voteBits = FORK_BIT_2MB;
+
         for (int i = 0; i < 100 && pindex != NULL; i++)
         {
-            if (!CBlock::VersionKnown(pindex->nVersion))
+            if (!CBlock::VersionKnown(pindex->nVersion, voteBits))
                 ++nUpgraded;
             pindex = pindex->pprev;
         }
@@ -5925,14 +5933,6 @@ uint32_t MaxLegacySigops(uint32_t nBlockTime)
     return std::numeric_limits<uint32_t>::max(); // Use accurately-counted limit
 }
 
-uint32_t ForkBits(uint32_t nTime) {
-    uint32_t bits = 0;
-    AssertLockHeld(cs_main);
-    // Vote for 2 MB until the fork time to show continued support
-    if (sizeForkTime.load() < nTime && (GetBoolArg("-vote2mb", DEFAULT_2MB_VOTE) || (pblocktree->ForkBitActivated(FORK_BIT_2MB) != uint256())))
-        bits |= FORK_BIT_2MB;
-    return bits;
-}
 
 
 class CMainCleanup

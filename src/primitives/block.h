@@ -97,7 +97,7 @@ public:
         *((CBlockHeader*)this) = header;
     }
 
-    static bool VersionKnown(int32_t nVersion)
+    static bool VersionKnown(int32_t nVersion, int32_t voteBits)
     {
         if (nVersion >= 1 && nVersion <= 4)
             return true;
@@ -105,7 +105,7 @@ public:
         if (nVersion & BIP_009_MASK)
         {
             uint32_t v = nVersion & ~BIP_009_MASK;
-            if (v == 0)
+            if ((v & ~voteBits) == 0)
                 return true;
         }
         return false;
