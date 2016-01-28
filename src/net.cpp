@@ -2184,11 +2184,12 @@ bool CNode::SupportsThinBlocks() const {
     if (!SupportsBloom())
         return false;
 
-    // Before Bitcoin Core PR #7100 and Bitcoin XT PR #109 peers would
-    // only track 1000 inv entries in filterInventoryKnown - causing them
-    // to send us a lot more txs than we require for thin blocks.
+    const int SENDHEADERS_VERSION = 70012;
 
-    // Some pre-releases of Bitcoin Core 0.12 have >= NO_BLOOM_VERSION, without
-    // this fix, so those will be a false positive.
-    return nVersion >= NO_BLOOM_VERSION;
+    // Bitcoin Core removed filterInventoryKnown filtering in 0.12,
+    // causing those nodes to send us all transactions in a block.
+    //
+    // Use SENDHEADERS_VERSION as a (temporary) means of
+    // detecting Bitcoin Core 0.12
+    return nVersion < SENDHEADERS_VERSION;
 }
