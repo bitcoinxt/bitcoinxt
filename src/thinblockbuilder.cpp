@@ -33,7 +33,7 @@ std::vector<uint256> ThinBlockBuilder::getHashes(const CMerkleBlock& m) const {
     std::vector<uint256> txHashes;
     // FIXME: Calculate a sane number of max
     // transactions here, or skip the check.
-    uint256 merkleRoot = CMerkleBlock(m).txn.ExtractMatches(50000, txHashes);
+    uint256 merkleRoot = CMerkleBlock(m).txn.ExtractMatches(txHashes);
     if (m.header.hashMerkleRoot != merkleRoot)
         throw thinblock_error("Failed to match Merkle root or bad tree in thin block");
 

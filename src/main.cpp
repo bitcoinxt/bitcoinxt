@@ -34,6 +34,7 @@
 #include <boost/dynamic_bitset.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/assign/list_of.hpp>
+#include <boost/atomic.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/math/distributions/poisson.hpp>
@@ -54,6 +55,7 @@ CCriticalSection cs_main;
 BlockMap mapBlockIndex;
 CChain chainActive;
 CBlockIndex *pindexBestHeader = NULL;
+boost::atomic<uint32_t> sizeForkTime(std::numeric_limits<uint32_t>::max());
 int64_t nTimeBestReceived = 0;
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
@@ -69,8 +71,6 @@ bool fCheckpointsEnabled = true;
 size_t nCoinCacheUsage = 5000 * 300;
 uint64_t nPruneTarget = 0;
 bool fAlerts = DEFAULT_ALERTS;
-
-SizeForkTime sizeForkTime(std::numeric_limits<uint64_t>::max());
 
 /** Fees smaller than this (in satoshi) are considered zero fee (for relaying and mining) */
 CFeeRate minRelayTxFee = CFeeRate(1000);
@@ -92,12 +92,12 @@ static bool SanityCheckMessage(CNode* peer, const CNetMessage& msg);
  * versionOrBitmask in the last Consensus::Params::nMajorityWindow blocks,
  * starting at pstart and going backwards.
  *
- * A bitmask is used to be compatible with Pieter Wuille's "Version bits"
- * proposal, so it is possible for multiple forks to be in-progress
+ * A bitmask is used to be compatible with BIP009,
+ * so it is possible for multiple forks to be in-progress
  * at the same time. A simple >= version field is used for forks that
  * predate this proposal.
  */
-static bool IsSuperMajority(int versionOrBitmask, const CBlockIndex* pstart, unsigned nRequired, const Consensus::Params& consensusParams, bool useBitMask = true);
+static bool IsSuperMajority(int versionOrBitmask, const CBlockIndex* pstart, unsigned nRequired, const Consensus::Params& consensusParams, bool useBitMask=false);
 static void CheckBlockIndex();
 
 /** Constant stuff for coinbase transactions we create: */
@@ -1032,7 +1032,7 @@ unsigned int GetP2SHSigOpCount(const CTransaction& tx, const CCoinsViewCache& in
 
 
 
-bool CheckTransaction(const CTransaction& tx, CValidationState &state, uint64_t nMaxTxSize)
+bool CheckTransaction(const CTransaction& tx, CValidationState &state)
 {
     // Basic checks that don't depend on any context
     if (tx.vin.empty())
@@ -1042,8 +1042,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, uint64_t 
         return state.DoS(10, error("CheckTransaction(): vout empty"),
                          REJECT_INVALID, "bad-txns-vout-empty");
     // Size limits
-    size_t txSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
-    if (txSize > nMaxTxSize)
+    if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
         return state.DoS(100, error("CheckTransaction(): size limits failed"),
                          REJECT_INVALID, "bad-txns-oversize");
 
@@ -1090,16 +1089,6 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state, uint64_t 
     return true;
 }
 
-static uint64_t CalcDefaultBlockPrioritySize() {
-    uint64_t nConsensusMaxSize = Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load());
-    // How much of the block should be dedicated to high-priority transactions,
-    // included regardless of the fees they pay. This is to help people who want
-    // to make free transactions and don't mind waiting a while: coin age stands
-    // in for the monetary value of the fee. Defaults to an arbitrary 5% of the
-    // current max block size.
-    return nConsensusMaxSize / 20;
-}
-
 CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowFree)
 {
     {
@@ -1120,7 +1109,7 @@ CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowF
         // * If we are relaying we allow transactions up to DEFAULT_BLOCK_PRIORITY_SIZE - 1000
         //   to be considered to fall into this category. We don't want to encourage sending
         //   multiple transactions instead of one big transaction to avoid fees.
-        if (nBytes < (CalcDefaultBlockPrioritySize() - 1000))
+        if (nBytes < (DEFAULT_BLOCK_PRIORITY_SIZE - 1000))
             nMinFee = 0;
     }
 
@@ -1171,7 +1160,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     if (pfMissingInputs)
         *pfMissingInputs = false;
 
-    if (!CheckTransaction(tx, state, Params().GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load())))
+    if (!CheckTransaction(tx, state))
         return error("AcceptToMemoryPool: CheckTransaction failed");
 
     // Coinbase is only valid in a block, not as a loose transaction
@@ -1723,7 +1712,7 @@ void UpdateCoins(const CTransaction& tx, CValidationState &state, CCoinsViewCach
 }
 
 bool CScriptCheck::operator()() {
-    if (resourceTracker && !resourceTracker->IsWithinLimits())
+    if (costTracker && !costTracker->IsWithinLimits())
         return false; // Don't do any more checks if already past limits
 
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
@@ -1731,15 +1720,15 @@ bool CScriptCheck::operator()() {
     if (!VerifyScript(scriptSig, scriptPubKey, nFlags, checker, &error)) {
         return ::error("CScriptCheck(): %s:%d VerifySignature failed: %s", ptxTo->GetHash().ToString(), nIn, ScriptErrorString(error));
     }
-    if (resourceTracker) {
-        if (!resourceTracker->Update(ptxTo->GetHash(), checker.GetNumSigops(), checker.GetBytesHashed()))
+    if (costTracker) {
+        if (!costTracker->Update(ptxTo->GetHash(), checker.GetNumSigops(), checker.GetBytesHashed()))
             return ::error("CScriptCheck(): %s:%d sigop and/or sighash byte limit exceeded",
                            ptxTo->GetHash().ToString(), nIn);
     }
     return true;
 }
 
-bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &inputs, bool fScriptChecks, unsigned int flags, bool cacheStore, BlockValidationResourceTracker* resourceTracker, std::vector<CScriptCheck> *pvChecks)
+bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &inputs, bool fScriptChecks, unsigned int flags, bool cacheStore, ValidationCostTracker* costTracker, std::vector<CScriptCheck> *pvChecks)
 {
     if (!tx.IsCoinBase())
     {
@@ -1808,7 +1797,7 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                 assert(coins);
 
                 // Verify signature
-                CScriptCheck check(resourceTracker, *coins, tx, i, flags, cacheStore);
+                CScriptCheck check(costTracker, *coins, tx, i, flags, cacheStore);
                 if (pvChecks) {
                     pvChecks->push_back(CScriptCheck());
                     check.swap(pvChecks->back());
@@ -2118,10 +2107,19 @@ static int64_t nTimeIndex = 0;
 static int64_t nTimeCallbacks = 0;
 static int64_t nTimeTotal = 0;
 
-static bool DidBlockTriggerSizeFork(const CBlock &block, const CBlockIndex *pindex, const CChainParams &chainparams) {
-    return ((block.nVersion & SIZE_FORK_VERSION) == SIZE_FORK_VERSION) &&
-           (pblocktree->ForkActivated(SIZE_FORK_VERSION) == uint256()) &&
-           IsSuperMajority(SIZE_FORK_VERSION, pindex, chainparams.GetConsensus().ActivateSizeForkMajority(), chainparams.GetConsensus(), true /* use bitmask */);
+static bool DidBlockTriggerSizeFork(const CBlock &block, const CBlockIndex *pindex, const CChainParams &chainparams)
+{
+    if (pblocktree->ForkBitActivated(FORK_BIT_2MB) != uint256())
+        return false; // Already active
+    if (block.nTime > chainparams.GetConsensus().SizeForkExpiration()) {
+        // 2MB vote failed: this code is obsolete
+        strMiscWarning = _("Warning: This version is obsolete; upgrade required!");
+        CAlert::Notify(strMiscWarning, true);
+        return false;
+    }
+    if ((block.nVersion & FORK_BIT_2MB) != FORK_BIT_2MB)
+        return false;
+    return IsSuperMajority(FORK_BIT_2MB, pindex, chainparams.GetConsensus().ActivateSizeForkMajority(), chainparams.GetConsensus(), true /* use bitmask */);
 }
 
 bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& view, bool fJustCheck)
@@ -2190,23 +2188,18 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     CBlockUndo blockundo;
 
-    // Pre-fork, maxAccurateSigops and maxSighashBytes will be unlimited (they'll
-    // be the maximum possible uint64 value).
-    // And Post-fork, the legacy sigop limits will be unlimited.
-    // This code is written to be oblivious to whether or not the fork has happened;
-    // one or the other counting method is wasted effort (but it is not worth optimizing
-    // because sigop counting is not a significant percentage of validation time).
-    // Some future release well after the fork has occurred should remove all of the
-    // legacy sigop counting code and just keep the accurate counting method.
-    uint64_t maxAccurateSigops = chainparams.GetConsensus().MaxBlockAccurateSigops(block.GetBlockTime(), sizeForkTime.load());
-    uint64_t maxSighashBytes = chainparams.GetConsensus().MaxBlockSighashBytes(block.GetBlockTime(), sizeForkTime.load());
-    BlockValidationResourceTracker resourceTracker(maxAccurateSigops, maxSighashBytes);
+    int64_t nTimeStart = GetTimeMicros();
+
+    // Pre-fork, legacy sigop counting is used, unlimited resource tracker
+    // Post-fork, accurately counted sigop/sighash limits are used
+    ValidationCostTracker costTracker(MaxBlockSigops(block.nTime), MaxBlockSighash(block.nTime));
+
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && nScriptCheckThreads ? &scriptcheckqueue : NULL);
 
-    int64_t nTimeStart = GetTimeMicros();
     CAmount nFees = 0;
     int nInputs = 0;
-    unsigned int nSigOps = 0;
+    uint32_t nSigOps = 0;
+    uint32_t nMaxLegacySigops = MaxLegacySigops(block.nTime);
     CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
     vPos.reserve(block.vtx.size());
@@ -2217,7 +2210,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
         nInputs += tx.vin.size();
         nSigOps += GetLegacySigOpCount(tx);
-        if (nSigOps > chainparams.GetConsensus().MaxBlockLegacySigops(block.GetBlockTime(), sizeForkTime.load()))
+        if (nSigOps > nMaxLegacySigops)
             return state.DoS(100, error("ConnectBlock(): too many sigops"),
                              REJECT_INVALID, "bad-blk-sigops");
 
@@ -2233,7 +2226,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 // this is to prevent a "rogue miner" from creating
                 // an incredibly-expensive-to-validate block.
                 nSigOps += GetP2SHSigOpCount(tx, view);
-                if (nSigOps > chainparams.GetConsensus().MaxBlockLegacySigops(block.GetBlockTime(), sizeForkTime.load()))
+                if (nSigOps > nMaxLegacySigops)
                     return state.DoS(100, error("ConnectBlock(): too many sigops"),
                                      REJECT_INVALID, "bad-blk-sigops");
             }
@@ -2242,7 +2235,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
             std::vector<CScriptCheck> vChecks;
             if (!CheckInputs(tx, state, view, fScriptChecks, flags, false,
-                             &resourceTracker, nScriptCheckThreads ? &vChecks : NULL))
+                             &costTracker, nScriptCheckThreads ? &vChecks : NULL))
                 return false;
             control.Add(vChecks);
         }
@@ -2268,6 +2261,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     if (!control.Wait())
         return state.DoS(100, false);
+
     int64_t nTime2 = GetTimeMicros(); nTimeVerify += nTime2 - nTimeStart;
     LogPrint("bench", "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs]\n", nInputs - 1, 0.001 * (nTime2 - nTimeStart), nInputs <= 1 ? 0 : 0.001 * (nTime2 - nTimeStart) / (nInputs-1), nTimeVerify * 0.000001);
 
@@ -2312,10 +2306,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     LogPrint("bench", "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime4 - nTime3), nTimeCallbacks * 0.000001);
 
     if (DidBlockTriggerSizeFork(block, pindex, chainparams)) {
-        uint64_t tAllowBigger = block.nTime + chainparams.GetConsensus().SizeForkGracePeriod();
+        uint32_t tAllowBigger = block.nTime + chainparams.GetConsensus().SizeForkGracePeriod();
         LogPrintf("%s: Max block size fork activating at time %d, bigger blocks allowed at time %d\n",
                   __func__, block.nTime, tAllowBigger);
-        pblocktree->ActivateFork(SIZE_FORK_VERSION, pindex->GetBlockHash());
+        pblocktree->ActivateForkBit(FORK_BIT_2MB, pindex->GetBlockHash());
         sizeForkTime.store(tAllowBigger);
     }
 
@@ -2464,14 +2458,16 @@ void static UpdateTip(CBlockIndex *pindexNew) {
     {
         int nUpgraded = 0;
         const CBlockIndex* pindex = chainActive.Tip();
+        int32_t voteBits = FORK_BIT_2MB;
+
         for (int i = 0; i < 100 && pindex != NULL; i++)
         {
-            if ((pindex->nVersion & ~CBlock::UNDERSTOOD_VERSIONS) != 0)
+            if (!CBlock::VersionKnown(pindex->nVersion, voteBits))
                 ++nUpgraded;
             pindex = pindex->pprev;
         }
         if (nUpgraded > 0)
-            LogPrintf("%s: %d of last 100 blocks contain unknown version feature bit\n", __func__, nUpgraded);
+            LogPrintf("%s: %d of last 100 blocks unknown version\n", __func__, nUpgraded);
         if (nUpgraded > 100/2)
         {
             // strMiscWarning is read by GetWarnings(), called by Qt and the JSON-RPC code to warn the user:
@@ -2525,10 +2521,10 @@ bool static DisconnectTip(CValidationState &state) {
     mempool.check(pcoinsTip);
 
     // Re-org past the size fork, reset activation condition:
-    if (pblocktree->ForkActivated(SIZE_FORK_VERSION) == pindexDelete->GetBlockHash()) {
+    if (pblocktree->ForkBitActivated(FORK_BIT_2MB) == pindexDelete->GetBlockHash()) {
         LogPrintf("%s: re-org past size fork\n", __func__);
-        pblocktree->ActivateFork(SIZE_FORK_VERSION, uint256());
-        sizeForkTime.store(std::numeric_limits<uint64_t>::max());
+        pblocktree->ActivateForkBit(FORK_BIT_2MB, uint256());
+        sizeForkTime.store(std::numeric_limits<uint32_t>::max());
     }
 
     // Update chainActive and related variables.
@@ -2970,7 +2966,7 @@ bool FindBlockPos(CValidationState &state, CDiskBlockPos &pos, unsigned int nAdd
     }
 
     if (!fKnown) {
-        while (vinfoBlockFile[nFile].nSize + nAddSize >= Params().GetConsensus().MaxBlockSize(nTime, sizeForkTime.load())*MIN_BLOCKFILE_BLOCKS) {
+        while (vinfoBlockFile[nFile].nSize + nAddSize >= MAX_BLOCKFILE_SIZE) {
             LogPrintf("Leaving block file %i: %s\n", nFile, vinfoBlockFile[nFile].ToString());
             FlushBlockFile(true);
             nFile++;
@@ -3083,17 +3079,16 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
                              REJECT_INVALID, "bad-txns-duplicate", true);
     }
 
+    // Size limits
+    unsigned int nSizeLimit = MaxBlockSize(block.nTime);
+
+    if (block.vtx.empty() || block.vtx.size() > nSizeLimit || ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION) > nSizeLimit)
+        return state.DoS(100, error("CheckBlock(): size limits failed"),
+                         REJECT_INVALID, "bad-blk-length");
+
     // All potential-corruption validation must be done before we do any
     // transaction validation, as otherwise we may mark the header as invalid
     // because we receive the wrong transactions for it.
-
-    // Size limits
-    uint64_t nMaxBlockSize = Params().GetConsensus().MaxBlockSize(block.GetBlockTime(), sizeForkTime.load());
-    if (block.vtx.empty() ||
-        block.vtx.size()*MIN_TRANSACTION_SIZE > nMaxBlockSize ||
-        ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION) > nMaxBlockSize)
-        return state.DoS(100, error("CheckBlock(): size limits failed"),
-                         REJECT_INVALID, "bad-blk-length");
 
     // First transaction must be coinbase, the rest must not be
     if (block.vtx.empty() || !block.vtx[0].IsCoinBase())
@@ -3106,7 +3101,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
 
     // Check transactions
     BOOST_FOREACH(const CTransaction& tx, block.vtx)
-        if (!CheckTransaction(tx, state, nMaxBlockSize))
+        if (!CheckTransaction(tx, state))
             return error("CheckBlock(): CheckTransaction failed");
 
     unsigned int nSigOps = 0;
@@ -3114,7 +3109,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     {
         nSigOps += GetLegacySigOpCount(tx);
     }
-    if (nSigOps > Params().GetConsensus().MaxBlockLegacySigops(block.GetBlockTime(), sizeForkTime.load()))
+    if (nSigOps > MaxLegacySigops(block.nTime))
         return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"),
                          REJECT_INVALID, "bad-blk-sigops", true);
 
@@ -3548,7 +3543,7 @@ bool static LoadBlockIndexDB()
 
     // If the max-block-size fork threshold was reached, update
     // chainparams so big blocks are allowed:
-    uint256 sizeForkHash = pblocktree->ForkActivated(SIZE_FORK_VERSION);
+    uint256 sizeForkHash = pblocktree->ForkBitActivated(FORK_BIT_2MB);
     if (sizeForkHash != uint256()) {
         BlockMap::iterator it = mapBlockIndex.find(sizeForkHash);
         assert(it != mapBlockIndex.end());
@@ -3842,8 +3837,7 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
     int nLoaded = 0;
     try {
         // This takes over fileIn and calls fclose() on it in the CBufferedFile destructor
-        uint64_t nMaxBlocksize = chainparams.GetConsensus().MaxBlockSize(GetAdjustedTime(), sizeForkTime.load());
-        CBufferedFile blkdat(fileIn, 2*nMaxBlocksize, nMaxBlocksize+8, SER_DISK, CLIENT_VERSION);
+        CBufferedFile blkdat(fileIn, 2*MAX_BLOCK_SIZE, MAX_BLOCK_SIZE+8, SER_DISK, CLIENT_VERSION);
         uint64_t nRewind = blkdat.GetPos();
         while (!blkdat.eof()) {
             boost::this_thread::interruption_point();
@@ -3862,7 +3856,7 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
                     continue;
                 // read size
                 blkdat >> nSize;
-                if (nSize < 80 || nSize > nMaxBlocksize)
+                if (nSize < 80 || nSize > MAX_BLOCK_SIZE)
                     continue;
             } catch (const std::exception&) {
                 // no valid block header found; don't complain
@@ -4206,14 +4200,7 @@ static std::map<std::string, size_t> maxMessageSizes = boost::assign::map_list_o
 bool static SanityCheckMessage(CNode* peer, const CNetMessage& msg)
 {
     const std::string& strCommand = msg.hdr.GetCommand();
-    if (strCommand == "block") {
-        uint64_t maxSize = Params().GetConsensus().MaxBlockSize(GetAdjustedTime() + 2 * 60 * 60, sizeForkTime.load());
-        if (msg.hdr.nMessageSize > maxSize) {
-            LogPrint("net", "Oversized %s message from peer=%i\n", SanitizeString(strCommand), peer->GetId());
-            return false;
-        }
-    }
-    else if (msg.hdr.nMessageSize > MAX_PROTOCOL_MESSAGE_LENGTH ||
+    if (msg.hdr.nMessageSize > MAX_PROTOCOL_MESSAGE_LENGTH ||
         (maxMessageSizes.count(strCommand) && msg.hdr.nMessageSize > maxMessageSizes[strCommand])) {
         LogPrint("net", "Oversized %s message from peer=%i (%d bytes)\n",
                  SanitizeString(strCommand), peer->GetId(), msg.hdr.nMessageSize);
@@ -5917,20 +5904,37 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
      return strprintf("CBlockFileInfo(blocks=%u, size=%u, heights=%u...%u, time=%s...%s)", nBlocks, nSize, nHeightFirst, nHeightLast, DateTimeStrFormat("%Y-%m-%d", nTimeFirst), DateTimeStrFormat("%Y-%m-%d", nTimeLast));
  }
 
-SizeForkTime::SizeForkTime(uint64_t _t)
+/** Maximum size of a block */
+unsigned int MaxBlockSize(uint32_t nBlockTime)
 {
-    t = _t;
+    if (nBlockTime < sizeForkTime.load())
+        return OLD_MAX_BLOCK_SIZE;
+    return MAX_BLOCK_SIZE;
 }
-uint64_t SizeForkTime::load() const
+
+/** Maximum size of a block */
+unsigned int MaxBlockSigops(uint32_t nBlockTime)
 {
-    LOCK(cs);
-    return t;
+    if (nBlockTime < sizeForkTime.load())
+        return std::numeric_limits<uint32_t>::max(); // Use old way of counting
+    return MAX_BLOCK_SIGOPS;
 }
-void SizeForkTime::store(uint64_t _t)
+/** Maximum size of a block */
+unsigned int MaxBlockSighash(uint32_t nBlockTime)
 {
-    LOCK(cs);
-    t = _t;
+    if (nBlockTime < sizeForkTime.load())
+        return std::numeric_limits<uint32_t>::max(); // no limit before
+    return MAX_BLOCK_SIGHASH;
 }
+
+/** Maximum legacy (miscounted) sigops in a block */
+uint32_t MaxLegacySigops(uint32_t nBlockTime)
+{
+    if (nBlockTime < sizeForkTime.load())
+        return MAX_BLOCK_SIGOPS;
+    return std::numeric_limits<uint32_t>::max(); // Use accurately-counted limit
+}
+
 
 
 class CMainCleanup

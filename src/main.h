@@ -35,9 +35,10 @@
 #include <utility>
 #include <vector>
 
+#include <boost/atomic.hpp>
 #include <boost/unordered_map.hpp>
 
-class BlockValidationResourceTracker;
+class ValidationCostTracker;
 class CBlockIndex;
 class CBlockTreeDB;
 class CBloomFilter;
@@ -48,19 +49,19 @@ class CValidationState;
 
 struct CNodeStateStats;
 
+/** Default for -blockmaxsize and -blockminsize, which control the range of sizes the mining code will create **/
+static const unsigned int DEFAULT_BLOCK_MAX_SIZE = 750000;
 static const unsigned int DEFAULT_BLOCK_MIN_SIZE = 0;
-/** Default 1/fraction of the block space for zero/low-fee transactions: 5% is arbitrary **/
-static const unsigned int DEFAULT_BLOCK_PRIORITY_SIZE_FRAC = 20;
+/** Default for -blockprioritysize, maximum space for zero/low-fee transactions **/
+static const unsigned int DEFAULT_BLOCK_PRIORITY_SIZE = 50000;
 /** Default for accepting alerts from the P2P network. */
 static const bool DEFAULT_ALERTS = true;
-/** Smallest possible serialized transaction, in bytes */
-static const unsigned int MIN_TRANSACTION_SIZE = 60;
 /** The maximum size for transactions we're willing to relay/mine */
 static const unsigned int MAX_STANDARD_TX_SIZE = 100000;
 /** Maximum number of signature check operations in an IsStandard() P2SH script */
 static const unsigned int MAX_P2SH_SIGOPS = 15;
 /** The maximum number of sigops we're willing to relay/mine in a single tx */
-static const unsigned int MAX_STANDARD_TX_SIGOPS = MAX_STANDARD_TX_SIZE/25; // one sigop per 25 bytes
+static const unsigned int MAX_STANDARD_TX_SIGOPS = MAX_BLOCK_SIGOPS/5;
 /** Default for -maxorphantx, maximum number of orphan transactions kept in memory */
 static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 100;
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
@@ -73,10 +74,10 @@ static const unsigned int DEFAULT_DESCENDANT_LIMIT = 25;
 static const unsigned int DEFAULT_DESCENDANT_SIZE_LIMIT = 101;
 /** Default for -maxmempool, maximum megabytes of mempool memory usage */
 static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE = 300;
-/** Minimum number of max-sized blocks in blk?????.dat files */
-static const unsigned int MIN_BLOCKFILE_BLOCKS = 128;
 /** Default for -mempoolexpiry, expiration time for mempool transactions in hours */
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 72;
+/** The maximum size of a blk?????.dat file (since 0.8) */
+static const unsigned int MAX_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
 static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
@@ -335,14 +336,14 @@ unsigned int GetP2SHSigOpCount(const CTransaction& tx, const CCoinsViewCache& ma
  * instead of being performed inline.
  */
 bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &view, bool fScriptChecks,
-                 unsigned int flags, bool cacheStore, BlockValidationResourceTracker* resourceTracker,
+                 unsigned int flags, bool cacheStore, ValidationCostTracker* costTracker,
                  std::vector<CScriptCheck> *pvChecks = NULL);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
 void UpdateCoins(const CTransaction& tx, CValidationState &state, CCoinsViewCache &inputs, int nHeight);
 
 /** Context-independent validity checks */
-bool CheckTransaction(const CTransaction& tx, CValidationState& state, uint64_t nMaxTransactionSize);
+bool CheckTransaction(const CTransaction& tx, CValidationState& state);
 
 /** Check for standard transaction types
  * @return True if all outputs (scriptPubKeys) use only standard transaction forms
@@ -366,17 +367,17 @@ bool CheckFinalTx(const CTransaction &tx);
  * Class that keeps track of number of signature operations
  * and bytes hashed to compute signature hashes.
  */
-class BlockValidationResourceTracker
+class ValidationCostTracker
 {
 private:
     mutable CCriticalSection cs;
-    uint64_t nSigops;
-    const uint64_t nMaxSigops;
-    uint64_t nSighashBytes;
-    const uint64_t nMaxSighashBytes;
+    uint32_t nSigops;
+    const uint32_t nMaxSigops;
+    uint32_t nSighashBytes;
+    const uint32_t nMaxSighashBytes;
 
 public:
-    BlockValidationResourceTracker(uint64_t nMaxSigopsIn, uint64_t nMaxSighashBytesIn) :
+    ValidationCostTracker(uint32_t nMaxSigopsIn, uint32_t nMaxSighashBytesIn) :
                                   nSigops(0), nMaxSigops(nMaxSigopsIn),
                                   nSighashBytes(0), nMaxSighashBytes(nMaxSighashBytesIn) { }
 
@@ -384,17 +385,17 @@ public:
         LOCK(cs);
         return (nSigops <= nMaxSigops && nSighashBytes <= nMaxSighashBytes);
     }
-    bool Update(const uint256& txid, uint64_t nSigopsIn, uint64_t nSighashBytesIn) {
+    bool Update(const uint256& txid, uint32_t nSigopsIn, uint32_t nSighashBytesIn) {
         LOCK(cs);
         nSigops += nSigopsIn;
         nSighashBytes += nSighashBytesIn;
         return (nSigops <= nMaxSigops && nSighashBytes <= nMaxSighashBytes);
     }
-    uint64_t GetSigOps() const {
+    uint32_t GetSigOps() const {
         LOCK(cs);
         return nSigops;
     }
-    uint64_t GetSighashBytes() const {
+    uint32_t GetSighashBytes() const {
         LOCK(cs);
         return nSighashBytes;
     }
@@ -407,7 +408,7 @@ public:
 class CScriptCheck
 {
 private:
-    BlockValidationResourceTracker* resourceTracker;
+    ValidationCostTracker* costTracker;
     CScript scriptPubKey;
     const CTransaction *ptxTo;
     unsigned int nIn;
@@ -416,15 +417,15 @@ private:
     ScriptError error;
 
 public:
-    CScriptCheck(): resourceTracker(NULL), ptxTo(0), nIn(0), nFlags(0), cacheStore(false), error(SCRIPT_ERR_UNKNOWN_ERROR) {}
-    CScriptCheck(BlockValidationResourceTracker* resourceTrackerIn, const CCoins& txFromIn, const CTransaction& txToIn, unsigned int nInIn, unsigned int nFlagsIn, bool cacheIn) :
-        resourceTracker(resourceTrackerIn), scriptPubKey(txFromIn.vout[txToIn.vin[nInIn].prevout.n].scriptPubKey),
+    CScriptCheck(): costTracker(NULL), ptxTo(0), nIn(0), nFlags(0), cacheStore(false), error(SCRIPT_ERR_UNKNOWN_ERROR) {}
+    CScriptCheck(ValidationCostTracker* costTrackerIn, const CCoins& txFromIn, const CTransaction& txToIn, unsigned int nInIn, unsigned int nFlagsIn, bool cacheIn) :
+        costTracker(costTrackerIn), scriptPubKey(txFromIn.vout[txToIn.vin[nInIn].prevout.n].scriptPubKey),
         ptxTo(&txToIn), nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn), error(SCRIPT_ERR_UNKNOWN_ERROR) { }
 
     bool operator()();
 
     void swap(CScriptCheck &check) {
-        std::swap(resourceTracker, check.resourceTracker);
+        std::swap(costTracker, check.costTracker);
         scriptPubKey.swap(check.scriptPubKey);
         std::swap(ptxTo, check.ptxTo);
         std::swap(nIn, check.nIn);
@@ -551,20 +552,16 @@ extern CCoinsViewCache *pcoinsTip;
 /** Global variable that points to the active block tree (protected by cs_main) */
 extern CBlockTreeDB *pblocktree;
 
-// Time when bigger-than-1MB-blocks are allowed
-class SizeForkTime {
-public:
-    SizeForkTime(uint64_t _t);
+/** Maximum size of a block */
+unsigned int MaxBlockSize(uint32_t nBlockTime);
 
-    // Same interface as std::atomic -- when c++11 is supported,
-    // this class can go away and sizeForkTime can just be type
-    // std::atomic<uint64_t>
-    uint64_t load() const;
-    void store(uint64_t _t);
-private:
-    mutable CCriticalSection cs;
-    uint64_t t;
-};
-extern SizeForkTime sizeForkTime;
+/** Max accurately-counted sigops in a block */
+uint32_t MaxBlockSigops(uint32_t nBlockTime);
+
+/** Max accurately-counted bytes hashed to compute signatures, per block */
+uint32_t MaxBlockSighash(uint32_t nBlockTime);
+
+/** Maximum number of legacy sigops in a block */
+uint32_t MaxLegacySigops(uint32_t nBlockTime);
 
 #endif // BITCOIN_MAIN_H

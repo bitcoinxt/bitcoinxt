@@ -13,13 +13,10 @@
 
 #include "test/test_bitcoin.h"
 
+#include <boost/atomic.hpp>
 #include <boost/test/unit_test.hpp>
 
-// These must match parameters in chainparams.cpp
-static const uint64_t EARLIEST_FORK_TIME = 1452470400; // 11 Jan 2016
-static const uint32_t MAXSIZE_PREFORK = 1000*1000;
-static const uint32_t MAXSIZE_POSTFORK = 8*1000*1000;
-static const uint64_t SIZE_DOUBLE_EPOCH = 60*60*24*365*2; // two years
+extern boost::atomic<uint32_t> sizeForkTime;
 
 BOOST_FIXTURE_TEST_SUITE(block_size_tests, TestingSetup)
 
@@ -83,10 +80,10 @@ BOOST_AUTO_TEST_CASE(BigBlockFork_Time1)
     CScript scriptPubKey = CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") << OP_CHECKSIG;
     CBlockTemplate *pblocktemplate;
 
-    uint64_t t = EARLIEST_FORK_TIME;
-    uint64_t preforkSize = MAXSIZE_PREFORK;
-    uint64_t postforkSize = MAXSIZE_POSTFORK;
-    uint64_t tActivate = EARLIEST_FORK_TIME;
+    uint64_t t = GetTime();
+    uint64_t preforkSize = OLD_MAX_BLOCK_SIZE;
+    uint64_t postforkSize = MAX_BLOCK_SIZE;
+    uint64_t tActivate = t;
 
     sizeForkTime.store(tActivate);
 
@@ -105,37 +102,12 @@ BOOST_AUTO_TEST_CASE(BigBlockFork_Time1)
     BOOST_CHECK(TestCheckBlock(*pblock, t, postforkSize)); // big : valid
     BOOST_CHECK(!TestCheckBlock(*pblock, t,  postforkSize+1)); // big+1 : invalid
 
-    // Halfway to first doubling...
-    uint64_t tHalf = t+SIZE_DOUBLE_EPOCH/2;
-    BOOST_CHECK(!TestCheckBlock(*pblock, tHalf-1, (3*postforkSize)/2));
-    BOOST_CHECK(TestCheckBlock(*pblock, tHalf, (3*postforkSize)/2));
-    BOOST_CHECK(!TestCheckBlock(*pblock, tHalf, (3*postforkSize)/2)+1);
+    // After fork time...
+    BOOST_CHECK(TestCheckBlock(*pblock, t+11000, preforkSize)); // 1MB : valid
+    BOOST_CHECK(TestCheckBlock(*pblock, t+11000, postforkSize)); // big : valid
+    BOOST_CHECK(!TestCheckBlock(*pblock, t+11000,  postforkSize+1)); // big+1 : invalid
 
-    // Sanity check: April 1 2017 is more than halfway to first
-    // doubling:
-    uint64_t tApril_2017 = 1491004800;
-    BOOST_CHECK(TestCheckBlock(*pblock, tApril_2017, (3*postforkSize)/2)+1);
-
-    // After one doubling...
-    uint64_t yearsAfter = t+SIZE_DOUBLE_EPOCH;
-    BOOST_CHECK(TestCheckBlock(*pblock, yearsAfter, 2*postforkSize)); // 2 * big : valid
-    BOOST_CHECK(!TestCheckBlock(*pblock, yearsAfter, 2*postforkSize+1)); // > 2 * big : invalid
-
-#if 0
-    // These tests use gigabytes of memory and take a long time to run--
-    // don't enable by default until computers have petabytes of memory
-    // and are 100 times faster than in 2015.
-    // Network protocol will have to be updated before we get there...
-    uint64_t maxDoublings = SIZE_MAX_DOUBLINGS;
-    uint64_t postDoubleTime = t + SIZE_DOUBLE_EPOCH * maxDoublings + 1;
-    uint64_t farFuture = t + SIZE_DOUBLE_EPOCH * 100;
-    BOOST_CHECK(TestCheckBlock(*pblock, postDoubleTime, postforkSize<<maxDoublings));
-    BOOST_CHECK(TestCheckBlock(*pblock, farFuture, postforkSize<<maxDoublings));
-    BOOST_CHECK(!TestCheckBlock(*pblock, postDoubleTime, (postforkSize<<maxDoublings)+1));
-    BOOST_CHECK(!TestCheckBlock(*pblock, farFuture, (postforkSize<<maxDoublings)+1));
-#endif
-
-    sizeForkTime.store(std::numeric_limits<uint64_t>::max());
+    sizeForkTime.store(std::numeric_limits<uint32_t>::max());
 }
 
 // Test activation time 30 days after earliest possible:
@@ -144,11 +116,11 @@ BOOST_AUTO_TEST_CASE(BigBlockFork_Time2)
     CScript scriptPubKey = CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") << OP_CHECKSIG;
     CBlockTemplate *pblocktemplate;
 
-    uint64_t t = EARLIEST_FORK_TIME;
-    uint64_t preforkSize = MAXSIZE_PREFORK;
-    uint64_t postforkSize = MAXSIZE_POSTFORK;
+    uint64_t t = GetTime();
+    uint64_t preforkSize = OLD_MAX_BLOCK_SIZE;
+    uint64_t postforkSize = MAX_BLOCK_SIZE;
 
-    uint64_t tActivate = EARLIEST_FORK_TIME+60*60*24*30;
+    uint64_t tActivate = t+60*60*24*30;
     sizeForkTime.store(tActivate);
 
     LOCK(cs_main);
@@ -164,11 +136,7 @@ BOOST_AUTO_TEST_CASE(BigBlockFork_Time2)
     BOOST_CHECK(TestCheckBlock(*pblock, tActivate, preforkSize)); // 1MB : valid
     BOOST_CHECK(TestCheckBlock(*pblock, tActivate, postforkSize)); // big : valid
  
-    // Halfway to first doubling IS after the activation time:
-    uint64_t tHalf = t+SIZE_DOUBLE_EPOCH/2;
-    BOOST_CHECK(TestCheckBlock(*pblock, tHalf, (3*postforkSize)/2));
-
-    sizeForkTime.store(std::numeric_limits<uint64_t>::max());
+    sizeForkTime.store(std::numeric_limits<uint32_t>::max());
 }
 
 // Test: no miner consensus, no big blocks:
@@ -177,9 +145,9 @@ BOOST_AUTO_TEST_CASE(BigBlockFork_NoActivation)
     CScript scriptPubKey = CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") << OP_CHECKSIG;
     CBlockTemplate *pblocktemplate;
 
-    uint64_t t = EARLIEST_FORK_TIME;
-    uint64_t preforkSize = MAXSIZE_PREFORK;
-    uint64_t postforkSize = MAXSIZE_POSTFORK;
+    uint64_t t = GetTime();
+    uint64_t preforkSize = OLD_MAX_BLOCK_SIZE;
+    uint64_t postforkSize = MAX_BLOCK_SIZE;
 
     LOCK(cs_main);
 
@@ -190,8 +158,8 @@ BOOST_AUTO_TEST_CASE(BigBlockFork_NoActivation)
     BOOST_CHECK(TestCheckBlock(*pblock, t, preforkSize)); // 1MB : valid
     BOOST_CHECK(!TestCheckBlock(*pblock, t, postforkSize)); // big : invalid
 
-    uint64_t tHalf = t+SIZE_DOUBLE_EPOCH/2;
-    BOOST_CHECK(!TestCheckBlock(*pblock, tHalf, (3*postforkSize)/2));
+    uint64_t tAfter = t+11000;
+    BOOST_CHECK(!TestCheckBlock(*pblock, tAfter, postforkSize));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

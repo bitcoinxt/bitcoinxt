@@ -90,6 +90,7 @@ void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, 
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, consensusParams);
 }
 
+
 CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
 {
     const CChainParams& chainparams = Params();
@@ -98,15 +99,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
     if(!pblocktemplate.get())
         return NULL;
     CBlock *pblock = &pblocktemplate->block; // pointer for convenience
-
-    uint64_t maxAccurateSigops = chainparams.GetConsensus().MaxBlockAccurateSigops(pblock->GetBlockTime(), sizeForkTime.load());
-    uint64_t maxSighashBytes = chainparams.GetConsensus().MaxBlockSighashBytes(pblock->GetBlockTime(), sizeForkTime.load());
-    BlockValidationResourceTracker resourceTracker(maxAccurateSigops, maxSighashBytes);
-
-    // -regtest only: allow overriding block.nVersion with
-    // -blockversion=N to test forking scenarios
-    if (Params().MineBlocksOnDemand())
-        pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
+    ValidationCostTracker resourceTracker(std::numeric_limits<size_t>::max(), std::numeric_limits<size_t>::max());
 
     // Create coinbase tx
     CMutableTransaction txNew;
@@ -130,29 +123,35 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         pblock->nTime = GetAdjustedTime();
         CCoinsViewCache view(pcoinsTip);
 
-        UpdateTime(pblock, Params().GetConsensus(), pindexPrev);
-        uint64_t nBlockTime = pblock->GetBlockTime();
+        pblock->nVersion = BASE_VERSION;
+        // Vote for 2 MB until the vote expiration time
+        if (pblock->nTime <= chainparams.GetConsensus().SizeForkExpiration())
+            pblock->nVersion |= FORK_BIT_2MB;
 
-        uint64_t nConsensusMaxSize = chainparams.GetConsensus().MaxBlockSize(nBlockTime, sizeForkTime.load());
+        // -regtest only: allow overriding block.nVersion with
+        // -blockversion=N to test forking scenarios
+        if (Params().MineBlocksOnDemand())
+            pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
+
+        UpdateTime(pblock, Params().GetConsensus(), pindexPrev);
+
+        uint32_t nConsensusMaxSize = MaxBlockSize(pblock->nTime);
         // Largest block you're willing to create, defaults to being the biggest possible.
         // Miners can adjust downwards if they wish to throttle their blocks, for instance, to work around
         // high orphan rates or other scaling problems.
-        uint64_t nBlockMaxSize = (uint64_t) GetArg("-blockmaxsize", nConsensusMaxSize);
+        uint32_t nBlockMaxSize = (uint32_t) GetArg("-blockmaxsize", nConsensusMaxSize);
         // Limit to betweeen 1K and MAX_BLOCK_SIZE-1K for sanity:
-        nBlockMaxSize = std::max((uint64_t)1000,
+        nBlockMaxSize = std::max((uint32_t)1000,
                                  std::min(nConsensusMaxSize-1000, nBlockMaxSize));
 
         // How much of the block should be dedicated to high-priority transactions,
-        // included regardless of the fees they pay. This is to help people who want
-        // to make free transactions and don't mind waiting a while: coin age stands
-        // in for the monetary value of the fee. Defaults to an arbitrary 5% of the
-        // current max block size.
-        uint64_t nBlockPrioritySize = (uint64_t) GetArg("-blockprioritysize", nBlockMaxSize / DEFAULT_BLOCK_PRIORITY_SIZE_FRAC);
+        // included regardless of the fees they pay
+        unsigned int nBlockPrioritySize = GetArg("-blockprioritysize", DEFAULT_BLOCK_PRIORITY_SIZE);
         nBlockPrioritySize = std::min(nBlockMaxSize, nBlockPrioritySize);
 
         // Minimum block size you want to create; block will be filled with free transactions
         // until there are no more or the block reaches this size:
-        uint64_t nBlockMinSize = GetArg("-blockminsize", DEFAULT_BLOCK_MIN_SIZE);
+        unsigned int nBlockMinSize = GetArg("-blockminsize", DEFAULT_BLOCK_MIN_SIZE);
         nBlockMinSize = std::min(nBlockMaxSize, nBlockMinSize);
 
         // Priority order to process transactions
@@ -239,6 +238,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         uint64_t nBlockTx = 0;
         int nBlockSigOps = 100;
         bool fSortedByFee = (nBlockPrioritySize <= 0);
+        uint32_t nMaxLegacySigops = MaxLegacySigops(pblock->nTime);
 
         TxPriorityCompare comparer(fSortedByFee);
         std::make_heap(vecPriority.begin(), vecPriority.end(), comparer);
@@ -260,7 +260,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
 
             // Legacy limits on sigOps:
             unsigned int nTxSigOps = GetLegacySigOpCount(tx);
-            if (nBlockSigOps + nTxSigOps >= chainparams.GetConsensus().MaxBlockLegacySigops(nBlockTime, sizeForkTime.load()))
+            if (nBlockSigOps + nTxSigOps >= nMaxLegacySigops)
                 continue;
 
             // Skip free transactions if we're past the minimum block size:
@@ -287,7 +287,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             CAmount nTxFees = view.GetValueIn(tx)-tx.GetValueOut();
 
             nTxSigOps += GetP2SHSigOpCount(tx, view);
-            if (nBlockSigOps + nTxSigOps >= chainparams.GetConsensus().MaxBlockLegacySigops(nBlockTime, sizeForkTime.load()))
+            if (nBlockSigOps + nTxSigOps >= nMaxLegacySigops)
                 continue;
 
             // Note that flags: we don't want to set mempool/IsStandard()
@@ -295,25 +295,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             // create only contains transactions that are valid in new blocks.
             CValidationState state;
             if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true, &resourceTracker))
-            {
-                // If CheckInputs fails because adding the transaction would hit
-                // per-block limits on sigops or sighash bytes, stop building the block
-                // right away. It is _possible_ we have another transaction in the mempool
-                // that wouldn't trigger the limits, but that case isn't worth optimizing
-                // for, because those limits are very difficult to hit with a mempool full of
-                // transactions that pass the IsStandard() test.
-                if (!resourceTracker.IsWithinLimits())
-                    break; // stop before adding this transaction to the block
-                else
-                    // If CheckInputs fails for some other reason,
-                    // continue to consider other transactions for inclusion
-                    // in this block. This should almost never happen-- it
-                    // could theoretically happen if a timelocked transaction
-                    // entered the mempool after the lock time, but then the
-                    // blockchain re-orgs to a more-work chain with a lower
-                    // height or time.
-                    continue;
-            }
+                continue;
 
             UpdateCoins(tx, state, view, nHeight);
 
