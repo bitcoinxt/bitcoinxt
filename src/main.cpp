@@ -305,7 +305,6 @@ struct CNodeState {
     //! the thin block the node is currently providing to us
     boost::shared_ptr<ThinBlockWorker> thinblock;
     std::set<uint256> recentThinBlockTx;
-    bool thinBlockRerequesting;
 
     CNodeState(NodeId id) {
         fCurrentlyConnected = false;
@@ -319,7 +318,6 @@ struct CNodeState {
         nBlocksInFlight = 0;
         nBlocksInFlightValidHeaders = 0;
         fPreferredDownload = false;
-        thinBlockRerequesting = false;
         thinblock.reset(new ThinBlockWorker(thinblockmgr, id));
     }
 
@@ -5349,7 +5347,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                 else
                     txsMissing = thinblock.getTxsMissing();
                 bool reRequest = txsMissing.size();
-                bool giveUp = reRequest && nodestate->thinBlockRerequesting;
+                bool giveUp = reRequest && thinblock.isReRequesting();
 
                 if (giveUp) {
                     LogPrintf("Re-reqested transactions for thin block %s from %d, peer did not follow up. Disconnecting peer.\n",
@@ -5370,12 +5368,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                         LogPrintf("Re-requesting tx %s\n", m->ToString());
                     }
                     assert(hashesToReRequest.size() > 0);
-                    nodestate->thinBlockRerequesting = true;
+                    thinblock.setReRequesting(true);
                     pfrom->PushMessage("getdata", hashesToReRequest);
                     pfrom->PushMessage("ping", pfrom->thinBlockNonce);
                 }
                 else {
-                    nodestate->thinBlockRerequesting = false;
+                    thinblock.setReRequesting(false);
                 }
             } else {
                 sProblem = "Unsolicited pong without ping";
