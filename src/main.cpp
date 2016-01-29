@@ -215,7 +215,7 @@ void InitRespendFilter() {
 }
 
 bool UsingThinBlocks() {
-    return GetBoolArg("-use-thin-blocks", false);
+    return GetBoolArg("-use-thin-blocks", true);
 }
 
 /// Avoid requesting full block when we're cought up with the block chain.
