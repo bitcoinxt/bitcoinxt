@@ -233,9 +233,9 @@ void ThinBlockManager::finishBlock(const uint256& h) {
     for (auto_ w = workers.begin(); w != workers.end(); ++w)
         peers.push_back((*w)->nodeID());
 
-    removeIfExists(h);
     ThinBlockFinishedCallb& callb = *finishedCallb;
     callb(block, peers);
+    removeIfExists(h);
 }
 
 

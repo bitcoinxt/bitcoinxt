@@ -436,8 +436,6 @@ bool MarkBlockAsReceived(const uint256& hash) {
     std::vector<QueuedBlockPtr> queued = blocksInFlight.queuedPtrsFor(hash);
     typedef std::vector<QueuedBlockPtr>::const_iterator auto_;
     for (auto_ q = queued.begin(); q != queued.end(); ++q) {
-        // Thin block downloads already have their queued item erased.
-        // Need to erase full block downloads here.
         InFlightEraserImpl erase;
         erase((*q)->node, hash);
     }
@@ -681,10 +679,8 @@ void OnBlockFinished::rejectAndPunish(const CValidationState& state,
 void InFlightEraserImpl::operator()(NodeId node, const uint256& hash) {
     LOCK(cs_main);
     QueuedBlockPtr q = blocksInFlight.queuedItem(node, hash);
-    if (q == QueuedBlockPtr()) {
-        LogPrint("relayperf", "Received block %s that was not marked as in flight from peer %d\n");
+    if (q == QueuedBlockPtr())
         return;
-    }
 
     NodeStatePtr state(q->node);
     assert(!state.IsNull());
