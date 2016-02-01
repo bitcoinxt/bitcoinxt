@@ -125,6 +125,7 @@ class ThinBlockWorker : boost::noncopyable {
         void setToWork(const uint256& block);
         bool isReRequesting() const;
         void setReRequesting(bool);
+        bool isOnlyWorker() const; // no other peers providing this block
 
     private:
         ThinBlockManager& manager;

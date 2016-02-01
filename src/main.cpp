@@ -26,6 +26,7 @@
 #include "validationinterface.h"
 #include "options.h"
 #include "thinblockbuilder.h"
+#include "thinblockconcluder.h"
 #include "process_merkleblock.h"
 
 #include <sstream>
@@ -443,21 +444,23 @@ bool MarkBlockAsReceived(const uint256& hash) {
     return !queued.empty();
 }
 
-// Requires cs_main.
-void MarkBlockAsInFlight(NodeId nodeid, const uint256& hash, const Consensus::Params& consensusParams, CBlockIndex *pindex = NULL) {
-    AssertLockHeld(cs_main);
+struct MarkBlockAsInFlight : public BlockInFlightMarker {
 
-    NodeStatePtr state(nodeid);
-    assert(!state.IsNull());
+    void operator()(NodeId nodeid, const uint256& hash, const Consensus::Params& consensusParams, CBlockIndex *pindex = NULL) {
+        AssertLockHeld(cs_main);
 
-    int64_t nNow = GetTimeMicros();
-    QueuedBlock newentry = {hash, pindex, nNow, pindex != NULL, GetBlockTimeout(nNow, nQueuedValidatedHeaders, consensusParams), nodeid};
-    nQueuedValidatedHeaders += newentry.fValidatedHeaders;
-    list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
-    state->nBlocksInFlight++;
-    state->nBlocksInFlightValidHeaders += newentry.fValidatedHeaders;
-    blocksInFlight.insert(it);
-}
+        NodeStatePtr state(nodeid);
+        assert(!state.IsNull());
+
+        int64_t nNow = GetTimeMicros();
+        QueuedBlock newentry = {hash, pindex, nNow, pindex != NULL, GetBlockTimeout(nNow, nQueuedValidatedHeaders, consensusParams), nodeid};
+        nQueuedValidatedHeaders += newentry.fValidatedHeaders;
+        list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
+        state->nBlocksInFlight++;
+        state->nBlocksInFlightValidHeaders += newentry.fValidatedHeaders;
+        blocksInFlight.insert(it);
+    };
+};
 
 /** Check whether the last unknown block a peer advertized is not yet known. */
 static void ProcessBlockAvailability(NodeStatePtr& state) {
@@ -4344,7 +4347,7 @@ void ProcessInvMsgBlock(CNode* pfrom, CInv inv, std::vector<CInv>& toFetch) {
     }
 
     if (markAsInFlight)
-        MarkBlockAsInFlight(pfrom->id, inv.hash, Params().GetConsensus());
+        MarkBlockAsInFlight()(pfrom->id, inv.hash, Params().GetConsensus());
 }
 } // ns processinv
 
@@ -5324,53 +5327,13 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                         sProblem = "Nonce zero";
                     }
                 }
-            } else if (pfrom->thinBlockNonce == nonce) {
-                // This marks the end of the transactions we've received. If we get this and we have NOT been able to
-                // finish reassembling the block, we need to re-request the transactions we're missing: this should
-                // only happen if we download a transaction and then delete it from memory.
+            } else if (nonce && pfrom->thinBlockNonce == nonce) {
                 LOCK(cs_main);
-
                 NodeStatePtr nodestate(pfrom->id);
                 ThinBlockWorker& thinblock = *(nodestate->thinblock);
-
-                // If it the thin block is finished, it the worker will be null.
-                //
-                // If node sends us headers, does not send us a merkleblock, but sends us a pong,
-                // it will have a worker without a thin block stub.
-                std::vector<uint256> txsMissing;
-                if (thinblock.isAvailable() || !thinblock.isStubBuilt())
-                    txsMissing = std::vector<uint256>();
-                else
-                    txsMissing = thinblock.getTxsMissing();
-                bool reRequest = txsMissing.size();
-                bool giveUp = reRequest && thinblock.isReRequesting();
-
-                if (giveUp) {
-                    LogPrintf("Re-reqested transactions for thin block %s from %d, peer did not follow up. Disconnecting peer.\n",
-                            thinblock.blockStr(), pfrom->id);
-                    pfrom->fDisconnect = true;
-                    // FIXME: Disconnecting is a too harsh. We should probably
-                    // just clean up block and let the peer stay connected.
-                }
-                else if (reRequest) {
-                    LogPrint("thin", "Missing %d transactions for thin block %s, re-requesting (consider adjusting relay policies)\n",
-                            txsMissing.size(), thinblock.blockStr());
-
-                    std::vector<CInv> hashesToReRequest;
-                    typedef std::vector<uint256>::const_iterator auto_;
-
-                    for (auto_ m = txsMissing.begin(); m != txsMissing.end(); ++m) {
-                        hashesToReRequest.push_back(CInv(MSG_TX, *m));
-                        LogPrintf("Re-requesting tx %s\n", m->ToString());
-                    }
-                    assert(hashesToReRequest.size() > 0);
-                    thinblock.setReRequesting(true);
-                    pfrom->PushMessage("getdata", hashesToReRequest);
-                    pfrom->PushMessage("ping", pfrom->thinBlockNonce);
-                }
-                else {
-                    thinblock.setReRequesting(false);
-                }
+                MarkBlockAsInFlight m;
+                ThinBlockConcluder concludeDownload(m);
+                concludeDownload(pfrom, nonce, thinblock);
             } else {
                 sProblem = "Unsolicited pong without ping";
             }
@@ -5853,7 +5816,7 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
                     : MSG_BLOCK;
 
                 vGetData.push_back(CInv(type, pindex->GetBlockHash()));
-                MarkBlockAsInFlight(pto->GetId(), pindex->GetBlockHash(), consensusParams, pindex);
+                MarkBlockAsInFlight()(pto->GetId(), pindex->GetBlockHash(), consensusParams, pindex);
                 LogPrint("net", "Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
                     pindex->nHeight, pto->id);
             }

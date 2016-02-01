@@ -304,3 +304,7 @@ bool ThinBlockWorker::isReRequesting() const {
 void ThinBlockWorker::setReRequesting(bool r) {
     isReRequesting_ = r;
 }
+
+bool ThinBlockWorker::isOnlyWorker() const {
+    return manager.numWorkers(block) == 1;
+}
