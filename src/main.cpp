@@ -5797,14 +5797,17 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             std::set<NodeId> stallers;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - statePtr->nBlocksInFlight, vToDownload, stallers);
             BOOST_FOREACH(CBlockIndex *pindex, vToDownload) {
-                int type = ThinBlocksActive(pto)
-                    ? MSG_FILTERED_BLOCK
-                    : MSG_BLOCK;
+                int type = MSG_BLOCK;
+                ThinBlockWorker& worker = *(statePtr->thinblock);
+                if (ThinBlocksActive(pto) && worker.isAvailable()) {
+                    type = MSG_FILTERED_BLOCK;
+                    worker.setToWork(pindex->GetBlockHash());
+                }
 
                 vGetData.push_back(CInv(type, pindex->GetBlockHash()));
                 MarkBlockAsInFlight()(pto->GetId(), pindex->GetBlockHash(), consensusParams, pindex);
-                LogPrint("net", "Requesting block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
-                    pindex->nHeight, pto->id);
+                LogPrint("net", "Requesting block %s (%d, type %d) peer=%d\n", pindex->GetBlockHash().ToString(),
+                    pindex->nHeight, type, pto->id);
             }
             if (statePtr->nBlocksInFlight == 0 && !stallers.empty()) {
                 typedef set<NodeId>::const_iterator auto_;
