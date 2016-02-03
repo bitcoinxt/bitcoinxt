@@ -20,7 +20,8 @@ bool HaveBlockData(const uint256& hash) {
 // hem due to various policies or running out of memory, then we won't be
 // able to reassemble the block. So we must ask the peer to send the
 // transactions again.
-void SendPing(CNode& pfrom) {
+void SendPing(CNode& pfrom, const uint256& block) {
+    pfrom.thinBlockNonceBlock = block;
     pfrom.thinBlockNonce = 0;
     while (pfrom.thinBlockNonce == 0)
         GetRandBytes((unsigned char*)&pfrom.thinBlockNonce,
@@ -40,11 +41,6 @@ void ProcessMerkleBlock(CNode& pfrom, CDataStream& vRecv,
     pfrom.AddInventoryKnown(CInv(MSG_BLOCK, hash));
 
 
-    if (!worker.isAvailable() && worker.blockHash() != hash)
-        LogPrint("thin", "expected peer %d to be working on %s, "
-                "but received block %s, switching peer to new block\n",
-                pfrom.id, worker.blockStr(), hash.ToString());
-
     if (HaveBlockData(hash)) {
         LogPrint("thin", "already had block %s, "
                 "ignoring merkleblock (peer %d)\n",
@@ -53,12 +49,17 @@ void ProcessMerkleBlock(CNode& pfrom, CDataStream& vRecv,
         return;
     }
 
+    if (!worker.isAvailable() && worker.blockHash() != hash)
+        LogPrint("thin", "expected peer %d to be working on %s, "
+                "but received block %s, switching peer to new block\n",
+                pfrom.id, worker.blockStr(), hash.ToString());
+
     worker.setToWork(hash);
 
     if (worker.isStubBuilt()) {
         LogPrint("thin", "already built thin block stub "
                 "%s (peer %d)\n", hash.ToString(), pfrom.id);
-        SendPing(pfrom);
+        SendPing(pfrom, hash);
         return;
     }
 
@@ -71,7 +72,7 @@ void ProcessMerkleBlock(CNode& pfrom, CDataStream& vRecv,
     // entirely for now.
     try {
         worker.buildStub(merkleBlock, txfinder);
-        SendPing(pfrom);
+        SendPing(pfrom, hash);
     }
     catch (const thinblock_error& e) {
         pfrom.PushMessage("reject", std::string("merkleblock"),

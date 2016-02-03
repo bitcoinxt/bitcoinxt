@@ -10,14 +10,24 @@
 void ThinBlockConcluder::operator()(CNode* pfrom,
     uint64_t nonce, ThinBlockWorker& worker) {
 
-    pfrom->thinBlockNonce = 0;
-
     // If it the thin block is finished, it the worker will be available.
-    if (worker.isAvailable())
+    if (worker.isAvailable()) {
+        pfrom->thinBlockNonce = 0;
+        pfrom->thinBlockNonceBlock.SetNull();
         return;
+    }
+
+    if (pfrom->thinBlockNonceBlock != worker.blockHash()) {
+        LogPrint("thin", "thinblockconcluder: pong response for a different download (%s, currently waiting for %s). Ignoring.\n",
+            pfrom->thinBlockNonceBlock.ToString(), worker.blockStr());
+        return;
+    }
+
+    pfrom->thinBlockNonce = 0;
+    pfrom->thinBlockNonceBlock.SetNull();
 
     // If node sends us headers, does not send us a merkleblock, but sends us a pong,
-    // it will have a worker without a thin block stub.
+    // then the worker will be without a stub.
     if (!worker.isAvailable() && !worker.isStubBuilt()) {
         LogPrintf("Peer %d did not provide us a merkleblock for %s\n",
                 pfrom->id, worker.blockStr());
@@ -52,6 +62,7 @@ void ThinBlockConcluder::reRequest(
     assert(hashesToReRequest.size() > 0);
     worker.setReRequesting(true);
     pfrom->thinBlockNonce = nonce;
+    pfrom->thinBlockNonceBlock = worker.blockHash();
     pfrom->PushMessage("getdata", hashesToReRequest);
     pfrom->PushMessage("ping", nonce);
 }

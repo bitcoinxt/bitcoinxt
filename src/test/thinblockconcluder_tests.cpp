@@ -105,6 +105,7 @@ BOOST_AUTO_TEST_CASE(merkleblock_not_provided) {
     ThinBlockWorker worker(tmgr, 42);
     uint256 dummyhash;
     dummyhash.SetHex("0xDEADBEA7");
+    pfrom.thinBlockNonceBlock = dummyhash;
     worker.setToWork(dummyhash);
     DummyConcluder c;
     c(&pfrom, nonce, worker);
@@ -119,6 +120,7 @@ BOOST_AUTO_TEST_CASE(merkleblock_not_provided) {
 // and peer is able to provide.
 BOOST_AUTO_TEST_CASE(rerequest_success) {
     ThinBlockWorker worker(tmgr, 42);
+    pfrom.thinBlockNonceBlock = mblock.header.GetHash();
     worker.setToWork(mblock.header.GetHash());
     worker.buildStub(mblock, NullFinder());
     BOOST_CHECK(!worker.isReRequesting());
@@ -128,6 +130,7 @@ BOOST_AUTO_TEST_CASE(rerequest_success) {
     BOOST_CHECK_EQUAL(1, c.reRequestCalled);
     BOOST_CHECK_EQUAL(0, c.giveUpCalled);
     BOOST_CHECK(worker.isReRequesting());
+    BOOST_CHECK_EQUAL(mblock.header.GetHash().ToString(), pfrom.thinBlockNonceBlock.ToString());
     BOOST_CHECK_EQUAL(nonce, pfrom.thinBlockNonce);
 
     // Provide all the transactions.
@@ -151,6 +154,7 @@ BOOST_AUTO_TEST_CASE(re_request_not_fulfilled_one_worker) {
     worker.setToWork(mblock.header.GetHash());
     worker.buildStub(mblock, NullFinder());
     worker.setReRequesting(true);
+    pfrom.thinBlockNonceBlock = mblock.header.GetHash();
 
     // We have re-requested the missing transactions, but block is still incomplete.
     DummyConcluder c;
@@ -176,6 +180,7 @@ BOOST_AUTO_TEST_CASE(re_request_not_fulfilled_multiple_workers) {
     worker1.buildStub(mblock, NullFinder());
     worker1.setReRequesting(true);
     worker2.setReRequesting(true);
+    pfrom.thinBlockNonceBlock = mblock.header.GetHash();
 
     DummyConcluder c;
 
@@ -185,13 +190,35 @@ BOOST_AUTO_TEST_CASE(re_request_not_fulfilled_multiple_workers) {
     BOOST_CHECK_EQUAL(0, c.reRequestCalled);
     BOOST_CHECK_EQUAL(1, c.giveUpCalled);
     BOOST_CHECK_EQUAL(0, c.fallbackDownloadCalled);
-    c(&pfrom, nonce, worker2);
+
 
     // Second (and last) worker to give up. Fall back to full download.
+    pfrom.thinBlockNonceBlock = mblock.header.GetHash();
+    c(&pfrom, nonce, worker2);
+
     BOOST_CHECK_EQUAL(0, c.misbehave);
     BOOST_CHECK_EQUAL(0, c.reRequestCalled);
     BOOST_CHECK_EQUAL(2, c.giveUpCalled);
     BOOST_CHECK_EQUAL(1, c.fallbackDownloadCalled);
+}
+
+BOOST_AUTO_TEST_CASE(ignore_old_pongs) {
+    uint256 dummyhash1, dummyhash2;
+    dummyhash1.SetHex("0xBADF00D");
+    dummyhash2.SetHex("0xBADBEEF");
+
+    pfrom.thinBlockNonce = nonce;
+    pfrom.thinBlockNonceBlock = dummyhash1;
+    ThinBlockWorker worker(tmgr, 42);
+    worker.setToWork(dummyhash2); // working on next block
+    DummyConcluder c;
+    c(&pfrom, pfrom.thinBlockNonce, worker);
+
+    // Should have been ignored.
+    BOOST_CHECK_EQUAL(0, c.reRequestCalled);
+    BOOST_CHECK_EQUAL(0, c.giveUpCalled);
+    BOOST_CHECK_EQUAL(nonce, pfrom.thinBlockNonce);
+    BOOST_CHECK_EQUAL(dummyhash1.ToString(), pfrom.thinBlockNonceBlock.ToString());
 }
 
 BOOST_AUTO_TEST_SUITE_END();
