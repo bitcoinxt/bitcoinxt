@@ -4747,7 +4747,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         pfrom->nTimeOffset = nTimeOffset;
         AddTimeData(pfrom->addr, nTimeOffset);
 
-        if (ThinBlocksActive(pfrom))
+        if (UsingThinBlocks() && pfrom->SupportsThinBlocks())
         {
             LogPrint("thin", "Enabling thin blocks on peer %d\n", pfrom->id);
             pfrom->PushMessage("filterload", CBloomFilter());
@@ -5216,20 +5216,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         OnBlockFinished callb(strCommand);
         callb(block, std::vector<NodeId>(1, pfrom->id));
-
-        // If we have received a block that's near to the current time, then switch to downloading thin blocks
-        // to save bandwidth and reduce block download times (if we haven't already switched).
-        if (ThinBlocksActive(pfrom)) {
-            LOCK(cs_vNodes);
-            BOOST_FOREACH(CNode* pnode, vNodes)
-            {
-                if (!pnode->SupportsThinBlocks())
-                    continue;
-
-                LogPrint("thin", "Enabling thin blocks on peer %d\n", pnode->id);
-                pnode->PushMessage("filterload", CBloomFilter());
-            }
-        }
     }
 
 
