@@ -123,12 +123,15 @@ class ThinBlockWorker : boost::noncopyable {
         virtual void buildStub(const CMerkleBlock& m, const TxFinder& txFinder);
         virtual bool isStubBuilt() const;
         void setToWork(const uint256& block);
+        bool isReRequesting() const;
+        void setReRequesting(bool);
+        bool isOnlyWorker() const; // no other peers providing this block
 
     private:
         ThinBlockManager& manager;
         uint256 block;
         // if we-re currently re-requesting txs for thin block it provided us
-        bool isReRequesting;
+        bool isReRequesting_;
         NodeId node;
 };
 

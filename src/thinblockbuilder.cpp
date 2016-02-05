@@ -233,14 +233,14 @@ void ThinBlockManager::finishBlock(const uint256& h) {
     for (auto_ w = workers.begin(); w != workers.end(); ++w)
         peers.push_back((*w)->nodeID());
 
-    removeIfExists(h);
     ThinBlockFinishedCallb& callb = *finishedCallb;
     callb(block, peers);
+    removeIfExists(h);
 }
 
 
 ThinBlockWorker::ThinBlockWorker(ThinBlockManager& m, NodeId nodeID) :
-    manager(m), isReRequesting(false), node(nodeID)
+    manager(m), isReRequesting_(false), node(nodeID)
 {
 }
 
@@ -265,7 +265,7 @@ void ThinBlockWorker::setAvailable() {
         return;
     manager.delWorker(*this, node);
     block.SetNull();
-    isReRequesting = false;
+    isReRequesting_ = false;
 }
 
 bool ThinBlockWorker::isAvailable() const {
@@ -288,11 +288,23 @@ void ThinBlockWorker::setToWork(const uint256& newblock) {
 
     manager.delWorker(*this, node);
     block = newblock;
-    isReRequesting = false;
+    isReRequesting_ = false;
     manager.addWorker(newblock, *this);
 }
 
 void ThinBlockWorker::buildStub(const CMerkleBlock& m, const TxFinder& txFinder) {
     assert(block == m.header.GetHash());
     manager.buildStub(m, txFinder);
+}
+
+bool ThinBlockWorker::isReRequesting() const {
+    return isReRequesting_;
+}
+
+void ThinBlockWorker::setReRequesting(bool r) {
+    isReRequesting_ = r;
+}
+
+bool ThinBlockWorker::isOnlyWorker() const {
+    return manager.numWorkers(block) == 1;
 }

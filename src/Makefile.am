@@ -141,6 +141,7 @@ BITCOIN_CORE_H = \
   support/pagelocker.h \
   sync.h \
   thinblockbuilder.h \
+  thinblockconcluder.h \
   threadsafety.h \
   timedata.h \
   tinyformat.h \
@@ -211,6 +212,7 @@ libbitcoin_server_a_SOURCES = \
   rpcserver.cpp \
   script/sigcache.cpp \
   thinblockbuilder.cpp \
+  thinblockconcluder.cpp \
   timedata.cpp \
   txdb.cpp \
   txmempool.cpp \

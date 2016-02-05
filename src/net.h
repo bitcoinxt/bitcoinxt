@@ -297,6 +297,7 @@ public:
 
     // the nonce we expect to find in a pong message marking end of thin block tx data.
     uint64_t thinBlockNonce;
+    uint256 thinBlockNonceBlock; //< In what context was the nonce created
 
 protected:
 
