@@ -2191,5 +2191,5 @@ bool CNode::SupportsThinBlocks() const {
     //
     // Use SENDHEADERS_VERSION as a (temporary) means of
     // detecting Bitcoin Core 0.12
-    return nVersion < SENDHEADERS_VERSION;
+    return nVersion < SENDHEADERS_VERSION || nServices & NODE_GETUTXO;
 }

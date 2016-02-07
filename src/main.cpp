@@ -216,10 +216,12 @@ void InitRespendFilter() {
 }
 
 bool UsingThinBlocks() {
+    if (Opt().IsStealthMode())
+        return false;
     return GetBoolArg("-use-thin-blocks", true);
 }
 
-/// Avoid requesting full block when we're cought up with the block chain.
+/// Avoid requesting full block when we're caught up with the block chain.
 /// Wait a short while for a thin block supporting node to announce it.
 bool AvoidFullBlocks() {
     return GetArg("-use-thin-blocks", 1) == 2;
