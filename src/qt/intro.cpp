@@ -6,6 +6,7 @@
 #include "ui_intro.h"
 
 #include "guiutil.h"
+#include "guiconstants.h"
 #include "scicon.h"
 
 #include "util.h"
@@ -19,10 +20,6 @@
 #include <cmath>
 
 static const uint64_t GB_BYTES = 1000000000LL;
-/* Minimum free space (in GB) needed for data directory */
-static const uint64_t BLOCK_CHAIN_SIZE = 80;
-/* Minimum free space (in GB) needed for data directory when pruned; Does not include prune target */
-static const uint64_t CHAIN_STATE_SIZE = 2;
 /* Total required space (in GB) depending on user choice (prune, not prune) */
 static uint64_t requiredSpace;
 

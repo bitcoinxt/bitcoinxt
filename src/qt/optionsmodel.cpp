@@ -11,6 +11,7 @@
 
 #include "bitcoinunits.h"
 #include "guiutil.h"
+#include "guiconstants.h" // for BLOCK_CHAIN_SIZE
 
 #include "amount.h"
 #include "init.h"
@@ -90,6 +91,19 @@ void OptionsModel::Init()
         settings.setValue("nThreadsScriptVerif", DEFAULT_SCRIPTCHECK_THREADS);
     if (!SoftSetArg("-par", settings.value("nThreadsScriptVerif").toString().toStdString()))
         addOverriddenOption("-par");
+    if (!settings.contains("bPrune"))
+        settings.setValue("bPrune", false);
+    if (!settings.contains("nPruneSize"))
+        settings.setValue("nPruneSize", static_cast<double>(BLOCK_CHAIN_SIZE)); // GB
+    if (settings.value("bPrune").toBool()) {
+        int mb = static_cast<int>(settings.value("nPruneSize").toDouble() * 1024);
+        if (!SoftSetArg("-prune", QString::number(mb).toStdString()))
+            addOverriddenOption("-prune");
+    }
+    else {
+        if (!SoftSetArg("-prune", "0")) // Disabled
+            addOverriddenOption("-prune");
+    }
 
     // Wallet
 #ifdef ENABLE_WALLET
@@ -250,6 +264,10 @@ QVariant OptionsModel::data(const QModelIndex & index, int role) const
             return settings.value("nSendBurst");
         case SendAve:
             return settings.value("nSendAve");
+        case Prune:
+            return settings.value("bPrune");
+        case PruneSize:
+            return settings.value("nPruneSize");
         default:
             return QVariant();
         }
@@ -396,6 +414,18 @@ bool OptionsModel::setData(const QModelIndex & index, const QVariant & value, in
             if (settings.value("nSendAve") != value) {
                 settings.setValue("nSendAve",value);
                 changeSendShaper = true;
+            }
+            break;
+        case Prune:
+            if (settings.value("bPrune") != value) {
+                settings.setValue("bPrune", value);
+                setRestartRequired(true);
+            }
+            break;
+        case PruneSize:
+            if (settings.value("nPruneSize") != value) {
+                settings.setValue("nPruneSize", value);
+                setRestartRequired(true);
             }
             break;
         default:

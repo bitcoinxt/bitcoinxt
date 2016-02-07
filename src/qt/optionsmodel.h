@@ -48,6 +48,8 @@ public:
         ReceiveAve,             // int
         SendBurst,              // int
         SendAve,                // int
+        Prune,                  // bool
+        PruneSize,              // int
         OptionIDRowCount,
     };
 
