@@ -80,6 +80,7 @@ BITCOIN_TESTS =\
   test/thinblockbuilder_tests.cpp \
   test/thinblockconcluder_tests.cpp \
   test/thinblockutil.cpp \
+  test/thinblockutil.h \
   test/timedata_tests.cpp \
   test/transaction_tests.cpp \
   test/uint256_tests.cpp \
