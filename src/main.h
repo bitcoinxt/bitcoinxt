@@ -583,4 +583,9 @@ uint32_t MaxBlockSighash(uint32_t nBlockTime);
 /** Maximum number of legacy sigops in a block */
 uint32_t MaxLegacySigops(uint32_t nBlockTime);
 
+/**
+ * Determine what nVersion a new block should use.
+ */
+int32_t ComputeBlockVersion(const CBlockIndex* pindexPrev, const Consensus::Params& params);
+
 #endif // BITCOIN_MAIN_H
