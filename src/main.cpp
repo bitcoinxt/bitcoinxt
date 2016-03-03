@@ -6340,7 +6340,11 @@ uint32_t MaxLegacySigops(uint32_t nBlockTime)
     return std::numeric_limits<uint32_t>::max(); // Use accurately-counted limit
 }
 
-
+ThresholdState VersionBitsTipState(const Consensus::Params& params, Consensus::DeploymentPos pos)
+{
+    LOCK(cs_main);
+    return VersionBitsState(chainActive.Tip(), params, pos, versionbitscache);
+}
 
 class CMainCleanup
 {
