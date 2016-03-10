@@ -16,6 +16,7 @@ fi
 #Run the tests
 
 testScripts=(
+    'bip68-112-113-p2p.py'
     'spv.py'
     'wallet.py'
     'listtransactions.py'
