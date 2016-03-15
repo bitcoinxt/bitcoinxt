@@ -41,6 +41,7 @@ BITCOIN_TESTS =\
   test/base64_tests.cpp \
   test/bip32_tests.cpp \
   test/block_size_tests.cpp \
+  test/blocksender_tests.cpp \
   test/bloom_tests.cpp \
   test/checkblock_tests.cpp \
   test/Checkpoints_tests.cpp \
@@ -58,6 +59,7 @@ BITCOIN_TESTS =\
   test/mempool_tests.cpp \
   test/miner_tests.cpp \
   test/multisig_tests.cpp \
+  test/net_tests.cpp \
   test/netbase_tests.cpp \
   test/p2p_protocol_tests.cpp \
   test/pmt_tests.cpp \
@@ -79,13 +81,15 @@ BITCOIN_TESTS =\
   test/test_bitcoin.h \
   test/thinblockbuilder_tests.cpp \
   test/thinblockconcluder_tests.cpp \
+  test/thinblockmanager_tests.cpp \
   test/thinblockutil.cpp \
   test/thinblockutil.h \
   test/timedata_tests.cpp \
   test/transaction_tests.cpp \
   test/uint256_tests.cpp \
   test/univalue_tests.cpp \
-  test/util_tests.cpp
+  test/util_tests.cpp \
+  test/xthin_tests.cpp
 
 if ENABLE_WALLET
 BITCOIN_TESTS += \

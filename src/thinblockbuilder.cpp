@@ -1,26 +1,29 @@
 #include "thinblockbuilder.h"
-#include "merkleblock.h"
+#include "thinblock.h"
 #include "util.h"
-#include <utility>
-#include <sstream>
+#include "merkleblock.h"
+#include "xthin.h"
+#include "uint256.h"
 
-ThinBlockBuilder::ThinBlockBuilder(const CMerkleBlock& m, const TxFinder& txFinder) :
-    missing(NOT_BUILDING)
+ThinBlockBuilder::ThinBlockBuilder(const CBlockHeader& header,
+        const std::vector<ThinTx>& txs, const TxFinder& txFinder) :
+    wantedTxs(txs),
+    missing(txs.size())
 {
-    thinBlock.nVersion = m.header.nVersion;
-    thinBlock.nBits = m.header.nBits;
-    thinBlock.nNonce = m.header.nNonce;
-    thinBlock.nTime = m.header.nTime;
-    thinBlock.hashMerkleRoot = m.header.hashMerkleRoot;
-    thinBlock.hashPrevBlock = m.header.hashPrevBlock;
-    wantedTxs = getHashes(m);
+    thinBlock.nVersion = header.nVersion;
+    thinBlock.nBits = header.nBits;
+    thinBlock.nNonce = header.nNonce;
+    thinBlock.nTime = header.nTime;
+    thinBlock.hashMerkleRoot = header.hashMerkleRoot;
+    thinBlock.hashPrevBlock = header.hashPrevBlock;
 
     missing = wantedTxs.size();
-    typedef std::vector<uint256>::const_iterator auto_;
+    typedef std::vector<ThinTx>::const_iterator auto_;
     for (auto_ h = wantedTxs.begin(); h != wantedTxs.end(); ++h) {
         CTransaction tx = txFinder(*h);
         if (!tx.IsNull())
             --missing;
+
         // keep null txs, we'll download them later.
         // coinbase is guaranteed to be missing
         thinBlock.vtx.push_back(tx);
@@ -28,28 +31,11 @@ ThinBlockBuilder::ThinBlockBuilder(const CMerkleBlock& m, const TxFinder& txFind
     LogPrint("thin", "%d out of %d txs missing\n", missing, wantedTxs.size());
 }
 
-std::vector<uint256> ThinBlockBuilder::getHashes(const CMerkleBlock& m) const {
-
-    std::vector<uint256> txHashes;
-    // FIXME: Calculate a sane number of max
-    // transactions here, or skip the check.
-    uint256 merkleRoot = CMerkleBlock(m).txn.ExtractMatches(txHashes);
-    if (m.header.hashMerkleRoot != merkleRoot)
-        throw thinblock_error("Failed to match Merkle root or bad tree in thin block");
-
-    return txHashes;
-}
-
-bool ThinBlockBuilder::isValid() const {
-    return missing != NOT_BUILDING;
-}
-
 ThinBlockBuilder::TXAddRes ThinBlockBuilder::addTransaction(const CTransaction& tx) {
-    assert(isValid());
     assert(!tx.IsNull());
-    typedef std::vector<uint256>::iterator auto_;
+    typedef std::vector<ThinTx>::iterator auto_;
     auto_ loc = std::find(
-            wantedTxs.begin(), wantedTxs.end(), tx.GetHash());
+            wantedTxs.begin(), wantedTxs.end(), ThinTx(tx.GetHash()));
 
     if (loc == wantedTxs.end()){
         // TX does not belong to block
@@ -69,20 +55,18 @@ ThinBlockBuilder::TXAddRes ThinBlockBuilder::addTransaction(const CTransaction& 
 }
 
 int ThinBlockBuilder::numTxsMissing() const {
-    assert(isValid());
     return missing;
 }
 
-std::vector<uint256> ThinBlockBuilder::getTxsMissing() const {
+std::vector<ThinTx> ThinBlockBuilder::getTxsMissing() const {
     assert(wantedTxs.size() == thinBlock.vtx.size());
-    assert(isValid());
 
-    std::vector<uint256> missing;
+    std::vector<ThinTx> missing;
 
-    for (size_t i = 0; i < wantedTxs.size(); ++i) {
+    for (size_t i = 0; i < wantedTxs.size(); ++i)
         if (thinBlock.vtx[i].IsNull())
             missing.push_back(wantedTxs[i]);
-    }
+
     assert(missing.size() == this->missing);
     return missing;
 }
@@ -112,199 +96,24 @@ CBlock ThinBlockBuilder::finishBlock() {
 
 
     CBlock block = thinBlock;
-    reset();
     return block;
 }
 
-void ThinBlockBuilder::reset() {
-    missing = NOT_BUILDING;
-    thinBlock.SetNull();
-    wantedTxs.clear();
-}
+void ThinBlockBuilder::replaceWantedTx(const std::vector<ThinTx>& tx) {
+    assert(!tx.empty());
 
-ThinBlockManager::ThinBlockManager(
-        std::auto_ptr<ThinBlockFinishedCallb> callb,
-        std::auto_ptr<InFlightEraser> inFlightEraser) :
-    finishedCallb(callb.release()), inFlightEraser(inFlightEraser.release())
-{ }
-
-void ThinBlockManager::addWorker(const uint256& block, ThinBlockWorker& w) {
-    if (!builders.count(block))
-        builders[block] = ThinBlockManager::ActiveBuilder();
-    builders[block].workers.insert(&w);
-}
-
-void ThinBlockManager::delWorker(ThinBlockWorker& w, NodeId nodeId) {
-    typedef std::map<uint256, ActiveBuilder>::iterator auto_;
-    for (auto_ a = builders.begin(); a != builders.end(); ++a) {
-        if (!a->second.workers.erase(&w))
-            continue; // not working on block.
-
-        if (a->second.workers.empty())
-            builders.erase(a);
-
-        InFlightEraser& erase = *inFlightEraser;
-        erase(nodeId, a->first);
-
-        return;
-    }
-}
-int ThinBlockManager::numWorkers(const uint256& block) const {
-    return builders.count(block)
-        ? builders.find(block)->second.workers.size()
-        : 0;
-}
-
-void ThinBlockManager::buildStub(const CMerkleBlock& m, const TxFinder& txFinder) {
-    uint256 h = m.header.GetHash();
-    assert(!isStubBuilt(h));
-    builders[h].builder = ThinBlockBuilder(m, txFinder);
-}
-
-bool ThinBlockManager::isStubBuilt(const uint256& block) const {
-    return builders.count(block)
-        && builders.find(block)->second.builder.isValid();
-}
-
-
-// Try to add transaction to the block peer is providing.
-// Returns true if tx belonged to block
-bool ThinBlockManager::addTx(const uint256& block, const CTransaction& tx) {
-    ThinBlockBuilder& b = builders[block].builder;
-
-    if (!b.isValid())
-        return false;
-
-    ThinBlockBuilder::TXAddRes res = b.addTransaction(tx);
-
-    if (res == ThinBlockBuilder::TX_UNWANTED) {
-        LogPrint("thin", "tx %s does not belong to block %s\n",
-                tx.GetHash().ToString(), block.ToString());
-        return false;
-    }
-
-    else if (res == ThinBlockBuilder::TX_DUP)
-        LogPrint("thin2", "already had tx %s\n",
-                tx.GetHash().ToString());
-
-    else if (res == ThinBlockBuilder::TX_ADDED)
-        LogPrint("thin2", "added transaction %s\n", tx.GetHash().ToString());
-
-    else { assert(!"unknown addTransaction response"); }
-
-    if (b.numTxsMissing() == 0)
-        finishBlock(block);
-
-    return true;
-}
-
-void ThinBlockManager::removeIfExists(const uint256& h) {
-    if (!builders.count(h))
+    if (wantedTxs.at(0).hasFull())
         return;
 
-    typedef std::set<ThinBlockWorker*>::iterator auto_;
-
-    // Take copy. Calling setAvailable causes workers to remove
-    // themself from set (changing it during iteration)
-    std::set<ThinBlockWorker*> workers = builders[h].workers;
-    for (auto_ w = workers.begin(); w != workers.end(); ++w)
-        (*w)->setAvailable();
-    builders.erase(h);
-}
-
-std::vector<uint256> ThinBlockManager::getTxsMissing(const uint256& hash) const {
-    assert(builders.count(hash));
-    return builders.find(hash)->second.builder.getTxsMissing();
-}
-
-void ThinBlockManager::finishBlock(const uint256& h) {
-    CBlock block;
-    try {
-        block = builders[h].builder.finishBlock();
-    }
-    catch (thinblock_error& e) {
-        LogPrintf("%s\n", e.what());
-        assert(!"FIXME: Handle finishBlock failing");
-    }
-
-    typedef std::set<ThinBlockWorker*>::iterator auto_;
-    std::vector<NodeId> peers;
-    std::set<ThinBlockWorker*> workers = builders[h].workers;
-    for (auto_ w = workers.begin(); w != workers.end(); ++w)
-        peers.push_back((*w)->nodeID());
-
-    ThinBlockFinishedCallb& callb = *finishedCallb;
-    callb(block, peers);
-    removeIfExists(h);
-}
-
-
-ThinBlockWorker::ThinBlockWorker(ThinBlockManager& m, NodeId nodeID) :
-    manager(m), isReRequesting_(false), node(nodeID)
-{
-}
-
-ThinBlockWorker::~ThinBlockWorker() {
-    manager.delWorker(*this, node);
-}
-
-bool ThinBlockWorker::addTx(const CTransaction& tx) {
-    return manager.addTx(block, tx);
-}
-
-std::string ThinBlockWorker::blockStr() const {
-    return block.ToString();
-}
-
-uint256 ThinBlockWorker::blockHash() const {
-    return block;
-}
-
-void ThinBlockWorker::setAvailable() {
-    if (isAvailable())
-        return;
-    manager.delWorker(*this, node);
-    block.SetNull();
-    isReRequesting_ = false;
-}
-
-bool ThinBlockWorker::isAvailable() const {
-    return block.IsNull();
-}
-
-std::vector<uint256> ThinBlockWorker::getTxsMissing() const {
-    assert(isStubBuilt());
-    return manager.getTxsMissing(block);
-}
-
-bool ThinBlockWorker::isStubBuilt() const {
-    return manager.isStubBuilt(block);
-}
-
-void ThinBlockWorker::setToWork(const uint256& newblock) {
-    assert(!newblock.IsNull());
-    if (newblock == block)
+    if (!tx.at(0).hasFull())
         return;
 
-    manager.delWorker(*this, node);
-    block = newblock;
-    isReRequesting_ = false;
-    manager.addWorker(newblock, *this);
-}
+    if (tx.size() != wantedTxs.size())
+        throw thinblock_error("transactions in stub do not match previous stub provided");
 
-void ThinBlockWorker::buildStub(const CMerkleBlock& m, const TxFinder& txFinder) {
-    assert(block == m.header.GetHash());
-    manager.buildStub(m, txFinder);
-}
+    for (size_t i = 0; i < tx.size(); ++i)
+        if (tx[i].cheap() != wantedTxs[i].cheap())
+            throw thinblock_error("txhash mismatch between provided stubs");
 
-bool ThinBlockWorker::isReRequesting() const {
-    return isReRequesting_;
-}
-
-void ThinBlockWorker::setReRequesting(bool r) {
-    isReRequesting_ = r;
-}
-
-bool ThinBlockWorker::isOnlyWorker() const {
-    return manager.numWorkers(block) == 1;
+    wantedTxs = tx;
 }

@@ -1,16 +1,13 @@
 #include "process_merkleblock.h"
-#include "main.h"
-#include "uint256.h"
-#include "net.h"
-#include "util.h"
-#include "thinblockbuilder.h"
-#include "merkleblock.h"
+#include "bloomthin.h"
 #include "consensus/validation.h"
-
-bool HaveBlockData(const uint256& hash) {
-    return mapBlockIndex.count(hash)
-        && mapBlockIndex.find(hash)->second->nStatus & BLOCK_HAVE_DATA;
-}
+#include "main.h" // Misbehaving, mapBlockIndex
+#include "merkleblock.h"
+#include "net.h"
+#include "thinblock.h"
+#include "uint256.h"
+#include "util.h"
+#include "utilprocessmsg.h"
 
 // Send a ping to serialize the connection and ensure we can figure out
 // when the remote peer thinks it finished sending us data. This reflects
@@ -32,19 +29,33 @@ void SendPing(CNode& pfrom, const uint256& block) {
 
 void ProcessMerkleBlock(CNode& pfrom, CDataStream& vRecv,
         ThinBlockWorker& worker,
-        const TxFinder& txfinder) {
+        const TxFinder& txfinder,
+        BlockHeaderProcessor& processHeader)
+{
 
     CMerkleBlock merkleBlock;
     vRecv >> merkleBlock;
 
+    if (pfrom.SupportsXThinBlocks()) {
+        LogPrint("thin", "Ignoring merkleblock from peer=%d,"
+                "peer should send xthin blocks\n", pfrom.id);
+        return;
+    }
+
     uint256 hash = merkleBlock.header.GetHash();
     pfrom.AddInventoryKnown(CInv(MSG_BLOCK, hash));
-
 
     if (HaveBlockData(hash)) {
         LogPrint("thin", "already had block %s, "
                 "ignoring merkleblock (peer %d)\n",
                 hash.ToString(), pfrom.id);
+        worker.setAvailable();
+        return;
+    }
+
+    std::vector<CBlockHeader> headers(1, merkleBlock.header);
+    if (!processHeader(headers, false)) {
+        LogPrint("thin", "Header failed for merkleblock peer=%d\n", pfrom.id);
         worker.setAvailable();
         return;
     }
@@ -56,22 +67,13 @@ void ProcessMerkleBlock(CNode& pfrom, CDataStream& vRecv,
 
     worker.setToWork(hash);
 
-    if (worker.isStubBuilt()) {
-        LogPrint("thin", "already built thin block stub "
-                "%s (peer %d)\n", hash.ToString(), pfrom.id);
-        SendPing(pfrom, hash);
-        return;
-    }
-
-    LogPrint("thin", "building thin block %s (peer %d) ",
+    LogPrint("thin", "received stub for block %s (peer %d) ",
             hash.ToString(), pfrom.id);
 
     // Now attempt to reconstruct the block from the state of our memory pool.
-    // The peer should have already sent us the transactions we need before
-    // sending us this message. If it didn't, we just ignore the message
-    // entirely for now.
     try {
-        worker.buildStub(merkleBlock, txfinder);
+        ThinBloomStub stubData(merkleBlock);
+        worker.buildStub(stubData, txfinder);
         SendPing(pfrom, hash);
     }
     catch (const thinblock_error& e) {

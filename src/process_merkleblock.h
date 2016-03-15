@@ -5,9 +5,11 @@ class CNode;
 class CDataStream;
 class ThinBlockWorker;
 class TxFinder;
+class BlockHeaderProcessor;
 
 void ProcessMerkleBlock(CNode& pfrom, CDataStream& vRecv,
         ThinBlockWorker& worker,
-        const TxFinder& txfinder);
+        const TxFinder& txfinder,
+        BlockHeaderProcessor& processHeader);
 
 #endif

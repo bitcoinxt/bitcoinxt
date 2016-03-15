@@ -10,6 +10,7 @@ struct BlockInFlightMarker;
 typedef int NodeId;
 class CBlockIndex;
 class uint256;
+struct XThinReReqResponse;
 
 namespace Consensus { struct Params; }
 
@@ -20,12 +21,12 @@ namespace Consensus { struct Params; }
 // we have NOT been able to finish reassembling the block, we need to
 // re-request the transactions we're missing: this should only happen if we
 // download a transaction and then delete it from memory.
-struct ThinBlockConcluder {
+struct BloomBlockConcluder {
     public:
-        ThinBlockConcluder(BlockInFlightMarker& m) : markInFlight(m)
+        BloomBlockConcluder(BlockInFlightMarker& m) : markInFlight(m)
         {
         }
-        virtual ~ThinBlockConcluder() { }
+        virtual ~BloomBlockConcluder() { }
         void operator()(CNode* pfrom,
             uint64_t nonce, ThinBlockWorker& thinblock);
 
@@ -50,5 +51,11 @@ struct BlockInFlightMarker {
         CBlockIndex *pindex) = 0;
 };
 inline BlockInFlightMarker::~BlockInFlightMarker() { }
+
+// Finishes a block using response from a transaction re-request.
+struct XThinBlockConcluder {
+    void operator()(const XThinReReqResponse& resp,
+        CNode& pfrom, ThinBlockWorker& worker);
+};
 
 #endif

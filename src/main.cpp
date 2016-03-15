@@ -8,26 +8,33 @@
 #include "addrman.h"
 #include "alert.h"
 #include "arith_uint256.h"
+#include "blocksender.h"
+#include "bloomthin.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "checkqueue.h"
 #include "consensus/validation.h"
+#include "dummythin.h"
 #include "inflightindex.h"
 #include "init.h"
 #include "merkleblock.h"
 #include "net.h"
+#include "options.h"
 #include "pow.h"
+#include "process_merkleblock.h"
+#include "process_xthinblock.h"
+#include "thinblockbuilder.h"
+#include "thinblockconcluder.h"
+#include "thinblockmanager.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
 #include "undo.h"
 #include "util.h"
+#include "utilprocessmsg.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
-#include "options.h"
-#include "thinblockbuilder.h"
-#include "thinblockconcluder.h"
-#include "process_merkleblock.h"
+#include "xthin.h"
 
 #include <sstream>
 #include <algorithm>
@@ -221,10 +228,16 @@ bool UsingThinBlocks() {
     return GetBoolArg("-use-thin-blocks", true);
 }
 
-/// Avoid requesting full block when we're caught up with the block chain.
-/// Wait a short while for a thin block supporting node to announce it.
+/// Don't request blocks from nodes hat don't support thin blocks.
 bool AvoidFullBlocks() {
-    return GetArg("-use-thin-blocks", 1) == 2;
+    return GetArg("-use-thin-blocks", 1) == 2
+        || GetArg("-use-thin-blocks" ,1) == 3;
+}
+
+// Makes only outbound connection to xthin-supporting nodes.
+// Implicitly enables "avoid full blocks".
+bool XThinBlocksOnly() {
+    return GetArg("-use-thin-blocks", 1) == 3;
 }
 
 
@@ -253,7 +266,7 @@ class OnBlockFinished : public ThinBlockFinishedCallb {
 struct InFlightEraserImpl : public InFlightEraser {
     virtual void operator()(NodeId, const uint256& block);
 };
-ThinBlockManager thinblockmgr(
+ThinBlockManager thinblockmg(
         std::auto_ptr<ThinBlockFinishedCallb>(new OnBlockFinished()), 
         std::auto_ptr<InFlightEraser>(new InFlightEraserImpl()));
 
@@ -321,9 +334,8 @@ struct CNodeState {
         nBlocksInFlight = 0;
         nBlocksInFlightValidHeaders = 0;
         fPreferredDownload = false;
-        thinblock.reset(new ThinBlockWorker(thinblockmgr, id));
+        thinblock.reset(new DummyThinWorker(thinblockmg, id));
     }
-
 };
 
 // Class that maintains per-node state, and
@@ -442,7 +454,7 @@ bool MarkBlockAsReceived(const uint256& hash) {
         InFlightEraserImpl erase;
         erase((*q)->node, hash);
     }
-    thinblockmgr.removeIfExists(hash);
+    thinblockmg.removeIfExists(hash);
     return !queued.empty();
 }
 
@@ -4257,7 +4269,8 @@ bool static AlreadyHave(const CInv& inv)
 // Activate thin blocks only if we're not doing bulk downloads (it's faster to use ordinary block messages when
 // catching up with the block chain).
 bool ThinBlocksActive(CNode* n) {
-    return !IsInitialBlockDownload() && UsingThinBlocks() && n->SupportsThinBlocks();
+    return !IsInitialBlockDownload() && UsingThinBlocks()
+        && (n->SupportsBloomThinBlocks() || n->SupportsXThinBlocks());
 }
 
 namespace processinv {
@@ -4281,15 +4294,19 @@ bool FullBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, NodeId id) {
     if (nodestate->nBlocksInFlight >= MAX_BLOCKS_IN_TRANSIT_PER_PEER)
         return false;
 
+    LogPrint("thin", "full block download of %s from %d\n",
+            inv.hash.ToString(), id);
+
     toFetch.push_back(inv);
     return true;
 }
 
-bool ThinBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, NodeId id) {
+bool ThinBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, CNode& node) {
 
     if (!AlmostSynced())
         return false;
 
+    NodeId id = node.id;
     NodeStatePtr nodestate(id);
     if (!nodestate->thinblock->isAvailable()) {
         LogPrint("thin", "peer %d is busy, won't req %s\n",
@@ -4297,7 +4314,7 @@ bool ThinBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, NodeId id) {
         return false;
     }
 
-    int numDownloading = thinblockmgr.numWorkers(inv.hash);
+    int numDownloading = thinblockmg.numWorkers(inv.hash);
     if (numDownloading >= ThinBlocksMaxParallel()) {
         LogPrint("thin", "max parallel thin req reached, not req %s from peer %d\n",
                 inv.hash.ToString(), id);
@@ -4306,10 +4323,8 @@ bool ThinBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, NodeId id) {
 
     LogPrint("thin", "requesting %s from peer %d (%d of %d parallel)\n",
             inv.hash.ToString(), id, (numDownloading + 1), ThinBlocksMaxParallel());
-    CInv thinFetchInv(inv);
-    thinFetchInv.type = MSG_FILTERED_BLOCK;
-    toFetch.push_back(thinFetchInv);
 
+    nodestate->thinblock->requestBlock(inv.hash, toFetch, node);
     nodestate->thinblock->setToWork(inv.hash);
 
     return true;
@@ -4323,12 +4338,19 @@ void ProcessInvMsgBlock(CNode* pfrom, CInv inv, std::vector<CInv>& toFetch) {
     if (!WeWantBlock(inv.hash))
         return;
 
-    // Headers must arrive before data. We can't know if headers from the first
-    // node has reached us before block from the second node, so as long as we
-    // haven't yet received  headers, we'll request if from all to enforce correct sequence.
-    // Receiving duplicate headers is fine.
-    bool headerFromMultiple = ThinBlocksActive(pfrom)
-        && thinblockmgr.numWorkers(inv.hash) < ThinBlocksMaxParallel();
+    bool doThinDownload  = ThinBlocksActive(pfrom)
+        && thinblockmg.numWorkers(inv.hash) < ThinBlocksMaxParallel();
+    bool downloadLater = false;
+
+    if (doThinDownload) {
+        if (ThinBlockDownload(inv, toFetch, *pfrom)) {
+            MarkBlockAsInFlight()(pfrom->id, inv.hash, Params().GetConsensus());
+            return;
+        }
+        else  {
+            downloadLater = true;
+        }
+    }
 
     // First request the headers preceding the announced block. In the normal fully-synced
     // case where a new block is announced that succeeds the current tip (no reorganization),
@@ -4339,28 +4361,25 @@ void ProcessInvMsgBlock(CNode* pfrom, CInv inv, std::vector<CInv>& toFetch) {
     // doing this will result in the received block being rejected as an orphan in case it is
     // not a direct successor.
 
-    if (headerFromMultiple || !blocksInFlight.isInFlight(inv.hash)) {
+    if (!blocksInFlight.isInFlight(inv.hash)) {
         pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), inv.hash);
         LogPrint("net", "getheaders (%d) %s to peer=%d\n",
                 pindexBestHeader->nHeight, inv.hash.ToString(), pfrom->id);
     }
 
-    bool markAsInFlight = false;
-    if (ThinBlocksActive(pfrom))
-        markAsInFlight = ThinBlockDownload(inv, toFetch, pfrom->id);
+    if (downloadLater) {
+        // Block can be downloaded with thin blocks,
+        // but not right now. Only get headers for now.
+        return;
+    }
 
-    else if (AvoidFullBlocks()) {
+    if (AvoidFullBlocks()) {
         LogPrint("thin", "avoiding full blocks, not requesting %s from %d\n",
                 inv.hash.ToString(), pfrom->id);
         return;
     }
-    else {
-        LogPrint("thin", "full block download of %s from %d\n",
-                inv.hash.ToString(), pfrom->id);
-        markAsInFlight = FullBlockDownload(inv, toFetch, pfrom->id);
-    }
 
-    if (markAsInFlight)
+    if (FullBlockDownload(inv, toFetch, pfrom->id))
         MarkBlockAsInFlight()(pfrom->id, inv.hash, Params().GetConsensus());
 }
 } // ns processinv
@@ -4383,72 +4402,16 @@ void static ProcessGetData(CNode* pfrom)
             boost::this_thread::interruption_point();
             it++;
 
-            if (inv.type == MSG_BLOCK || inv.type == MSG_FILTERED_BLOCK)
+            BlockSender blockSender;
+            if (blockSender.isBlockType(inv.type))
             {
-                bool send = false;
                 BlockMap::iterator mi = mapBlockIndex.find(inv.hash);
-                if (mi != mapBlockIndex.end())
-                {
-                    if (chainActive.Contains(mi->second)) {
-                        send = true;
-                    } else {
-                        static const int nOneMonth = 30 * 24 * 60 * 60;
-                        // To prevent fingerprinting attacks, only send blocks outside of the active
-                        // chain if they are valid, and no more than a month older (both in time, and in
-                        // best equivalent proof of work) than the best header chain we know about.
-                        send = mi->second->IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
-                            (pindexBestHeader->GetBlockTime() - mi->second->GetBlockTime() < nOneMonth) &&
-                            (GetBlockProofEquivalentTime(*pindexBestHeader, *mi->second, *pindexBestHeader, Params().GetConsensus()) < nOneMonth);
-                        if (!send) {
-                            LogPrintf("%s: ignoring request from peer=%i for old block that isn't in the main chain\n", __func__, pfrom->GetId());
-                        }
-                    }
-                }
-                // Pruned nodes may have deleted the block, so check whether
-                // it's available before trying to send.
-                if (send && (mi->second->nStatus & BLOCK_HAVE_DATA))
-                {
-                    // Send block from disk
-                    CBlock block;
-                    if (!ReadBlockFromDisk(block, (*mi).second))
-                        assert(!"cannot load block from disk");
-                    if (inv.type == MSG_BLOCK)
-                        pfrom->PushMessage("block", block);
-                    else // MSG_FILTERED_BLOCK)
-                    {
-                        LOCK(pfrom->cs_filter);
-                        if (pfrom->pfilter)
-                        {
-                            CMerkleBlock merkleBlock(block, *pfrom->pfilter);
-                            pfrom->PushMessage("merkleblock", merkleBlock);
-                            // CMerkleBlock just contains hashes, so also push any transactions in the block the client did not see
-                            // This avoids hurting performance by pointlessly requiring a round-trip
-                            // Note that there is currently no way for a node to request any single transactions we didn't send here -
-                            // they must either disconnect and retry or request the full block.
-                            // Thus, the protocol spec specified allows for us to provide duplicate txn here,
-                            // however we MUST always provide at least what the remote peer needs
-                            LOCK(pfrom->cs_inventory);
-                            typedef std::pair<unsigned int, uint256> PairType;
-                            BOOST_FOREACH(PairType& pair, merkleBlock.vMatchedTxn)
-                                if (!pfrom->filterInventoryKnown.contains(pair.second))
-                                    pfrom->PushMessage("tx", block.vtx[pair.first]);
-                        }
-                        // else
-                            // no response
-                    }
+                bool haveBlock = mi != mapBlockIndex.end();
+                bool canSend = haveBlock && blockSender.canSend(
+                        chainActive, *(mi->second), pindexBestHeader);
 
-                    // Trigger the peer node to send a getblocks request for the next batch of inventory
-                    if (inv.hash == pfrom->hashContinue)
-                    {
-                        // Bypass PushInventory, this must send even if redundant,
-                        // and we want it right after the last block so they don't
-                        // wait for other stuff first.
-                        vector<CInv> vInv;
-                        vInv.push_back(CInv(MSG_BLOCK, chainActive.Tip()->GetBlockHash()));
-                        pfrom->PushMessage("inv", vInv);
-                        pfrom->hashContinue.SetNull();
-                    }
-                }
+                if (canSend)
+                    blockSender.send(chainActive, *pfrom, *(mi->second), inv);
             }
             else if (inv.IsKnownType())
             {
@@ -4592,19 +4555,17 @@ bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, ve
 // Used for reconstructing thin blocks.
 struct TxFinderImpl : public TxFinder {
 
-    CTransaction operator()(const uint256& hash) const {
-        AssertLockHeld(cs_main);
+    CTransaction fullLookup(const uint256& h) const {
         CTransaction tx;
-
-        if (mempool.lookup(hash, tx))
+        if (mempool.lookup(h, tx))
             return tx;
 
-        if (mapOrphanTransactions.count(hash))
-            return mapOrphanTransactions[hash].tx;
+        if (mapOrphanTransactions.count(h))
+            return mapOrphanTransactions[h].tx;
 
         // if not found, tx is left alone.
         try {
-            FindTransactionInRelayMap(hash, tx);
+            FindTransactionInRelayMap(h, tx);
         }
         catch (const std::ios_base::failure& e) {
             LogPrint("Exception '%s' in FindTransactionInRelayMap ignored\n", e.what());
@@ -4613,7 +4574,82 @@ struct TxFinderImpl : public TxFinder {
 
         return tx;
     }
+
+    // "Cheap" refers to the hash. This lookup is much more expensive.
+    CTransaction cheapLookup(const uint64_t& h) const {
+
+        { // mempool
+            LOCK(mempool.cs);
+            typedef CTxMemPool::indexed_transaction_set::const_iterator auto_;
+            for (auto_ t = mempool.mapTx.begin(); t != mempool.mapTx.end(); ++t)
+                if (t->GetTx().GetHash().GetCheapHash() == h)
+                    return t->GetTx();
+        }
+
+        typedef map<uint256, COrphanTx>::const_iterator auto_;
+        for (auto_ t = mapOrphanTransactions.begin(); t != mapOrphanTransactions.end(); ++t)
+            if (t->second.tx.GetHash().GetCheapHash() == h)
+                return t->second.tx;
+
+        // Skip relay map.
+        return CTransaction();
+    }
+
+    CTransaction operator()(const ThinTx& hash) const {
+        AssertLockHeld(cs_main);
+        return hash.hasFull()
+            ? fullLookup(hash.full())
+            : cheapLookup(hash.cheap());
+    }
 };
+
+// Lists all hashes in mempool
+struct MempoolHashProvider : public TxHashProvider {
+    void operator()(std::vector<uint256>& dst) {
+        mempool.queryHashes(dst);
+    }
+};
+
+struct BlockHeaderProcessorImpl : public BlockHeaderProcessor {
+
+    BlockHeaderProcessorImpl(CNode* pfrom) : pfrom(pfrom) { }
+
+    bool operator()(const std::vector<CBlockHeader>& headers, bool peerSentMax)
+    {
+        CBlockIndex *pindexLast = NULL;
+        BOOST_FOREACH(const CBlockHeader& header, headers) {
+            CValidationState state;
+            if (pindexLast != NULL && header.hashPrevBlock != pindexLast->GetBlockHash()) {
+                Misbehaving(pfrom->GetId(), 20);
+                return error("non-continuous headers sequence");
+            }
+            if (!AcceptBlockHeader(header, state, &pindexLast)) {
+                int nDoS;
+                if (state.IsInvalid(nDoS)) {
+                    if (nDoS > 0)
+                        Misbehaving(pfrom->GetId(), nDoS);
+                    return error("invalid header received");
+                }
+            }
+        }
+
+        if (pindexLast)
+            UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
+
+        if (peerSentMax && pindexLast) {
+            // Headers message had its maximum size; the peer may have more headers.
+            // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
+            // from there instead.
+            LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
+            pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256());
+        }
+
+        CheckBlockIndex();
+        return true;
+    }
+    CNode* pfrom;
+};
+
 
 bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived)
 {
@@ -4676,12 +4712,28 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             return true;
         }
 
-        // Disconnect outbound connection if we need bloom filter,
-        // but peer does not provide it.
-        if (UsingThinBlocks() && !pfrom->fInbound && !pfrom->SupportsThinBlocks()) {
-            LogPrintf("peer %d does not support thin blocks, disconnecting\n", pfrom->id);
-            pfrom->fDisconnect = true;
-            return true;
+        {
+            LOCK(cs_main);
+            NodeStatePtr ns(pfrom->id);
+
+            if (UsingThinBlocks() && pfrom->SupportsXThinBlocks())
+                ns->thinblock.reset(new XThinWorker(
+                    thinblockmg, pfrom->id,
+                    std::auto_ptr<TxHashProvider>(new MempoolHashProvider)));
+
+            else if (UsingThinBlocks() && pfrom->SupportsBloomThinBlocks())
+                ns->thinblock.reset(new BloomThinWorker(thinblockmg, pfrom->id));
+            else { /* keep DummyThinWorker */ }
+
+            bool hasRequiredThinSupport = XThinBlocksOnly()
+                ? pfrom->SupportsXThinBlocks()
+                : pfrom->SupportsBloomThinBlocks() || pfrom->SupportsXThinBlocks();
+            // Disconnect outbound connections that don't support thin blocks.
+            if (UsingThinBlocks() && !pfrom->fInbound && !hasRequiredThinSupport) {
+                LogPrintf("'%s' - peer=%d does not support thin blocks, disconnecting\n", pfrom->cleanSubVer, pfrom->id);
+                pfrom->fDisconnect = true;
+                return true;
+            }
         }
 
         pfrom->addrLocal = addrMe;
@@ -4761,9 +4813,9 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         pfrom->nTimeOffset = nTimeOffset;
         AddTimeData(pfrom->addr, nTimeOffset);
 
-        if (UsingThinBlocks() && pfrom->SupportsThinBlocks())
+        if (UsingThinBlocks() && pfrom->SupportsBloomThinBlocks() && !pfrom->SupportsXThinBlocks())
         {
-            LogPrint("thin", "Enabling thin blocks on peer %d\n", pfrom->id);
+            LogPrint("thin", "Enabling bloom thin blocks on peer %d\n", pfrom->id);
             pfrom->PushMessage("filterload", CBloomFilter());
 	}
     }
@@ -5171,42 +5223,17 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             return true;
         }
 
-        CBlockIndex *pindexLast = NULL;
-        BOOST_FOREACH(const CBlockHeader& header, headers) {
-            CValidationState state;
-            if (pindexLast != NULL && header.hashPrevBlock != pindexLast->GetBlockHash()) {
-                Misbehaving(pfrom->GetId(), 20);
-                return error("non-continuous headers sequence");
-            }
-            if (!AcceptBlockHeader(header, state, &pindexLast)) {
-                int nDoS;
-                if (state.IsInvalid(nDoS)) {
-                    if (nDoS > 0)
-                        Misbehaving(pfrom->GetId(), nDoS);
-                    return error("invalid header received");
-                }
-            }
-        }
-
-        if (pindexLast)
-            UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
-
-        if (nCount == MAX_HEADERS_RESULTS && pindexLast) {
-            // Headers message had its maximum size; the peer may have more headers.
-            // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
-            // from there instead.
-            LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
-            pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256());
-        }
-
-        CheckBlockIndex();
+        BlockHeaderProcessorImpl p(pfrom);
+        if (!p(headers, nCount == MAX_HEADERS_RESULTS))
+            return false;
     }
     else if (strCommand == "merkleblock" && !fImporting && !fReindex) // Ignore blocks received while importing
     {
         try {
             LOCK(cs_main);
             NodeStatePtr nodestate(pfrom->id);
-            ProcessMerkleBlock(*pfrom, vRecv, *(nodestate->thinblock), TxFinderImpl());
+            BlockHeaderProcessorImpl p(pfrom);
+            ProcessMerkleBlock(*pfrom, vRecv, *(nodestate->thinblock), TxFinderImpl(), p);
         }
         catch (...) {
             LogPrintf("Unexpected error receiving merkleblock from %d\n", pfrom->id);
@@ -5217,6 +5244,25 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             throw;
         }
 
+    }
+    else if (strCommand == "xthinblock" && !fImporting && !fReindex) // Ignore blocks received while importing
+    {
+        // This is a reponose to a xthin block request.
+        try {
+            LOCK(cs_main);
+            NodeStatePtr nodestate(pfrom->id);
+            BlockHeaderProcessorImpl headerp(pfrom);
+            XThinBlockProcessor blockp(*pfrom);
+            blockp(vRecv, *(nodestate->thinblock), TxFinderImpl(), headerp);
+        }
+        catch (...) {
+            LogPrintf("Unexpected error receiving xthinblock from %d\n", pfrom->id);
+            LOCK(cs_main);
+            NodeStatePtr nodestate(pfrom->id);
+            nodestate->thinblock->setAvailable();
+            Misbehaving(pfrom->GetId(), 10); // FIXME: Is this DoS policy reasonable? May not be pfrom's fault.
+            throw;
+        }
     }
     else if (strCommand == "block" && !fImporting && !fReindex) // Ignore blocks received while importing
     {
@@ -5231,7 +5277,65 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         OnBlockFinished callb(strCommand);
         callb(block, std::vector<NodeId>(1, pfrom->id));
     }
+    else if (strCommand == "get_xthin") {
+        CBloomFilter dontWant;
+        CInv inv;
 
+        vRecv >> inv >> dontWant;
+
+        if (!dontWant.IsWithinSizeConstraints())
+            // There is no excuse for sending a too-large filter
+            Misbehaving(pfrom->GetId(), 100);
+        else
+        {
+            LOCK(pfrom->cs_filter);
+            pfrom->xthinFilter.reset(new CBloomFilter(dontWant));
+            pfrom->xthinFilter->UpdateEmptyFull();
+
+
+            pfrom->vRecvGetData.push_back(inv);
+            ProcessGetData(pfrom);
+        }
+
+    }
+    else if (strCommand == "get_xblocktx") {
+        // This is a request for transactions that remote peer wanted
+        // as part of a xthinblock, but were not provided.
+
+        XThinReRequest req;
+        vRecv >> req;
+        LogPrint("thin", "peer=%d is re-requesting %d transactions for %s\n",
+                pfrom->id, req.txRequesting.size(), req.block.ToString());
+
+        BlockSender sender;
+        BlockMap::iterator mi = mapBlockIndex.find(req.block);
+        bool haveBlock = mi != mapBlockIndex.end();
+        BlockSender bs;
+        bool canSend = haveBlock && bs.canSend(
+                chainActive, *(mi->second), pindexBestHeader);
+
+        try {
+            if (canSend)
+                bs.sendReReqReponse(*pfrom, *(mi->second), req);
+        }
+        catch (const std::exception& e) {
+            LogPrintf("error in re-request from peer=%d: %s\n",
+                    pfrom->id, e.what());
+        }
+    }
+    else if (strCommand == "xblocktx") {
+        // This is a response for us requesting missing transactions from
+        // xthinblocks.
+
+        XThinReReqResponse resp;
+        vRecv >> resp;
+        LogPrint("thin", "recieved re-request response from peer=%d with %d txs for %s\n",
+            pfrom->id, resp.txRequested.size(), resp.block.ToString());
+
+        LOCK(cs_main);
+        NodeStatePtr statePtr(pfrom->id);
+        XThinBlockConcluder()(resp, *pfrom, *(statePtr->thinblock));
+    }
 
     // This asymmetric behavior for inbound and outbound connections was introduced
     // to prevent a fingerprinting attack: an attacker can send specific fake addresses
@@ -5322,7 +5426,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                 NodeStatePtr nodestate(pfrom->id);
                 ThinBlockWorker& thinblock = *(nodestate->thinblock);
                 MarkBlockAsInFlight m;
-                ThinBlockConcluder concludeDownload(m);
+                BloomBlockConcluder concludeDownload(m);
                 concludeDownload(pfrom, nonce, thinblock);
             }
             else if (pfrom->nPingNonceSent) {
@@ -5593,6 +5697,33 @@ bool ProcessMessages(CNode* pfrom)
     return fOk;
 }
 
+// If node is configured to avoid full block downloads,
+// this will determine if we should skip downloading from this peer (for now)
+bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
+
+    // We always download full blocks during initial sync.
+    if (IsInitialBlockDownload())
+        return true;
+
+    // We don't mind full blocks.
+    if (!UsingThinBlocks())
+        return true;
+
+    if (!AvoidFullBlocks())
+        return true;
+
+    // We want thin blocks only, but peer does not support it.
+    if (!(pto->SupportsBloomThinBlocks() || pto->SupportsXThinBlocks()))
+        return false;
+
+    // We want xthin only, but peer does not support it.
+    if (XThinBlocksOnly() && !pto->SupportsXThinBlocks())
+        return false;
+
+    // Is node busy serving a thin block already?
+    return worker.isAvailable();
+}
+
 
 bool SendMessages(CNode* pto, bool fSendTrickle)
 {
@@ -5805,23 +5936,28 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         //
         // Message: getdata (blocks)
         //
+        ThinBlockWorker& worker = *(statePtr->thinblock);
+        bool fetchData = WillDownloadFromNode(pto, worker);
         vector<CInv> vGetData;
-        if (!pto->fDisconnect && !pto->fClient && (fFetch || !IsInitialBlockDownload()) && statePtr->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
+        if (fetchData && !pto->fDisconnect && !pto->fClient && (fFetch || !IsInitialBlockDownload()) && statePtr->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
             vector<CBlockIndex*> vToDownload;
             std::set<NodeId> stallers;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - statePtr->nBlocksInFlight, vToDownload, stallers);
             BOOST_FOREACH(CBlockIndex *pindex, vToDownload) {
-                int type = MSG_BLOCK;
-                ThinBlockWorker& worker = *(statePtr->thinblock);
                 if (ThinBlocksActive(pto) && worker.isAvailable()) {
-                    type = MSG_FILTERED_BLOCK;
+                    worker.requestBlock(pindex->GetBlockHash(), vGetData, *pto);
                     worker.setToWork(pindex->GetBlockHash());
+                    LogPrint("net", "Requesting thin block %s (%d) peer=%d\n",
+                            pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
                 }
+                else
+                {
+                    vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
+                    LogPrint("net", "Requesting full block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
+                            pindex->nHeight, pto->id);
 
-                vGetData.push_back(CInv(type, pindex->GetBlockHash()));
+                }
                 MarkBlockAsInFlight()(pto->GetId(), pindex->GetBlockHash(), consensusParams, pindex);
-                LogPrint("net", "Requesting block %s (%d, type %d) peer=%d\n", pindex->GetBlockHash().ToString(),
-                    pindex->nHeight, type, pto->id);
             }
             if (statePtr->nBlocksInFlight == 0 && !stallers.empty()) {
                 typedef set<NodeId>::const_iterator auto_;
@@ -5855,7 +5991,6 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
         }
         if (!vGetData.empty())
             pto->PushMessage("getdata", vGetData);
-
     }
     return true;
 }
