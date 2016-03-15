@@ -34,6 +34,7 @@ testScripts=(
     'merkle_blocks.py'
     'signrawtransactions.py'
     'walletbackup.py'
+    'p2p-versionbits-warning.py'
 );
 testScriptsExt=(
     'bigblocks.py'
