@@ -144,6 +144,9 @@ class TestManager(object):
             # associated NodeConn
             self.connections[-1].cb.add_connection(self.connections[-1])
 
+    def clear_all_connections(self):
+        self.connections    = []
+
     def wait_for_verack(self):
         sleep_time = 0.05
         max_tries = 10 / sleep_time  # Wait at most 10 seconds
