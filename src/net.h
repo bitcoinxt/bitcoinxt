@@ -677,6 +677,7 @@ public:
     CAddrDB();
     bool Write(const CAddrMan& addr);
     bool Read(CAddrMan& addr);
+    bool Read(CAddrMan& addr, CDataStream& ssPeers);
 };
 
 /** Return a timestamp in the future (in microseconds) for exponentially distributed events. */
