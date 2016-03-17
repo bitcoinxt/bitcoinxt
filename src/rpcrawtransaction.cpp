@@ -805,7 +805,9 @@ Value sendrawtransaction(const Array& params, bool fHelp)
     } else if (fHaveChain) {
         throw JSONRPCError(RPC_TRANSACTION_ALREADY_IN_CHAIN, "transaction already in block chain");
     }
-    RelayTransaction(tx);
+    std::vector<uint256> vAncestors;
+    mempool.queryAncestors(tx.GetHash(), vAncestors);
+    RelayTransaction(tx, vAncestors);
 
     return hashTx.GetHex();
 }

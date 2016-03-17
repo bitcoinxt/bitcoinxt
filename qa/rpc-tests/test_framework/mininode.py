@@ -30,6 +30,8 @@ from threading import RLock
 from threading import Thread
 import logging
 import copy
+import math
+from murmurhash import MurmurHash3
 
 BIP0031_VERSION = 60000
 MY_VERSION = 70011 # So we can signal that we don't support merkleblocks (no thin blocks)
@@ -621,6 +623,82 @@ class CAlert(object):
         return "CAlert(vchMsg.sz %d, vchSig.sz %d)" \
             % (len(self.vchMsg), len(self.vchSig))
 
+#Bloom filter support adapted from
+#https://raw.githubusercontent.com/jgarzik/python-bitcoinlib/0b28060356f52e778592b6797e3ae71725055173/bitcoin/bloom.py
+class CBloomFilter(object):
+    MAX_BLOOM_FILTER_SIZE = 36000
+    MAX_HASH_FUNCS = 50
+
+    UPDATE_NONE = 0
+    UPDATE_ALL = 1
+    UPDATE_P2PUBKEY_ONLY = 2
+    UPDATE_MASK = 3
+    ANCESTOR_UPDATE_BIT = 4
+
+    def __init__(self, nElements=1000, nFPRate=0.0001, nTweak=0, nFlags=UPDATE_NONE):
+        LN2SQUARED = 0.4804530139182014246671025263266649717305529515945455
+        LN2 = 0.6931471805599453094172321214581765680755001343602552
+
+        self.vData = bytearray(int(min(-1  / LN2SQUARED * nElements * math.log(nFPRate), self.MAX_BLOOM_FILTER_SIZE * 8) / 8))
+        self.nHashFuncs = int(min(len(self.vData) * 8 / nElements * LN2, self.MAX_HASH_FUNCS))
+        self.nTweak = nTweak
+        self.nFlags = nFlags
+
+    def bloom_hash(self, nHashNum, vDataToHash):
+        return MurmurHash3(((nHashNum * 0xFBA4C795) + self.nTweak) & 0xFFFFFFFF, vDataToHash) % (len(self.vData) * 8)
+
+    __bit_mask = bytearray([0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80])
+    def insert(self, elem):
+        """Insert an element in the filter.
+
+        elem may be a COutPoint or bytes
+        """
+        if isinstance(elem, COutPoint):
+            elem = elem.serialize()
+
+        if len(self.vData) == 1 and self.vData[0] == 0xff:
+            return
+
+        for i in range(0, self.nHashFuncs):
+            nIndex = self.bloom_hash(i, elem)
+            # Sets bit nIndex of vData
+            self.vData[nIndex >> 3] |= self.__bit_mask[7 & nIndex]
+
+    def contains(self, elem):
+        """Test if the filter contains an element
+
+        elem may be a COutPoint or bytes
+        """
+        if isinstance(elem, COutPoint):
+            elem = elem.serialize()
+
+        if len(self.vData) == 1 and self.vData[0] == 0xff:
+            return True
+
+        for i in range(0, self.nHashFuncs):
+            nIndex = self.bloom_hash(i, elem)
+            if not (self.vData[nIndex >> 3] & self.__bit_mask[7 & nIndex]):
+                return False
+        return True
+
+    def IsWithinSizeConstraints(self):
+        return len(self.vData) <= self.MAX_BLOOM_FILTER_SIZE and self.nHashFuncs <= self.MAX_HASH_FUNCS
+
+    __struct = struct.Struct("<IIB")
+    def deserialize(self, f):
+        self.vData = deser_string(f)
+        (self.nHashFuncs,
+         self.nTweak,
+         self.nFlags) = self.__struct.unpack(f.read(self.__struct.size))
+
+    def serialize(self):
+        r = ser_string(self.vData)
+        return r + self.__struct.pack(self.nHashFuncs, self.nTweak, self.nFlags)
+
+    def __repr__(self):
+        return "CBloomFilter(len(vData)=%i nHashFuncs=%i nTweak=%i nFlags=%i)" \
+            % (len(self.vData), self.nHashFuncs, self.nTweak, self.nFlags)
+
 
 # Objects that correspond to messages on the wire
 class msg_version(object):
@@ -751,8 +829,8 @@ class msg_inv(object):
 class msg_getdata(object):
     command = "getdata"
 
-    def __init__(self):
-        self.inv = []
+    def __init__(self, inv=None):
+        self.inv = inv if inv != None else []
 
     def deserialize(self, f):
         self.inv = deser_vector(f, CInv)
@@ -984,11 +1062,40 @@ class msg_reject(object):
             % (self.message, self.code, self.reason, self.data)
 
 
+class msg_filterload(object):
+    command = "filterload"
+
+    def __init__(self, filter=CBloomFilter()):
+        self.filter = filter
+
+    def deserialize(self, f):
+        self.filter.deserialize(f)
+
+    def serialize(self):
+        r = ""
+        r += self.filter.serialize()
+        return r
+
+    def __repr__(self):
+        return "msg_filterload(filter=%r)" % (self.filter)
+
+
 # This is what a callback should look like for NodeConn
 # Reimplement the on_* functions to provide handling for events
 class NodeConnCB(object):
     def __init__(self):
         self.verack_received = False
+
+    # Spin until verack message is received from the node.
+    # Tests may want to use this as a signal that the test can begin.
+    # This can be called from the testing thread, so it needs to acquire the
+    # global lock.
+    def wait_for_verack(self):
+        while True:
+            with mininode_lock:
+                if self.verack_received:
+                    return
+            time.sleep(0.05)
 
     def deliver(self, conn, message):
         with mininode_lock:
@@ -1054,7 +1161,8 @@ class NodeConn(asyncore.dispatcher):
         "headers": msg_headers,
         "getheaders": msg_getheaders,
         "reject": msg_reject,
-        "mempool": msg_mempool
+        "mempool": msg_mempool,
+        "filterload": msg_filterload
     }
     MAGIC_BYTES = {
         "mainnet": "\xf9\xbe\xb4\xd9",   # mainnet
@@ -1062,7 +1170,7 @@ class NodeConn(asyncore.dispatcher):
         "regtest": "\xfa\xbf\xb5\xda"    # regtest
     }
 
-    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest"):
+    def __init__(self, dstaddr, dstport, rpc, callback, net="regtest", services=1):
         asyncore.dispatcher.__init__(self, map=mininode_socket_map)
         self.log = logging.getLogger("NodeConn(%s:%d)" % (dstaddr, dstport))
         self.dstaddr = dstaddr
@@ -1080,6 +1188,7 @@ class NodeConn(asyncore.dispatcher):
 
         # stuff version msg into sendbuf
         vt = msg_version()
+        vt.nServices = services
         vt.addrTo.ip = self.dstaddr
         vt.addrTo.port = self.dstport
         vt.addrFrom.ip = "0.0.0.0"

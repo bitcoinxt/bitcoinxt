@@ -471,6 +471,12 @@ public:
      */
     bool CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntries &setAncestors, uint64_t limitAncestorCount, uint64_t limitAncestorSize, uint64_t limitDescendantCount, uint64_t limitDescendantSize, std::string &errString, bool fSearchForParents = true);
 
+    /** Utility method to find ancestor hashes.
+     *  txHash = tx hash for which to find ancestors
+     *  vAncestors = returned ancestor tx hashes, including txHash.
+     */
+    void queryAncestors(const uint256 txHash, std::vector<uint256>& vAncestors);
+
     /** Remove transactions from the mempool until its dynamic size is <= sizelimit. */
     void TrimToSize(size_t sizelimit);
 

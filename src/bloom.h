@@ -19,7 +19,6 @@ static const unsigned int MAX_HASH_FUNCS = 50;
 
 /**
  * First two bits of nFlags control how much IsRelevantAndUpdate actually updates
- * The remaining bits are reserved
  */
 enum bloomflags
 {
@@ -29,6 +28,12 @@ enum bloomflags
     BLOOM_UPDATE_P2PUBKEY_ONLY = 2,
     BLOOM_UPDATE_MASK = 3,
 };
+
+/* Third bit of nFlags indicates filter wants to be updated with mempool ancestors for its entries.
+ * This also requires that we set NODE_BLOOM locally, regardless of peer version
+ * The remaining bits are reserved
+ */
+static const unsigned char BLOOM_ANCESTOR_UPDATE_BIT = 4;
 
 /**
  * BloomFilter is a probabilistic filter which SPV clients provide
@@ -97,6 +102,9 @@ public:
 
     //! Also adds any outputs which match the filter to the filter (to match their spending txes)
     bool IsRelevantAndUpdate(const CTransaction& tx);
+
+    //! Wants ancestors of matching transactions to be inserted
+    bool WantsAncestors() {return nFlags & BLOOM_ANCESTOR_UPDATE_BIT;}
 
     //! Checks for empty and full filters to avoid wasting cpu
     void UpdateEmptyFull();
