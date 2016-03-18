@@ -8,6 +8,7 @@
 #endif
 
 #include "init.h"
+#include "sodium.h"
 
 #include "addrman.h"
 #include "amount.h"
@@ -710,6 +711,10 @@ bool AppInitServers()
  */
 bool AppInit2()
 {
+    // Perform libsodium initialization
+    if (sodium_init() == -1) {
+        return false;
+    }
     // ********************************************************* Step 1: setup
 #ifdef _MSC_VER
     // Turn off Microsoft heap dump noise
