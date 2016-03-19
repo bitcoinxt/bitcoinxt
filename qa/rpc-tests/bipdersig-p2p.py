@@ -10,8 +10,8 @@ from test_framework.mininode import CTransaction, NetworkThread
 from test_framework.blocktools import create_coinbase, create_block
 from test_framework.comptool import TestInstance, TestManager
 from test_framework.script import CScript
-from binascii import hexlify, unhexlify
-import cStringIO
+from binascii import unhexlify
+from io import BytesIO
 import time
 
 # A canonical signature consists of:
@@ -68,7 +68,7 @@ class BIP66Test(ComparisonTestFramework):
         rawtx = node.createrawtransaction(inputs, outputs)
         signresult = node.signrawtransaction(rawtx)
         tx = CTransaction()
-        f = cStringIO.StringIO(unhexlify(signresult['hex']))
+        f = BytesIO(unhexlify(signresult['hex']))
         tx.deserialize(f)
         return tx
 

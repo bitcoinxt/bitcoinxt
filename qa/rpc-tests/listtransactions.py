@@ -8,7 +8,6 @@
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 
-
 def check_array_result(object_array, to_match, expected):
     """
     Pass in array of JSON objects, a dictionary with key/value pairs
