@@ -1,10 +1,10 @@
-#!/usr/bin/env python2
-# Copyright (c) 2014 The Bitcoin Core developers
+#!/usr/bin/env python3
+# Copyright (c) 2014-2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #
-# Test -alertnotify 
+# Test -alertnotify
 #
 
 from test_framework.test_framework import BitcoinTestFramework
@@ -20,7 +20,7 @@ class ForkNotifyTest(BitcoinTestFramework):
         self.num_nodes = 3
 
     def setup_chain(self):
-        print "Initializing test directory "+self.options.tmpdir
+        print("Initializing test directory "+self.options.tmpdir)
         initialize_chain_clean(self.options.tmpdir, self.num_nodes)
 
     def setup_network(self):

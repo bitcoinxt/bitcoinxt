@@ -1,7 +1,8 @@
-#!/usr/bin/env python2
-# Copyright (c) 2015 The Bitcoin Core developers
+#!/usr/bin/env python3
+# Copyright (c) 2015-2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
 import socket
 import traceback, sys
 from binascii import hexlify
@@ -66,9 +67,9 @@ class ProxyTest(BitcoinTestFramework):
         # Note: proxies are not used to connect to local nodes
         # this is because the proxy to use is based on CService.GetNetwork(), which return NET_UNROUTABLE for localhost
         return start_nodes(4, self.options.tmpdir, extra_args=[
-            ['-listen', '-debug=net', '-debug=proxy', '-proxy=%s:%i' % (self.conf1.addr),'-proxyrandomize=1'], 
-            ['-listen', '-debug=net', '-debug=proxy', '-proxy=%s:%i' % (self.conf1.addr),'-onion=%s:%i' % (self.conf2.addr),'-proxyrandomize=0'], 
-            ['-listen', '-debug=net', '-debug=proxy', '-proxy=%s:%i' % (self.conf2.addr),'-proxyrandomize=1'], 
+            ['-listen', '-debug=net', '-debug=proxy', '-proxy=%s:%i' % (self.conf1.addr),'-proxyrandomize=1'],
+            ['-listen', '-debug=net', '-debug=proxy', '-proxy=%s:%i' % (self.conf1.addr),'-onion=%s:%i' % (self.conf2.addr),'-proxyrandomize=0'],
+            ['-listen', '-debug=net', '-debug=proxy', '-proxy=%s:%i' % (self.conf2.addr),'-proxyrandomize=1'],
             ['-listen', '-debug=net', '-debug=proxy', '-proxy=[%s]:%i' % (self.conf3.addr),'-proxyrandomize=0']
             ])
 
@@ -93,7 +94,7 @@ class ProxyTest(BitcoinTestFramework):
         assert(isinstance(cmd, Socks5Command))
         # Note: bitcoind's SOCKS5 implementation only sends atyp DOMAINNAME, even if connecting directly to IPv4/IPv6
         assert_equal(cmd.atyp, AddressType.DOMAINNAME)
-        assert_equal(cmd.addr, "1233:3432:2434:2343:3234:2345:6546:4534")
+        assert_equal(cmd.addr, b"1233:3432:2434:2343:3234:2345:6546:4534")
         assert_equal(cmd.port, 5443)
         if not auth:
             assert_equal(cmd.username, None)
@@ -105,7 +106,7 @@ class ProxyTest(BitcoinTestFramework):
         cmd = proxies[2].queue.get()
         assert(isinstance(cmd, Socks5Command))
         assert_equal(cmd.atyp, AddressType.DOMAINNAME)
-        assert_equal(cmd.addr, "bitcoinostk4e4re.onion")
+        assert_equal(cmd.addr, b"bitcoinostk4e4re.onion")
         assert_equal(cmd.port, 8333)
         if not auth:
             assert_equal(cmd.username, None)
@@ -141,7 +142,7 @@ class ProxyTest(BitcoinTestFramework):
 
         # proxy on IPv6 localhost
         self.node_test(self.nodes[3], [self.serv3, self.serv3, self.serv3, self.serv3], False)
-        
+
 if __name__ == '__main__':
     ProxyTest().main()
 

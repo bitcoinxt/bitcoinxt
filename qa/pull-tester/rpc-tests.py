@@ -1,5 +1,5 @@
-#!/usr/bin/env python2
-# Copyright (c) 2014 The Bitcoin Core developers
+#!/usr/bin/env python3
+# Copyright (c) 2014-2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -67,7 +67,7 @@ if "BITCOINCLI" not in os.environ:
 
 #Disable Windows tests by default
 if EXEEXT == ".exe" and "-win" not in opts:
-    print "Win tests currently disabled.  Use -win option to enable"
+    print("Win tests currently disabled.  Use -win option to enable")
     sys.exit(0)
 
 #Tests
@@ -179,7 +179,7 @@ def runtests():
             coverage.cleanup()
 
     else:
-        print "No rpc tests to run. Wallet, utils, and bitcoind must all be enabled"
+        print("No rpc tests to run. Wallet, utils, and bitcoind must all be enabled")
 
 
 class RPCCoverage(object):

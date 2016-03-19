@@ -1,5 +1,5 @@
-#!/usr/bin/env python2
-# Copyright (c) 2015 The Bitcoin Core developers
+#!/usr/bin/env python3
+# Copyright (c) 2015-2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -18,7 +18,7 @@ class BIP65Test(BitcoinTestFramework):
         self.num_nodes = 3
 
     def setup_chain(self):
-        print "Initializing test directory "+self.options.tmpdir
+        print("Initializing test directory "+self.options.tmpdir)
         initialize_chain_clean(self.options.tmpdir, self.num_nodes)
 
     def setup_network(self):
@@ -41,7 +41,7 @@ class BIP65Test(BitcoinTestFramework):
             raise AssertionError("Failed to mine 10 version=3 blocks")
 
         # Mine 75 new-version blocks
-        for i in xrange(15):
+        for i in range(15):
             self.nodes[2].generate(5)
         self.sync_all()
         if (self.nodes[0].getblockcount() != cnt + 85):
