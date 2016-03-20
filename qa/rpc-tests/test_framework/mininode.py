@@ -859,7 +859,7 @@ class msg_version(object):
     def __init__(self):
         self.nVersion = MY_VERSION
         self.nServices = 1
-        self.nTime = time.time()
+        self.nTime = int(time.time())
         self.addrTo = CAddress()
         self.addrFrom = CAddress()
         self.nNonce = random.getrandbits(64)
@@ -1204,7 +1204,7 @@ class msg_reject(object):
 
     def __init__(self):
         self.message = ""
-        self.code = ""
+        self.code = 0
         self.reason = ""
         self.data = 0L
 
