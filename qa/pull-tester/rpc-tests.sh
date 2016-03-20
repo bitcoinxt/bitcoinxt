@@ -33,6 +33,7 @@ testScripts=(
     'merkle_blocks.py'
     'signrawtransactions.py'
     'walletbackup.py'
+    'sendheaders.py'
 );
 testScriptsExt=(
     'bigblocks.py'
@@ -56,7 +57,6 @@ testScriptsExt=(
     'maxblocksinflight.py'
     'invalidblockrequest.py'
     'rawtransactions.py'
-#    'forknotify.py'
     'p2p-acceptblock.py'
     'mempool_packages.py'
 );

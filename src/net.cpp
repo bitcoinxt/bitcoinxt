@@ -2184,8 +2184,6 @@ bool CNode::SupportsThinBlocks() const {
     if (!SupportsBloom())
         return false;
 
-    const int SENDHEADERS_VERSION = 70012;
-
     // Bitcoin Core removed filterInventoryKnown filtering in 0.12,
     // causing those nodes to send us all transactions in a block.
     //
