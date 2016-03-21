@@ -764,9 +764,8 @@ UniValue estimatepriority(const JSONRPCRequest& request)
     if (request.fHelp || request.params.size() != 1)
         throw runtime_error(
             "estimatepriority nblocks\n"
-            "\nEstimates the approximate priority\n"
-            "a zero-fee transaction needs to begin confirmation\n"
-            "within nblocks blocks.\n"
+            "\nDEPRECATED. Estimates the approximate priority a zero-fee transaction needs to begin\n"
+            "confirmation within nblocks blocks.\n"
             "\nArguments:\n"
             "1. nblocks     (numeric, required)\n"
             "\nResult:\n"
