@@ -8,11 +8,13 @@
 
 #include "key.h"
 #include "main.h"
+#include "options.h"
 #include "random.h"
+#include "rpc/register.h"
+#include "rpc/server.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
-#include "options.h"
 
 #include "test/testutil.h"
 
@@ -44,6 +46,7 @@ BasicTestingSetup::~BasicTestingSetup()
 
 TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(chainName)
 {
+        RegisterAllCoreRPCCommands(tableRPC);
         ClearDatadirCache();
         pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i", (unsigned long)GetTime(), (int)(GetRand(100000)));
         boost::filesystem::create_directories(pathTemp);

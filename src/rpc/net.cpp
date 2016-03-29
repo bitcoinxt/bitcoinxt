@@ -490,3 +490,23 @@ UniValue getnetworkinfo(const UniValue& params, bool fHelp)
     obj.push_back(Pair("localaddresses", localAddresses));
     return obj;
 }
+
+static const CRPCCommand commands[] =
+{ //  category              name                      actor (function)         okSafeMode
+  //  --------------------- ------------------------  -----------------------  ----------
+    { "network",            "getconnectioncount",     &getconnectioncount,     true  },
+    { "network",            "ping",                   &ping,                   true  },
+    { "network",            "getpeerinfo",            &getpeerinfo,            true  },
+    { "network",            "addnode",                &addnode,                true  },
+    { "network",            "getaddednodeinfo",       &getaddednodeinfo,       true  },
+    { "network",            "getnettotals",           &getnettotals,           true  },
+    { "network",            "getnetworkinfo",         &getnetworkinfo,         true  },
+    { "network",            "settrafficshaping",      &settrafficshaping,      true  },
+    { "network",            "gettrafficshaping",      &gettrafficshaping,      true  },
+};
+
+void RegisterNetRPCCommands(CRPCTable &tableRPC)
+{
+    for (unsigned int vcidx = 0; vcidx < ARRAYLEN(commands); vcidx++)
+        tableRPC.appendCommand(commands[vcidx].name, &commands[vcidx]);
+}
