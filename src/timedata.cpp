@@ -32,11 +32,7 @@ int64_t GetTimeOffset()
 
 int64_t GetAdjustedTime()
 {
-    if (GetBoolArg("-trustsystemclock", true)) {
-        return GetTime();
-    } else {
-        return GetTime() + GetTimeOffset();
-    }
+    return GetTime() + GetTimeOffset();
 }
 
 static int64_t abs64(int64_t n)
@@ -79,7 +75,7 @@ void AddTimeData(const CNetAddr& ip, int64_t nOffsetSample)
         int64_t nMedian = vTimeOffsets.median();
         std::vector<int64_t> vSorted = vTimeOffsets.sorted();
         // Only let other nodes change our time by so much
-        if (abs64(nMedian) < 70 * 60)
+        if (abs64(nMedian) <= std::max<int64_t>(0, GetArg("-maxtimeadjustment", DEFAULT_MAX_TIME_ADJUSTMENT)))
         {
             nTimeOffset = nMedian;
         }
