@@ -9,12 +9,13 @@
 
 #include "optionsdialog.h"
 #include "ui_optionsdialog.h"
+#include "guiconstants.h" // for CHAIN_STATE_SIZE
 
 #include "bitcoinunits.h"
 #include "guiutil.h"
 #include "optionsmodel.h"
 
-#include "main.h" // for MAX_SCRIPTCHECK_THREADS
+#include "main.h" // for MAX_SCRIPTCHECK_THREADS, MIN_DISK_SPACE_FOR_BLOCK_FILES
 #include "netbase.h"
 #include "txdb.h" // for -dbcache defaults
 
@@ -46,6 +47,9 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
     ui->databaseCache->setMaximum(nMaxDbCache);
     ui->threadsScriptVerif->setMinimum(-(int)boost::thread::hardware_concurrency());
     ui->threadsScriptVerif->setMaximum(MAX_SCRIPTCHECK_THREADS);
+    ui->diskRequiredLbl->setText(
+            ui->diskRequiredLbl->text().arg(CHAIN_STATE_SIZE));
+    ui->pruneSize->setMinimum(double(MIN_DISK_SPACE_FOR_BLOCK_FILES) / 1024 / 1024 / 1024);
 
     /* Network elements init */
 #ifndef USE_UPNP
@@ -58,6 +62,7 @@ OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
 
     connect(ui->connectSocks, SIGNAL(toggled(bool)), ui->proxyIp, SLOT(setEnabled(bool)));
     connect(ui->connectSocks, SIGNAL(toggled(bool)), ui->proxyPort, SLOT(setEnabled(bool)));
+    connect(ui->pruneEnableChk, SIGNAL(toggled(bool)), ui->pruneSize, SLOT(setEnabled(bool)));
 
     ui->proxyIp->installEventFilter(this);
 
@@ -162,6 +167,8 @@ void OptionsDialog::setMapper()
     mapper->addMapping(ui->bitcoinAtStartup, OptionsModel::StartAtStartup);
     mapper->addMapping(ui->threadsScriptVerif, OptionsModel::ThreadsScriptVerif);
     mapper->addMapping(ui->databaseCache, OptionsModel::DatabaseCache);
+    mapper->addMapping(ui->pruneEnableChk, OptionsModel::Prune);
+    mapper->addMapping(ui->pruneSize, OptionsModel::PruneSize);
 
     /* Wallet */
     mapper->addMapping(ui->spendZeroConfChange, OptionsModel::SpendZeroConfChange);
