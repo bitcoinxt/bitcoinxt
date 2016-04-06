@@ -318,6 +318,10 @@ struct CNodeState {
     //! Whether we consider this a preferred download peer.
     bool fPreferredDownload;
 
+    // we need to receive headers leading to a block, before we can
+    // request a block.
+    bool initialHeadersReceived;
+
     //! the thin block the node is currently providing to us
     boost::shared_ptr<ThinBlockWorker> thinblock;
     std::set<uint256> recentThinBlockTx;
@@ -334,6 +338,7 @@ struct CNodeState {
         nBlocksInFlight = 0;
         nBlocksInFlightValidHeaders = 0;
         fPreferredDownload = false;
+        initialHeadersReceived = false;
         thinblock.reset(new DummyThinWorker(thinblockmg, id));
     }
 };
@@ -4342,6 +4347,12 @@ void ProcessInvMsgBlock(CNode* pfrom, CInv inv, std::vector<CInv>& toFetch) {
         && thinblockmg.numWorkers(inv.hash) < ThinBlocksMaxParallel();
     bool downloadLater = false;
 
+    bool initialHeadersReceived = NodeStatePtr(pfrom->id)->initialHeadersReceived;
+    if (!initialHeadersReceived && doThinDownload) {
+        doThinDownload = false;
+        downloadLater = true;
+    }
+
     if (doThinDownload) {
         if (ThinBlockDownload(inv, toFetch, *pfrom)) {
             MarkBlockAsInFlight()(pfrom->id, inv.hash, Params().GetConsensus());
@@ -4361,7 +4372,7 @@ void ProcessInvMsgBlock(CNode* pfrom, CInv inv, std::vector<CInv>& toFetch) {
     // doing this will result in the received block being rejected as an orphan in case it is
     // not a direct successor.
 
-    if (!blocksInFlight.isInFlight(inv.hash)) {
+    if (!blocksInFlight.isInFlight(inv.hash) || !initialHeadersReceived) {
         pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), inv.hash);
         LogPrint("net", "getheaders (%d) %s to peer=%d\n",
                 pindexBestHeader->nHeight, inv.hash.ToString(), pfrom->id);
@@ -5222,6 +5233,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             // Nothing interesting. Stop asking this peers for more headers.
             return true;
         }
+
+        NodeStatePtr(pfrom->id)->initialHeadersReceived = true;
 
         BlockHeaderProcessorImpl p(pfrom);
         if (!p(headers, nCount == MAX_HEADERS_RESULTS))
