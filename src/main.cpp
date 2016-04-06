@@ -2581,6 +2581,9 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
     const CChainParams& chainParams = Params();
     do {
         boost::this_thread::interruption_point();
+        if (ShutdownRequested())
+            break;
+
         CBlockIndex *pindexNewTip = nullptr;
         const CBlockIndex *pindexFork;
         bool fInitialDownload;
