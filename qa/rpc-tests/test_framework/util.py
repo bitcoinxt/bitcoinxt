@@ -356,5 +356,11 @@ def assert_raises(exc, fun, *args, **kwds):
         raise AssertionError("No exception raised")
 
 def satoshi_round(amount):
-   return Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
+    return  Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
 
+def get_bip9_status(node, key):
+    info = node.getblockchaininfo()
+    for row in info['bip9_softforks']:
+        if row['id'] == key:
+            return row
+    raise IndexError ('key:"%s" not found' % key)
