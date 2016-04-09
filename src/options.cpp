@@ -1,6 +1,7 @@
 #include "options.h"
 #include "util.h"
 #include <stdexcept>
+#include <boost/thread.hpp>
 
 static std::auto_ptr<ArgGetter> Args;
 
@@ -13,6 +14,9 @@ struct DefaultGetter : public ArgGetter {
             return std::vector<std::string>();
 
         return mapMultiArgs[arg];
+    }
+    virtual int64_t GetArg(const std::string& strArg, int64_t nDefault) {
+        return ::GetArg(strArg, nDefault);
     }
 };
 
@@ -46,6 +50,18 @@ std::vector<std::string> Opt::UAComment(bool validate) {
     }
 
     return uacomments;
+}
+
+int Opt::ScriptCheckThreads() {
+    // -par=0 means autodetect, but nScriptCheckThreads==0 means no concurrency
+    int nScriptCheckThreads = Args->GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
+    if (nScriptCheckThreads <= 0)
+        nScriptCheckThreads += boost::thread::hardware_concurrency();
+    if (nScriptCheckThreads <= 1)
+        nScriptCheckThreads = 0;
+    else if (nScriptCheckThreads > MAX_SCRIPTCHECK_THREADS)
+        nScriptCheckThreads = MAX_SCRIPTCHECK_THREADS;
+    return nScriptCheckThreads;
 }
 
 std::auto_ptr<ArgReset> SetDummyArgGetter(std::auto_ptr<ArgGetter> getter) {

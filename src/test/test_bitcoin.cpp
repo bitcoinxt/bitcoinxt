@@ -12,6 +12,7 @@
 #include "txdb.h"
 #include "ui_interface.h"
 #include "util.h"
+#include "options.h"
 #ifdef ENABLE_WALLET
 #include "wallet/db.h"
 #include "wallet/wallet.h"
@@ -60,8 +61,8 @@ TestingSetup::TestingSetup()
         pwalletMain->LoadWallet(fFirstRun);
         RegisterValidationInterface(pwalletMain);
 #endif
-        nScriptCheckThreads = 3;
-        for (int i=0; i < nScriptCheckThreads-1; i++)
+        mapArgs["-par"] = "3";
+        for (int i=0; i < Opt().ScriptCheckThreads()-1; i++)
             threadGroup.create_thread(&ThreadScriptCheck);
         RegisterNodeSignals(GetNodeSignals());
 }
