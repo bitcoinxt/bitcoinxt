@@ -1,6 +1,8 @@
 # Copyright (c) 2014 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+
 #
 # Helpful routines for regression testing
 #
@@ -9,6 +11,8 @@
 import os
 import sys
 
+from binascii import hexlify, unhexlify
+from base64 import b64encode
 from decimal import Decimal, ROUND_DOWN
 import json
 import random
@@ -89,6 +93,15 @@ def check_json_precision():
 
 def count_bytes(hex_string):
     return len(bytearray.fromhex(hex_string))
+
+def bytes_to_hex_str(byte_str):
+    return hexlify(byte_str).decode('ascii')
+
+def hex_str_to_bytes(hex_str):
+    return unhexlify(hex_str.encode('ascii'))
+
+def str_to_b64str(string):
+    return b64encode(string.encode('utf-8')).decode('ascii')
 
 def sync_blocks(rpc_connections, wait=1, timeout=60):
     """
@@ -423,7 +436,7 @@ def assert_raises(exc, fun, *args, **kwds):
         raise AssertionError("No exception raised")
 
 def satoshi_round(amount):
-    return  Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
+    return Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
 
 def get_bip9_status(node, key):
     info = node.getblockchaininfo()

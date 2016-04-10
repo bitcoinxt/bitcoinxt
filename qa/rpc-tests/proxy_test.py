@@ -80,7 +80,7 @@ class ProxyTest(BitcoinTestFramework):
         assert(isinstance(cmd, Socks5Command))
         # Note: bitcoind's SOCKS5 implementation only sends atyp DOMAINNAME, even if connecting directly to IPv4/IPv6
         assert_equal(cmd.atyp, AddressType.DOMAINNAME)
-        assert_equal(cmd.addr, "15.61.23.23")
+        assert_equal(cmd.addr, b"15.61.23.23")
         assert_equal(cmd.port, 1234)
         if not auth:
             assert_equal(cmd.username, None)
@@ -117,7 +117,7 @@ class ProxyTest(BitcoinTestFramework):
         cmd = proxies[3].queue.get()
         assert(isinstance(cmd, Socks5Command))
         assert_equal(cmd.atyp, AddressType.DOMAINNAME)
-        assert_equal(cmd.addr, "node.noumenon")
+        assert_equal(cmd.addr, b"node.noumenon")
         assert_equal(cmd.port, 8333)
         if not auth:
             assert_equal(cmd.username, None)

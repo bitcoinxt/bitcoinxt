@@ -20,10 +20,10 @@
 import struct
 import socket
 import asyncore
-import binascii
 import time
 import sys
 import random
+from binascii import hexlify, unhexlify
 from io import BytesIO
 from codecs import encode
 import hashlib
@@ -41,6 +41,8 @@ MY_SUBVERSION = b"/python-mininode-tester:0.0.3/"
 
 MAX_INV_SZ = 50000
 MAX_BLOCK_SIZE = 1000000
+
+COIN = 100000000
 
 # Keep our own socket map for asyncore, so that we can track disconnects
 # ourselves (to workaround an issue with closing an asyncore socket when
@@ -192,12 +194,12 @@ def ser_int_vector(l):
 
 # Deserialize from a hex string representation (eg from RPC)
 def FromHex(obj, hex_string):
-    obj.deserialize(BytesIO(binascii.unhexlify(hex_string)))
+    obj.deserialize(BytesIO(unhexlify(hex_string.encode('ascii'))))
     return obj
 
 # Convert a binary-serializable object to hex (eg for submission via RPC)
 def ToHex(obj):
-    return binascii.hexlify(obj.serialize()).decode('utf-8')
+    return hexlify(obj.serialize()).decode('ascii')
 
 # Objects that map to bitcoind objects, which can be serialized/deserialized
 
@@ -317,12 +319,12 @@ class CTxIn(object):
 
     def __repr__(self):
         return "CTxIn(prevout=%s scriptSig=%s nSequence=%i)" \
-            % (repr(self.prevout), binascii.hexlify(self.scriptSig),
+            % (repr(self.prevout), hexlify(self.scriptSig),
                self.nSequence)
 
 
 class CTxOut(object):
-    def __init__(self, nValue=0, scriptPubKey=""):
+    def __init__(self, nValue=0, scriptPubKey=b""):
         self.nValue = nValue
         self.scriptPubKey = scriptPubKey
 
@@ -338,8 +340,8 @@ class CTxOut(object):
 
     def __repr__(self):
         return "CTxOut(nValue=%i.%08i scriptPubKey=%s)" \
-            % (self.nValue // 100000000, self.nValue % 100000000,
-               binascii.hexlify(self.scriptPubKey))
+            % (self.nValue // COIN, self.nValue % COIN,
+               hexlify(self.scriptPubKey))
 
 
 class CTransaction(object):
@@ -382,7 +384,7 @@ class CTransaction(object):
     def calc_sha256(self):
         if self.sha256 is None:
             self.sha256 = uint256_from_str(hash256(self.serialize()))
-        self.hash = encode(hash256(self.serialize())[::-1], 'hex')
+        self.hash = encode(hash256(self.serialize())[::-1], 'hex_codec').decode('ascii')
 
     def is_valid(self):
         self.calc_sha256()
@@ -451,7 +453,7 @@ class CBlockHeader(object):
             r += struct.pack("<I", self.nBits)
             r += struct.pack("<I", self.nNonce)
             self.sha256 = uint256_from_str(hash256(r))
-            self.hash = encode(hash256(r)[::-1], 'hex')
+            self.hash = encode(hash256(r)[::-1], 'hex_codec').decode('ascii')
 
     def rehash(self):
         self.sha256 = None
@@ -1062,7 +1064,7 @@ class msg_getaddr(object):
         pass
 
     def serialize(self):
-        return ""
+        return b""
 
     def __repr__(self):
         return "msg_getaddr()"
