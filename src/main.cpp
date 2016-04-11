@@ -2152,7 +2152,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         return true;
     }
 
-    const int64_t timeBarrier = GetTime() - 24 * 3600 * std::max(1, nScriptCheckThreads);
+    const int64_t timeBarrier = GetTime() - 24 * 3600 * Opt().CheckpointDays();
     // Blocks that have varius days of POW behind them makes them secure in
     // that actually online nodes checked the scripts, so during initial sync we
     // don't need to check the scripts.

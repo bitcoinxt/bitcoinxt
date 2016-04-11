@@ -64,6 +64,11 @@ int Opt::ScriptCheckThreads() {
     return nScriptCheckThreads;
 }
 
+int64_t Opt::CheckpointDays() {
+    int64_t def = DEFAULT_CHECKPOINT_DAYS * std::max(1, ScriptCheckThreads());
+    return std::max(int64_t(1), Args->GetArg("-checkpoint-days", def));
+}
+
 std::auto_ptr<ArgReset> SetDummyArgGetter(std::auto_ptr<ArgGetter> getter) {
     Args.reset(getter.release());
     return std::auto_ptr<ArgReset>(new ArgReset);

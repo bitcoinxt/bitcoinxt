@@ -13,13 +13,15 @@ struct Opt {
     bool HidePlatform();
     std::vector<std::string> UAComment(bool validate = false);
     int ScriptCheckThreads();
+    int64_t CheckpointDays();
 };
 
 /** Maximum number of script-checking threads allowed */
 static const int MAX_SCRIPTCHECK_THREADS = 16;
 /** -par default (number of script-checking threads, 0 = auto) */
 static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
-
+// Blocks newer than n days will have their script validated during sync.
+static const int DEFAULT_CHECKPOINT_DAYS = 30;
 
 //
 // For unit testing
