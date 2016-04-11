@@ -2063,6 +2063,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     filterInventoryKnown.reset();
     fGetAddr = false;
     fRelayTxes = false;
+    fSentAddr = false;
     pfilter = new CBloomFilter();
     xthinFilter.reset(new CBloomFilter());
     nPingNonceSent = 0;
