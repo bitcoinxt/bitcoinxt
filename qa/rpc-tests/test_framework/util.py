@@ -704,3 +704,7 @@ def get_relay_fee(node, txsize = 500, unit = "bch"):
         return int(bchrate * COIN)
     else:
         raise Exception("unsupported unit")
+
+def get_bip9_status(node, key):
+    info = node.getblockchaininfo()
+    return info['bip9_softforks'][key]
