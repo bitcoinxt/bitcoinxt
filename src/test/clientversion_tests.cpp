@@ -34,6 +34,10 @@ struct DummyArgGetter : public ArgGetter {
             return uacomment;
         return std::vector<std::string>();
     }
+    virtual int64_t GetArg(const std::string& strArg, int64_t nDefault) {
+        assert(false);
+    }
+
 
     bool stealthmode;
     bool hideplatform;
