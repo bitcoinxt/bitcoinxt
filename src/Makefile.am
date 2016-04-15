@@ -78,6 +78,7 @@ BITCOIN_CORE_H = \
   base58.h \
   blockannounce.h \
   blockheaderprocessor.h \
+  blockencodings.h \
   blocksender.h \
   bloom.h \
   bloomthin.h \
@@ -198,6 +199,7 @@ libbitcoin_server_a_SOURCES = \
   addrman.cpp \
   blockannounce.cpp \
   blockheaderprocessor.cpp \
+  blockencodings.cpp \
   blocksender.cpp \
   bloom.cpp \
   bloomthin.cpp \
