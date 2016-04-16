@@ -117,6 +117,7 @@ public:
     void ClearBanned(); // needed for unit testing
     bool IsBanned(CNetAddr ip);
 
+    void AddOneShot(const std::string& strDest);
 private:
     struct ListenSocket {
         SOCKET socket;
@@ -142,6 +143,8 @@ private:
     CCriticalSection cs_setBanned;
     bool fAddressesInitialized;
     CAddrMan addrman;
+    std::deque<std::string> vOneShots;
+    CCriticalSection cs_vOneShots;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void MapPort(bool fUseUPnP);

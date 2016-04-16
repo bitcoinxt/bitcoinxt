@@ -88,13 +88,7 @@ deque<pair<int64_t, CInv> > vRelayExpiration;
 CCriticalSection cs_mapRelay;
 limitedmap<CInv, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
 
-static deque<string> vOneShots;
-CCriticalSection cs_vOneShots;
-
-set<CNetAddr> setservAddNodeAddresses;
-CCriticalSection cs_setservAddNodeAddresses;
-
-vector<std::string> vAddedNodes;
+std::vector<std::string> vAddedNodes;
 CCriticalSection cs_vAddedNodes;
 
 NodeId nLastNodeId = 0;
@@ -112,7 +106,7 @@ CLeakyBucket receiveShaper(0 ,0);
 CLeakyBucket sendShaper(0, 0);
 boost::chrono::steady_clock CLeakyBucket::clock;
 
-void AddOneShot(const std::string& strDest)
+void CConnman::AddOneShot(const std::string& strDest)
 {
     LOCK(cs_vOneShots);
     vOneShots.push_back(strDest);

@@ -1140,8 +1140,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         }
     }
 
-    BOOST_FOREACH(string strDest, mapMultiArgs["-seednode"])
-        AddOneShot(strDest);
+    for (const std::string& strDest : mapMultiArgs["-seednode"])
+        connman.AddOneShot(strDest);
 
     // ********************************************************* Step 7: load block chain
 
