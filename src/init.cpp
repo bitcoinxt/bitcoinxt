@@ -37,6 +37,7 @@
 
 #include <stdint.h>
 #include <stdio.h>
+#include <memory>
 
 #ifndef WIN32
 #include <signal.h>
@@ -56,6 +57,7 @@ using namespace std;
 #ifdef ENABLE_WALLET
 CWallet* pwalletMain = NULL;
 #endif
+std::unique_ptr<CConnman> g_connman;
 bool fFeeEstimatesInitialized = false;
 
 #ifdef WIN32
@@ -176,7 +178,9 @@ void Shutdown()
         pwalletMain->Flush(false);
 #endif
     GenerateBitcoins(false, 0, Params());
-    StopNode();
+    StopNode(*g_connman);
+    g_connman.reset();
+
     UnregisterNodeSignals(GetNodeSignals());
 
     if (fFeeEstimatesInitialized)
@@ -1025,6 +1029,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 #endif // ENABLE_WALLET
     // ********************************************************* Step 6: network initialization
 
+    assert(!g_connman);
+    g_connman = std::unique_ptr<CConnman>(new CConnman());
+    CConnman& connman = *g_connman;
+
     RegisterNodeSignals(GetNodeSignals());
 
     try { Opt().UAComment(true /* validate */); }
@@ -1493,7 +1501,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     LogPrintf("mapAddressBook.size() = %u\n",  pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
 #endif
 
-    StartNode(threadGroup, scheduler);
+    std::string strNodeError;
+    if(!StartNode(connman, threadGroup, scheduler, strNodeError))
+        return InitError(strNodeError);
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected
     int64_t nPowTargetSpacing = Params().GetConsensus().nPowTargetSpacing;

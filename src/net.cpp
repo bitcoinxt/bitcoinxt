@@ -63,13 +63,6 @@ namespace {
     const int MAX_OUTBOUND_CONNECTIONS = 8;
     const int MAX_FEELER_CONNECTIONS = 1;
 
-    struct ListenSocket {
-        SOCKET socket;
-        bool whitelisted;
-
-        ListenSocket(SOCKET socket, bool whitelisted) : socket(socket), whitelisted(whitelisted) {}
-    };
-
     static const size_t DEFAULT_MAXRECEIVEBUFFER = 5 * 1000;
     static const size_t DEFAULT_MAXSENDBUFFER    = 1 * 1000;
 }
@@ -748,9 +741,90 @@ void SocketSendData(CNode *pnode)
     pnode->vSendMsg.erase(pnode->vSendMsg.begin(), it);
 }
 
-static list<CNode*> vNodesDisconnected;
+static std::list<CNode*> vNodesDisconnected;
 
-void ThreadSocketHandler()
+void CConnman::AcceptConnection(const ListenSocket& hListenSocket) {
+    struct sockaddr_storage sockaddr;
+    socklen_t len = sizeof(sockaddr);
+    SOCKET hSocket = accept(hListenSocket.socket, (struct sockaddr*)&sockaddr, &len);
+    CAddress addr;
+    int nInbound = 0;
+
+    if (hSocket != INVALID_SOCKET)
+        if (!addr.SetSockAddr((const struct sockaddr*)&sockaddr))
+            LogPrintf("Warning: Unknown socket family\n");
+
+    bool whitelisted = hListenSocket.whitelisted || CNode::IsWhitelistedRange(addr);
+    {
+        LOCK(cs_vNodes);
+        BOOST_FOREACH(CNode* pnode, vNodes)
+            if (pnode->fInbound)
+                nInbound++;
+    }
+
+    if (hSocket == INVALID_SOCKET)
+    {
+        int nErr = WSAGetLastError();
+        if (nErr != WSAEWOULDBLOCK)
+            LogPrintf("socket error accept failed: %s\n", NetworkErrorString(nErr));
+        return;
+    }
+    else if (!IsSelectableSocket(hSocket))
+    {
+        LogPrintf("connection from %s dropped: non-selectable socket\n", addr.ToString());
+        CloseSocket(hSocket);
+        return;
+    }
+    else if (CNode::IsBanned(addr) && !whitelisted)
+    {
+        LogPrintf("connection from %s dropped (banned)\n", addr.ToString());
+        CloseSocket(hSocket);
+        return;
+    }
+    else if (nInbound >= nMaxConnections - MAX_OUTBOUND_CONNECTIONS)
+    {
+        // Calculate the priority of the new IP to see if we should drop it immediately (normal) or kick
+        // one of the other peers out to make room for it.
+
+        // See if this IP has static prio data from a group.
+        CIPGroupData ipgroup = FindGroupForIP(addr);
+
+        bool disconnected = false;
+        {
+            LOCK(cs_vNodes);
+            BOOST_FOREACH(CNode *n, vNodes)
+            {
+                CIPGroupData ngroup = FindGroupForIP(n->addr);
+                int nodePriority = ngroup.priority;
+                if (nodePriority < ipgroup.priority) {
+                    LogPrintf("Connection slots exhausted, evicting peer %d with priority %d (group %s) to free up resources\n",
+                              n->id, nodePriority, ngroup.name == "" ? string("default") : ngroup.name);
+                    n->fDisconnect = true;
+                    disconnected = true;
+                    // Leave shouldConnect = true to allow this socket through.
+                    break;
+                }
+            }
+        }
+
+        if (!disconnected) {
+            CloseSocket(hSocket);
+            LogPrintf("Connection slots exhausted, refusing inbound connection from %s\n", addr.ToString());
+            return;
+        }
+    }
+
+    CNode* pnode = new CNode(hSocket, addr, "", true);
+    pnode->AddRef();
+    pnode->fWhitelisted = whitelisted;
+
+    {
+        LOCK(cs_vNodes);
+        vNodes.push_back(pnode);
+    }
+}
+
+void CConnman::ThreadSocketHandler()
 {
     unsigned int nPrevNodeCount = 0;
 
@@ -917,88 +991,7 @@ void ThreadSocketHandler()
         {
             if (hListenSocket.socket != INVALID_SOCKET && FD_ISSET(hListenSocket.socket, &fdsetRecv))
             {
-                struct sockaddr_storage sockaddr;
-                socklen_t len = sizeof(sockaddr);
-                SOCKET hSocket = accept(hListenSocket.socket, (struct sockaddr*)&sockaddr, &len);
-                CAddress addr;
-                int nInbound = 0;
-
-                if (hSocket != INVALID_SOCKET)
-                    if (!addr.SetSockAddr((const struct sockaddr*)&sockaddr))
-                        LogPrintf("Warning: Unknown socket family\n");
-
-                bool whitelisted = hListenSocket.whitelisted || CNode::IsWhitelistedRange(addr);
-                {
-                    LOCK(cs_vNodes);
-                    BOOST_FOREACH(CNode* pnode, vNodes)
-                        if (pnode->fInbound)
-                            nInbound++;
-                }
-
-                bool shouldConnect = true;
-
-                if (hSocket == INVALID_SOCKET)
-                {
-                    int nErr = WSAGetLastError();
-                    if (nErr != WSAEWOULDBLOCK)
-                        LogPrintf("socket error accept failed: %s\n", NetworkErrorString(nErr));
-                    shouldConnect = false;
-                }
-                else if (!IsSelectableSocket(hSocket))
-                {
-                    LogPrintf("connection from %s dropped: non-selectable socket\n", addr.ToString());
-                    CloseSocket(hSocket);
-                }
-                else if (nInbound >= nMaxConnections - MAX_OUTBOUND_CONNECTIONS)
-                {
-                    // Calculate the priority of the new IP to see if we should drop it immediately (normal) or kick
-                    // one of the other peers out to make room for it.
-
-                    // See if this IP has static prio data from a group.
-                    CIPGroupData ipgroup = FindGroupForIP(addr);
-
-                    bool disconnected = false;
-                    {
-                        LOCK(cs_vNodes);
-                        BOOST_FOREACH(CNode *n, vNodes)
-                        {
-                            CIPGroupData ngroup = FindGroupForIP(n->addr);
-                            int nodePriority = ngroup.priority;
-                            if (nodePriority < ipgroup.priority) {
-                                LogPrintf("Connection slots exhausted, evicting peer %d with priority %d (group %s) to free up resources\n",
-                                          n->id, nodePriority, ngroup.name == "" ? string("default") : ngroup.name);
-                                n->fDisconnect = true;
-                                disconnected = true;
-                                // Leave shouldConnect = true to allow this socket through.
-                                break;
-                            }
-                        }
-                    }
-
-                    if (!disconnected) {
-                        CloseSocket(hSocket);
-                        LogPrintf("Connection slots exhausted, refusing inbound connection from %s\n", addr.ToString());
-                        shouldConnect = false;
-                    }
-                }
-                else if (CNode::IsBanned(addr) && !whitelisted)
-                {
-                    LogPrintf("connection from %s dropped (banned)\n", addr.ToString());
-                    CloseSocket(hSocket);
-                    shouldConnect = false;
-                }
-
-                if (shouldConnect)
-                {
-                    CNode* pnode = new CNode(hSocket, addr, "", true);
-                    pnode->AddRef();
-                    pnode->fWhitelisted = whitelisted;
-
-                    {
-                        LOCK(cs_vNodes);
-                        vNodes.push_back(pnode);
-                    }
-                }
+                AcceptConnection(hListenSocket);
             }
         }
 
@@ -1259,7 +1252,7 @@ void MapPort(bool)
 
 
 
-void ThreadDNSAddressSeed()
+void CConnman::ThreadDNSAddressSeed()
 {
     // goal: only query DNS seeds if address need is acute
     if ((addrman.size() > 0) &&
@@ -1324,7 +1317,7 @@ void DumpAddresses()
            addrman.size(), GetTimeMillis() - nStart);
 }
 
-void static ProcessOneShot()
+void CConnman::ProcessOneShot()
 {
     string strDest;
     {
@@ -1342,7 +1335,7 @@ void static ProcessOneShot()
     }
 }
 
-void ThreadOpenConnections()
+void CConnman::ThreadOpenConnections()
 {
     // Connect to specific addresses
     if (mapArgs.count("-connect") && mapMultiArgs["-connect"].size() > 0)
@@ -1526,7 +1519,7 @@ std::vector<AddedNodeInfo> GetAddedNodeInfo()
     return ret;
 }
 
-void ThreadOpenAddedConnections()
+void CConnman::ThreadOpenAddedConnections()
 {
     {
         LOCK(cs_vAddedNodes);
@@ -1583,7 +1576,7 @@ bool OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSem
 }
 
 
-void ThreadMessageHandler()
+void CConnman::ThreadMessageHandler()
 {
     boost::mutex condition_mutex;
     boost::unique_lock<boost::mutex> lock(condition_mutex);
@@ -1794,7 +1787,11 @@ void static Discover(boost::thread_group& threadGroup)
 #endif
 }
 
-void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
+CConnman::CConnman()
+{
+}
+
+bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& scheduler, std::string& strNodeError)
 {
     //  Init network shapers
     receiveShaper.set(GetArg("-receiveburst", 0) * 1000, GetArg("-receiveavg", 0) * 1000);
@@ -1816,6 +1813,20 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
            addrman.size(), GetTimeMillis() - nStart);
     fAddressesInitialized = true;
 
+    Discover(threadGroup);
+
+    // Download or load data that's useful for prioritising traffic by IP address.
+    InitIPGroups(&scheduler);
+
+    bool ret = connman.Start(threadGroup, strNodeError);
+
+    // Dump network addresses
+    scheduler.scheduleEvery(&DumpAddresses, DUMP_ADDRESSES_INTERVAL);
+    return ret;
+}
+
+bool CConnman::Start(boost::thread_group& threadGroup, std::string& strNodeError)
+{
     if (semOutbound == NULL) {
         // initialize semaphore
         int nMaxOutbound = std::min((MAX_OUTBOUND_CONNECTIONS + MAX_FEELER_CONNECTIONS), nMaxConnections);
@@ -1825,8 +1836,6 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (pnodeLocalHost == NULL)
         pnodeLocalHost = new CNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), nLocalServices));
 
-    Discover(threadGroup);
-
     //
     // Start threads
     //
@@ -1834,37 +1843,30 @@ void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler)
     if (!GetBoolArg("-dnsseed", true))
         LogPrintf("DNS seeding disabled\n");
     else
-        threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "dnsseed", &ThreadDNSAddressSeed));
+        threadGroup.create_thread(boost::bind(&TraceThread<boost::function<void()> >, "dnsseed", boost::function<void()>(boost::bind(&CConnman::ThreadDNSAddressSeed, this))));
 
     // Map ports with UPnP
     MapPort(GetBoolArg("-upnp", DEFAULT_UPNP));
 
-    // Download or load data that's useful for prioritising traffic by IP address.
-    InitIPGroups(&scheduler);
-
     // Send and receive from sockets, accept connections
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "net", &ThreadSocketHandler));
+    threadGroup.create_thread(boost::bind(&TraceThread<boost::function<void()> >, "net", boost::function<void()>(boost::bind(&CConnman::ThreadSocketHandler, this))));
 
     // Initiate outbound connections from -addnode
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "addcon", &ThreadOpenAddedConnections));
+    threadGroup.create_thread(boost::bind(&TraceThread<boost::function<void()> >, "addcon", boost::function<void()>(boost::bind(&CConnman::ThreadOpenAddedConnections, this))));
 
     // Initiate outbound connections
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "opencon", &ThreadOpenConnections));
+    threadGroup.create_thread(boost::bind(&TraceThread<boost::function<void()> >, "opencon", boost::function<void()>(boost::bind(&CConnman::ThreadOpenConnections, this))));
 
     // Process messages
-    threadGroup.create_thread(boost::bind(&TraceThread<void (*)()>, "msghand", &ThreadMessageHandler));
+    threadGroup.create_thread(boost::bind(&TraceThread<boost::function<void()> >, "msghand", boost::function<void()>(boost::bind(&CConnman::ThreadMessageHandler, this))));
 
-    // Dump network addresses
-    scheduler.scheduleEvery(&DumpAddresses, DUMP_ADDRESSES_INTERVAL);
+    return true;
 }
 
-bool StopNode()
+bool StopNode(CConnman& connman)
 {
     LogPrintf("StopNode()\n");
     MapPort(false);
-    if (semOutbound)
-        for (int i=0; i<(MAX_OUTBOUND_CONNECTIONS + MAX_FEELER_CONNECTIONS); i++)
-            semOutbound->post();
 
     if (fAddressesInitialized)
     {
@@ -1872,6 +1874,7 @@ bool StopNode()
         fAddressesInitialized = false;
     }
 
+    connman.Stop();
     return true;
 }
 
@@ -1882,27 +1885,6 @@ public:
 
     ~CNetCleanup()
     {
-        // Close sockets
-        BOOST_FOREACH(CNode* pnode, vNodes)
-            pnode->CloseSocketDisconnect();
-        BOOST_FOREACH(ListenSocket& hListenSocket, vhListenSocket)
-            if (hListenSocket.socket != INVALID_SOCKET)
-                if (!CloseSocket(hListenSocket.socket))
-                    LogPrintf("CloseSocket(hListenSocket) failed with error %s\n", NetworkErrorString(WSAGetLastError()));
-
-        // clean up some globals (to help leak detection)
-        BOOST_FOREACH(CNode *pnode, vNodes)
-            delete pnode;
-        BOOST_FOREACH(CNode *pnode, vNodesDisconnected)
-            delete pnode;
-        vNodes.clear();
-        vNodesDisconnected.clear();
-        vhListenSocket.clear();
-        delete semOutbound;
-        semOutbound = NULL;
-        delete pnodeLocalHost;
-        pnodeLocalHost = NULL;
-
 #ifdef WIN32
         // Shutdown Windows Sockets
         WSACleanup();
@@ -1911,6 +1893,37 @@ public:
 }
 instance_of_cnetcleanup;
 
+void CConnman::Stop()
+{
+    if (semOutbound)
+        for (int i=0; i<(MAX_OUTBOUND_CONNECTIONS + MAX_FEELER_CONNECTIONS); i++)
+            semOutbound->post();
+
+    // Close sockets
+    BOOST_FOREACH(CNode* pnode, vNodes)
+        pnode->CloseSocketDisconnect();
+    BOOST_FOREACH(ListenSocket& hListenSocket, vhListenSocket)
+        if (hListenSocket.socket != INVALID_SOCKET)
+            if (!CloseSocket(hListenSocket.socket))
+                LogPrintf("CloseSocket(hListenSocket) failed with error %s\n", NetworkErrorString(WSAGetLastError()));
+
+    // clean up some globals (to help leak detection)
+    BOOST_FOREACH(CNode *pnode, vNodes)
+        delete pnode;
+    BOOST_FOREACH(CNode *pnode, vNodesDisconnected)
+        delete pnode;
+    vNodes.clear();
+    vNodesDisconnected.clear();
+    vhListenSocket.clear();
+    delete semOutbound;
+    semOutbound = NULL;
+    delete pnodeLocalHost;
+    pnodeLocalHost = NULL;
+}
+
+CConnman::~CConnman()
+{
+}
 
 
 
