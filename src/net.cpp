@@ -1972,6 +1972,33 @@ bool CConnman::RemoveAddedNode(const std::string& strNode)
     return false;
 }
 
+size_t CConnman::GetNodeCount(NumConnections flags)
+{
+    LOCK(cs_vNodes);
+    if (flags == CConnman::CONNECTIONS_ALL) // Shortcut if we want total
+        return vNodes.size();
+
+    int nNum = 0;
+    for(std::vector<CNode*>::const_iterator it = vNodes.begin(); it != vNodes.end(); ++it)
+        if (flags & ((*it)->fInbound ? CONNECTIONS_IN : CONNECTIONS_OUT))
+            nNum++;
+
+    return nNum;
+}
+
+void CConnman::GetNodeStats(std::vector<CNodeStats>& vstats)
+{
+    vstats.clear();
+    LOCK(cs_vNodes);
+    vstats.reserve(vNodes.size());
+    for(std::vector<CNode*>::iterator it = vNodes.begin(); it != vNodes.end(); ++it) {
+        CNode* pnode = *it;
+        CNodeStats stats;
+        pnode->copyStats(stats);
+        vstats.push_back(stats);
+    }
+}
+
 void RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors)
 {
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);

@@ -90,9 +90,18 @@ CNode* FindNode(const CNetAddr& ip);
 CNode* FindNode(const std::string& addrName);
 CNode* FindNode(const CService& ip);
 
+class CNodeStats;
 class CConnman
 {
 public:
+
+    enum NumConnections {
+        CONNECTIONS_NONE = 0,
+        CONNECTIONS_IN = (1U << 0),
+        CONNECTIONS_OUT = (1U << 1),
+        CONNECTIONS_ALL = (CONNECTIONS_IN | CONNECTIONS_OUT),
+    };
+
     CConnman();
     ~CConnman();
     bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, std::string& strNodeError);
@@ -130,6 +139,9 @@ public:
     bool AddNode(const std::string& node);
     bool RemoveAddedNode(const std::string& node);
     std::vector<AddedNodeInfo> GetAddedNodeInfo();
+
+    size_t GetNodeCount(NumConnections num);
+    void GetNodeStats(std::vector<CNodeStats>& vstats);
 
 private:
     struct ListenSocket {
