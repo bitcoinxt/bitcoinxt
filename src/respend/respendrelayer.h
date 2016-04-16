@@ -6,12 +6,14 @@
 
 #include "respend/respendaction.h"
 
+class CConnman;
+
 namespace respend {
 
 // Relays double spends to other peers so they also may detect the doublespend.
 class RespendRelayer : public RespendAction {
     public:
-        RespendRelayer();
+        RespendRelayer(CConnman*);
 
         bool AddOutpointConflict(
                 const COutPoint&, const CTxMemPool::txiter,
@@ -27,6 +29,7 @@ class RespendRelayer : public RespendAction {
         bool interesting;
         bool valid;
         CTransaction respend;
+        CConnman* connman;
 };
 
 } // ns respend

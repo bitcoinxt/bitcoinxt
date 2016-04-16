@@ -26,7 +26,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeVersionMessage)
     s << n.fRelayTxes;
     BOOST_CHECK_EQUAL(size_t(352), s.size());
     CConnman dummy;
-    BOOST_CHECK(ProcessMessage(&n, "version", s, 0, dummy));
+    BOOST_CHECK(ProcessMessage(&n, "version", s, 0, &dummy));
 }
 
 BOOST_AUTO_TEST_CASE(OverMaxSizeVersionMessage)
@@ -45,7 +45,7 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeVersionMessage)
     s << n.fRelayTxes;
     BOOST_CHECK_EQUAL(size_t(353), s.size());
     CConnman dummy;
-    BOOST_CHECK_THROW(ProcessMessage(&n, "version", s, 0, dummy), std::ios_base::failure);
+    BOOST_CHECK_THROW(ProcessMessage(&n, "version", s, 0, &dummy), std::ios_base::failure);
 }
 
 BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
@@ -60,7 +60,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
     bool temp = fDebug;
     fDebug = true;
     CConnman dummy;
-    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, dummy));
+    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, &dummy));
     fDebug = temp;
 }
 
@@ -77,7 +77,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeValidRejectMessage)
     bool temp = fDebug;
     fDebug = true;
     CConnman dummy;
-    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, dummy));
+    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, &dummy));
     fDebug = temp;
 }
 
@@ -93,7 +93,7 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeWeirdRejectMessage)
     bool temp = fDebug;
     fDebug = true;
     CConnman dummy;
-    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, dummy)); // check this way since the reject message processing swallows the exception
+    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, &dummy)); // check this way since the reject message processing swallows the exception
     fDebug = temp;
 }
 
@@ -110,7 +110,7 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeValidRejectMessage)
     bool temp = fDebug;
     fDebug = true;
     CConnman dummy;
-    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, dummy)); // check this way since the reject message processing swallows the exception
+    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, &dummy)); // check this way since the reject message processing swallows the exception
     fDebug = temp;
 }
 

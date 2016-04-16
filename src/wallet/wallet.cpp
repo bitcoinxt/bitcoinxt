@@ -1183,10 +1183,12 @@ bool CWalletTx::RelayWalletTransaction(CConnman* connman)
     {
         if (GetDepthInMainChain() == 0) {
             LogPrintf("Relaying wtx %s\n", GetHash().ToString());
-            std::vector<uint256> vAncestors;
-            mempool.queryAncestors(GetHash(), vAncestors);
-            RelayTransaction((CTransaction)*this, vAncestors);
-            return true;
+	    if (connman) {
+	        std::vector<uint256> vAncestors;
+	        mempool.queryAncestors(GetHash(), vAncestors);
+	        connman->RelayTransaction((CTransaction)*this, vAncestors);
+	        return true;
+	    }
         }
     }
     return false;
@@ -2942,5 +2944,5 @@ int CMerkleTx::GetBlocksToMaturity() const
 bool CMerkleTx::AcceptToMemoryPool(bool fLimitFree, bool fRejectAbsurdFee)
 {
     CValidationState state;
-    return ::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, false, fRejectAbsurdFee);
+    return ::AcceptToMemoryPool(mempool, state, *this, fLimitFree, NULL, nullptr, false, fRejectAbsurdFee);
 }

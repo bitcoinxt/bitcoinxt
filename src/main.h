@@ -220,17 +220,17 @@ bool LoadBlockIndex(bool* fRebuildRequired);
 /** Unload database information */
 void UnloadBlockIndex();
 /** Process protocol messages received from a given node */
-bool ProcessMessages(CNode* pfrom, CConnman& connman);
+bool ProcessMessages(CNode* pfrom, CConnman* connman);
 /** Process a single message from a given node */
 bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv,
-                    int64_t nTimeReceived, CConnman& connman);
+                    int64_t nTimeReceived, CConnman* connman);
 /**
  * Send queued protocol messages to be sent to a give node.
  *
  * @param[in]   pto             The node which we are sending messages to.
  * @param[in]   connman         The connection manager for that node.
  */
-bool SendMessages(CNode* pto, CConnman& connman);
+bool SendMessages(CNode* pto, CConnman* connman);
 /** Run an instance of the script checking thread */
 void ThreadScriptCheck();
 /** Try to detect Partition (network isolation) attacks against us */
@@ -287,7 +287,7 @@ bool IsCashHFEnabled(const CBlockIndex *pindexPrev);
 
 /** (try to) add transaction to memory pool **/
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
-                        bool* pfMissingInputs, bool fOverrideMempoolLimit=false, bool fRejectAbsurdFee=false);
+                        bool* pfMissingInputs, CConnman*, bool fOverrideMempoolLimit=false, bool fRejectAbsurdFee=false);
 
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state);

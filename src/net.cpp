@@ -81,8 +81,6 @@ static CNode* pnodeLocalHost = NULL;
 uint64_t nLocalHostNonce = 0;
 int nMaxConnections = 125;
 
-vector<CNode*> vNodes;
-CCriticalSection cs_vNodes;
 map<CInv, CDataStream> mapRelay;
 deque<pair<int64_t, CInv> > vRelayExpiration;
 CCriticalSection cs_mapRelay;
@@ -314,7 +312,8 @@ uint64_t CNode::nTotalBytesSent = 0;
 CCriticalSection CNode::cs_totalBytesRecv;
 CCriticalSection CNode::cs_totalBytesSent;
 
-CNode* FindNode(const CNetAddr& ip)
+
+CNode* CConnman::FindNode(const CNetAddr& ip)
 {
     LOCK(cs_vNodes);
     BOOST_FOREACH(CNode* pnode, vNodes)
@@ -323,7 +322,7 @@ CNode* FindNode(const CNetAddr& ip)
     return NULL;
 }
 
-CNode* FindNode(const std::string& addrName)
+CNode* CConnman::FindNode(const std::string& addrName)
 {
     LOCK(cs_vNodes);
     BOOST_FOREACH(CNode* pnode, vNodes)
@@ -332,7 +331,7 @@ CNode* FindNode(const std::string& addrName)
     return NULL;
 }
 
-CNode* FindNode(const CService& addr)
+CNode* CConnman::FindNode(const CService& addr)
 {
     LOCK(cs_vNodes);
     BOOST_FOREACH(CNode* pnode, vNodes)
@@ -1585,7 +1584,7 @@ void CConnman::ThreadMessageHandler()
                 TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
                 if (lockRecv)
                 {
-                    if (!g_signals.ProcessMessages(pnode, *this))
+                    if (!g_signals.ProcessMessages(pnode, this))
                         pnode->CloseSocketDisconnect();
 
                     if (pnode->nSendSize < SendBufferSize())
@@ -1603,7 +1602,7 @@ void CConnman::ThreadMessageHandler()
             {
                 TRY_LOCK(pnode->cs_vSend, lockSend);
                 if (lockSend)
-                    g_signals.SendMessages(pnode, *this);
+                    g_signals.SendMessages(pnode, this);
             }
             boost::this_thread::interruption_point();
         }
@@ -1999,15 +1998,7 @@ void CConnman::GetNodeStats(std::vector<CNodeStats>& vstats)
     }
 }
 
-void RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors)
-{
-    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-    ss.reserve(10000);
-    ss << tx;
-    RelayTransaction(tx, ss, vAncestors);
-}
-
-void RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors)
+void CConnman::RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors)
 {
     CInv inv(MSG_TX, tx.GetHash());
     {
@@ -2054,6 +2045,15 @@ bool FindTransactionInRelayMap(uint256 hash, CTransaction &out) {
     }
     return false;
 }
+
+void CConnman::RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors)
+{
+    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
+    ss.reserve(10000);
+    ss << tx;
+    RelayTransaction(tx, ss, vAncestors);
+}
+
 
 void CNode::RecordBytesRecv(uint64_t bytes)
 {
@@ -2267,6 +2267,68 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         SocketSendData(this);
 
     LEAVE_CRITICAL_SECTION(cs_vSend);
+}
+
+bool CConnman::ForNode(NodeId id, std::function<bool(CNode* pnode)> func)
+{
+    CNode* found = nullptr;
+    LOCK(cs_vNodes);
+    for (auto&& pnode : vNodes) {
+        if(pnode->id == id) {
+            found = pnode;
+            break;
+        }
+    }
+    return found != nullptr && func(found);
+}
+
+bool CConnman::ForEachNode(std::function<bool(CNode* pnode)> func)
+{
+    LOCK(cs_vNodes);
+    for (auto&& node : vNodes)
+        if(!func(node))
+            return false;
+    return true;
+}
+
+bool CConnman::ForEachNode(std::function<bool(const CNode* pnode)> func) const
+{
+    LOCK(cs_vNodes);
+    for (const auto& node : vNodes)
+        if(!func(node))
+            return false;
+    return true;
+}
+
+bool CConnman::ForEachNodeThen(std::function<bool(CNode* pnode)> pre, std::function<void()> post)
+{
+    bool ret = true;
+    LOCK(cs_vNodes);
+    for (auto&& node : vNodes)
+        if(!pre(node)) {
+            ret = false;
+            break;
+        }
+    post();
+    return ret;
+}
+
+bool CConnman::ForEachNodeThen(std::function<bool(const CNode* pnode)> pre, std::function<void()> post) const
+{
+    bool ret = true;
+    LOCK(cs_vNodes);
+    for (const auto& node : vNodes)
+        if(!pre(node)) {
+            ret = false;
+            break;
+        }
+    post();
+    return ret;
+}
+
+void CConnman::AddTestNode(CNode* n) {
+    LOCK(cs_vNodes);
+    vNodes.push_back(n);
 }
 
 bool CNode::SupportsXThinBlocks() const {

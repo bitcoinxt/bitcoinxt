@@ -32,7 +32,11 @@ struct DummyNode : public CNode {
         NodeStatePtr::insert(id, this, *mgr);
         nVersion = PROTOCOL_VERSION;
     }
-    virtual ~DummyNode() { NodeStatePtr(id).erase(); }
+    virtual ~DummyNode() {
+        bool fUpdateConnectionTime;
+        GetNodeSignals().FinalizeNode(id, fUpdateConnectionTime);
+        NodeStatePtr(id).erase();
+    }
     virtual void BeginMessage(const char* pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend) {
         messages.push_back(pszCommand);
         CNode::BeginMessage(pszCommand);

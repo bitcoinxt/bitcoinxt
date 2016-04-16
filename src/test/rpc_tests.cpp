@@ -239,24 +239,22 @@ static std::string get_coinbaseaux_flags(UniValue blocktpl) {
 // Put us in a state where we accept rpc calls.
 class RpcMineState {
 public:
-    RpcMineState()
+     RpcMineState() : dummynode(INVALID_SOCKET, CAddress())
     {
         // Don't throw "Bitcoin is downloading blocks"
         fForceInitialBlockDownload = true;
 
         // Don't throw "Bitcoin is not connected"
-        LOCK(cs_vNodes);
-        assert(vNodes.empty());
-        vNodes.push_back(new CNode(INVALID_SOCKET, CAddress()));
-
+        globalBackup.reset(g_connman.release());
+        g_connman.reset(new CConnman);
+        g_connman->AddTestNode(&dummynode);
     }
     ~RpcMineState() {
         fForceInitialBlockDownload = false;
-
-        LOCK(cs_vNodes);
-        delete vNodes[0];
-        vNodes.clear();
+        g_connman.reset(globalBackup.release());
     }
+    std::unique_ptr<CConnman> globalBackup;
+    CNode dummynode;
 };
 
 BOOST_AUTO_TEST_CASE(rpc_getblocktemplate_vote)

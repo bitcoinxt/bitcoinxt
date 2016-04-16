@@ -19,11 +19,11 @@ static const unsigned int MAX_RESPEND_BLOOM = 100000;
 std::unique_ptr<CRollingBloomFilter> RespendDetector::respentBefore;
 std::mutex RespendDetector::respentBeforeMutex;
 
-std::vector<RespendActionPtr> CreateDefaultActions() {
+std::vector<RespendActionPtr> CreateDefaultActions(CConnman* connman) {
     std::vector<RespendActionPtr> actions;
 
-    if (!Opt().IsStealthMode()) {
-        actions.push_back(RespendActionPtr(new RespendRelayer{}));
+    if (connman && !Opt().IsStealthMode()) {
+        actions.push_back(RespendActionPtr(new RespendRelayer{connman}));
     }
     if (LogAcceptCategory("respend")) {
         actions.push_back(RespendActionPtr(new RespendLogger{}));
