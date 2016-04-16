@@ -6,6 +6,7 @@
 #ifndef BITCOIN_NET_H
 #define BITCOIN_NET_H
 
+#include "addrdb.h"
 #include "bloom.h"
 #include "compat.h"
 #include "hash.h"
@@ -241,9 +242,6 @@ public:
     int readHeader(const char *pch, unsigned int nBytes);
     int readData(const char *pch, unsigned int nBytes);
 };
-
-
-
 
 
 /** Information about a peer */
@@ -670,18 +668,6 @@ void RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors);
 void RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors);
 
 bool FindTransactionInRelayMap(uint256 hash, CTransaction &out);
-
-/** Access to the (IP) address database (peers.dat) */
-class CAddrDB
-{
-private:
-    boost::filesystem::path pathAddr;
-public:
-    CAddrDB();
-    bool Write(const CAddrMan& addr);
-    bool Read(CAddrMan& addr);
-    bool Read(CAddrMan& addr, CDataStream& ssPeers);
-};
 
 /** Return a timestamp in the future (in microseconds) for exponentially distributed events. */
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds);
