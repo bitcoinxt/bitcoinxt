@@ -79,9 +79,7 @@ static bool vfReachable[NET_MAX] = {};
 static bool vfLimited[NET_MAX] = {};
 static CNode* pnodeLocalHost = NULL;
 uint64_t nLocalHostNonce = 0;
-CAddrMan addrman;
 int nMaxConnections = 125;
-bool fAddressesInitialized = false;
 
 vector<CNode*> vNodes;
 CCriticalSection cs_vNodes;
@@ -114,7 +112,7 @@ CLeakyBucket receiveShaper(0 ,0);
 CLeakyBucket sendShaper(0, 0);
 boost::chrono::steady_clock CLeakyBucket::clock;
 
-void AddOneShot(string strDest)
+void AddOneShot(const std::string& strDest)
 {
     LOCK(cs_vOneShots);
     vOneShots.push_back(strDest);
@@ -476,15 +474,13 @@ void CNode::PushVersion()
 
 
 
-std::map<CNetAddr, int64_t> CNode::setBanned;
-CCriticalSection CNode::cs_setBanned;
-
-void CNode::ClearBanned()
+void CConnman::ClearBanned()
 {
+    LOCK(cs_setBanned);
     setBanned.clear();
 }
 
-bool CNode::IsBanned(CNetAddr ip)
+bool CConnman::IsBanned(CNetAddr ip)
 {
     bool fResult = false;
     {
@@ -500,7 +496,7 @@ bool CNode::IsBanned(CNetAddr ip)
     return fResult;
 }
 
-bool CNode::Ban(const CNetAddr &addr) {
+bool CConnman::Ban(const CNetAddr &addr) {
     int64_t banTime = GetTime()+GetArg("-bantime", 60*60*24);  // Default 24-hour ban
     {
         LOCK(cs_setBanned);
@@ -509,7 +505,6 @@ bool CNode::Ban(const CNetAddr &addr) {
     }
     return true;
 }
-
 
 std::vector<CSubNet> CNode::vWhitelistedRange;
 CCriticalSection CNode::cs_vWhitelistedRange;
@@ -769,7 +764,7 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket) {
         CloseSocket(hSocket);
         return;
     }
-    else if (CNode::IsBanned(addr) && !whitelisted)
+    else if (IsBanned(addr) && !whitelisted)
     {
         LogPrintf("connection from %s dropped (banned)\n", addr.ToString());
         CloseSocket(hSocket);
@@ -1301,7 +1296,7 @@ void CConnman::ThreadDNSAddressSeed()
 
 
 
-void DumpAddresses()
+void CConnman::DumpAddresses()
 {
     int64_t nStart = GetTimeMillis();
 
@@ -1548,7 +1543,7 @@ bool CConnman::OpenNetworkConnection(const CAddress& addrConnect, bool fCountFai
     boost::this_thread::interruption_point();
     if (!pszDest) {
         if (IsLocal(addrConnect) ||
-            FindNode((CNetAddr)addrConnect) || CNode::IsBanned(addrConnect) ||
+            FindNode((CNetAddr)addrConnect) || IsBanned(addrConnect) ||
             FindNode(addrConnect.ToStringIPPort()))
             return false;
     } else if (FindNode(std::string(pszDest)))
@@ -1782,7 +1777,7 @@ void static Discover(boost::thread_group& threadGroup)
 #endif
 }
 
-CConnman::CConnman()
+CConnman::CConnman() : fAddressesInitialized(false)
 {
 }
 
@@ -1792,6 +1787,16 @@ bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& 
     receiveShaper.set(GetArg("-receiveburst", 0) * 1000, GetArg("-receiveavg", 0) * 1000);
     sendShaper.set(GetArg("-sendburst", 0) * 1000, GetArg("-sendavg", 0) * 1000);
 
+    Discover(threadGroup);
+
+    // Download or load data that's useful for prioritising traffic by IP address.
+    InitIPGroups(&scheduler);
+
+    return connman.Start(threadGroup, scheduler, strNodeError);
+}
+
+bool CConnman::Start(boost::thread_group& threadGroup, CScheduler& scheduler, std::string& strNodeError)
+{
     uiInterface.InitMessage(_("Loading addresses..."));
     // Load addresses for peers.dat
     int64_t nStart = GetTimeMillis();
@@ -1808,20 +1813,9 @@ bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& 
            addrman.size(), GetTimeMillis() - nStart);
     fAddressesInitialized = true;
 
-    Discover(threadGroup);
+    uiInterface.InitMessage(_("Starting network threads..."));
 
-    // Download or load data that's useful for prioritising traffic by IP address.
-    InitIPGroups(&scheduler);
 
-    bool ret = connman.Start(threadGroup, strNodeError);
-
-    // Dump network addresses
-    scheduler.scheduleEvery(&DumpAddresses, DUMP_ADDRESSES_INTERVAL);
-    return ret;
-}
-
-bool CConnman::Start(boost::thread_group& threadGroup, std::string& strNodeError)
-{
     if (semOutbound == NULL) {
         // initialize semaphore
         int nMaxOutbound = std::min((MAX_OUTBOUND_CONNECTIONS + MAX_FEELER_CONNECTIONS), nMaxConnections);
@@ -1857,6 +1851,9 @@ bool CConnman::Start(boost::thread_group& threadGroup, std::string& strNodeError
     // Process messages
     threadGroup.create_thread(boost::bind(&TraceThread<boost::function<void()> >, "msghand", boost::function<void()>(boost::bind(&CConnman::ThreadMessageHandler, this))));
 
+    // Dump network addresses
+    scheduler.scheduleEvery(boost::bind(&CConnman::DumpAddresses, this), DUMP_ADDRESSES_INTERVAL);
+
     return true;
 }
 
@@ -1864,12 +1861,6 @@ bool StopNode(CConnman& connman)
 {
     LogPrintf("StopNode()\n");
     MapPort(false);
-
-    if (fAddressesInitialized)
-    {
-        DumpAddresses();
-        fAddressesInitialized = false;
-    }
 
     connman.Stop();
     return true;
@@ -1895,6 +1886,12 @@ void CConnman::Stop()
     if (semOutbound)
         for (int i=0; i<(MAX_OUTBOUND_CONNECTIONS + MAX_FEELER_CONNECTIONS); i++)
             semOutbound->post();
+
+    if (fAddressesInitialized)
+    {
+        DumpAddresses();
+        fAddressesInitialized = false;
+    }
 
     // Close sockets
     BOOST_FOREACH(CNode* pnode, vNodes)
@@ -1935,6 +1932,30 @@ CConnman::~CConnman()
 {
 }
 
+size_t CConnman::GetAddressCount() const
+{
+    return addrman.size();
+}
+
+void CConnman::MarkAddressGood(const CAddress& addr)
+{
+    addrman.Good(addr);
+}
+
+void CConnman::AddNewAddress(const CAddress& addr, const CAddress& addrFrom, int64_t nTimePenalty)
+{
+    addrman.Add(addr, addrFrom, nTimePenalty);
+}
+
+void CConnman::AddNewAddresses(const std::vector<CAddress>& vAddr, const CAddress& addrFrom, int64_t nTimePenalty)
+{
+    addrman.Add(vAddr, addrFrom, nTimePenalty);
+}
+
+std::vector<CAddress> CConnman::GetAddresses()
+{
+    return addrman.GetAddr();
+}
 
 
 

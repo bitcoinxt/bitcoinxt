@@ -7,6 +7,7 @@
 #define BITCOIN_NET_H
 
 #include "addrdb.h"
+#include "addrman.h"
 #include "bloom.h"
 #include "compat.h"
 #include "hash.h"
@@ -74,7 +75,9 @@ static const size_t MAPASKFOR_MAX_SZ = MAX_INV_SZ;
 unsigned int ReceiveFloodSize();
 unsigned int SendBufferSize();
 
-void AddOneShot(std::string strDest);
+void AddOneShot(const std::string& strDest);
+typedef int NodeId;
+
 CNode* FindNode(const CNetAddr& ip);
 CNode* FindNode(const std::string& addrName);
 CNode* FindNode(const CService& ip);
@@ -84,10 +87,35 @@ class CConnman
 public:
     CConnman();
     ~CConnman();
-    bool Start(boost::thread_group& threadGroup, std::string& strNodeError);
+    bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, std::string& strNodeError);
     void Stop();
     bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
     bool OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
+
+    // Addrman functions
+    size_t GetAddressCount() const;
+    void MarkAddressGood(const CAddress& addr);
+    void AddNewAddress(const CAddress& addr, const CAddress& addrFrom, int64_t nTimePenalty = 0);
+    void AddNewAddresses(const std::vector<CAddress>& vAddr, const CAddress& addrFrom, int64_t nTimePenalty = 0);
+    std::vector<CAddress> GetAddresses();
+
+    // Denial-of-service detection/prevention
+    // The idea is to detect peers that are behaving
+    // badly and disconnect/ban them, but do it in a
+    // one-coding-mistake-won't-shatter-the-entire-network
+    // way.
+    // IMPORTANT:  There should be nothing I can give a
+    // node that it will forward on that will make that
+    // node's peers drop it. If there is, an attacker
+    // can isolate a node and/or try to split the network.
+    // Dropping a node for sending stuff that is invalid
+    // now but might be valid in a later version is also
+    // dangerous, because it can cause a network split
+    // between nodes running old code and nodes running
+    // new code.
+    bool Ban(const CNetAddr &addr);
+    void ClearBanned(); // needed for unit testing
+    bool IsBanned(CNetAddr ip);
 
 private:
     struct ListenSocket {
@@ -107,8 +135,13 @@ private:
 
     CNode* ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure);
     void DeleteNode(CNode* pnode);
+    void DumpAddresses();
 
     std::vector<ListenSocket> vhListenSocket;
+    std::map<CNetAddr, int64_t> setBanned;
+    CCriticalSection cs_setBanned;
+    bool fAddressesInitialized;
+    CAddrMan addrman;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void MapPort(bool fUseUPnP);
@@ -118,7 +151,6 @@ bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& 
 bool StopNode(CConnman& connman);
 void SocketSendData(CNode *pnode);
 
-typedef int NodeId;
 
 struct CombinerAll
 {
@@ -185,7 +217,8 @@ extern bool fDiscover;
 extern bool fListen;
 extern uint64_t nLocalServices;
 extern uint64_t nLocalHostNonce;
-extern CAddrMan addrman;
+
+/** Maximum number of connections to simultaneously allow (aka connection slots) */
 extern int nMaxConnections;
 
 extern std::vector<CNode*> vNodes;
@@ -332,12 +365,6 @@ public:
     NodeId id;
 
 protected:
-
-    // Denial-of-service detection/prevention
-    // Key is IP address, value is banned-until-time
-    static std::map<CNetAddr, int64_t> setBanned;
-    static CCriticalSection cs_setBanned;
-
     // Whitelisted ranges. Any node connecting from these is automatically
     // whitelisted (as well as those connecting to whitelisted binds).
     static std::vector<CSubNet> vWhitelistedRange;
@@ -660,23 +687,6 @@ public:
 
     void CloseSocketDisconnect();
 
-    // Denial-of-service detection/prevention
-    // The idea is to detect peers that are behaving
-    // badly and disconnect/ban them, but do it in a
-    // one-coding-mistake-won't-shatter-the-entire-network
-    // way.
-    // IMPORTANT:  There should be nothing I can give a
-    // node that it will forward on that will make that
-    // node's peers drop it. If there is, an attacker
-    // can isolate a node and/or try to split the network.
-    // Dropping a node for sending stuff that is invalid
-    // now but might be valid in a later version is also
-    // dangerous, because it can cause a network split
-    // between nodes running old code and nodes running
-    // new code.
-    static void ClearBanned(); // needed for unit testing
-    static bool IsBanned(CNetAddr ip);
-    static bool Ban(const CNetAddr &ip);
     void copyStats(CNodeStats &stats);
 
     static bool IsWhitelistedRange(const CNetAddr &ip);

@@ -4885,12 +4885,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             }
 
             // Get recent addresses
-            if (pfrom->fOneShot || pfrom->nVersion >= CADDR_TIME_VERSION || addrman.size() < 1000)
+            if (pfrom->fOneShot || pfrom->nVersion >= CADDR_TIME_VERSION || connman.GetAddressCount() < 1000)
             {
                 pfrom->PushMessage("getaddr");
                 pfrom->fGetAddr = true;
             }
-            addrman.Good(pfrom->addr);
+            connman.MarkAddressGood(pfrom->addr);
         }
 
         pfrom->fSuccessfullyConnected = true;
@@ -4957,7 +4957,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         vRecv >> vAddr;
 
         // Don't want addr from older versions unless seeding
-        if (pfrom->nVersion < CADDR_TIME_VERSION && addrman.size() > 1000)
+        if (pfrom->nVersion < CADDR_TIME_VERSION && connman.GetAddressCount() > 1000)
             return true;
         if (vAddr.size() > 1000)
         {
@@ -5009,7 +5009,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             if (fReachable)
                 vAddrOk.push_back(addr);
         }
-        addrman.Add(vAddrOk, pfrom->addr, 2 * 60 * 60);
+        connman.AddNewAddresses(vAddrOk, pfrom->addr, 2 * 60 * 60);
         if (vAddr.size() < 1000)
             pfrom->fGetAddr = false;
         if (pfrom->fOneShot)
@@ -5587,7 +5587,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         pfrom->fSentAddr = true;
 
         pfrom->vAddrToSend.clear();
-        vector<CAddress> vAddr = addrman.GetAddr();
+        vector<CAddress> vAddr = connman.GetAddresses();
         FastRandomContext insecure_rand;
         for (const CAddress& addr : vAddr) {
             pfrom->PushAddress(addr, insecure_rand);
@@ -6024,7 +6024,7 @@ bool SendMessages(CNode* pto, CConnman& connman)
                     LogPrintf("Warning: not banning local peer %s!\n", pto->addr.ToString());
                 else
                 {
-                    CNode::Ban(pto->addr);
+                    connman.Ban(pto->addr);
                 }
             }
             statePtr->fShouldBan = false;
