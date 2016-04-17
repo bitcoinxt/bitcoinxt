@@ -1,12 +1,14 @@
 #include <boost/test/unit_test_suite.hpp>
 #include <boost/test/test_tools.hpp>
 #include "test/thinblockutil.h"
+#include "bloomthin.h"
+#include "chainparams.h"
 #include "merkleblock.h"
 #include "streams.h"
 #include "thinblockconcluder.h"
 #include "uint256.h"
-#include "chainparams.h"
 #include "util.h" // for fPrintToDebugLog
+#include "xthin.h"
 #include <memory>
 
 struct DummyMarkAsInFlight : public BlockInFlightMarker {
@@ -21,10 +23,10 @@ struct DummyMarkAsInFlight : public BlockInFlightMarker {
     uint256 block;
 };
 
-struct DummyConcluder : public ThinBlockConcluder {
+struct DummyBloomConcluder : public BloomBlockConcluder {
 
-    DummyConcluder() :
-        ThinBlockConcluder(inFlight),
+    DummyBloomConcluder() :
+        BloomBlockConcluder(inFlight),
         reRequestCalled(0), giveUpCalled(0),
         fallbackDownloadCalled(0), misbehave(0)
     {
@@ -32,7 +34,7 @@ struct DummyConcluder : public ThinBlockConcluder {
 
     virtual void giveUp(CNode* pfrom, ThinBlockWorker& worker) {
         giveUpCalled++;
-        ThinBlockConcluder::giveUp(pfrom, worker);
+        BloomBlockConcluder::giveUp(pfrom, worker);
     }
 
     virtual void reRequest(
@@ -41,11 +43,11 @@ struct DummyConcluder : public ThinBlockConcluder {
         uint64_t nonce)
     {
         reRequestCalled++;
-        ThinBlockConcluder::reRequest(pfrom, worker, nonce);
+        BloomBlockConcluder::reRequest(pfrom, worker, nonce);
     }
     virtual void fallbackDownload(CNode *pfrom, const uint256& block) {
         fallbackDownloadCalled++;
-        ThinBlockConcluder::fallbackDownload(pfrom, block);
+        BloomBlockConcluder::fallbackDownload(pfrom, block);
     }
     virtual void misbehaving(NodeId, int howmuch) {
         misbehave = howmuch;
@@ -90,10 +92,10 @@ BOOST_FIXTURE_TEST_SUITE(thinblockconcluder_tests, ConcluderSetup);
 // The normal case. Block is finished (and worker is available).
 BOOST_AUTO_TEST_CASE(block_complete) {
 
-    ThinBlockWorker worker(tmgr, 42);
+    BloomThinWorker worker(tmgr, 42);
     worker.setAvailable();
 
-    DummyConcluder c;
+    DummyBloomConcluder c;
     c(&pfrom, nonce, worker);
     BOOST_CHECK_EQUAL(0, c.giveUpCalled);
     BOOST_CHECK_EQUAL(0, c.reRequestCalled);
@@ -102,12 +104,12 @@ BOOST_AUTO_TEST_CASE(block_complete) {
 // Peer did not provide us the merkleblock.
 // This should only happen if the peer does not support bloom filter.
 BOOST_AUTO_TEST_CASE(merkleblock_not_provided) {
-    ThinBlockWorker worker(tmgr, 42);
+    BloomThinWorker worker(tmgr, 42);
     uint256 dummyhash;
     dummyhash.SetHex("0xDEADBEA7");
     pfrom.thinBlockNonceBlock = dummyhash;
     worker.setToWork(dummyhash);
-    DummyConcluder c;
+    DummyBloomConcluder c;
     c(&pfrom, nonce, worker);
 
     BOOST_CHECK_EQUAL(0, c.giveUpCalled);
@@ -119,13 +121,13 @@ BOOST_AUTO_TEST_CASE(merkleblock_not_provided) {
 // Peer does not provide all transactions. We re-request them,
 // and peer is able to provide.
 BOOST_AUTO_TEST_CASE(rerequest_success) {
-    ThinBlockWorker worker(tmgr, 42);
+    BloomThinWorker worker(tmgr, 42);
     pfrom.thinBlockNonceBlock = mblock.header.GetHash();
     worker.setToWork(mblock.header.GetHash());
-    worker.buildStub(mblock, NullFinder());
+    worker.buildStub(ThinBloomStub(mblock), NullFinder());
     BOOST_CHECK(!worker.isReRequesting());
 
-    DummyConcluder c;
+    DummyBloomConcluder c;
     c(&pfrom, nonce, worker);
     BOOST_CHECK_EQUAL(1, c.reRequestCalled);
     BOOST_CHECK_EQUAL(0, c.giveUpCalled);
@@ -137,9 +139,9 @@ BOOST_AUTO_TEST_CASE(rerequest_success) {
     std::vector<CTransaction> txs = block.vtx;
     typedef std::vector<CTransaction>::const_iterator auto_;
     for (auto_ t = txs.begin(); t != txs.end(); ++t)
-        worker.addTx(*t);
+        BOOST_CHECK(worker.addTx(*t));
 
-    DummyConcluder c2;
+    DummyBloomConcluder c2;
     c2(&pfrom, nonce, worker);
     BOOST_CHECK_EQUAL(0, c2.reRequestCalled);
     BOOST_CHECK_EQUAL(0, c2.giveUpCalled);
@@ -150,14 +152,14 @@ BOOST_AUTO_TEST_CASE(rerequest_success) {
 BOOST_AUTO_TEST_CASE(re_request_not_fulfilled_one_worker) {
     CBloomFilter emptyFilter;
 
-    ThinBlockWorker worker(tmgr, 42);
+    BloomThinWorker worker(tmgr, 42);
     worker.setToWork(mblock.header.GetHash());
-    worker.buildStub(mblock, NullFinder());
+    worker.buildStub(ThinBloomStub(mblock), NullFinder());
     worker.setReRequesting(true);
     pfrom.thinBlockNonceBlock = mblock.header.GetHash();
 
     // We have re-requested the missing transactions, but block is still incomplete.
-    DummyConcluder c;
+    DummyBloomConcluder c;
     c(&pfrom, nonce, worker);
 
     // FIXME: Should we mark node as misbehaving? What effect would that
@@ -171,18 +173,17 @@ BOOST_AUTO_TEST_CASE(re_request_not_fulfilled_one_worker) {
 
 BOOST_AUTO_TEST_CASE(re_request_not_fulfilled_multiple_workers) {
     CBloomFilter emptyFilter;
-    ThinBlockBuilder bb = ThinBlockBuilder(mblock, NullFinder());
 
-    ThinBlockWorker worker1(tmgr, 42);
-    ThinBlockWorker worker2(tmgr, 24);
+    BloomThinWorker worker1(tmgr, 42);
+    BloomThinWorker worker2(tmgr, 24);
     worker1.setToWork(mblock.header.GetHash());
     worker2.setToWork(mblock.header.GetHash());
-    worker1.buildStub(mblock, NullFinder());
+    worker1.buildStub(ThinBloomStub(mblock), NullFinder());
     worker1.setReRequesting(true);
     worker2.setReRequesting(true);
     pfrom.thinBlockNonceBlock = mblock.header.GetHash();
 
-    DummyConcluder c;
+    DummyBloomConcluder c;
 
     // First worker to give up - no need to fall back to full download.
     c(&pfrom, nonce, worker1);
@@ -209,9 +210,9 @@ BOOST_AUTO_TEST_CASE(ignore_old_pongs) {
 
     pfrom.thinBlockNonce = nonce;
     pfrom.thinBlockNonceBlock = dummyhash1;
-    ThinBlockWorker worker(tmgr, 42);
+    BloomThinWorker worker(tmgr, 42);
     worker.setToWork(dummyhash2); // working on next block
-    DummyConcluder c;
+    DummyBloomConcluder c;
     c(&pfrom, pfrom.thinBlockNonce, worker);
 
     // Should have been ignored.
@@ -219,6 +220,43 @@ BOOST_AUTO_TEST_CASE(ignore_old_pongs) {
     BOOST_CHECK_EQUAL(0, c.giveUpCalled);
     BOOST_CHECK_EQUAL(nonce, pfrom.thinBlockNonce);
     BOOST_CHECK_EQUAL(dummyhash1.ToString(), pfrom.thinBlockNonceBlock.ToString());
+}
+
+BOOST_AUTO_TEST_CASE(xthin_concluder) {
+
+    XThinReReqResponse resp;
+    resp.block = uint256S("0xBADBAD");
+    resp.txRequested.push_back(CTransaction());
+
+    struct DummyWorker : public XThinWorker {
+        DummyWorker(ThinBlockManager& mg, NodeId id) :
+            XThinWorker(mg, id), addTxCalled(false) { }
+
+        virtual bool addTx(const CTransaction& tx) {
+            addTxCalled = true;
+            return true;
+        }
+
+        bool addTxCalled;
+    };
+
+    DummyWorker worker(tmgr, 42);
+    XThinBlockConcluder conclude;
+    // Should ignore since worker is not working
+    // on anything.
+    worker.setAvailable();
+    conclude(resp, pfrom, worker);
+    BOOST_CHECK(!worker.addTxCalled);
+
+    // Should ignore since worker is assigned to a
+    // different block.
+    worker.setToWork(uint256S("0xf00d"));
+    conclude(resp, pfrom, worker);
+    BOOST_CHECK(!worker.addTxCalled);
+
+    // Should add tx.
+    worker.setToWork(resp.block);
+    conclude(resp, pfrom, worker);
 }
 
 BOOST_AUTO_TEST_SUITE_END();

@@ -70,7 +70,7 @@ namespace {
 //
 bool fDiscover = true;
 bool fListen = true;
-uint64_t nLocalServices = NODE_NETWORK | NODE_GETUTXO | NODE_BLOOM;
+uint64_t nLocalServices = NODE_NETWORK | NODE_GETUTXO | NODE_BLOOM | NODE_THIN;
 CCriticalSection cs_mapLocalHost;
 map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfReachable[NET_MAX] = {};
@@ -2061,6 +2061,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     fGetAddr = false;
     fRelayTxes = false;
     pfilter = new CBloomFilter();
+    xthinFilter.reset(new CBloomFilter());
     nPingNonceSent = 0;
     nPingUsecStart = 0;
     nPingUsecTime = 0;
@@ -2180,7 +2181,8 @@ bool CNode::SupportsBloom() const {
     return nVersion < NO_BLOOM_VERSION || nServices & NODE_BLOOM;
 }
 
-bool CNode::SupportsThinBlocks() const {
+bool CNode::SupportsBloomThinBlocks() const {
+
     if (!SupportsBloom())
         return false;
 
@@ -2192,4 +2194,8 @@ bool CNode::SupportsThinBlocks() const {
     // Use SENDHEADERS_VERSION as a (temporary) means of
     // detecting Bitcoin Core 0.12
     return nVersion < SENDHEADERS_VERSION || nServices & NODE_GETUTXO;
+}
+
+bool CNode::SupportsXThinBlocks() const {
+    return nServices & NODE_THIN;
 }

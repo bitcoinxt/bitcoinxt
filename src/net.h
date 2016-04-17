@@ -292,6 +292,7 @@ public:
     CSemaphoreGrant grantOutbound;
     CCriticalSection cs_filter;
     CBloomFilter* pfilter;
+    std::auto_ptr<CBloomFilter> xthinFilter;
     int nRefCount;
     NodeId id;
 
@@ -341,7 +342,7 @@ public:
     bool fPingQueued;
 
     CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn = "", bool fInboundIn=false);
-    ~CNode();
+    virtual ~CNode();
 
 private:
     // Network usage totals
@@ -441,7 +442,7 @@ public:
     void AskFor(const CInv& inv);
 
     // TODO: Document the postcondition of this function.  Is cs_vSend locked?
-    void BeginMessage(const char* pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend);
+    virtual void BeginMessage(const char* pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend);
 
     // TODO: Document the precondition of this function.  Is cs_vSend locked?
     void AbortMessage() UNLOCK_FUNCTION(cs_vSend);
@@ -644,7 +645,8 @@ public:
     // Node (probably) supports filter_* commands
     bool SupportsBloom() const;
 
-    bool SupportsThinBlocks() const;
+    bool SupportsBloomThinBlocks() const;
+    bool SupportsXThinBlocks() const;
 };
 
 

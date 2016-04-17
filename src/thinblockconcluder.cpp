@@ -5,9 +5,11 @@
 #include "protocol.h"
 #include "chainparams.h"
 #include "main.h" // For Misbehaving
+#include "xthin.h"
 #include <vector>
 
-void ThinBlockConcluder::operator()(CNode* pfrom,
+
+void BloomBlockConcluder::operator()(CNode* pfrom,
     uint64_t nonce, ThinBlockWorker& worker) {
 
     // If it the thin block is finished, it the worker will be available.
@@ -42,22 +44,22 @@ void ThinBlockConcluder::operator()(CNode* pfrom,
     reRequest(pfrom, worker, nonce);
 }
 
-void ThinBlockConcluder::reRequest(
+void BloomBlockConcluder::reRequest(
     CNode* pfrom,
     ThinBlockWorker& worker,
     uint64_t nonce)
 {
-    std::vector<uint256> txsMissing = worker.getTxsMissing();
+    std::vector<ThinTx> txsMissing = worker.getTxsMissing();
     assert(txsMissing.size()); // worker should have been available, not "missing 0 transactions".
     LogPrint("thin", "Missing %d transactions for thin block %s, re-requesting (consider adjusting relay policies)\n",
             txsMissing.size(), worker.blockStr());
 
     std::vector<CInv> hashesToReRequest;
-    typedef std::vector<uint256>::const_iterator auto_;
+    typedef std::vector<ThinTx>::const_iterator auto_;
 
     for (auto_ m = txsMissing.begin(); m != txsMissing.end(); ++m) {
-        hashesToReRequest.push_back(CInv(MSG_TX, *m));
-        LogPrint("thin", "Re-requesting tx %s\n", m->ToString());
+        hashesToReRequest.push_back(CInv(MSG_TX, m->full()));
+        LogPrint("thin", "Re-requesting tx %s\n", m->full().ToString());
     }
     assert(hashesToReRequest.size() > 0);
     worker.setReRequesting(true);
@@ -67,7 +69,7 @@ void ThinBlockConcluder::reRequest(
     pfrom->PushMessage("ping", nonce);
 }
 
-void ThinBlockConcluder::fallbackDownload(CNode *pfrom, const uint256& block) {
+void BloomBlockConcluder::fallbackDownload(CNode *pfrom, const uint256& block) {
     LogPrint("thin", "Last worker working on %s could not provide missing transactions"
             ", falling back on full block download\n", block.ToString());
 
@@ -76,8 +78,8 @@ void ThinBlockConcluder::fallbackDownload(CNode *pfrom, const uint256& block) {
     markInFlight(pfrom->id, block, Params().GetConsensus(), NULL);
 }
 
-void ThinBlockConcluder::giveUp(CNode* pfrom, ThinBlockWorker& worker) {
-    LogPrintf("Re-reqested transactions for thin block %s from %d, peer did not follow up.\n",
+void BloomBlockConcluder::giveUp(CNode* pfrom, ThinBlockWorker& worker) {
+    LogPrintf("Re-requested transactions for thin block %s from %d, peer did not follow up.\n",
             worker.blockStr(), pfrom->id);
     uint256 block = worker.blockHash();
     bool wasLastWorker = worker.isOnlyWorker();
@@ -89,6 +91,39 @@ void ThinBlockConcluder::giveUp(CNode* pfrom, ThinBlockWorker& worker) {
 }
 
 
-void ThinBlockConcluder::misbehaving(NodeId id, int howmuch) {
+void BloomBlockConcluder::misbehaving(NodeId id, int howmuch) {
     ::Misbehaving(id, howmuch);
+}
+
+void XThinBlockConcluder::operator()(const XThinReReqResponse& resp,
+        CNode& pfrom, ThinBlockWorker& worker) {
+
+    if (worker.isAvailable())
+    {
+        LogPrint("thin", "worker peer=%d should not be working on a thin block,"
+                "ignoring re-req response\n", pfrom.id);
+        return;
+    }
+    if (worker.blockHash() != resp.block) {
+        LogPrint("thin", "working on block %s, got re-req response from peer=%d for %s\n",
+                worker.blockStr(), pfrom.id, resp.block.ToString());
+        return;
+    }
+
+    typedef std::vector<CTransaction>::const_iterator auto_;
+    for (auto_ t = resp.txRequested.begin(); t != resp.txRequested.end(); ++t)
+        worker.addTx(*t);
+
+    // Block finished?
+    if (worker.isAvailable())
+        return;
+
+    // There is no reason for remote peer not to have provided all
+    // transactions at this point.
+    LogPrint("thin", "peer=%d responded to re-request for block %s, "
+        "but still did not provide all transctions missing\n",
+        pfrom.id, resp.block.ToString());
+
+    worker.setAvailable();
+    Misbehaving(pfrom.id, 10);
 }

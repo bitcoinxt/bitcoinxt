@@ -75,7 +75,9 @@ BITCOIN_CORE_H = \
   amount.h \
   arith_uint256.h \
   base58.h \
+  blocksender.h \
   bloom.h \
+  bloomthin.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
@@ -96,6 +98,7 @@ BITCOIN_CORE_H = \
   core_io.h \
   curl_wrapper.h \
   core_memusage.h \
+  dummythin.h \
   hash.h \
   inflightindex.h \
   init.h \
@@ -118,6 +121,7 @@ BITCOIN_CORE_H = \
   primitives/block.h \
   primitives/transaction.h \
   process_merkleblock.h \
+  process_xthinblock.h \
   protocol.h \
   pubkey.h \
   random.h \
@@ -138,8 +142,10 @@ BITCOIN_CORE_H = \
   support/cleanse.h \
   support/pagelocker.h \
   sync.h \
+  thinblock.h \
   thinblockbuilder.h \
   thinblockconcluder.h \
+  thinblockmanager.h \
   threadsafety.h \
   timedata.h \
   tinyformat.h \
@@ -153,13 +159,15 @@ BITCOIN_CORE_H = \
   utilmoneystr.h \
   utilstrencodings.h \
   utiltime.h \
+  utilprocessmsg.h \
   validationinterface.h \
   version.h \
   wallet/crypter.h \
   wallet/db.h \
   wallet/wallet.h \
   wallet/wallet_ismine.h \
-  wallet/walletdb.h
+  wallet/walletdb.h \
+  xthin.h
 
 JSON_H = \
   json/json_spirit.h \
@@ -183,7 +191,9 @@ libbitcoin_server_a_CPPFLAGS = $(BITCOIN_INCLUDES) $(MINIUPNPC_CPPFLAGS)
 libbitcoin_server_a_SOURCES = \
   addrman.cpp \
   alert.cpp \
+  blocksender.cpp \
   bloom.cpp \
+  bloomthin.cpp \
   chain.cpp \
   checkpoints.cpp \
   curl_wrapper.cpp \
@@ -201,6 +211,7 @@ libbitcoin_server_a_SOURCES = \
   policy/fees.cpp \
   pow.cpp \
   process_merkleblock.cpp \
+  process_xthinblock.cpp \
   rest.cpp \
   rpcblockchain.cpp \
   rpcmining.cpp \
@@ -209,12 +220,16 @@ libbitcoin_server_a_SOURCES = \
   rpcrawtransaction.cpp \
   rpcserver.cpp \
   script/sigcache.cpp \
+  thinblock.cpp \
   thinblockbuilder.cpp \
   thinblockconcluder.cpp \
+  thinblockmanager.cpp \
   timedata.cpp \
   txdb.cpp \
   txmempool.cpp \
+  utilprocessmsg.cpp \
   validationinterface.cpp \
+  xthin.cpp \
   $(JSON_H) \
   $(BITCOIN_CORE_H)
 

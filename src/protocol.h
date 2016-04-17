@@ -79,7 +79,12 @@ enum {
     // NODE_BLOOM means the node is capable and willing to handle bloom-filtered connections.
     // All nodes with protocol version < 70011 support bloom-filter without advertising this bit.
     // Core nodes with protocol >= 70011 do not support bloom-filter unless this bit is advertised.
-    NODE_BLOOM = (1 << 2)
+    NODE_BLOOM = (1 << 2),
+
+    // FIXME: Remove or rename. This one will likely be used for segwit.
+    NODE_RESERVED_1 = (1 << 3),
+
+    NODE_THIN = (1 << 4)
 
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
     // isn't getting used, or one not being used much, and notify the
@@ -158,6 +163,14 @@ enum {
     // A filtered block is a CMerkleBlock structure, in which a list of hashes in the merkle tree is provided instead
     // of the entire block contents.
     MSG_FILTERED_BLOCK,
+
+    // BUIP010 thin block. We don't support these.
+    MSG_THINBLOCK,
+
+    // BUIP010 xthin block. An xthin block contains the first 8 bytes of all
+    // tx hashes in a block + transactions node is missing to reconstruct the
+    // block.
+    MSG_XTHINBLOCK
 };
 
 #endif // BITCOIN_PROTOCOL_H
