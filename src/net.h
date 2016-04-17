@@ -152,6 +152,7 @@ public:
      // for unittesting
      void AddTestNode(CNode* n);
 
+    void AddWhitelistedRange(const CSubNet &subnet);
 private:
     struct ListenSocket {
         SOCKET socket;
@@ -175,8 +176,15 @@ private:
 
     bool AttemptToEvictConnection();
     CNode* ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure);
+    bool IsWhitelistedRange(const CNetAddr &addr);
+
     void DeleteNode(CNode* pnode);
     void DumpAddresses();
+
+    // Whitelisted ranges. Any node connecting from these is automatically
+    // whitelisted (as well as those connecting to whitelisted binds).
+    std::vector<CSubNet> vWhitelistedRange;
+    CCriticalSection cs_vWhitelistedRange;
 
     std::vector<ListenSocket> vhListenSocket;
     std::map<CNetAddr, int64_t> setBanned;
@@ -407,11 +415,6 @@ public:
     NodeId id;
 
 protected:
-    // Whitelisted ranges. Any node connecting from these is automatically
-    // whitelisted (as well as those connecting to whitelisted binds).
-    static std::vector<CSubNet> vWhitelistedRange;
-    static CCriticalSection cs_vWhitelistedRange;
-
     // Basic fuzz-testing
     void Fuzz(int nChance); // modifies ssSend
 
@@ -730,9 +733,6 @@ public:
     void CloseSocketDisconnect();
 
     void copyStats(CNodeStats &stats);
-
-    static bool IsWhitelistedRange(const CNetAddr &ip);
-    static void AddWhitelistedRange(const CSubNet &subnet);
 
     // Network stats
     static void RecordBytesRecv(uint64_t bytes);
