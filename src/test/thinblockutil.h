@@ -23,12 +23,11 @@ struct NullFinder : public TxFinder {
 };
 
 struct DummyNode : public CNode {
-    DummyNode(NodeId myid = 42, ThinBlockManager* mgr = nullptr) : CNode(INVALID_SOCKET, CAddress()) {
+        DummyNode(NodeId myid = 42, ThinBlockManager* mgr = nullptr) : CNode(myid, INVALID_SOCKET, CAddress()) {
         static auto staticmgr = GetDummyThinBlockMg();
         if (!mgr)
             mgr = staticmgr.get();
 
-        id = myid;
         NodeStatePtr::insert(id, this, *mgr);
         nVersion = PROTOCOL_VERSION;
     }

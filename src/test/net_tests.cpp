@@ -146,6 +146,7 @@ BOOST_AUTO_TEST_CASE(caddrdb_read_corrupted)
 BOOST_AUTO_TEST_CASE(cnode_simple_test)
 {
     SOCKET hSocket = INVALID_SOCKET;
+    NodeId id = 0;
 
     in_addr ipv4Addr;
     ipv4Addr.s_addr = 0xa0b0c001;
@@ -155,19 +156,18 @@ BOOST_AUTO_TEST_CASE(cnode_simple_test)
     bool fInboundIn = false;
 
     // Test that fFeeler is false by default.
-    CNode* pnode1 = new CNode(hSocket, addr, pszDest, fInboundIn);
+    CNode* pnode1 = new CNode(id++, hSocket, addr, pszDest, fInboundIn);
     BOOST_CHECK(pnode1->fInbound == false);
     BOOST_CHECK(pnode1->fFeeler == false);
 
     fInboundIn = true;
-    CNode* pnode2 = new CNode(hSocket, addr, pszDest, fInboundIn);
+    CNode* pnode2 = new CNode(id++, hSocket, addr, pszDest, fInboundIn);
     BOOST_CHECK(pnode2->fInbound == true);
     BOOST_CHECK(pnode2->fFeeler == false);
 }
 
 BOOST_AUTO_TEST_CASE(support_xthin_test) {
-    CNode node(INVALID_SOCKET, CAddress());
-    node.id = 42;
+    CNode node(42, INVALID_SOCKET, CAddress());
 
     BOOST_CHECK(!node.SupportsXThinBlocks());
     node.nServices |= NODE_THIN;
@@ -178,7 +178,7 @@ BOOST_AUTO_TEST_CASE(support_xthin_test) {
 // when node is destructed.
 BOOST_AUTO_TEST_CASE(ipgroup_assigned) {
     CNetAddr ip("10.0.0.1");
-    std::unique_ptr<CNode> node(new CNode(
+    std::unique_ptr<CNode> node(new CNode(42,
                 INVALID_SOCKET, CAddress(CService(ip, 1234))));
 
     CIPGroupData ipgroup = FindGroupForIP(ip);

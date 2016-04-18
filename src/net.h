@@ -179,6 +179,9 @@ private:
     bool IsWhitelistedRange(const CNetAddr &addr);
 
     void DeleteNode(CNode* pnode);
+
+    NodeId GetNewNodeId();
+
     void DumpAddresses();
 
     // Whitelisted ranges. Any node connecting from these is automatically
@@ -197,6 +200,7 @@ private:
     CCriticalSection cs_vAddedNodes;
     std::vector<CNode*> vNodes;
     mutable CCriticalSection cs_vNodes;
+    std::atomic<NodeId> nLastNodeId;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void MapPort(bool fUseUPnP);
@@ -280,9 +284,6 @@ extern std::map<CInv, CDataStream> mapRelay;
 extern std::deque<std::pair<int64_t, CInv> > vRelayExpiration;
 extern CCriticalSection cs_mapRelay;
 extern limitedmap<CInv, int64_t> mapAlreadyAskedFor;
-
-extern NodeId nLastNodeId;
-extern CCriticalSection cs_nLastNodeId;
 
 struct LocalServiceInfo {
     int nScore;
@@ -453,8 +454,8 @@ public:
     // adds connection to ipgroup (for prioritising connection slots)
     std::unique_ptr<IPGroupSlot> ipgroupSlot;
 
-    CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn = "", bool fInboundIn=false);
-    virtual ~CNode();
+    CNode(NodeId id, SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
+    ~CNode();
 
 private:
     // Network usage totals

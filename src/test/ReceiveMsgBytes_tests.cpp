@@ -22,7 +22,7 @@ BOOST_FIXTURE_TEST_SUITE(ReceiveMsgBytes_tests, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(FullMessages)
 {
-    CNode testNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode testNode(42, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
@@ -70,7 +70,7 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
     CDataStream stream(ParseHex("0100000079cda856b143d9db2c1caff01d1aecc8630d30625d10e8b4b8b0000000000000b50cc069d6a3e33e3ff84a5c41d9d3febe7c770fdcc96b2c3ff60abe184f196367291b4d4c86041b8fa45d630101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08044c86041b020a02ffffffff0100f2052a01000000434104ecd3229b0571c3be876feaac0442a9f13c5a572742927af1dc623353ecf8c202225f64868137a18cdd85cbbb4c74fbccfd4f49639cf1bdc94a5672bb15ad5d4cac00000000"), SER_NETWORK, PROTOCOL_VERSION);
     stream >> block;
 
-    CNode testNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode testNode(42, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
@@ -96,7 +96,7 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
 
 BOOST_AUTO_TEST_CASE(TooLargeVerack)
 {
-    CNode testNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode testNode(42, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
@@ -117,7 +117,7 @@ BOOST_AUTO_TEST_CASE(TooLargeVerack)
 
 BOOST_AUTO_TEST_CASE(TooLargePing)
 {
-    CNode testNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode testNode(42, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
