@@ -16,20 +16,19 @@
 struct BasicTestingSetup {
     ECCVerifyHandle globalVerifyHandle;
 
-    BasicTestingSetup();
+    BasicTestingSetup(const std::string& chainName = CBaseChainParams::MAIN);
     ~BasicTestingSetup();
 };
 
 /** Testing setup that configures a complete environment.
- * Included are data directory, coins database, script check threads
- * and wallet (if enabled) setup.
+ * Included are data directory, coins database, script check threads setup.
  */
 struct TestingSetup: public BasicTestingSetup {
     CCoinsViewDB *pcoinsdbview;
     boost::filesystem::path pathTemp;
     boost::thread_group threadGroup;
 
-    TestingSetup();
+    TestingSetup(const std::string& chainName = CBaseChainParams::MAIN);
     ~TestingSetup();
 };
 
@@ -47,11 +46,11 @@ struct TestMemPoolEntryHelper
     bool spendsCoinbase;
     LockPoints lp;
     unsigned int sigOpCount;
-    
+
     TestMemPoolEntryHelper() :
         nFee(0), nTime(0), dPriority(0.0), nHeight(1),
         hadNoDependencies(false), spendsCoinbase(false), sigOpCount(1) { }
-    
+
     CTxMemPoolEntry FromTx(CMutableTransaction &tx, CTxMemPool *pool = NULL);
     CTxMemPoolEntry FromTx(CTransaction &tx, CTxMemPool *pool = NULL);
 
