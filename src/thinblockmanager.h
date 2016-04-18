@@ -20,7 +20,7 @@ struct StubData;
 class ThinBlockBuilder;
 class ThinBlockWorker;
 class CTransaction;
-struct ThinTx;
+class ThinTx;
 typedef int NodeId;
 
 // Call when a block is reassembled.

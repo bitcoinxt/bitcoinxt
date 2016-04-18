@@ -24,7 +24,7 @@ struct xthin_collision_error : public std::runtime_error {
 // based on a filter it sent us.
 //
 // Always includes coinbase.
-struct XThinBlock {
+class XThinBlock {
 
     public:
         XThinBlock();
@@ -106,7 +106,8 @@ struct XThinStub : public StubData {
 };
 
 // XThin has its own message for re-requesting transactions missing.
-struct XThinReRequest {
+class XThinReRequest {
+public:
     uint256 block;
     std::set<uint64_t> txRequesting;
 
