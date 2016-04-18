@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "main.h"
+#include "net.h"
 
 #include "test/test_bitcoin.h"
 
@@ -10,11 +11,21 @@
 
 BOOST_FIXTURE_TEST_SUITE(p2p_protocol_tests, TestingSetup)
 
+namespace {
+class DummyConnman : public CConnman {
+        bool CheckIncomingNonce(uint64_t nonce) override {
+            // this trips the version message logic to end shortly after reading
+            // the data (which is the focus the tests using this dummy object)
+            return false;
+        }
+};
+} // ns anon
+
 BOOST_AUTO_TEST_CASE(MaxSizeVersionMessage)
 {
     CNode n(42, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
-    nLocalHostNonce = 2; // this trips the version message logic to end shortly after reading the data (which is the focus of this test)
+    uint64_t nLocalHostNonce = 2;
     s << PROTOCOL_VERSION;
     s << n.nServices;
     s << GetTime();
@@ -25,7 +36,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeVersionMessage)
     s << n.nStartingHeight;
     s << n.fRelayTxes;
     BOOST_CHECK_EQUAL(size_t(352), s.size());
-    CConnman dummy;
+    DummyConnman dummy;
     BOOST_CHECK(ProcessMessage(&n, "version", s, 0, &dummy));
 }
 
@@ -33,7 +44,7 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeVersionMessage)
 {
     CNode n(42, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
-    nLocalHostNonce = 2; // this trips the version message logic to end shortly after reading the data (which is the focus of this test)
+    uint64_t nLocalHostNonce = 2;
     s << PROTOCOL_VERSION;
     s << n.nServices;
     s << GetTime();
@@ -44,7 +55,7 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeVersionMessage)
     s << n.nStartingHeight;
     s << n.fRelayTxes;
     BOOST_CHECK_EQUAL(size_t(353), s.size());
-    CConnman dummy;
+    DummyConnman dummy;
     BOOST_CHECK_THROW(ProcessMessage(&n, "version", s, 0, &dummy), std::ios_base::failure);
 }
 

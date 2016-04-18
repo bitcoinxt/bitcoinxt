@@ -100,11 +100,12 @@ public:
     };
 
     CConnman();
-    ~CConnman();
+    virtual ~CConnman();
     bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, std::string& strNodeError);
     void Stop();
     bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
     bool OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
+    virtual bool CheckIncomingNonce(uint64_t nonce);
 
     bool ForNode(NodeId id, std::function<bool(CNode* pnode)> func);
     bool ForEachNode(std::function<bool(CNode* pnode)> func);
@@ -275,7 +276,6 @@ CAddress GetLocalAddress(const CNetAddr *paddrPeer = NULL);
 extern bool fDiscover;
 extern bool fListen;
 extern uint64_t nLocalServices;
-extern uint64_t nLocalHostNonce;
 
 /** Maximum number of connections to simultaneously allow (aka connection slots) */
 extern int nMaxConnections;
@@ -455,7 +455,7 @@ public:
     std::unique_ptr<IPGroupSlot> ipgroupSlot;
 
     CNode(NodeId id, SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
-    ~CNode();
+    virtual ~CNode();
 
 private:
     // Network usage totals
@@ -467,10 +467,15 @@ private:
     CNode(const CNode&);
     void operator=(const CNode&);
 
+    uint64_t nLocalHostNonce;
 public:
 
     NodeId GetId() const {
       return id;
+    }
+
+    uint64_t GetLocalNonce() const {
+      return nLocalHostNonce;
     }
 
     int GetRefCount()
