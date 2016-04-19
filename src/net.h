@@ -71,11 +71,6 @@ static const bool DEFAULT_UPNP = false;
 /** The maximum number of entries in mapAskFor */
 static const size_t MAPASKFOR_MAX_SZ = MAX_INV_SZ;
 
-
-unsigned int ReceiveFloodSize();
-unsigned int SendBufferSize();
-
-void AddOneShot(const std::string& strDest);
 typedef int NodeId;
 
 struct AddedNodeInfo
@@ -150,14 +145,15 @@ public:
     size_t GetNodeCount(NumConnections num);
     void GetNodeStats(std::vector<CNodeStats>& vstats);
 
-     // for unittesting
-     void AddTestNode(CNode* n);
+    unsigned int GetSendBufferSize() const;
 
     void AddWhitelistedRange(const CSubNet &subnet);
 
     uint64_t GetTotalBytesRecv();
     uint64_t GetTotalBytesSent();
 
+    // for unittesting
+    void AddTestNode(CNode* n);
 
 private:
     struct ListenSocket {
@@ -190,6 +186,8 @@ private:
 
     void DumpAddresses();
 
+    unsigned int GetReceiveFloodSize() const;
+
     // Network stats
     void RecordBytesRecv(uint64_t bytes);
     void RecordBytesSent(uint64_t bytes);
@@ -206,6 +204,9 @@ private:
     // whitelisted (as well as those connecting to whitelisted binds).
     std::vector<CSubNet> vWhitelistedRange;
     CCriticalSection cs_vWhitelistedRange;
+
+    unsigned int nSendBufferMaxSize;
+    unsigned int nReceiveFloodSize;
 
     std::vector<ListenSocket> vhListenSocket;
     std::map<CNetAddr, int64_t> setBanned;

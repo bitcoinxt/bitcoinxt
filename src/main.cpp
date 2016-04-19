@@ -4546,9 +4546,13 @@ static void RelayAddress(const CAddress& addr, bool fReachable, CConnman* connma
     connman->ForEachNodeThen(std::move(sortfunc), std::move(pushfunc));
 }
 
-void static ProcessGetData(CNode* pfrom)
+void static ProcessGetData(CNode* pfrom, CConnman* connman)
 {
+    if (!connman)
+        throw std::invalid_argument(std::string(__func__ )+ " requires connection manager");
+
     std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
+    unsigned int nMaxSendBufferSize = connman->GetSendBufferSize();
 
     vector<CInv> vNotFound;
 
@@ -4556,7 +4560,7 @@ void static ProcessGetData(CNode* pfrom)
 
     while (it != pfrom->vRecvGetData.end()) {
         // Don't bother if send buffer is too full to respond anyway
-        if (pfrom->nSendSize >= SendBufferSize())
+        if (pfrom->nSendSize >= nMaxSendBufferSize)
             break;
 
         const CInv &inv = *it;
@@ -4644,8 +4648,10 @@ struct CCoin {
     }
 };
 
-bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, vector<unsigned char> *result, vector<CCoin> *resultCoins)
+bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, vector<unsigned char> *result, vector<CCoin> *resultCoins, CConnman* connman)
 {
+    if (!connman)
+        throw std::invalid_argument(std::string(__func__ )+ " requires connection manager");
     // Defined by BIP 64.
     //
     // Allows a peer to retrieve the CTxOut structures corresponding to the given COutPoints.
@@ -4670,7 +4676,7 @@ bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, ve
 
     // Due to the above check max space the bitmap can use is 50,000 / 8 == 6250 bytes.
     size_t bytes_used = vOutPoints.size() / 8;
-    size_t max_bytes = SendBufferSize();
+    size_t max_bytes = connman->GetSendBufferSize();
     boost::dynamic_bitset<unsigned char> hits(vOutPoints.size());
     {
         LOCK2(cs_main, mempool.cs);
@@ -4801,6 +4807,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         throw std::invalid_argument(std::string(__func__ )+ " requires connection manager");
 
     RandAddSeedPerfmon();
+    unsigned int nMaxSendBufferSize = connman->GetSendBufferSize();
+
     LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
     {
@@ -5096,7 +5104,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             // Track requests for our stuff
             GetMainSignals().Inventory(inv.hash);
 
-            if (pfrom->nSendSize > (SendBufferSize() * 2)) {
+            if (pfrom->nSendSize > (nMaxSendBufferSize * 2)) {
                 Misbehaving(pfrom->GetId(), 50);
                 return error("send buffer size() = %u", pfrom->nSendSize);
             }
@@ -5153,7 +5161,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             LogPrint("net", "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
 
         pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
-        ProcessGetData(pfrom);
+        ProcessGetData(pfrom, connman);
     }
 
 
@@ -5258,7 +5266,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
             vector<unsigned char> bitmap;
             vector<CCoin> outs;
-            if (ProcessGetUTXOs(vOutPoints, fCheckMemPool, &bitmap, &outs))
+            if (ProcessGetUTXOs(vOutPoints, fCheckMemPool, &bitmap, &outs, connman))
                 pfrom->PushMessage("utxos", chainActive.Height(), chainActive.Tip()->GetBlockHash(), bitmap, outs);
             else
                 Misbehaving(pfrom->GetId(), 20);
@@ -5517,7 +5525,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
 
             pfrom->vRecvGetData.push_back(inv);
-            ProcessGetData(pfrom);
+            ProcessGetData(pfrom, connman);
         }
 
     }
@@ -5809,6 +5817,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 // requires LOCK(cs_vRecvMsg)
 bool ProcessMessages(CNode* pfrom, CConnman* connman)
 {
+    unsigned int nMaxSendBufferSize = connman->GetSendBufferSize();
     //if (fDebug)
     //    LogPrintf("%s(%u messages)\n", __func__, pfrom->vRecvMsg.size());
 
@@ -5823,7 +5832,7 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman)
     bool fOk = true;
 
     if (!pfrom->vRecvGetData.empty())
-        ProcessGetData(pfrom);
+        ProcessGetData(pfrom, connman);
 
     // this maintains the order of responses
     if (!pfrom->vRecvGetData.empty()) return fOk;
@@ -5831,7 +5840,7 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman)
     std::deque<CNetMessage>::iterator it = pfrom->vRecvMsg.begin();
     while (!pfrom->fDisconnect && it != pfrom->vRecvMsg.end()) {
         // Don't bother if send buffer is too full to respond anyway
-        if (pfrom->nSendSize >= SendBufferSize())
+        if (pfrom->nSendSize >= nMaxSendBufferSize)
             break;
 
         // get next message
