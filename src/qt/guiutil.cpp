@@ -887,7 +887,7 @@ QString formatServicesStr(quint64 mask)
                 strList.append("BLOOM");
                 break;
             case NODE_THIN:
-                strList.Append("THIN");
+                strList.append("THIN");
                 break;
             default:
                 strList.append(QString("%1[%2]").arg("UNKNOWN").arg(check));
