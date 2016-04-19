@@ -16,7 +16,8 @@ typedef int NodeId;
 class CBlockHeader;
 
 // We may, or may not have the full uint256 hash of transactions in block.
-struct ThinTx {
+class ThinTx {
+public:
     ThinTx(const uint256& h) :
         hash(h), cheapHash(h.GetCheapHash())  { }
 
@@ -44,7 +45,7 @@ struct ThinTx {
         return !(b == *this);
     }
 
-    private:
+private:
         uint256 hash;
         uint64_t cheapHash;
 };
@@ -62,7 +63,8 @@ struct StubData {
 };
 inline StubData::~StubData() { }
 
-struct TxFinder {
+class TxFinder {
+public:
     // returned tx is null if not found (and needs to be downloaded)
     virtual CTransaction operator()(const ThinTx& hash) const = 0;
     virtual ~TxFinder() = 0;
