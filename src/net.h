@@ -226,6 +226,8 @@ private:
 
     /** Services this instance offers */
     uint64_t nLocalServices;
+
+    CSemaphore *semOutbound;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void MapPort(bool fUseUPnP);

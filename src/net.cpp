@@ -84,8 +84,6 @@ deque<pair<int64_t, CInv> > vRelayExpiration;
 CCriticalSection cs_mapRelay;
 limitedmap<CInv, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
 
-static CSemaphore *semOutbound = NULL;
-
 // Signals for message handling
 static CNodeSignals g_signals;
 CNodeSignals& GetNodeSignals() { return g_signals; }
@@ -1768,8 +1766,8 @@ void static Discover(boost::thread_group& threadGroup)
 #endif
 }
 
-CConnman::CConnman() : fAddressesInitialized(false), nLastNodeId(0),
-                       nSendBufferMaxSize(0), nReceiveFloodSize(0)
+CConnman::CConnman() : nSendBufferMaxSize(0), nReceiveFloodSize(0),
+                       fAddressesInitialized(false),  nLastNodeId(0), semOutbound(nullptr)
 {
 }
 
