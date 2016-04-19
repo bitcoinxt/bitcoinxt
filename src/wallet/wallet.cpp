@@ -1176,7 +1176,9 @@ bool CWalletTx::RelayWalletTransaction()
     {
         if (GetDepthInMainChain() == 0) {
             LogPrintf("Relaying wtx %s\n", GetHash().ToString());
-            RelayTransaction((CTransaction)*this);
+            std::vector<uint256> vAncestors;
+            mempool.queryAncestors(GetHash(), vAncestors);
+            RelayTransaction((CTransaction)*this, vAncestors);
             return true;
         }
     }

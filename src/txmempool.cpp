@@ -212,6 +212,25 @@ bool CTxMemPool::CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntr
     return true;
 }
 
+void CTxMemPool::queryAncestors(const uint256 txHash, std::vector<uint256>& vAncestors) {
+    CTxMemPool::setEntries setAncestors;
+	const uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
+	std::string dummy;
+
+    LOCK(cs);
+    vAncestors.push_back(txHash);
+    if (!(nLocalServices & NODE_BLOOM))
+        return;
+    indexed_transaction_set::const_iterator it = mapTx.find(txHash);
+    if (it == mapTx.end())
+        return;
+    CalculateMemPoolAncestors(*it, setAncestors, nNoLimit, nNoLimit, nNoLimit, nNoLimit, dummy, false);
+    BOOST_FOREACH(txiter ancestorIt, setAncestors)
+        vAncestors.push_back(ancestorIt->GetTx().GetHash());
+    return;
+}
+
+
 void CTxMemPool::UpdateAncestorsOf(bool add, txiter it, setEntries &setAncestors)
 {
     setEntries parentIters = GetMemPoolParents(it);

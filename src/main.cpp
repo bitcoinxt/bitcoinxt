@@ -1380,8 +1380,11 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                 doubleSpendFilter.clear();
             doubleSpendFilter.insert(relayForOutpoint);
 
-            if (!Opt().IsStealthMode())
-                RelayTransaction(tx);
+            if (!Opt().IsStealthMode()) {
+                std::vector<uint256> vAncestors;
+                vAncestors.push_back(hash); // Alert only for the tx itself
+                RelayTransaction(tx, vAncestors);
+            }
         }
         else
         {
@@ -5117,7 +5120,9 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
             {
                 mempool.check(pcoinsTip);
-                RelayTransaction(tx);
+                std::vector<uint256> vAncestors;
+                mempool.queryAncestors(tx.GetHash(), vAncestors);
+                RelayTransaction(tx, vAncestors);
                 vWorkQueue.push_back(inv.hash);
 
                 LogPrint("mempool", "AcceptToMemoryPool: peer=%d %s: accepted %s (poolsz %u)\n",
@@ -5151,7 +5156,9 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                         if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
                         {
                             LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
-                            RelayTransaction(orphanTx);
+                            std::vector<uint256> vAncestors;
+                            mempool.queryAncestors(orphanTx.GetHash(), vAncestors);
+                            RelayTransaction(orphanTx, vAncestors);
                             vWorkQueue.push_back(orphanHash);
                             vEraseQueue.push_back(orphanHash);
                         }
@@ -5199,7 +5206,9 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                     // FIXME: This includes invalid transactions, which means a
                     // whitelisted peer could get us banned! We may want to change
                     // that.
-                    RelayTransaction(tx);
+                    std::vector<uint256> vAncestors;
+                    mempool.queryAncestors(tx.GetHash(), vAncestors);
+                    RelayTransaction(tx, vAncestors);
                 }
             }
             int nDoS = 0;
@@ -5374,18 +5383,29 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         std::vector<uint256> vtxid;
         mempool.queryHashes(vtxid);
-        vector<CInv> vInv;
+        std::set<CInv> vInv;
         BOOST_FOREACH(uint256& hash, vtxid) {
-            CInv inv(MSG_TX, hash);
             CTransaction tx;
             bool fInMemPool = mempool.lookup(hash, tx);
             if (!fInMemPool) continue; // another thread removed since queryHashes, maybe...
-            if ((pfrom->pfilter && pfrom->pfilter->IsRelevantAndUpdate(tx)) ||
-               (!pfrom->pfilter))
-                vInv.push_back(inv);
-            if (vInv.size() == MAX_INV_SZ) {
-                pfrom->PushMessage("inv", vInv);
-                vInv.clear();
+            if (pfrom->pfilter && !pfrom->pfilter->IsRelevantAndUpdate(tx))
+                continue;
+
+            // No filter, or filter matched
+            std::vector<uint256> vAncestors;
+            if (pfrom->pfilter && pfrom->pfilter->WantsAncestors())
+                mempool.queryAncestors(hash, vAncestors);
+            else
+            	vAncestors.push_back(hash);
+            BOOST_FOREACH(uint256& hashFound, vAncestors) {
+                if (hashFound != hash && pfrom->pfilter && pfrom->pfilter->WantsAncestors())
+                    pfrom->pfilter->insert(hashFound);
+                if (hashFound == hash || (pfrom->pfilter && pfrom->pfilter->WantsAncestors()))
+                    vInv.insert(CInv(MSG_TX, hashFound));
+                if (vInv.size() == MAX_INV_SZ) {
+                    pfrom->PushMessage("inv", vInv);
+                    vInv.clear();
+                }
             }
         }
         if (vInv.size() > 0)

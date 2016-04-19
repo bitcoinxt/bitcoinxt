@@ -1813,15 +1813,15 @@ instance_of_cnetcleanup;
 
 
 
-void RelayTransaction(const CTransaction& tx)
+void RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors)
 {
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss.reserve(10000);
     ss << tx;
-    RelayTransaction(tx, ss);
+    RelayTransaction(tx, ss, vAncestors);
 }
 
-void RelayTransaction(const CTransaction& tx, const CDataStream& ss)
+void RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors)
 {
     CInv inv(MSG_TX, tx.GetHash());
     {
@@ -1845,8 +1845,14 @@ void RelayTransaction(const CTransaction& tx, const CDataStream& ss)
         LOCK(pnode->cs_filter);
         if (pnode->pfilter)
         {
-            if (pnode->pfilter->IsRelevantAndUpdate(tx))
-                pnode->PushInventory(inv);
+            if (pnode->pfilter->IsRelevantAndUpdate(tx)) {
+                BOOST_FOREACH(uint256& hashFound, vAncestors) {
+                    if (hashFound != tx.GetHash() && pnode->pfilter->WantsAncestors())
+                        pnode->pfilter->insert(hashFound);
+                    if (hashFound == tx.GetHash() || pnode->pfilter->WantsAncestors())
+                        pnode->PushInventory(CInv(MSG_TX, hashFound));
+                }
+            }
         } else
             pnode->PushInventory(inv);
     }

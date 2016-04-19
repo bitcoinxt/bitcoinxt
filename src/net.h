@@ -652,8 +652,8 @@ public:
 
 
 class CTransaction;
-void RelayTransaction(const CTransaction& tx);
-void RelayTransaction(const CTransaction& tx, const CDataStream& ss);
+void RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors);
+void RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors);
 
 bool FindTransactionInRelayMap(uint256 hash, CTransaction &out);
 
