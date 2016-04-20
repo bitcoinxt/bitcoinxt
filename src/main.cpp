@@ -2834,9 +2834,8 @@ static void PruneBlockIndexCandidates() {
  * Try to make some progress towards making pindexMostWork the active block.
  * pblock is either NULL or a pointer to a CBlock corresponding to pindexMostWork.
  */
-static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock) {
+static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock, bool& fInvalidFound) {
     AssertLockHeld(cs_main);
-    bool fInvalidFound = false;
     const CBlockIndex *pindexOldTip = chainActive.Tip();
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
 
@@ -2922,15 +2921,22 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
         {
             LOCK(cs_main);
             CBlockIndex* pindexOldTip = chainActive.Tip();
-            pindexMostWork = FindMostWorkChain();
+            if (pindexMostWork == NULL) {
+                pindexMostWork = FindMostWorkChain();
+            }
 
             // Whether we have anything to do at all.
             if (pindexMostWork == NULL || pindexMostWork == chainActive.Tip())
                 return true;
 
-            if (!ActivateBestChainStep(state, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL))
+            bool fInvalidFound = false;
+            if (!ActivateBestChainStep(state, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL, fInvalidFound))
                 return false;
 
+            if (fInvalidFound) {
+                // Wipe cache, we may need another branch now.
+                pindexMostWork = NULL;
+            }
             pindexNewTip = chainActive.Tip();
             pindexFork = chainActive.FindFork(pindexOldTip);
             fInitialDownload = IsInitialBlockDownload();
