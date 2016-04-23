@@ -462,6 +462,8 @@ int32_t ComputeBlockVersion(const CBlockIndex* pindexPrev, const Consensus::Para
  */
 int GetSpendHeight(const CCoinsViewCache& inputs);
 
+extern VersionBitsCache versionbitscache;
+
 /** local "reject" message codes for RPC which can not be triggered by p2p trasactions */
 static const unsigned int REJECT_HIGHFEE = 0x100;
 
