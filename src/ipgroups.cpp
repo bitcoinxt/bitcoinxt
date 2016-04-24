@@ -24,7 +24,13 @@
 
 using namespace std;
 
-CCriticalSection cs_groups;
+// shared_ptr as a workaround for last IPGroupSlot being
+// destructed after cs_groups at program exit. IPGroupSlots keep a week ptr.
+static boost::shared_ptr<CCriticalSection> cs_groups;
+struct CSGroupsInit {
+    CSGroupsInit() { cs_groups.reset(new CCriticalSection); }
+} csgroupinit_instance;
+
 static vector<CIPGroup> groups;
 
 static const int OPEN_PROXY_PRIORITY = -10;
@@ -37,7 +43,7 @@ extern bool fListen;
 
 // Returns the empty/default group if the IP does not belong to any group.
 CIPGroupData FindGroupForIP(CNetAddr ip) {
-    LOCK(cs_groups);
+    LOCK(*cs_groups);
     if (!ip.IsValid()) {
         LogPrintf("IP is not valid: %s\n", ip.ToString());
         return CIPGroupData();  // Default.
@@ -181,12 +187,12 @@ static void LoadTorIPsFromStaticData() {
         ip = ip + "/32";
         ipGroup.subnets.push_back(CSubNet(ip));
     }
-    LOCK(cs_groups);
+    LOCK(*cs_groups);
     groups.push_back(ipGroup);
 }
 
 static void AddOrReplace(CIPGroup &group) {
-    LOCK(cs_groups);
+    LOCK(*cs_groups);
     // Try to replace existing group with same name.
     for (size_t i = 0; i < groups.size(); i++) {
         if (groups[i].header.name == group.header.name) {
@@ -198,7 +204,7 @@ static void AddOrReplace(CIPGroup &group) {
 }
 
 static void MaybeRemoveGroup(const string &group_name) {
-    LOCK(cs_groups);
+    LOCK(*cs_groups);
     for (size_t i = 0; i < groups.size(); i++) {
         if (groups[i].header.name == group_name) {
             groups.erase(groups.begin() + i);
@@ -279,7 +285,7 @@ static void InitTorIPGroups(CScheduler *scheduler) {
 
 void InitIPGroups(CScheduler *scheduler) {
     {
-        LOCK(cs_groups);
+        LOCK(*cs_groups);
         groups.clear();
     }
 
@@ -307,4 +313,89 @@ void InitIPGroups(CScheduler *scheduler) {
     // - Design a protocol to let user wallets gain priority by proving ownership of coin age, as they tend to have
     //   short lived connections and roam around different IPs, but we still want to serve them ahead of long term
     //   idling connections.
+}
+
+IPGroupSlot::IPGroupSlot(const std::string& groupName) :
+    groupName(groupName), groupCS(cs_groups)
+{
+    LOCK(*cs_groups);
+
+    typedef std::vector<CIPGroup>::iterator auto_;
+    for (auto_ g = groups.begin(); g != groups.end(); ++g) {
+        if (g->header.name != groupName)
+            continue;
+
+        g->header.connCount += 1;
+
+        if (g->header.decrPriority)
+            g->header.priority -= IPGROUP_CONN_MODIFIER;
+
+        return; // names are unique, so we're done.
+    }
+    assert(!"tried to create a groupslot for a group that does not exist");
+}
+
+IPGroupSlot::~IPGroupSlot() {
+    // groupCS can be null when exiting bitcoind due to CNetCleanup
+    // instance in net.cpp destructing after cs_groups.
+    boost::shared_ptr<CCriticalSection> cs(groupCS.lock());
+    if (cs.get() == NULL)
+        return;
+
+    LOCK(*cs);
+
+    typedef std::vector<CIPGroup>::iterator auto_;
+    for (auto_ g = groups.begin(); g != groups.end(); ++g) {
+        CIPGroupData& group = g->header;
+
+        if (group.name != groupName)
+            continue;
+
+        group.connCount -= 1;
+        assert(group.connCount >= 0);
+
+        if (group.decrPriority)
+            group.priority += IPGROUP_CONN_MODIFIER;
+
+        if (group.selfErases && !group.connCount)
+            MaybeRemoveGroup(g->header.name);
+
+        return;
+    }
+}
+
+CIPGroupData IPGroupSlot::Group() {
+    LOCK(*cs_groups);
+    typedef std::vector<CIPGroup>::iterator auto_;
+    for (auto_ g = groups.begin(); g != groups.end(); ++g)
+        if (g->header.name == groupName)
+            return g->header;
+
+    return CIPGroupData();
+}
+
+std::auto_ptr<IPGroupSlot> AssignIPGroupSlot(const CNetAddr& ip) {
+    LOCK(*cs_groups);
+
+    CIPGroupData group = FindGroupForIP(ip);
+
+    // IP belongs to a group already.
+    if (!group.name.empty())
+        return std::auto_ptr<IPGroupSlot>(new IPGroupSlot(group.name));
+
+    // If IP does not belong to a group, create a new group
+    // for only this IP. This group is used to de-prioritize multiple
+    // connections from same IP.
+    //
+    // The goal is to force an attacker to spread out in order to get lots of priority.
+
+    // IPGROUP_CONN_MODIFIER will be decremented again when slot is constructed.
+    int pri = DEFAULT_IPGROUP_PRI + IPGROUP_CONN_MODIFIER;
+
+    CIPGroup newGroup;
+    newGroup.header = CIPGroupData(ip.ToStringIP(), pri, true, true);
+    newGroup.subnets.push_back(CSubNet(ip.ToStringIP() + "/32"));
+    groups.push_back(newGroup);
+
+    return std::auto_ptr<IPGroupSlot>(new IPGroupSlot(newGroup.header.name));
 }

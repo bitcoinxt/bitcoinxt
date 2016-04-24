@@ -904,9 +904,6 @@ void ThreadSocketHandler()
                     // Calculate the priority of the new IP to see if we should drop it immediately (normal) or kick
                     // one of the other peers out to make room for it.
 
-                    // TODO: Lower the priority of an IP as it establishes more connections.
-                    // The goal is to force an attacker to spread out in order to get lots of priority.
-
                     // See if this IP has static prio data from a group.
                     CIPGroupData ipgroup = FindGroupForIP(addr);
 
@@ -2078,8 +2075,9 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
         id = nLastNodeId++;
     }
 
-    CIPGroupData ipgroup = FindGroupForIP(CNetAddr(addr.ToStringIP()));
-    std::string strIpGroup = ipgroup.name != "" ? tfm::format("(group %s)", ipgroup.name) : "";
+    ipgroupSlot = AssignIPGroupSlot(CNetAddr(addr.ToStringIP()));
+    CIPGroupData ipgroup = ipgroupSlot->Group();
+    std::string strIpGroup = tfm::format("(group %s)", ipgroup.name);
     if (fLogIPs)
         LogPrint("net", "Added connection to %s peer=%d %s\n", addrName, id, strIpGroup);
     else
