@@ -2578,13 +2578,13 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
  */
 bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSource& blockSource, CConnman* connman) {
     CBlockIndex *pindexMostWork = NULL;
+    CBlockIndex *pindexNewTip = nullptr;
     const CChainParams& chainParams = Params();
     do {
         boost::this_thread::interruption_point();
         if (ShutdownRequested())
             break;
 
-        CBlockIndex *pindexNewTip = nullptr;
         const CBlockIndex *pindexFork;
         bool fInitialDownload;
         int nNewHeight;
@@ -2643,7 +2643,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
             if (!hashesToAnnounce.empty())
                 uiInterface.NotifyBlockTip(hashesToAnnounce.front());
         }
-    } while(pindexMostWork != chainActive.Tip());
+    } while(pindexNewTip != pindexMostWork);
     CheckBlockIndex();
 
     // Write changes periodically to disk, after relay.
