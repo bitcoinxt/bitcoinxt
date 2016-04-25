@@ -3,7 +3,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <boost/test/unit_test.hpp>
-#include <boost/assign/list_of.hpp>
 
 #include "clientversion.h"
 #include "options.h"
@@ -98,7 +97,7 @@ BOOST_AUTO_TEST_CASE(xtsubversion_uacomment)
     BOOST_CHECK(XTSubVersion().find("(") == std::string::npos);
 
     // only uacomments
-    argPtr->uacomment = boost::assign::list_of("hello")("world");
+    argPtr->uacomment = {"hello", "world" };
     BOOST_CHECK(XTSubVersion().find("(hello; world)") != std::string::npos);
 
 #if BOOST_VERSION >= 105500
