@@ -52,11 +52,11 @@ class PruneTest(BitcoinTestFramework):
         self.is_network_split = False
 
         # Create nodes 0 and 1 to mine
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-maxreceivebuffer=20000","-blockmaxsize=2000000", "-checkblocks=5"], timewait=900))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-maxreceivebuffer=20000","-blockmaxsize=2000000", "-checkblocks=5"], timewait=900))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug","-maxreceivebuffer=20000","-blockmaxsize=2000000", "-checkblocks=5"], timewait=2700))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug","-maxreceivebuffer=20000","-blockmaxsize=2000000", "-checkblocks=5"], timewait=2700))
 
         # Create node 2 to test pruning
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-maxreceivebuffer=20000","-prune=950"], timewait=900))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-maxreceivebuffer=20000","-prune=950"], timewait=2700))
         self.prunedir = self.options.tmpdir+"/node2/regtest/blocks/"
 
         self.address[0] = self.nodes[0].getnewaddress()
@@ -124,7 +124,7 @@ class PruneTest(BitcoinTestFramework):
             # Node 2 stays connected, so it hears about the stale blocks and then reorg's when node0 reconnects
             # Stopping node 0 also clears its mempool, so it doesn't have node1's transactions to accidentally mine
             stop_node(self.nodes[0],0)
-            self.nodes[0]=start_node(0, self.options.tmpdir, ["-debug","-maxreceivebuffer=20000","-blockmaxsize=2000000", "-checkblocks=5"], timewait=900)
+            self.nodes[0]=start_node(0, self.options.tmpdir, ["-debug","-maxreceivebuffer=20000","-blockmaxsize=2000000", "-checkblocks=5"], timewait=2700)
             self.sync_block_time()
             # Mine 24 blocks in node 1
             self.utxo = self.nodes[1].listunspent()
@@ -176,7 +176,7 @@ class PruneTest(BitcoinTestFramework):
 
         # Reboot node1 to clear those giant tx's from mempool
         stop_node(self.nodes[1],1)
-        self.nodes[1]=start_node(1, self.options.tmpdir, ["-debug","-maxreceivebuffer=20000","-blockmaxsize=5000", "-checkblocks=5", "-disablesafemode"], timewait=900)
+        self.nodes[1]=start_node(1, self.options.tmpdir, ["-debug","-maxreceivebuffer=20000","-blockmaxsize=5000", "-checkblocks=5", "-disablesafemode"], timewait=2700)
         self.sync_block_time()
 
         print "Generating new longer chain of 300 more blocks"
