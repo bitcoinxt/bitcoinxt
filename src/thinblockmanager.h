@@ -42,8 +42,8 @@ inline InFlightEraser::~InFlightEraser() { }
 class ThinBlockManager : boost::noncopyable {
     public:
         ThinBlockManager(
-                std::auto_ptr<ThinBlockFinishedCallb> callb,
-                std::auto_ptr<InFlightEraser> inFlightEraser);
+                std::unique_ptr<ThinBlockFinishedCallb> callb,
+                std::unique_ptr<InFlightEraser> inFlightEraser);
 
         void addWorker(const uint256& block, ThinBlockWorker& w);
         void delWorker(ThinBlockWorker& w, NodeId);
@@ -62,8 +62,8 @@ class ThinBlockManager : boost::noncopyable {
             std::set<ThinBlockWorker*> workers;
         };
         std::map<uint256, ActiveBuilder> builders;
-        std::auto_ptr<ThinBlockFinishedCallb> finishedCallb;
-        std::auto_ptr<InFlightEraser> inFlightEraser;
+        std::unique_ptr<ThinBlockFinishedCallb> finishedCallb;
+        std::unique_ptr<InFlightEraser> inFlightEraser;
 
         void finishBlock(const uint256& block, ThinBlockBuilder&);
 };

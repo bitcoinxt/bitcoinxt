@@ -40,6 +40,6 @@ struct ArgReset {
 // Temporary replace the global getter for fetching user configurations.
 //
 // Returns a RAII object that sets system back to default state.
-std::auto_ptr<ArgReset> SetDummyArgGetter(std::auto_ptr<ArgGetter>);
+std::unique_ptr<ArgReset> SetDummyArgGetter(std::unique_ptr<ArgGetter>);
 
 #endif
