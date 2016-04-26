@@ -105,6 +105,11 @@ size_t ClientModel::getMempoolDynamicUsage() const
     return mempool.DynamicMemoryUsage();
 }
 
+double ClientModel::getTransactionsPerSecond() const
+{
+    return mempool.TransactionsPerSecond();
+}
+
 double ClientModel::getVerificationProgress() const
 {
     LOCK(cs_main);
@@ -141,6 +146,7 @@ void ClientModel::updateTimer()
 
     Q_EMIT mempoolSizeChanged(getMempoolSize(), getMempoolDynamicUsage());
     Q_EMIT bytesChanged(getTotalBytesRecv(), getTotalBytesSent());
+    Q_EMIT transactionsPerSecondChanged(getTransactionsPerSecond()); // BU:
 }
 
 void ClientModel::updateNumConnections(int numConnections)

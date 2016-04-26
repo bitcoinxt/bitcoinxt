@@ -904,3 +904,22 @@ void CTxMemPool::TrimToSize(size_t sizelimit) {
         RemoveStaged(stage, false);
     }
 }
+
+// BU: begin
+void CTxMemPool::UpdateTransactionsPerSecond()
+{
+    static int64_t nLastTime = GetTime();
+    double nSecondsToAverage = 60; // Length of time in seconds to smooth the tx rate over
+    int64_t nNow = GetTime();
+
+    // Decay the previous tx rate.  
+    int64_t nDeltaTime = nNow - nLastTime;
+    if (nDeltaTime > 0) {
+        nTxPerSec -= (nTxPerSec / nSecondsToAverage) * nDeltaTime;
+        nLastTime = nNow;
+    }
+
+    // Add the new tx to the rate
+    nTxPerSec += 1/nSecondsToAverage; // The amount that the new tx will add to the tx rate
+}
+// BU: end
