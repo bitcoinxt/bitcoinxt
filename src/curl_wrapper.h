@@ -36,6 +36,6 @@ struct DummyCurlWrapper : public CurlWrapper {
     std::string lastUrl; // last url used with fetchURL
 };
 
-std::auto_ptr<CurlWrapper> MakeCurl();
+std::unique_ptr<CurlWrapper> MakeCurl();
 
 #endif
