@@ -123,7 +123,7 @@ string DummyCurlWrapper::fetchURL(const string& url) {
     return content;
 }
 
-auto_ptr<CurlWrapper> MakeCurl() {
+unique_ptr<CurlWrapper> MakeCurl() {
     static CurlInitWrapper c;
     if (!c.curlOK)
         throw curl_error("", "libcurl failed to initialize");
@@ -132,5 +132,5 @@ auto_ptr<CurlWrapper> MakeCurl() {
     if (!curl)
         throw curl_error("", "curl_easy_init failed");
 
-    return auto_ptr<CurlWrapper>(new CurlWrapperImpl(curl));
+    return unique_ptr<CurlWrapper>(new CurlWrapperImpl(curl));
 }

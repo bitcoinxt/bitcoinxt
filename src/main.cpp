@@ -265,8 +265,8 @@ struct InFlightEraserImpl : public InFlightEraser {
     virtual void operator()(NodeId, const uint256& block);
 };
 ThinBlockManager thinblockmg(
-        std::auto_ptr<ThinBlockFinishedCallb>(new OnBlockFinished()), 
-        std::auto_ptr<InFlightEraser>(new InFlightEraserImpl()));
+        std::unique_ptr<ThinBlockFinishedCallb>(new OnBlockFinished()),
+        std::unique_ptr<InFlightEraser>(new InFlightEraserImpl()));
 
 //////////////////////////////////////////////////////////////////////////////
 //
@@ -5060,7 +5060,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             if (UsingThinBlocks() && pfrom->SupportsXThinBlocks())
                 ns->thinblock.reset(new XThinWorker(
                     thinblockmg, pfrom->id,
-                    std::auto_ptr<TxHashProvider>(new MempoolHashProvider)));
+                    std::unique_ptr<TxHashProvider>(new MempoolHashProvider)));
 
             else if (UsingThinBlocks() && pfrom->SupportsBloomThinBlocks())
                 ns->thinblock.reset(new BloomThinWorker(thinblockmg, pfrom->id));

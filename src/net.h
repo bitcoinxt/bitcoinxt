@@ -292,7 +292,7 @@ public:
     CSemaphoreGrant grantOutbound;
     CCriticalSection cs_filter;
     CBloomFilter* pfilter;
-    std::auto_ptr<CBloomFilter> xthinFilter;
+    std::unique_ptr<CBloomFilter> xthinFilter;
     int nRefCount;
     NodeId id;
 
@@ -342,7 +342,7 @@ public:
     bool fPingQueued;
 
     // adds connection to ipgroup (for prioritising connection slots)
-    std::auto_ptr<IPGroupSlot> ipgroupSlot;
+    std::unique_ptr<IPGroupSlot> ipgroupSlot;
 
     CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn = "", bool fInboundIn=false);
     virtual ~CNode();
