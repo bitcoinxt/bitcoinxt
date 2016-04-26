@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <boost/thread.hpp>
 
-static std::auto_ptr<ArgGetter> Args;
+static std::unique_ptr<ArgGetter> Args;
 
 struct DefaultGetter : public ArgGetter {
     virtual bool GetBool(const std::string& arg, bool def) {
@@ -69,9 +69,9 @@ int64_t Opt::CheckpointDays() {
     return std::max(int64_t(1), Args->GetArg("-checkpoint-days", def));
 }
 
-std::auto_ptr<ArgReset> SetDummyArgGetter(std::auto_ptr<ArgGetter> getter) {
+std::unique_ptr<ArgReset> SetDummyArgGetter(std::unique_ptr<ArgGetter> getter) {
     Args.reset(getter.release());
-    return std::auto_ptr<ArgReset>(new ArgReset);
+    return std::unique_ptr<ArgReset>(new ArgReset);
 }
 
 ArgReset::~ArgReset() {

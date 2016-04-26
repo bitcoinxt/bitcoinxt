@@ -60,8 +60,8 @@ struct MerkleblockSetup {
 
     MerkleblockSetup() :
         mstream(SER_NETWORK, PROTOCOL_VERSION),
-        tmgr(std::auto_ptr<ThinBlockFinishedCallb>(new DummyFinishedCallb),
-             std::auto_ptr<InFlightEraser>(new DummyInFlightEraser))
+        tmgr(std::unique_ptr<ThinBlockFinishedCallb>(new DummyFinishedCallb),
+             std::unique_ptr<InFlightEraser>(new DummyInFlightEraser))
     {
         CBloomFilter emptyFilter;
         mblock = CMerkleBlock(TestBlock2(), emptyFilter);
@@ -169,8 +169,8 @@ BOOST_AUTO_TEST_SUITE_END();
 struct XThinBlockSetup {
 
     XThinBlockSetup() :
-        tmgr(std::auto_ptr<ThinBlockFinishedCallb>(new DummyFinishedCallb),
-             std::auto_ptr<InFlightEraser>(new DummyInFlightEraser))
+        tmgr(std::unique_ptr<ThinBlockFinishedCallb>(new DummyFinishedCallb),
+             std::unique_ptr<InFlightEraser>(new DummyInFlightEraser))
     {
         SelectParams(CBaseChainParams::MAIN);
         fPrintToDebugLog = false;

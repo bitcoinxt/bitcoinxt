@@ -86,8 +86,8 @@ BOOST_AUTO_TEST_CASE(throw_on_collision) {
 
 struct ThinBlockMgDummy : public ThinBlockManager {
     ThinBlockMgDummy() : ThinBlockManager(
-            std::auto_ptr<ThinBlockFinishedCallb>(),
-            std::auto_ptr<InFlightEraser>())
+            std::unique_ptr<ThinBlockFinishedCallb>(),
+            std::unique_ptr<InFlightEraser>())
     {
     }
 };
@@ -100,7 +100,7 @@ struct NullProvider : public TxHashProvider {
 BOOST_AUTO_TEST_CASE(requestBlock) {
     ThinBlockMgDummy mg;
     DummyNode node;
-    XThinWorker w(mg, node.id, std::auto_ptr<TxHashProvider>(new NullProvider));
+    XThinWorker w(mg, node.id, std::unique_ptr<TxHashProvider>(new NullProvider));
 
     std::vector<CInv> reqs;
     w.requestBlock(uint256S("0xfafafa"), reqs, node);
