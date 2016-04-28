@@ -16,6 +16,8 @@ public:
     bool fAllowOtherInputs;
     //! Includes watch only addresses which match the ISMINE_WATCH_SOLVABLE criteria
     bool fAllowWatchOnly;
+    //! Feerate to use (0 = estimate fee with payTxFee fallback)
+    CFeeRate nFeeRate;
 
     CCoinControl()
     {
@@ -28,6 +30,7 @@ public:
         fAllowOtherInputs = false;
         fAllowWatchOnly = false;
         setSelected.clear();
+        nFeeRate = CFeeRate(0);
     }
 
     bool HasSelected() const
