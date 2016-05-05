@@ -12,6 +12,7 @@
 #include <test/test_bitcoin.h>
 
 extern std::vector<CSubNet> ParseIPData(std::string input);
+extern void AddOrReplace(CIPGroup &group);
 
 BOOST_AUTO_TEST_SUITE(ipgroups_tests);
 
@@ -148,5 +149,19 @@ BOOST_AUTO_TEST_CASE(ipgroup_self_erases) {
     BOOST_CHECK_EQUAL(0, newip.connCount);
 }
 
-BOOST_AUTO_TEST_SUITE_END()
+BOOST_AUTO_TEST_CASE(add_or_replace_keeps_conncount) {
+    CIPGroup g;
+    g.header.name = "test";
+    AddOrReplace(g);
 
+    CNetAddr ip("127.1.1.1");
+    std::auto_ptr<IPGroupSlot> slot1 = AssignIPGroupSlot(ip);
+
+    CIPGroup g2;
+    g.header.name = "test";
+    AddOrReplace(g2);
+
+    BOOST_CHECK_EQUAL(1, FindGroupForIP(ip).connCount);
+}
+
+BOOST_AUTO_TEST_SUITE_END();

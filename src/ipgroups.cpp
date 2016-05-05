@@ -191,12 +191,14 @@ static void LoadTorIPsFromStaticData() {
     groups.push_back(ipGroup);
 }
 
-static void AddOrReplace(CIPGroup &group) {
+void AddOrReplace(CIPGroup &group) {
     LOCK(*cs_groups);
     // Try to replace existing group with same name.
     for (size_t i = 0; i < groups.size(); i++) {
         if (groups[i].header.name == group.header.name) {
+            int connCount = groups[i].header.connCount;
             groups[i] = group;
+            groups[i].header.connCount = connCount;
             return;
         }
     }
