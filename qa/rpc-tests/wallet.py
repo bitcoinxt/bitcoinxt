@@ -252,7 +252,7 @@ class WalletTest (BitcoinTestFramework):
 
         assert_equal("not an integer" in errorString, True)
 
-        #check if wallet or blochchain maintenance changes the balance
+        # check if wallet or blockchain maintenance changes the balance
         self.sync_all()
         self.nodes[0].generate(1)
         self.sync_all()
@@ -263,7 +263,8 @@ class WalletTest (BitcoinTestFramework):
             '-reindex',
             '-zapwallettxes=1',
             '-zapwallettxes=2',
-            '-salvagewallet',
+            # disabled until issue is fixed: https://github.com/bitcoin/bitcoin/issues/7463
+            # '-salvagewallet',
         ]
         for m in maintenance:
             print("check %s" % m)
@@ -274,4 +275,4 @@ class WalletTest (BitcoinTestFramework):
 
 
 if __name__ == '__main__':
-    WalletTest ().main ()
+    WalletTest().main()
