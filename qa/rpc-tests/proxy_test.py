@@ -37,7 +37,10 @@ addnode connect to generic DNS name
 
 class ProxyTest(BitcoinTestFramework):
     def __init__(self):
-        super(ProxyTest, self).__init__()
+        super().__init__()
+        self.num_nodes = 4
+        self.setup_clean_chain = False
+
         # Create two proxies on different ports
         # ... one unauthenticated
         self.conf1 = Socks5Configuration()
@@ -66,7 +69,7 @@ class ProxyTest(BitcoinTestFramework):
     def setup_nodes(self):
         # Note: proxies are not used to connect to local nodes
         # this is because the proxy to use is based on CService.GetNetwork(), which return NET_UNROUTABLE for localhost
-        return start_nodes(4, self.options.tmpdir, extra_args=[
+        return start_nodes(self.num_nodes, self.options.tmpdir, extra_args=[
             ['-listen', '-debug=net', '-debug=proxy', '-proxy=%s:%i' % (self.conf1.addr),'-proxyrandomize=1'],
             ['-listen', '-debug=net', '-debug=proxy', '-proxy=%s:%i' % (self.conf1.addr),'-onion=%s:%i' % (self.conf2.addr),'-proxyrandomize=0'],
             ['-listen', '-debug=net', '-debug=proxy', '-proxy=%s:%i' % (self.conf2.addr),'-proxyrandomize=1'],
