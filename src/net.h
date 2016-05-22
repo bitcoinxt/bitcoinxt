@@ -59,7 +59,8 @@ static const unsigned int MAX_ADDR_TO_SEND = 1000;
 static const int MAX_RECV_CHUNK = 256*1024;
 /** Maximum length of strSubVer in `version` message */
 static const unsigned int MAX_SUBVERSION_LENGTH = 256;
-
+/** Maximum number of outgoing nodes */
+static const int MAX_OUTBOUND_CONNECTIONS = 8;
 /** -listen default */
 static const bool DEFAULT_LISTEN = true;
 /** -upnp default */
@@ -70,6 +71,8 @@ static const bool DEFAULT_UPNP = false;
 #endif
 /** The maximum number of entries in mapAskFor */
 static const size_t MAPASKFOR_MAX_SZ = MAX_INV_SZ;
+/** The maximum number of peer connections to maintain. */
+static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
 
 typedef int NodeId;
 
@@ -96,7 +99,7 @@ public:
 
     CConnman();
     virtual ~CConnman();
-    bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServices, std::string& strNodeError);
+    bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServicesIn, int nMaxConnectionsIn, int nMaxOutboundIn, std::string& strNodeError);
     void Stop();
     bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
     bool OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
@@ -228,12 +231,14 @@ private:
     uint64_t nLocalServices;
 
     CSemaphore *semOutbound;
+    int nMaxConnections;
+    int nMaxOutbound;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void MapPort(bool fUseUPnP);
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
-bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServices, std::string& strNodeError);
+bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServices, int nMaxConnections, int nMaxOutbound, std::string& strNodeError);
 bool StopNode(CConnman& connman);
 size_t SocketSendData(CNode *pnode);
 
@@ -301,9 +306,6 @@ CAddress GetLocalAddress(const CNetAddr *paddrPeer, uint64_t nLocalServices);
 
 extern bool fDiscover;
 extern bool fListen;
-
-/** Maximum number of connections to simultaneously allow (aka connection slots) */
-extern int nMaxConnections;
 
 extern std::map<CInv, CDataStream> mapRelay;
 extern std::deque<std::pair<int64_t, CInv> > vRelayExpiration;
@@ -760,7 +762,7 @@ public:
 
     void copyStats(CNodeStats &stats);
 
-    uint64_t GetLocalServices() const 
+    uint64_t GetLocalServices() const
     {
         return nLocalServices;
     }
