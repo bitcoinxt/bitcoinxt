@@ -277,7 +277,8 @@ void InitializeNode(NodeId nodeid, const CNode *pnode) {
     NodeStatePtr::insert(nodeid, pnode, thinblockmg);
 }
 
-void FinalizeNode(NodeId nodeid) {
+void FinalizeNode(NodeId nodeid, bool& fUpdateConnectionTime) {
+    fUpdateConnectionTime = false;
     LOCK(cs_main);
     NodeStatePtr state(nodeid);
 
@@ -285,7 +286,7 @@ void FinalizeNode(NodeId nodeid) {
         nSyncStarted--;
 
     if (state->nMisbehavior == 0 && state->fCurrentlyConnected) {
-        AddressCurrentlyConnected(state->address);
+        fUpdateConnectionTime = true;
     }
 
     BOOST_FOREACH(const QueuedBlock& entry, state->vBlocksInFlight)
