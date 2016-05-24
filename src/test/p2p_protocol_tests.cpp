@@ -23,7 +23,7 @@ class DummyConnman : public CConnman {
 
 BOOST_AUTO_TEST_CASE(MaxSizeVersionMessage)
 {
-    CNode n(42, NODE_NETWORK, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode n(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     uint64_t nLocalHostNonce = 2;
     s << PROTOCOL_VERSION;
@@ -42,7 +42,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeVersionMessage)
 
 BOOST_AUTO_TEST_CASE(OverMaxSizeVersionMessage)
 {
-    CNode n(42, NODE_NETWORK, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode n(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     uint64_t nLocalHostNonce = 2;
     s << PROTOCOL_VERSION;
@@ -61,7 +61,7 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeVersionMessage)
 
 BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
 {
-    CNode n(42, NODE_NETWORK, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode n(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     n.nVersion = PROTOCOL_VERSION;
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     s << std::string(12, 'a'); // not a real command, but it uses the max of 12 here.
@@ -77,7 +77,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
 
 BOOST_AUTO_TEST_CASE(MaxSizeValidRejectMessage)
 {
-    CNode n(42, NODE_NETWORK, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode n(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     n.nVersion = PROTOCOL_VERSION;
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     s << std::string("block"); // does not use the max of 12, but "block" is the longest command that has a defined extension of 32 bytes
@@ -94,7 +94,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeValidRejectMessage)
 
 BOOST_AUTO_TEST_CASE(OverMaxSizeWeirdRejectMessage)
 {
-    CNode n(42, NODE_NETWORK, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode n(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     n.nVersion = PROTOCOL_VERSION;
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     s << std::string(13, 'a'); // invalid, max is 12
@@ -110,7 +110,7 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeWeirdRejectMessage)
 
 BOOST_AUTO_TEST_CASE(OverMaxSizeValidRejectMessage)
 {
-    CNode n(42, NODE_NETWORK, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode n(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     n.nVersion = PROTOCOL_VERSION;
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     s << std::string("block");

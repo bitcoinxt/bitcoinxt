@@ -239,7 +239,7 @@ static std::string get_coinbaseaux_flags(UniValue blocktpl) {
 // Put us in a state where we accept rpc calls.
 class RpcMineState {
 public:
-    RpcMineState() : dummynode(42, NODE_NETWORK, INVALID_SOCKET, CAddress())
+    RpcMineState() : dummynode(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress())
     {
         // Don't throw "Bitcoin is downloading blocks"
         fForceInitialBlockDownload = true;

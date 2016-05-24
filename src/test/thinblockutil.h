@@ -23,7 +23,7 @@ struct NullFinder : public TxFinder {
 };
 
 struct DummyNode : public CNode {
-        DummyNode(NodeId myid = 42, ThinBlockManager* mgr = nullptr) : CNode(myid, NODE_NETWORK, INVALID_SOCKET, CAddress()) {
+        DummyNode(NodeId myid = 42, ThinBlockManager* mgr = nullptr) : CNode(myid, NODE_NETWORK, 0, INVALID_SOCKET, CAddress()) {
         static auto staticmgr = GetDummyThinBlockMg();
         if (!mgr)
             mgr = staticmgr.get();

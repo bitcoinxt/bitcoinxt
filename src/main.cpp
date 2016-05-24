@@ -244,12 +244,6 @@ ThinBlockManager thinblockmg(
 
 namespace {
 
-int GetHeight()
-{
-    LOCK(cs_main);
-    return chainActive.Height();
-}
-
 int GetMaxBlockSize()
 {
     LOCK(cs_main);
@@ -572,7 +566,6 @@ bool GetNodeStateStats(NodeId nodeid, CNodeStateStats &stats) {
 
 void RegisterNodeSignals(CNodeSignals& nodeSignals)
 {
-    nodeSignals.GetHeight.connect(&GetHeight);
     nodeSignals.SanityCheckMessages.connect(&SanityCheckMessage);
     nodeSignals.ProcessMessages.connect(&ProcessMessages);
     nodeSignals.SendMessages.connect(&SendMessages);
@@ -583,7 +576,6 @@ void RegisterNodeSignals(CNodeSignals& nodeSignals)
 
 void UnregisterNodeSignals(CNodeSignals& nodeSignals)
 {
-    nodeSignals.GetHeight.disconnect(&GetHeight);
     nodeSignals.SanityCheckMessages.disconnect(&SanityCheckMessage);
     nodeSignals.ProcessMessages.disconnect(&ProcessMessages);
     nodeSignals.SendMessages.disconnect(&SendMessages);
@@ -2934,6 +2926,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
         CBlockIndex *pindexNewTip = nullptr;
         const CBlockIndex *pindexFork;
         bool fInitialDownload;
+        int nNewHeight;
         {
             LOCK(cs_main);
             CBlockIndex* pindexOldTip = chainActive.Tip();
@@ -2957,6 +2950,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
             pindexNewTip = chainActive.Tip();
             pindexFork = chainActive.FindFork(pindexOldTip);
             fInitialDownload = IsInitialBlockDownload();
+            nNewHeight = chainActive.Height();
         }
         // When we reach this point, we switched to a new tip (stored in pindexNewTip).
 
@@ -2983,8 +2977,6 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
 
                     for (auto h : hashesToAnnounce)
                         pnode->PushBlockHash(h);
-
-                    return true;
                 });
             // Notify external listeners about the new tip.
             if (!hashesToAnnounce.empty())

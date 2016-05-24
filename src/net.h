@@ -99,7 +99,7 @@ public:
 
     CConnman();
     virtual ~CConnman();
-    bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServicesIn, int nMaxConnectionsIn, int nMaxOutboundIn, std::string& strNodeError);
+    bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServicesIn, int nMaxConnectionsIn, int nMaxOutboundIn, int nBestHeightIn, std::string& strNodeError);
     void Stop();
     bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
     bool OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
@@ -156,6 +156,9 @@ public:
 
     uint64_t GetTotalBytesRecv();
     uint64_t GetTotalBytesSent();
+
+    void SetBestHeight(int height);
+    int GetBestHeight() const;
 
     // for unittesting
     void AddTestNode(CNode* n);
@@ -233,12 +236,13 @@ private:
     CSemaphore *semOutbound;
     int nMaxConnections;
     int nMaxOutbound;
+    std::atomic<int> nBestHeight;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void MapPort(bool fUseUPnP);
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
-bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServices, int nMaxConnections, int nMaxOutbound, std::string& strNodeError);
+bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServices, int nMaxConnections, int nMaxOutbound, int nBestHeightIn, std::string& strNodeError);
 bool StopNode(CConnman& connman);
 size_t SocketSendData(CNode *pnode);
 
@@ -261,7 +265,6 @@ struct CombinerAll
 // Signals are used to communicate with higher-level code.
 struct CNodeSignals
 {
-    boost::signals2::signal<int ()> GetHeight;
     // register a handler for this signal to do sanity checks as the bytes of a message are being
     // received. Note that the message may not be completely read (so this can be
     // used to prevent DoS attacks using over-size messages).
@@ -481,7 +484,7 @@ public:
     // adds connection to ipgroup (for prioritising connection slots)
     std::unique_ptr<IPGroupSlot> ipgroupSlot;
 
-    CNode(NodeId id, uint64_t nLocalServicesIn, SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
+    CNode(NodeId id, uint64_t nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
     virtual ~CNode();
 
 private:
@@ -490,6 +493,7 @@ private:
 
     uint64_t nLocalHostNonce;
     uint64_t nLocalServices;
+    int nMyStartingHeight;
 public:
 
     NodeId GetId() const {
