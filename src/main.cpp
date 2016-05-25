@@ -6053,7 +6053,7 @@ bool SendMessages(CNode* pto, CConnman& connman)
         // transactions become unconfirmed and spams other nodes.
         if (!fReindex && !fImporting && !IsInitialBlockDownload())
         {
-            GetMainSignals().Broadcast(nTimeBestReceived);
+            GetMainSignals().Broadcast(nTimeBestReceived, &connman);
         }
 
         // Try sending block announcements via headers
