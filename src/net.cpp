@@ -870,7 +870,8 @@ void CConnman::ThreadSocketHandler()
         }
         if(vNodes.size() != nPrevNodeCount) {
             nPrevNodeCount = vNodes.size();
-            uiInterface.NotifyNumConnectionsChanged(nPrevNodeCount);
+            if(clientInterface)
+                clientInterface->NotifyNumConnectionsChanged(nPrevNodeCount);
         }
 
         //
@@ -1765,11 +1766,11 @@ void static Discover(boost::thread_group& threadGroup)
 
 CConnman::CConnman() : nSendBufferMaxSize(0), nReceiveFloodSize(0),
                        fAddressesInitialized(false),  nLastNodeId(0), semOutbound(nullptr),
-                       nMaxConnections(0), nMaxOutbound(0), nBestHeight(0)
+                       nMaxConnections(0), nMaxOutbound(0), nBestHeight(0), clientInterface(nullptr)
 {
 }
 
-bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServices, int nMaxConnectionsIn, int nMaxOutboundIn, int nBestHeightIn, std::string& strNodeError)
+bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServices, int nMaxConnectionsIn, int nMaxOutboundIn, int nBestHeightIn, CClientUIInterface* interfaceIn, std::string& strNodeError)
 {
     //  Init network shapers
     receiveShaper.set(GetArg("-receiveburst", 0) * 1000, GetArg("-receiveavg", 0) * 1000);
@@ -1780,7 +1781,7 @@ bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& 
     // Download or load data that's useful for prioritising traffic by IP address.
     InitIPGroups(&scheduler);
 
-    return connman.Start(threadGroup, scheduler, nLocalServices, nMaxConnectionsIn, nMaxOutboundIn, nBestHeightIn, strNodeError);
+    return connman.Start(threadGroup, scheduler, nLocalServices, nMaxConnectionsIn, nMaxOutboundIn, nBestHeightIn, interfaceIn, strNodeError);
 }
 
 NodeId CConnman::GetNewNodeId()
@@ -1788,7 +1789,7 @@ NodeId CConnman::GetNewNodeId()
     return nLastNodeId.fetch_add(1, std::memory_order_relaxed);
 }
 
-bool CConnman::Start(boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServicesIn, int nMaxConnectionsIn, int nMaxOutboundIn, int nBestHeightIn, std::string& strNodeError)
+bool CConnman::Start(boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServicesIn, int nMaxConnectionsIn, int nMaxOutboundIn, int nBestHeightIn, CClientUIInterface* interfaceIn, std::string& strNodeError)
 {
     nTotalBytesRecv = 0;
     nTotalBytesSent = 0;
@@ -1802,8 +1803,10 @@ bool CConnman::Start(boost::thread_group& threadGroup, CScheduler& scheduler, ui
 
     SetBestHeight(nBestHeightIn);
 
-    uiInterface.InitMessage(_("Loading addresses..."));
-    // Load addresses for peers.dat
+    clientInterface = interfaceIn;
+    if (clientInterface)
+        clientInterface->InitMessage(_("Loading addresses..."));
+    // Load addresses from peers.dat
     int64_t nStart = GetTimeMillis();
     {
         CAddrDB adb;
@@ -1818,7 +1821,8 @@ bool CConnman::Start(boost::thread_group& threadGroup, CScheduler& scheduler, ui
            addrman.size(), GetTimeMillis() - nStart);
     fAddressesInitialized = true;
 
-    uiInterface.InitMessage(_("Starting network threads..."));
+    if (clientInterface)
+    	clientInterface->InitMessage(_("Starting network threads..."));
 
 
     if (semOutbound == NULL) {

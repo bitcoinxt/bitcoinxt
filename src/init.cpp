@@ -1508,7 +1508,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     std::string strNodeError;
     int nMaxOutbound = std::min(MAX_OUTBOUND_CONNECTIONS, nMaxConnections);
-    if(!StartNode(connman, threadGroup, scheduler, nLocalServices, nMaxConnections, nMaxOutbound, chainActive.Height(), strNodeError))
+    if(!StartNode(connman, threadGroup, scheduler, nLocalServices, nMaxConnections, nMaxOutbound, chainActive.Height(), &uiInterface, strNodeError))
         return InitError(strNodeError);
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected

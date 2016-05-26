@@ -86,6 +86,8 @@ struct AddedNodeInfo
 
 class CTransaction;
 class CNodeStats;
+class CClientUIInterface;
+
 class CConnman
 {
 public:
@@ -99,7 +101,7 @@ public:
 
     CConnman();
     virtual ~CConnman();
-    bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServicesIn, int nMaxConnectionsIn, int nMaxOutboundIn, int nBestHeightIn, std::string& strNodeError);
+    bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServicesIn, int nMaxConnectionsIn, int nMaxOutboundIn, int nBestHeightIn, CClientUIInterface*, std::string& strNodeError);
     void Stop();
     bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
     bool OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
@@ -237,12 +239,13 @@ private:
     int nMaxConnections;
     int nMaxOutbound;
     std::atomic<int> nBestHeight;
+    CClientUIInterface* clientInterface;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void MapPort(bool fUseUPnP);
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
-bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServices, int nMaxConnections, int nMaxOutbound, int nBestHeightIn, std::string& strNodeError);
+bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServices, int nMaxConnections, int nMaxOutbound, int nBestHeightIn, CClientUIInterface*, std::string& strNodeError);
 bool StopNode(CConnman& connman);
 size_t SocketSendData(CNode *pnode);
 
