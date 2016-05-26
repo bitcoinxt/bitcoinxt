@@ -25,7 +25,8 @@ BOOST_AUTO_TEST_CASE(MaxSizeVersionMessage)
     s << n.nStartingHeight;
     s << n.fRelayTxes;
     BOOST_CHECK_EQUAL(size_t(352), s.size());
-    BOOST_CHECK(ProcessMessage(&n, "version", s, 0));
+    CConnman dummy;
+    BOOST_CHECK(ProcessMessage(&n, "version", s, 0, dummy));
 }
 
 BOOST_AUTO_TEST_CASE(OverMaxSizeVersionMessage)
@@ -43,7 +44,8 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeVersionMessage)
     s << n.nStartingHeight;
     s << n.fRelayTxes;
     BOOST_CHECK_EQUAL(size_t(353), s.size());
-    BOOST_CHECK_THROW(ProcessMessage(&n, "version", s, 0), std::ios_base::failure);
+    CConnman dummy;
+    BOOST_CHECK_THROW(ProcessMessage(&n, "version", s, 0, dummy), std::ios_base::failure);
 }
 
 BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
@@ -57,7 +59,8 @@ BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
     BOOST_CHECK_EQUAL(size_t(126), s.size());
     bool temp = fDebug;
     fDebug = true;
-    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0));
+    CConnman dummy;
+    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, dummy));
     fDebug = temp;
 }
 
@@ -73,7 +76,8 @@ BOOST_AUTO_TEST_CASE(MaxSizeValidRejectMessage)
     BOOST_CHECK_EQUAL(size_t(151), s.size());
     bool temp = fDebug;
     fDebug = true;
-    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0));
+    CConnman dummy;
+    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, dummy));
     fDebug = temp;
 }
 
@@ -88,7 +92,8 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeWeirdRejectMessage)
     BOOST_CHECK_EQUAL(size_t(127), s.size());
     bool temp = fDebug;
     fDebug = true;
-    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0)); // check this way since the reject message processing swallows the exception
+    CConnman dummy;
+    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, dummy)); // check this way since the reject message processing swallows the exception
     fDebug = temp;
 }
 
@@ -104,7 +109,8 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeValidRejectMessage)
     BOOST_CHECK_EQUAL(size_t(152), s.size());
     bool temp = fDebug;
     fDebug = true;
-    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0)); // check this way since the reject message processing swallows the exception
+    CConnman dummy;
+    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, dummy)); // check this way since the reject message processing swallows the exception
     fDebug = temp;
 }
 

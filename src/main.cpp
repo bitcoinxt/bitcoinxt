@@ -486,7 +486,8 @@ void OnBlockFinished::operator()(const CBlock& block, const std::vector<NodeId>&
     bool forceProcessing = hasWhitelistedNode(ids) && !IsInitialBlockDownload();
 
     CBlock copy(block);
-    if (!ProcessNewBlock(state, source, &copy, forceProcessing, nullptr)) {
+    // TODO: Have g_connman passed to the constructor of OnBlockFinished
+    if (!ProcessNewBlock(state, source, &copy, forceProcessing, nullptr, g_connman.get())) {
         LogPrintf("ProcessNewBlock failed in %s\n", __func__);
     }
     rejectAndPunish(state, block.GetHash(), ids);
@@ -2936,7 +2937,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
  * or an activated best chain. pblock is either NULL or a pointer to a block
  * that is already loaded (to avoid loading it again from disk).
  */
-bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSource& blockSource) {
+bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSource& blockSource, CConnman* connman) {
     CBlockIndex *pindexMostWork = NULL;
     const CChainParams& chainParams = Params();
     do {
@@ -3560,7 +3561,7 @@ static bool IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned 
 
 
 bool ProcessNewBlock(CValidationState &state, const BlockSource& from,
-        CBlock* pblock, bool fForceProcessing, const CDiskBlockPos *dbp)
+                     CBlock* pblock, bool fForceProcessing, const CDiskBlockPos *dbp, CConnman* connman)
 {
     // Preliminary checks
     bool checked = CheckBlock(*pblock, state);
@@ -3581,7 +3582,7 @@ bool ProcessNewBlock(CValidationState &state, const BlockSource& from,
             return error("%s: AcceptBlock FAILED", __func__);
     }
 
-    if (!ActivateBestChain(state, pblock, from))
+    if (!ActivateBestChain(state, pblock, from, connman))
         return error("%s: ActivateBestChain failed", __func__);
 
     return true;
@@ -4760,7 +4761,8 @@ void unexpectedThinError(const std::string& cmd, CNode& from, const std::string&
     from.PushMessage("reject", cmd, REJECT_MALFORMED, err);
 }
 
-bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived)
+bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
+                    int64_t nTimeReceived, CConnman& connman)
 {
     RandAddSeedPerfmon();
     LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
@@ -5792,7 +5794,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 }
 
 // requires LOCK(cs_vRecvMsg)
-bool ProcessMessages(CNode* pfrom)
+bool ProcessMessages(CNode* pfrom, CConnman& connman)
 {
     //if (fDebug)
     //    LogPrintf("%s(%u messages)\n", __func__, pfrom->vRecvMsg.size());
@@ -5868,7 +5870,7 @@ bool ProcessMessages(CNode* pfrom)
         bool fRet = false;
         try
         {
-            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime);
+            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime, connman);
             boost::this_thread::interruption_point();
         }
         catch (const std::ios_base::failure& e)
@@ -5937,7 +5939,7 @@ bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
 }
 
 
-bool SendMessages(CNode* pto)
+bool SendMessages(CNode* pto, CConnman& connman)
 {
     const Consensus::Params& consensusParams = Params().GetConsensus();
     {

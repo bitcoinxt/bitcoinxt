@@ -177,7 +177,7 @@ void Shutdown()
     if (pwalletMain)
         pwalletMain->Flush(false);
 #endif
-    GenerateBitcoins(false, 0, Params());
+    GenerateBitcoins(false, 0, Params(), nullptr);
     StopNode(*g_connman);
     g_connman.reset();
 
@@ -1513,7 +1513,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     scheduler.scheduleEvery(f, PartitionCheck(&IsInitialBlockDownload, boost::ref(cs_main), boost::cref(pdummy), nPowTargetSpacing));
 
     // Generate coins in the background
-    GenerateBitcoins(GetBoolArg("-gen", false), GetArg("-genproclimit", 1), Params());
+    GenerateBitcoins(GetBoolArg("-gen", false), GetArg("-genproclimit", 1), Params(), g_connman.get());
 
     // ********************************************************* Step 11: finished
 
