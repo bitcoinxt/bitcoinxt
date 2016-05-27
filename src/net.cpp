@@ -61,9 +61,6 @@ using namespace std;
 
 namespace {
     const int MAX_FEELER_CONNECTIONS = 1;
-
-    static const size_t DEFAULT_MAXRECEIVEBUFFER = 5 * 1000;
-    static const size_t DEFAULT_MAXSENDBUFFER    = 1 * 1000;
 }
 
 //
@@ -1789,8 +1786,8 @@ bool CConnman::Start(boost::thread_group& threadGroup, CScheduler& scheduler, st
     nMaxConnections = connOptions.nMaxConnections;
     nMaxOutbound = std::min((connOptions.nMaxOutbound), nMaxConnections);
 
-    nSendBufferMaxSize = 1000*GetArg("-maxsendbuffer", DEFAULT_MAXSENDBUFFER);
-    nReceiveFloodSize = 1000*GetArg("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER);
+    nSendBufferMaxSize = connOptions.nSendBufferMaxSize;
+    nReceiveFloodSize = connOptions.nSendBufferMaxSize;
 
     SetBestHeight(connOptions.nBestHeight);
 

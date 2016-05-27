@@ -1517,6 +1517,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Map ports with UPnP
     MapPort(GetBoolArg("-upnp", DEFAULT_UPNP));
 
+    const size_t DEFAULT_MAXRECEIVEBUFFER = 5 * 1000;
+    const size_t DEFAULT_MAXSENDBUFFER    = 1 * 1000;
+
     std::string strNodeError;
     CConnman::Options connOptions;
     connOptions.nLocalServices = nLocalServices;
@@ -1524,6 +1527,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     connOptions.nMaxOutbound = std::min(MAX_OUTBOUND_CONNECTIONS, connOptions.nMaxConnections);
     connOptions.nBestHeight = chainActive.Height();
     connOptions.uiInterface = &uiInterface;
+    connOptions.nSendBufferMaxSize = 1000*GetArg("-maxsendbuffer", DEFAULT_MAXSENDBUFFER);
+    connOptions.nReceiveFloodSize = 1000*GetArg("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER);
 
     if (!connman.Start(threadGroup, scheduler, strNodeError, connOptions))
         return InitError(strNodeError);
