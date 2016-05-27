@@ -1713,7 +1713,7 @@ bool CConnman::BindListenPort(const CService &addrBind, std::string& strError, b
     return true;
 }
 
-void static Discover(boost::thread_group& threadGroup)
+void Discover(boost::thread_group& threadGroup)
 {
     if (!fDiscover)
         return;
@@ -1764,24 +1764,15 @@ void static Discover(boost::thread_group& threadGroup)
 #endif
 }
 
+void InitNetworkShapers() {
+    receiveShaper.set(GetArg("-receiveburst", 0) * 1000, GetArg("-receiveavg", 0) * 1000);
+    sendShaper.set(GetArg("-sendburst", 0) * 1000, GetArg("-sendavg", 0) * 1000);
+}
+
 CConnman::CConnman() : nSendBufferMaxSize(0), nReceiveFloodSize(0),
                        fAddressesInitialized(false),  nLastNodeId(0), semOutbound(nullptr),
                        nMaxConnections(0), nMaxOutbound(0), nBestHeight(0), clientInterface(nullptr)
 {
-}
-
-bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServices, int nMaxConnectionsIn, int nMaxOutboundIn, int nBestHeightIn, CClientUIInterface* interfaceIn, std::string& strNodeError)
-{
-    //  Init network shapers
-    receiveShaper.set(GetArg("-receiveburst", 0) * 1000, GetArg("-receiveavg", 0) * 1000);
-    sendShaper.set(GetArg("-sendburst", 0) * 1000, GetArg("-sendavg", 0) * 1000);
-
-    Discover(threadGroup);
-
-    // Download or load data that's useful for prioritising traffic by IP address.
-    InitIPGroups(&scheduler);
-
-    return connman.Start(threadGroup, scheduler, nLocalServices, nMaxConnectionsIn, nMaxOutboundIn, nBestHeightIn, interfaceIn, strNodeError);
 }
 
 NodeId CConnman::GetNewNodeId()
@@ -1844,9 +1835,6 @@ bool CConnman::Start(boost::thread_group& threadGroup, CScheduler& scheduler, ui
     else
         threadGroup.create_thread(boost::bind(&TraceThread<boost::function<void()> >, "dnsseed", boost::function<void()>(boost::bind(&CConnman::ThreadDNSAddressSeed, this))));
 
-    // Map ports with UPnP
-    MapPort(GetBoolArg("-upnp", DEFAULT_UPNP));
-
     // Send and receive from sockets, accept connections
     threadGroup.create_thread(boost::bind(&TraceThread<boost::function<void()> >, "net", boost::function<void()>(boost::bind(&CConnman::ThreadSocketHandler, this))));
 
@@ -1862,15 +1850,6 @@ bool CConnman::Start(boost::thread_group& threadGroup, CScheduler& scheduler, ui
     // Dump network addresses
     scheduler.scheduleEvery(boost::bind(&CConnman::DumpAddresses, this), DUMP_ADDRESSES_INTERVAL);
 
-    return true;
-}
-
-bool StopNode(CConnman& connman)
-{
-    LogPrintf("StopNode()\n");
-    MapPort(false);
-
-    connman.Stop();
     return true;
 }
 
@@ -1891,6 +1870,7 @@ instance_of_cnetcleanup;
 
 void CConnman::Stop()
 {
+    LogPrintf("%s\n",__func__);
     if (semOutbound)
         for (int i=0; i<(nMaxOutbound + MAX_FEELER_CONNECTIONS); i++)
             semOutbound->post();

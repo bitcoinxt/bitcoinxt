@@ -178,8 +178,11 @@ void Shutdown()
         pwalletMain->Flush(false);
 #endif
     GenerateBitcoins(false, 0, Params(), nullptr);
-    StopNode(*g_connman);
-    g_connman.reset();
+    MapPort(false);
+    if (g_connman) {
+        g_connman->Stop();
+        g_connman.reset();
+    }
 
     UnregisterNodeSignals(GetNodeSignals());
 
@@ -1506,9 +1509,17 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     LogPrintf("mapAddressBook.size() = %u\n",  pwalletMain ? pwalletMain->mapAddressBook.size() : 0);
 #endif
 
+    Discover(threadGroup);
+    InitNetworkShapers();
+    // Download or load data that's useful for prioritising traffic by IP address.
+    InitIPGroups(&scheduler);
+
+    // Map ports with UPnP
+    MapPort(GetBoolArg("-upnp", DEFAULT_UPNP));
+
     std::string strNodeError;
     int nMaxOutbound = std::min(MAX_OUTBOUND_CONNECTIONS, nMaxConnections);
-    if(!StartNode(connman, threadGroup, scheduler, nLocalServices, nMaxConnections, nMaxOutbound, chainActive.Height(), &uiInterface, strNodeError))
+    if(!connman.Start(threadGroup, scheduler, nLocalServices, nMaxConnections, nMaxOutbound, chainActive.Height(), &uiInterface, strNodeError))
         return InitError(strNodeError);
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected
