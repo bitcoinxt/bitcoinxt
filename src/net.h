@@ -99,9 +99,17 @@ public:
         CONNECTIONS_ALL = (CONNECTIONS_IN | CONNECTIONS_OUT),
     };
 
+    struct Options
+    {
+        uint64_t nLocalServices = 0;
+        int nMaxConnections = 0;
+        int nMaxOutbound = 0;
+        int nBestHeight = 0;
+        CClientUIInterface* uiInterface = nullptr;
+    };
     CConnman();
     virtual ~CConnman();
-    bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServicesIn, int nMaxConnectionsIn, int nMaxOutboundIn, int nBestHeightIn, CClientUIInterface*, std::string& strNodeError);
+    bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, std::string& strNodeError, Options options);
     void Stop();
     bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
     bool OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);

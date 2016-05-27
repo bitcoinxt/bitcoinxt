@@ -1780,21 +1780,21 @@ NodeId CConnman::GetNewNodeId()
     return nLastNodeId.fetch_add(1, std::memory_order_relaxed);
 }
 
-bool CConnman::Start(boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServicesIn, int nMaxConnectionsIn, int nMaxOutboundIn, int nBestHeightIn, CClientUIInterface* interfaceIn, std::string& strNodeError)
+bool CConnman::Start(boost::thread_group& threadGroup, CScheduler& scheduler, std::string& strNodeError, Options connOptions)
 {
     nTotalBytesRecv = 0;
     nTotalBytesSent = 0;
-    nLocalServices = nLocalServicesIn;
 
-    nMaxConnections = nMaxConnectionsIn;
-    nMaxOutbound = std::min((nMaxOutboundIn), nMaxConnections);
+    nLocalServices = connOptions.nLocalServices;
+    nMaxConnections = connOptions.nMaxConnections;
+    nMaxOutbound = std::min((connOptions.nMaxOutbound), nMaxConnections);
 
     nSendBufferMaxSize = 1000*GetArg("-maxsendbuffer", DEFAULT_MAXSENDBUFFER);
     nReceiveFloodSize = 1000*GetArg("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER);
 
-    SetBestHeight(nBestHeightIn);
+    SetBestHeight(connOptions.nBestHeight);
 
-    clientInterface = interfaceIn;
+    clientInterface = connOptions.uiInterface;
     if (clientInterface)
         clientInterface->InitMessage(_("Loading addresses..."));
     // Load addresses from peers.dat
