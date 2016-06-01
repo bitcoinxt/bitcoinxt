@@ -454,6 +454,7 @@ UniValue getblocktemplate(const JSONRPCRequest& request)
     std::string strMode = "template";
     UniValue lpval = NullUniValue;
     std::set<std::string> setClientRules;
+    int64_t nMaxVersionPreVB = -1;
     if (request.params.size() > 0)
     {
         const UniValue& oparam = request.params[0].get_obj();
@@ -503,6 +504,12 @@ UniValue getblocktemplate(const JSONRPCRequest& request)
             for (unsigned int i = 0; i < aClientRules.size(); ++i) {
                 const UniValue& v = aClientRules[i];
                 setClientRules.insert(v.get_str());
+            }
+        } else {
+            // NOTE: It is important that this NOT be read if versionbits is supported
+            const UniValue& uvMaxVersion = find_value(oparam, "maxversion");
+            if (uvMaxVersion.isNum()) {
+                nMaxVersionPreVB = uvMaxVersion.get_int64();
             }
         }
     }
@@ -644,13 +651,10 @@ UniValue getblocktemplate(const JSONRPCRequest& request)
 
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
 
-    static UniValue aMutable(UniValue::VARR);
-    if (aMutable.empty())
-    {
-        aMutable.push_back("time");
-        aMutable.push_back("transactions");
-        aMutable.push_back("prevblock");
-    }
+    UniValue aMutable(UniValue::VARR);
+    aMutable.push_back("time");
+    aMutable.push_back("transactions");
+    aMutable.push_back("prevblock");
 
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("capabilities", aCaps));
@@ -689,6 +693,7 @@ UniValue getblocktemplate(const JSONRPCRequest& request)
                 if (setClientRules.find(vbinfo.name) == setClientRules.end()) {
                     // Not supported by the client; make sure it's safe to proceed
                     if (!vbinfo.gbt_force) {
+                        // If we do anything other than throw an exception here, be sure version/force isn't sent to old clients
                         throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Support for '%s' rule requires explicit client support", vbinfo.name));
                     }
                 }
@@ -700,6 +705,14 @@ UniValue getblocktemplate(const JSONRPCRequest& request)
     result.push_back(Pair("rules", aRules));
     result.push_back(Pair("vbavailable", vbavailable));
     result.push_back(Pair("vbrequired", int(0)));
+
+    if (nMaxVersionPreVB >= 2) {
+        // If VB is supported by the client, nMaxVersionPreVB is -1, so we won't get here
+        // Because BIP 34 changed how the generation transaction is serialised, we can only use version/force back to v2 blocks
+        // This is safe to do [otherwise-]unconditionally only because we are throwing an exception above if a non-force deployment gets activated
+        // Note that this can probably also be removed entirely after the first BIP9 non-force deployment (ie, probably segwit) gets activated
+        aMutable.push_back("version/force");
+    }
 
     result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
     result.push_back(Pair("transactions", transactions));
