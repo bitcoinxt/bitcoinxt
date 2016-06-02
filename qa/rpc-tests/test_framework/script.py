@@ -15,7 +15,8 @@ Functionality to build scripts, as well as SignatureHash().
 """
 
 
-from test_framework.mininode import CTransaction, CTxOut, hash256, uint256_from_str, ser_uint256, ser_string
+from test_framework.mininode import CTransaction, CTxOut, hash256,\
+        uint256_from_str, ser_uint256, ser_string, sha256
 
 import sys
 bchr = chr
@@ -37,6 +38,11 @@ MAX_SCRIPT_OPCODES = 201
 OPCODE_NAMES = {}
 
 _opcode_instances = []
+
+def hash160(s):
+    import hashlib
+    return hashlib.new('ripemd160', sha256(s)).digest()
+
 class CScriptOp(int):
     """A single script opcode"""
     __slots__ = []
