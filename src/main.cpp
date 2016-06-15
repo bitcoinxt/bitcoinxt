@@ -2973,7 +2973,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
 
                     // Don't announce if our height is far below theirs
                     if (nNewHeight < announceMinHeight)
-                        return true;
+                        return;
 
                     for (auto h : hashesToAnnounce)
                         pnode->PushBlockHash(h);
@@ -4526,7 +4526,6 @@ static void RelayAddress(const CAddress& addr, bool fReachable, CConnman* connma
             uint64_t hashKey = CSipHasher(hasher).Write(pnode->id).Finalize();
             mapMix.emplace(hashKey, pnode);
         }
-        return true;
     };
 
     auto pushfunc = [&addr, &mapMix, &nRelayNodes] {
