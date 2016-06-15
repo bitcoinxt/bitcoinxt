@@ -2820,7 +2820,8 @@ void static UpdateTip(CBlockIndex *pindexNew) {
         for (int i = 0; i < 100 && pindex != NULL; i++)
         {
             int32_t nExpectedVersion = ComputeBlockVersion(pindex->pprev, chainParams.GetConsensus());
-            if (pindex->nVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION && (pindex->nVersion & ~nExpectedVersion) != 0)
+            int32_t nIgnoreForkVersion = pindex->nVersion & ~FORK_BIT_2MB;
+            if (nIgnoreForkVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION && (nIgnoreForkVersion & ~nExpectedVersion) != 0)
                 ++nUpgraded;
             pindex = pindex->pprev;
         }
