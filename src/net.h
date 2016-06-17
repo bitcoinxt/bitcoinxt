@@ -341,6 +341,9 @@ public:
     // Whether a ping is requested.
     bool fPingQueued;
 
+    // adds connection to ipgroup (for prioritising connection slots)
+    std::auto_ptr<IPGroupSlot> ipgroupSlot;
+
     CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn = "", bool fInboundIn=false);
     virtual ~CNode();
 
