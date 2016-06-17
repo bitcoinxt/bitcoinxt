@@ -48,8 +48,11 @@ class WalletBackupTest(BitcoinTestFramework):
     # This mirrors how the network was setup in the bash test
     def setup_network(self, split=False):
         # nodes 1, 2,3 are spenders, let's give them a keypool=100
-        extra_args = [["-keypool=100"], ["-keypool=100"], ["-keypool=100"], []]
-        self.nodes = start_nodes(4, self.options.tmpdir, extra_args)
+        self.nodes = []
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-keypool=100"], timewait=120))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-keypool=100"], timewait=120))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-keypool=100"], timewait=120))
+        self.nodes.append(start_node(3, self.options.tmpdir, None, timewait=120))
         connect_nodes(self.nodes[0], 3)
         connect_nodes(self.nodes[1], 3)
         connect_nodes(self.nodes[2], 3)

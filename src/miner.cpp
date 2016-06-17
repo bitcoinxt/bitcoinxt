@@ -121,9 +121,10 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         CBlockIndex* pindexPrev = chainActive.Tip();
         const int nHeight = pindexPrev->nHeight + 1;
         pblock->nTime = GetAdjustedTime();
+        const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
         CCoinsViewCache view(pcoinsTip);
 
-        pblock->nVersion = BASE_VERSION;
+        pblock->nVersion = ComputeBlockVersion(pindexPrev, chainparams.GetConsensus());
         // Vote for 2 MB until the vote expiration time
         if (pblock->nTime <= chainparams.GetConsensus().SizeForkExpiration())
             pblock->nVersion |= FORK_BIT_2MB;
@@ -132,6 +133,10 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         // -blockversion=N to test forking scenarios
         if (Params().MineBlocksOnDemand())
             pblock->nVersion = GetArg("-blockversion", pblock->nVersion);
+
+        int64_t nLockTimeCutoff = (STANDARD_LOCKTIME_VERIFY_FLAGS & LOCKTIME_MEDIAN_TIME_PAST)
+                                ? nMedianTimePast
+                                : pblock->GetBlockTime();
 
         UpdateTime(pblock, Params().GetConsensus(), pindexPrev);
 
@@ -166,7 +171,8 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
              mi != mempool.mapTx.end(); ++mi)
         {
             const CTransaction& tx = mi->GetTx();
-            if (tx.IsCoinBase() || !IsFinalTx(tx, nHeight, pblock->nTime))
+
+            if (tx.IsCoinBase() || !IsFinalTx(tx, nHeight, nLockTimeCutoff))
                 continue;
 
             COrphan* porphan = NULL;

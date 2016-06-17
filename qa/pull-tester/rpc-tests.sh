@@ -16,6 +16,7 @@ fi
 #Run the tests
 
 testScripts=(
+    'bip68-112-113-p2p.py'
     'spv.py'
     'wallet.py'
     'listtransactions.py'
@@ -27,19 +28,22 @@ testScripts=(
     'rawtransactions.py'
     'rest.py'
     'mempool_spendcoinbase.py'
-    'mempool_coinbase_spends.py'
+    'mempool_reorg.py'
     'httpbasics.py'
     'zapwallettxes.py'
     'proxy_test.py'
     'merkle_blocks.py'
     'signrawtransactions.py'
     'walletbackup.py'
+    'p2p-versionbits-warning.py'
 );
 testScriptsExt=(
     'bigblocks.py'
+    'bip9-softforks.py'
     'bipdersig-p2p.py'
     'bip65-cltv-p2p.py'
     'bip65-cltv.py'
+    'bip68-sequence.py'
     'getblocktemplate_longpoll.py'
     'getblocktemplate_proposals.py'
     'txn_clone.py --mineblock'

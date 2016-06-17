@@ -161,6 +161,7 @@ BITCOIN_CORE_H = \
   utilprocessmsg.h \
   validationinterface.h \
   version.h \
+  versionbits.h \
   wallet/crypter.h \
   wallet/db.h \
   wallet/wallet.h \
@@ -228,6 +229,7 @@ libbitcoin_server_a_SOURCES = \
   utilprocessmsg.cpp \
   validationinterface.cpp \
   xthin.cpp \
+  versionbits.cpp \
   $(JSON_H) \
   $(BITCOIN_CORE_H)
 
