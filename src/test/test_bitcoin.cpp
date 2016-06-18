@@ -51,6 +51,7 @@ TestingSetup::TestingSetup()
         pathTemp = GetTempPath() / strprintf("test_bitcoin_%lu_%i", (unsigned long)GetTime(), (int)(GetRand(100000)));
         boost::filesystem::create_directories(pathTemp);
         mapArgs["-datadir"] = pathTemp.string();
+        mempool.setSanityCheck(1.0);
         bool isObfuscated;
         pblocktree = new CBlockTreeDB(1 << 20, isObfuscated, true);
         pcoinsdbview = new CCoinsViewDB(1 << 23, isObfuscated, true);
