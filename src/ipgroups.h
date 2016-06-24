@@ -8,6 +8,7 @@
 #include "netbase.h"
 #include "sync.h"
 #include <boost/noncopyable.hpp>
+#include <boost/weak_ptr.hpp>
 
 #define IP_PRIO_SRC_FLAG_NAME "-ip-priority-source"
 
