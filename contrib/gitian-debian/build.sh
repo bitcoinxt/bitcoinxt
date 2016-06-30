@@ -56,7 +56,8 @@ Architecture: amd64
 Description: Bitcoin XT is a fully verifying Bitcoin node implementation, based on the sources of Bitcoin Core.
 Maintainer: Steve Myers <steven.myers@gmail.com>
 Version: $realver
-Depends: debconf, adduser, ntp
+Depends: debconf, adduser
+Recommends: ntp
 EOF
 
 cat <<EOF >DEBIAN/install
