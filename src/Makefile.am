@@ -105,6 +105,7 @@ BITCOIN_CORE_H = \
   compressor.h \
   consensus/consensus.h \
   consensus/params.h \
+  consensus/tx_verify.h \
   consensus/validation.h \
   core_io.h \
   curl_wrapper.h \
@@ -225,6 +226,7 @@ libbitcoin_server_a_SOURCES = \
   compactprefiller.cpp \
   compactthin.cpp \
   compacttxfinder.cpp \
+  consensus/tx_verify.cpp \
   curl_wrapper.cpp \
   dbwrapper.cpp \
   httprpc.cpp \
