@@ -290,7 +290,7 @@ public:
     //    until it has initialized its bloom filter.
     bool fRelayTxes;
     CSemaphoreGrant grantOutbound;
-    CCriticalSection cs_filter;
+    CCriticalSection cs_filter, cs_xfilter;
     CBloomFilter* pfilter;
     std::auto_ptr<CBloomFilter> xthinFilter;
     int nRefCount;
