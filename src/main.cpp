@@ -13,11 +13,11 @@
 #include "checkpoints.h"
 #include "checkqueue.h"
 #include "consensus/validation.h"
-#include "dummythin.h"
 #include "inflightindex.h"
 #include "init.h"
 #include "merkleblock.h"
 #include "net.h"
+#include "nodestate.h"
 #include "options.h"
 #include "pow.h"
 #include "process_merkleblock.h"
@@ -275,130 +275,6 @@ ThinBlockManager thinblockmg(
 
 namespace {
 
-struct CBlockReject {
-    unsigned char chRejectCode;
-    string strRejectReason;
-    uint256 hashBlock;
-};
-
-/**
- * Maintain validation-specific state about nodes, protected by cs_main, instead
- * by CNode's own locks. This simplifies asynchronous operation, where
- * processing of incoming data is done after the ProcessMessage call returns,
- * and we're no longer holding the node's locks.
- */
-struct CNodeState {
-    //! The peer's address
-    CService address;
-    //! Whether we have a fully established connection.
-    bool fCurrentlyConnected;
-    //! Accumulated misbehaviour score for this peer.
-    int nMisbehavior;
-    //! Whether this peer should be disconnected and banned (unless whitelisted).
-    bool fShouldBan;
-    //! String name of this peer (debugging/logging purposes).
-    std::string name;
-    //! List of asynchronously-determined block rejections to notify this peer about.
-    std::vector<CBlockReject> rejects;
-    //! The best known block we know this peer has announced.
-    CBlockIndex *pindexBestKnownBlock;
-    //! The hash of the last unknown block this peer has announced.
-    uint256 hashLastUnknownBlock;
-    //! The last full block we both have.
-    CBlockIndex *pindexLastCommonBlock;
-    //! Whether we've started headers synchronization with this peer.
-    bool fSyncStarted;
-    //! Since when we're stalling block download progress (in microseconds), or 0.
-    int64_t nStallingSince;
-    list<QueuedBlock> vBlocksInFlight;
-    int nBlocksInFlight;
-    int nBlocksInFlightValidHeaders;
-    //! Whether we consider this a preferred download peer.
-    bool fPreferredDownload;
-
-    // we need to receive headers leading to a block, before we can
-    // request a block.
-    bool initialHeadersReceived;
-
-    //! the thin block the node is currently providing to us
-    boost::shared_ptr<ThinBlockWorker> thinblock;
-    std::set<uint256> recentThinBlockTx;
-
-    CNodeState(NodeId id) {
-        fCurrentlyConnected = false;
-        nMisbehavior = 0;
-        fShouldBan = false;
-        pindexBestKnownBlock = NULL;
-        hashLastUnknownBlock.SetNull();
-        pindexLastCommonBlock = NULL;
-        fSyncStarted = false;
-        nStallingSince = 0;
-        nBlocksInFlight = 0;
-        nBlocksInFlightValidHeaders = 0;
-        fPreferredDownload = false;
-        initialHeadersReceived = false;
-        thinblock.reset(new DummyThinWorker(thinblockmg, id));
-    }
-};
-
-// Class that maintains per-node state, and
-// acts as a RAII smart-pointer that make sure
-// the state stays consistent.
-class NodeStatePtr {
-private:
-    static CCriticalSection cs_mapNodeState;
-    static map<NodeId, CNodeState> mapNodeState;
-    CNodeState* s;
-    NodeId id;
-public:
-    static void insert(NodeId nodeid, const CNode *pnode) {
-        LOCK(cs_mapNodeState);
-        CNodeState &state = mapNodeState.insert(std::make_pair(nodeid, CNodeState(nodeid))).first->second;
-        state.name = pnode->addrName;
-        state.address = pnode->addr;
-    }
-
-    NodeStatePtr(NodeId nodeid) {
-        LOCK(cs_mapNodeState);
-        map<NodeId, CNodeState>::iterator it = mapNodeState.find(nodeid);
-        if (it == mapNodeState.end())
-            s = NULL;
-        else {
-            s = &it->second;
-            id = nodeid;
-            cs_mapNodeState.lock();
-        }
-    }
-    ~NodeStatePtr() {
-        if (s)
-            cs_mapNodeState.unlock();
-    }
-    bool IsNull() const { return s == NULL; }
-
-    CNodeState* operator ->() { return s; }
-    const CNodeState* operator ->() const { return s; }
-
-    void erase() {
-        if (s) {
-            mapNodeState.erase(id);
-            s = NULL;
-            cs_mapNodeState.unlock();
-        }
-    }
-
-    static void clear() {
-        LOCK(cs_mapNodeState);
-        mapNodeState.clear();
-    }
-
-private:
-    // disallow copy/assignment
-    NodeStatePtr(const NodeStatePtr&) {}
-    NodeStatePtr& operator=(const NodeStatePtr& p) { return *this; }
-};
-CCriticalSection NodeStatePtr::cs_mapNodeState;
-map<NodeId, CNodeState> NodeStatePtr::mapNodeState;
-
 int GetHeight()
 {
     LOCK(cs_main);
@@ -422,7 +298,7 @@ int64_t GetBlockTimeout(int64_t nTime, int nValidatedQueuedBefore, const Consens
 }
 
 void InitializeNode(NodeId nodeid, const CNode *pnode) {
-    NodeStatePtr::insert(nodeid, pnode);
+    NodeStatePtr::insert(nodeid, pnode, thinblockmg);
 }
 
 void FinalizeNode(NodeId nodeid) {
