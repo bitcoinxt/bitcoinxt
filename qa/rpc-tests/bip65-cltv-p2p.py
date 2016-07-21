@@ -66,44 +66,45 @@ class BIP65Test(ComparisonTestFramework):
     def get_tests(self):
 
         self.coinbase_blocks = self.nodes[0].generate(2)
+        height = 3 # height of the next block to build
         self.tip = int ("0x" + self.nodes[0].getbestblockhash(), 0)
         self.nodeaddress = self.nodes[0].getnewaddress()
         self.last_block_time = int(time.time())
 
-        ''' 98 more version 3 blocks '''
+        self.log.info("398 more version 3 blocks")
         test_blocks = []
-        for i in range(98):
-            block = create_block(self.tip, create_coinbase(2), self.last_block_time + 1)
+        for i in range(398):
+            block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
             block.nVersion = 3
             block.rehash()
             block.solve()
             test_blocks.append([block, True])
             self.last_block_time += 1
             self.tip = block.sha256
+            height += 1
         yield TestInstance(test_blocks, sync_every_block=False)
 
-        ''' Mine 74 version 4 blocks '''
+        self.log.info("Mine 749 version 4 blocks")
         test_blocks = []
-        for i in range(74):
-            block = create_block(self.tip, create_coinbase(2), self.last_block_time + 1)
+        for i in range(749):
+            block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
             block.nVersion = 4
             block.rehash()
             block.solve()
             test_blocks.append([block, True])
             self.last_block_time += 1
             self.tip = block.sha256
+            height += 1
         yield TestInstance(test_blocks, sync_every_block=False)
 
-        '''
-        Check that the new CLTV rules are not enforced in the 75th
-        version 3 block.
-        '''
+        self.log.info("Check that the new CLTV rules are not enforced in the 750th" \
+                "version 3 block.")
         spendtx = self.create_transaction(self.nodes[0],
                 self.coinbase_blocks[0], self.nodeaddress, 1.0)
         cltv_invalidate(spendtx)
         spendtx.rehash()
 
-        block = create_block(self.tip, create_coinbase(2), self.last_block_time + 1)
+        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
         block.nVersion = 4
         block.vtx.append(spendtx)
         block.hashMerkleRoot = block.calc_merkle_root()
@@ -112,58 +113,60 @@ class BIP65Test(ComparisonTestFramework):
 
         self.last_block_time += 1
         self.tip = block.sha256
+        height += 1
         yield TestInstance([[block, True]])
 
-        '''
-        Check that the new CLTV rules are enforced in the 76th version 4
-        block.
-        '''
-        spendtx = self.create_transaction(self.nodes[0],
-                self.coinbase_blocks[1], self.nodeaddress, 1.0)
-        cltv_invalidate(spendtx)
-        spendtx.rehash()
-
-        block = create_block(self.tip, create_coinbase(1), self.last_block_time + 1)
-        block.nVersion = 4
-        block.vtx.append(spendtx)
-        block.hashMerkleRoot = block.calc_merkle_root()
-        block.rehash()
-        block.solve()
-        self.last_block_time += 1
-        yield TestInstance([[block, False]])
-
-        ''' Mine 19 new version blocks on last valid tip '''
+        self.log.info("Mine 199 new version blocks on last valid tip")
         test_blocks = []
-        for i in range(19):
-            block = create_block(self.tip, create_coinbase(1), self.last_block_time + 1)
+        for i in range(199):
+            block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
             block.nVersion = 4
             block.rehash()
             block.solve()
             test_blocks.append([block, True])
             self.last_block_time += 1
             self.tip = block.sha256
+            height += 1
         yield TestInstance(test_blocks, sync_every_block=False)
 
-        ''' Mine 1 old version block '''
-        block = create_block(self.tip, create_coinbase(1), self.last_block_time + 1)
+        self.log.info("Mine 1 old version block")
+        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
         block.nVersion = 3
         block.rehash()
         block.solve()
         self.last_block_time += 1
         self.tip = block.sha256
+        height += 1
         yield TestInstance([[block, True]])
 
-        ''' Mine 1 new version block '''
-        block = create_block(self.tip, create_coinbase(1), self.last_block_time + 1)
+        self.log.info("Mine 1 new version block")
+        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
         block.nVersion = 4
         block.rehash()
         block.solve()
         self.last_block_time += 1
         self.tip = block.sha256
+        height += 1
         yield TestInstance([[block, True]])
 
-        ''' Mine 1 old version block, should be invalid '''
-        block = create_block(self.tip, create_coinbase(1), self.last_block_time + 1)
+        self.log.info("Check that the new CLTV rules are enforced in the 951st version 4 block")
+        spendtx = self.create_transaction(self.nodes[0],
+                self.coinbase_blocks[1], self.nodeaddress, 1.0)
+        cltv_invalidate(spendtx)
+        spendtx.rehash()
+
+        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
+        block.nVersion = 4
+        block.vtx.append(spendtx)
+        block.hashMerkleRoot = block.calc_merkle_root()
+        block.rehash()
+        block.solve()
+        self.last_block_time += 1
+        height += 1
+        yield TestInstance([[block, False]])
+
+        self.log.info("Mine 1 old version block, should be invalid")
+        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
         block.nVersion = 3
         block.rehash()
         block.solve()
