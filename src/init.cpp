@@ -1571,6 +1571,9 @@ bool AppInit2()
             ForkMempoolClearer(mempool, oldTip, newTip);
         });
 
+    if (!CheckDiskSpace())
+        return false;
+
     // Either install a handler to notify us when genesis activates, or set fHaveGenesis directly.
     // No locking, as this happens before any background thread is started.
     if (chainActive.Tip() == NULL) {
@@ -1601,9 +1604,6 @@ bool AppInit2()
     }
 
     // ********************************************************* Step 10: start node
-
-    if (!CheckDiskSpace())
-        return false;
 
     if (!strErrors.str().empty())
         return InitError(strErrors.str());
