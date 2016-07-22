@@ -220,29 +220,6 @@ void InitRespendFilter() {
     doubleSpendFilter = CBloomFilter(MAX_DOUBLESPEND_BLOOM, 0.01, insecure_rand(), BLOOM_UPDATE_NONE);
 }
 
-bool UsingThinBlocks() {
-    if (Opt().IsStealthMode())
-        return false;
-    return GetBoolArg("-use-thin-blocks", true);
-}
-
-/// Don't request blocks from nodes hat don't support thin blocks.
-bool AvoidFullBlocks() {
-    return GetArg("-use-thin-blocks", 1) == 2
-        || GetArg("-use-thin-blocks" ,1) == 3;
-}
-
-// Makes only outbound connection to xthin-supporting nodes.
-// Implicitly enables "avoid full blocks".
-bool XThinBlocksOnly() {
-    return GetArg("-use-thin-blocks", 1) == 3;
-}
-
-
-int ThinBlocksMaxParallel() {
-    return GetArg("-thin-blocks-max-parallel", 3);
-}
-
 class OnBlockFinished : public ThinBlockFinishedCallb {
     public:
         OnBlockFinished();
@@ -1258,7 +1235,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         // merkleblock first, followed by the one we expect. Only that we don't expect
         // the one we requested first anymore (because it provided another).
         // Don't ban it for sending us the coinbase of the block we requested.
-        int dos = UsingThinBlocks() ? 10 : 100;
+        int dos = Opt().UsingThinBlocks() ? 10 : 100;
         return state.DoS(dos, error("AcceptToMemoryPool: coinbase as individual tx"),
                          REJECT_INVALID, "coinbase");
     }
@@ -4480,7 +4457,7 @@ bool static AlreadyHave(const CInv& inv)
 // Activate thin blocks only if we're not doing bulk downloads (it's faster to use ordinary block messages when
 // catching up with the block chain).
 bool ThinBlocksActive(CNode* n) {
-    return !IsInitialBlockDownload() && UsingThinBlocks()
+    return !IsInitialBlockDownload() && Opt().UsingThinBlocks()
         && (n->SupportsBloomThinBlocks() || n->SupportsXThinBlocks());
 }
 
@@ -4526,14 +4503,14 @@ bool ThinBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, CNode& node)
     }
 
     int numDownloading = thinblockmg.numWorkers(inv.hash);
-    if (numDownloading >= ThinBlocksMaxParallel()) {
+    if (numDownloading >= Opt().ThinBlocksMaxParallel()) {
         LogPrint("thin", "max parallel thin req reached, not req %s from peer %d\n",
                 inv.hash.ToString(), id);
         return false;
     }
 
     LogPrint("thin", "requesting %s from peer %d (%d of %d parallel)\n",
-            inv.hash.ToString(), id, (numDownloading + 1), ThinBlocksMaxParallel());
+            inv.hash.ToString(), id, (numDownloading + 1), Opt().ThinBlocksMaxParallel());
 
     nodestate->thinblock->requestBlock(inv.hash, toFetch, node);
     nodestate->thinblock->setToWork(inv.hash);
@@ -4550,7 +4527,7 @@ void ProcessInvMsgBlock(CNode* pfrom, CInv inv, std::vector<CInv>& toFetch) {
         return;
 
     bool doThinDownload  = ThinBlocksActive(pfrom)
-        && thinblockmg.numWorkers(inv.hash) < ThinBlocksMaxParallel();
+        && thinblockmg.numWorkers(inv.hash) < Opt().ThinBlocksMaxParallel();
     bool downloadLater = false;
 
     bool initialHeadersReceived = NodeStatePtr(pfrom->id)->initialHeadersReceived;
@@ -4590,7 +4567,7 @@ void ProcessInvMsgBlock(CNode* pfrom, CInv inv, std::vector<CInv>& toFetch) {
         return;
     }
 
-    if (AvoidFullBlocks()) {
+    if (Opt().AvoidFullBlocks()) {
         LogPrint("thin", "avoiding full blocks, not requesting %s from %d\n",
                 inv.hash.ToString(), pfrom->id);
         return;
@@ -4933,20 +4910,20 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             LOCK(cs_main);
             NodeStatePtr ns(pfrom->id);
 
-            if (UsingThinBlocks() && pfrom->SupportsXThinBlocks())
+            if (Opt().UsingThinBlocks() && pfrom->SupportsXThinBlocks())
                 ns->thinblock.reset(new XThinWorker(
                     thinblockmg, pfrom->id,
                     std::unique_ptr<TxHashProvider>(new MempoolHashProvider)));
 
-            else if (UsingThinBlocks() && pfrom->SupportsBloomThinBlocks())
+            else if (Opt().UsingThinBlocks() && pfrom->SupportsBloomThinBlocks())
                 ns->thinblock.reset(new BloomThinWorker(thinblockmg, pfrom->id));
             else { /* keep DummyThinWorker */ }
 
-            bool hasRequiredThinSupport = XThinBlocksOnly()
+            bool hasRequiredThinSupport = Opt().XThinBlocksOnly()
                 ? pfrom->SupportsXThinBlocks()
                 : pfrom->SupportsBloomThinBlocks() || pfrom->SupportsXThinBlocks();
             // Disconnect outbound connections that don't support thin blocks.
-            if (UsingThinBlocks() && !pfrom->fInbound && !hasRequiredThinSupport) {
+            if (Opt().UsingThinBlocks() && !pfrom->fInbound && !hasRequiredThinSupport) {
                 LogPrintf("'%s' - peer=%d does not support thin blocks, disconnecting\n", pfrom->cleanSubVer, pfrom->id);
                 pfrom->fDisconnect = true;
                 return true;
@@ -5023,7 +5000,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         pfrom->nTimeOffset = nTimeOffset;
         AddTimeData(pfrom->addr, nTimeOffset);
 
-        if (UsingThinBlocks() && pfrom->SupportsBloomThinBlocks() && !pfrom->SupportsXThinBlocks())
+        if (Opt().UsingThinBlocks() && pfrom->SupportsBloomThinBlocks() && !pfrom->SupportsXThinBlocks())
         {
             LogPrint("thin", "Enabling bloom thin blocks on peer %d\n", pfrom->id);
             pfrom->PushMessage("filterload", CBloomFilter());
@@ -5904,10 +5881,10 @@ bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
         return true;
 
     // We don't mind full blocks.
-    if (!UsingThinBlocks())
+    if (!Opt().UsingThinBlocks())
         return true;
 
-    if (!AvoidFullBlocks())
+    if (!Opt().AvoidFullBlocks())
         return true;
 
     // We want thin blocks only, but peer does not support it.
@@ -5915,7 +5892,7 @@ bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
         return false;
 
     // We want xthin only, but peer does not support it.
-    if (XThinBlocksOnly() && !pto->SupportsXThinBlocks())
+    if (Opt().XThinBlocksOnly() && !pto->SupportsXThinBlocks())
         return false;
 
     // Is node busy serving a thin block already?
