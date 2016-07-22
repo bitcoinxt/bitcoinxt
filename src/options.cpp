@@ -69,6 +69,28 @@ int64_t Opt::CheckpointDays() {
     return std::max(int64_t(1), Args->GetArg("-checkpoint-days", def));
 }
 
+bool Opt::UsingThinBlocks() {
+    if (IsStealthMode())
+        return false;
+    return Args->GetBool("-use-thin-blocks", true);
+}
+
+/// Don't request blocks from nodes hat don't support thin blocks.
+bool Opt::AvoidFullBlocks() {
+    return Args->GetArg("-use-thin-blocks", 1) == 2
+        || Args->GetArg("-use-thin-blocks", 1) == 3;
+}
+
+// Makes only outbound connection to xthin-supporting nodes.
+// Implicitly enables "avoid full blocks".
+bool Opt::XThinBlocksOnly() {
+    return Args->GetArg("-use-thin-blocks", 1) == 3;
+}
+
+int Opt::ThinBlocksMaxParallel() {
+    return Args->GetArg("-thin-blocks-max-parallel", 3);
+}
+
 std::unique_ptr<ArgReset> SetDummyArgGetter(std::unique_ptr<ArgGetter> getter) {
     Args.reset(getter.release());
     return std::unique_ptr<ArgReset>(new ArgReset);

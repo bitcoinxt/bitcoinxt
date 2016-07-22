@@ -14,6 +14,12 @@ struct Opt {
     std::vector<std::string> UAComment(bool validate = false);
     int ScriptCheckThreads();
     int64_t CheckpointDays();
+
+    // Thin block options
+    bool UsingThinBlocks();
+    bool AvoidFullBlocks();
+    bool XThinBlocksOnly();
+    int ThinBlocksMaxParallel();
 };
 
 /** Maximum number of script-checking threads allowed */
