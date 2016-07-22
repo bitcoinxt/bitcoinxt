@@ -6,17 +6,18 @@
 
 #include "test_bitcoin.h"
 
+
+#include "consensus/validation.h"
 #include "key.h"
 #include "main.h"
 #include "options.h"
 #include "random.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
+#include "test/testutil.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
-
-#include "test/testutil.h"
 
 #include <boost/filesystem.hpp>
 #include <boost/test/unit_test.hpp>
@@ -57,6 +58,11 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
         pcoinsdbview = new CCoinsViewDB(1 << 23, isObfuscated, true);
         pcoinsTip = new CCoinsViewCache(pcoinsdbview);
         InitBlockIndex();
+        {
+            CValidationState state;
+            bool ok = ActivateBestChain(state);
+            BOOST_CHECK(ok);
+        }
         mapArgs["-par"] = "3";
         for (int i=0; i < Opt().ScriptCheckThreads()-1; i++)
             threadGroup.create_thread(&ThreadScriptCheck);
