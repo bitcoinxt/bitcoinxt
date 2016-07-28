@@ -25,10 +25,11 @@ typedef std::list<QueuedBlock>::iterator QueuedBlockPtr;
 
 // Keeps track of blocks in flight.
 struct InFlightIndex {
+    virtual ~InFlightIndex() { }
     void erase(const QueuedBlockPtr& ptr);
     void erase(NodeId nodeid, const uint256& block);
     void insert(const QueuedBlockPtr& queued);
-    bool isInFlight(const uint256& block) const;
+    virtual bool isInFlight(const uint256& block) const;
     std::set<NodeId> nodesWithQueued(const uint256& block) const;
     std::vector<QueuedBlockPtr> queuedPtrsFor(const uint256& block) const;
     QueuedBlockPtr queuedItem(NodeId, const uint256& block) const;

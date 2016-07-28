@@ -7,6 +7,7 @@
 
 #include "addrman.h"
 #include "arith_uint256.h"
+#include "blockannounce.h"
 #include "blocksender.h"
 #include "bloomthin.h"
 #include "chainparams.h"
@@ -346,25 +347,6 @@ static void ProcessBlockAvailability(NodeStatePtr& state) {
     }
 }
 
-/** Update tracking information about which blocks a peer is assumed to have. */
-void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash) {
-    AssertLockHeld(cs_main);
-    NodeStatePtr state(nodeid);
-    assert(!state.IsNull());
-
-    ProcessBlockAvailability(state);
-
-    BlockMap::iterator it = mapBlockIndex.find(hash);
-    if (it != mapBlockIndex.end() && it->second->nChainWork > 0) {
-        // An actually better block was announced.
-        if (state->pindexBestKnownBlock == NULL || it->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
-            state->pindexBestKnownBlock = it->second;
-    } else {
-        // An unknown block was announced; just assume that the latest one is the best one.
-        state->hashLastUnknownBlock = hash;
-    }
-}
-
 /** Find the last common ancestor two blocks have.
  *  Both pa and pb must be non-NULL. */
 CBlockIndex* LastCommonAncestor(CBlockIndex* pa, CBlockIndex* pb) {
@@ -470,6 +452,25 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
 }
 
 } // anon namespace
+
+/** Update tracking information about which blocks a peer is assumed to have. */
+void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash) {
+    AssertLockHeld(cs_main);
+    NodeStatePtr state(nodeid);
+    assert(!state.IsNull());
+
+    ProcessBlockAvailability(state);
+
+    BlockMap::iterator it = mapBlockIndex.find(hash);
+    if (it != mapBlockIndex.end() && it->second->nChainWork > 0) {
+        // An actually better block was announced.
+        if (state->pindexBestKnownBlock == NULL || it->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
+            state->pindexBestKnownBlock = it->second;
+    } else {
+        // An unknown block was announced; just assume that the latest one is the best one.
+        state->hashLastUnknownBlock = hash;
+    }
+}
 
 OnBlockFinished::OnBlockFinished() { }
 OnBlockFinished::OnBlockFinished(const std::string& strCommand) : strCommand(strCommand) { }
@@ -4461,123 +4462,6 @@ bool ThinBlocksActive(CNode* n) {
         && (n->SupportsBloomThinBlocks() || n->SupportsXThinBlocks());
 }
 
-namespace processinv {
-
-bool WeWantBlock(const uint256& block) {
-    return !mapBlockIndex.count(block);
-}
-
-bool AlmostSynced() {
-    return chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - Params().GetConsensus().nPowTargetSpacing * 20;
-}
-
-bool FullBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, NodeId id) {
-    if (blocksInFlight.isInFlight(inv.hash))
-        return false; // Already requested from a peer.
-
-    if (!AlmostSynced())
-        return false;
-
-    NodeStatePtr nodestate(id);
-    if (nodestate->nBlocksInFlight >= MAX_BLOCKS_IN_TRANSIT_PER_PEER)
-        return false;
-
-    LogPrint("thin", "full block download of %s from %d\n",
-            inv.hash.ToString(), id);
-
-    toFetch.push_back(inv);
-    return true;
-}
-
-bool ThinBlockDownload(const CInv& inv, std::vector<CInv>& toFetch, CNode& node) {
-
-    if (!AlmostSynced())
-        return false;
-
-    NodeId id = node.id;
-    NodeStatePtr nodestate(id);
-    if (!nodestate->thinblock->isAvailable()) {
-        LogPrint("thin", "peer %d is busy, won't req %s\n",
-            id, inv.hash.ToString());
-        return false;
-    }
-
-    int numDownloading = thinblockmg.numWorkers(inv.hash);
-    if (numDownloading >= Opt().ThinBlocksMaxParallel()) {
-        LogPrint("thin", "max parallel thin req reached, not req %s from peer %d\n",
-                inv.hash.ToString(), id);
-        return false;
-    }
-
-    LogPrint("thin", "requesting %s from peer %d (%d of %d parallel)\n",
-            inv.hash.ToString(), id, (numDownloading + 1), Opt().ThinBlocksMaxParallel());
-
-    nodestate->thinblock->requestBlock(inv.hash, toFetch, node);
-    nodestate->thinblock->setToWork(inv.hash);
-
-    return true;
-}
-
-// Handle "inv" message of type MSG_BLOCK
-void ProcessInvMsgBlock(CNode* pfrom, CInv inv, std::vector<CInv>& toFetch) {
-    AssertLockHeld(cs_main);
-    UpdateBlockAvailability(pfrom->GetId(), inv.hash);
-
-    if (!WeWantBlock(inv.hash))
-        return;
-
-    bool doThinDownload  = ThinBlocksActive(pfrom)
-        && thinblockmg.numWorkers(inv.hash) < Opt().ThinBlocksMaxParallel();
-    bool downloadLater = false;
-
-    bool initialHeadersReceived = NodeStatePtr(pfrom->id)->initialHeadersReceived;
-    if (!initialHeadersReceived && doThinDownload) {
-        doThinDownload = false;
-        downloadLater = true;
-    }
-
-    if (doThinDownload) {
-        if (ThinBlockDownload(inv, toFetch, *pfrom)) {
-            MarkBlockAsInFlight()(pfrom->id, inv.hash, Params().GetConsensus());
-            return;
-        }
-        else  {
-            downloadLater = true;
-        }
-    }
-
-    // First request the headers preceding the announced block. In the normal fully-synced
-    // case where a new block is announced that succeeds the current tip (no reorganization),
-    // there are no such headers.
-    // Secondly, and only when we are close to being synced, we request the announced block directly,
-    // to avoid an extra round-trip. Note that we must *first* ask for the headers, so by the
-    // time the block arrives, the header chain leading up to it is already validated. Not
-    // doing this will result in the received block being rejected as an orphan in case it is
-    // not a direct successor.
-
-    if (!blocksInFlight.isInFlight(inv.hash) || !initialHeadersReceived) {
-        pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), inv.hash);
-        LogPrint("net", "getheaders (%d) %s to peer=%d\n",
-                pindexBestHeader->nHeight, inv.hash.ToString(), pfrom->id);
-    }
-
-    if (downloadLater) {
-        // Block can be downloaded with thin blocks,
-        // but not right now. Only get headers for now.
-        return;
-    }
-
-    if (Opt().AvoidFullBlocks()) {
-        LogPrint("thin", "avoiding full blocks, not requesting %s from %d\n",
-                inv.hash.ToString(), pfrom->id);
-        return;
-    }
-
-    if (FullBlockDownload(inv, toFetch, pfrom->id))
-        MarkBlockAsInFlight()(pfrom->id, inv.hash, Params().GetConsensus());
-}
-} // ns processinv
-
 void static ProcessGetData(CNode* pfrom)
 {
     std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
@@ -5126,7 +5010,11 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                 pfrom->AskFor(inv);
 
             if (inv.type == MSG_BLOCK) {
-                processinv::ProcessInvMsgBlock(pfrom, inv, vToFetch);
+                BlockAnnounceProcessor ann(inv.hash, *pfrom, thinblockmg, blocksInFlight);
+                if (ann.onBlockAnnounced(vToFetch)) {
+                    // This block has been requested from peer.
+                    MarkBlockAsInFlight()(pfrom->id, inv.hash, Params().GetConsensus());
+                }
             }
 
             // Track requests for our stuff
