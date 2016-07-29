@@ -36,7 +36,7 @@ struct DummyHeaderProcessor : public BlockHeaderProcessor {
 
     DummyHeaderProcessor() : headerOK(true), called(false) { }
 
-    bool operator()(const std::vector<CBlockHeader>&, bool) {
+    bool operator()(const std::vector<CBlockHeader>&, bool, bool) override {
         called = true;
         return headerOK;
     }

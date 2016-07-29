@@ -23,7 +23,7 @@ void XThinBlockProcessor::operator()(
 
     try {
         block.selfValidate();
-        if (!processHeader(std::vector<CBlockHeader>(1, block.header), false))
+        if (!processHeader(std::vector<CBlockHeader>(1, block.header), false, false))
             throw std::invalid_argument("invalid header");
     }
     catch (const std::invalid_argument& e) {

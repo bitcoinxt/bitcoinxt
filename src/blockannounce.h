@@ -11,17 +11,18 @@ class CInv;
 class CNode;
 class ThinBlockManager;
 class InFlightIndex;
-        
-class BlockAnnounceProcessor {
+
+/// Reacts to a node announcing a block to us
+class BlockAnnounceReceiver {
 
     public:
-        BlockAnnounceProcessor(uint256 block,
+        BlockAnnounceReceiver(uint256 block,
                 CNode& from, ThinBlockManager& thinmg, InFlightIndex& inFlightIndex) : 
             block(block), from(from), thinmg(thinmg), blocksInFlight(inFlightIndex)
         {
         }
 
-        bool onBlockAnnounced(std::vector<CInv>& toFetch);
+        bool onBlockAnnounced(std::vector<CInv>& toFetch, bool announcedAsHeader);
         
         enum DownloadStrategy {
             DOWNL_THIN_NOW,
@@ -36,9 +37,9 @@ class BlockAnnounceProcessor {
         virtual bool almostSynced();
         virtual void updateBlockAvailability();
         virtual DownloadStrategy pickDownloadStrategy();
-        virtual bool wantBlock() const;
+        virtual bool blockHeaderIsKnown() const;
         virtual bool isInitialBlockDownload() const;
-       
+        virtual bool hasBlockData() const;
 
     private:
         uint256 block;
@@ -48,5 +49,30 @@ class BlockAnnounceProcessor {
 
         bool fetchAsThin() const;
 };
+
+// Maximum nu, of headers to announce when relaying blocks with headers message
+static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 8;
+
+/// Sends blockannouncements to node
+class BlockAnnounceSender {
+
+    public:
+        BlockAnnounceSender(CNode& to) : to(to) { }
+        virtual ~BlockAnnounceSender() { }
+
+        void announce();
+
+    protected:
+        virtual bool canAnnounceWithHeaders() const;
+        virtual bool announceWithHeaders();
+        virtual void announceWithInv();
+
+    private:
+        bool peerHasHeader(const class CBlockIndex*) const;
+
+        CNode& to;
+};
+
+std::vector<uint256> findHeadersToAnnounce(const CBlockIndex* oldTip, const CBlockIndex* newTip);
 
 #endif

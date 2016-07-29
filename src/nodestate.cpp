@@ -9,11 +9,13 @@ CNodeState::CNodeState(NodeId id, ThinBlockManager& thinblockmg) {
     pindexBestKnownBlock = NULL;
     hashLastUnknownBlock.SetNull();
     pindexLastCommonBlock = NULL;
+    bestHeaderSent = nullptr;
     fSyncStarted = false;
     nStallingSince = 0;
     nBlocksInFlight = 0;
     nBlocksInFlightValidHeaders = 0;
     fPreferredDownload = false;
+    prefersHeaders = false;
     initialHeadersReceived = false;
     thinblock.reset(new DummyThinWorker(thinblockmg, id));
 }

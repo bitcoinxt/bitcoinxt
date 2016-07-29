@@ -12,7 +12,8 @@ bool HaveBlockData(const uint256& hash);
 class BlockHeaderProcessor {
 public:
     // returns false on error
-    virtual bool operator()(const std::vector<CBlockHeader>& headers, bool peerSentMax) = 0;
+    virtual bool operator()(const std::vector<CBlockHeader>& headers,
+            bool peerSentMax, bool maybeAnnouncement) = 0;
 
     virtual ~BlockHeaderProcessor() = 0;
 };

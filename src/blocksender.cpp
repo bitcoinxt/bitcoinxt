@@ -10,6 +10,7 @@
 #include "xthin.h"
 #include "merkleblock.h"
 #include "main.h" // ReadBlockFromDisk
+#include "nodestate.h"
 #include <vector>
 
 BlockSender::BlockSender() {
@@ -44,10 +45,21 @@ bool BlockSender::canSend(const CChain& activeChain, const CBlockIndex& block,
     return send;
 }
 
+void updateBestHeaderSent(CNode& node, CBlockIndex* blockIndex) {
+    // When we send a block, were also sending its header.
+    NodeStatePtr state(node.id);
+    if (!state->bestHeaderSent)
+        state->bestHeaderSent = blockIndex;
+
+    if (state->bestHeaderSent->nHeight <= blockIndex->nHeight)
+        state->bestHeaderSent = blockIndex;
+}
+
 void BlockSender::send(const CChain& activeChain, CNode& node,
-        const CBlockIndex& blockIndex, const CInv& inv)
+        CBlockIndex& blockIndex, const CInv& inv)
 {
     sendBlock(node, blockIndex, inv.type);
+    updateBestHeaderSent(node, &blockIndex);
     triggerNextRequest(activeChain, inv, node);
 }
 
