@@ -8,16 +8,6 @@
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 
-namespace {
-inline std::string ValueString(const std::vector<unsigned char>& vch)
-{
-    if (vch.size() <= 4)
-        return strprintf("%d", CScriptNum(vch, false).getint());
-    else
-        return HexStr(vch);
-}
-} // anon namespace
-
 using namespace std;
 
 const char* GetOpName(opcodetype opcode)
@@ -141,8 +131,8 @@ const char* GetOpName(opcodetype opcode)
 
     // expanson
     case OP_NOP1                   : return "OP_NOP1";
-    case OP_NOP2                   : return "OP_NOP2";
-    case OP_NOP3                   : return "OP_NOP3";
+    case OP_CHECKLOCKTIMEVERIFY    : return "OP_CHECKLOCKTIMEVERIFY";
+    case OP_CHECKSEQUENCEVERIFY    : return "OP_CHECKSEQUENCEVERIFY";
     case OP_NOP4                   : return "OP_NOP4";
     case OP_NOP5                   : return "OP_NOP5";
     case OP_NOP6                   : return "OP_NOP6";
@@ -236,27 +226,4 @@ bool CScript::IsPushOnly() const
             return false;
     }
     return true;
-}
-
-std::string CScript::ToString() const
-{
-    std::string str;
-    opcodetype opcode;
-    std::vector<unsigned char> vch;
-    const_iterator pc = begin();
-    while (pc < end())
-    {
-        if (!str.empty())
-            str += " ";
-        if (!GetOp(pc, opcode, vch))
-        {
-            str += "[error]";
-            return str;
-        }
-        if (0 <= opcode && opcode <= OP_PUSHDATA4)
-            str += ValueString(vch);
-        else
-            str += GetOpName(opcode);
-    }
-    return str;
 }
