@@ -5630,7 +5630,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             Misbehaving(pfrom->GetId(), 100);
         else
         {
-            LOCK(pfrom->cs_filter);
+            LOCK(pfrom->cs_xfilter);
             pfrom->xthinFilter.reset(new CBloomFilter(dontWant));
             pfrom->xthinFilter->UpdateEmptyFull();
 

@@ -92,7 +92,7 @@ void BlockSender::sendBlock(CNode& node,
 
     CBloomFilter filter;
     {
-        LOCK(node.cs_filter);
+        LOCK(node.cs_xfilter);
         assert(bool(node.xthinFilter.get())); // a filter is always allocated.
         filter = *node.xthinFilter;
     }
