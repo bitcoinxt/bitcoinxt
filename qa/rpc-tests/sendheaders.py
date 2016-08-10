@@ -395,10 +395,12 @@ class SendHeadersTest(BitcoinTestFramework):
             test_node.wait_for_block(new_block_hashes[-1])
 
             for i in xrange(3):
-                # Mine another block, still should get only an inv
+                # Mine another block, <strike>still should get only an inv</strike>
+                # XT change: We received header for previous block as a part of the block
+                # download, so we can continue with header announcements.
                 tip = self.mine_blocks(1)
                 assert_equal(inv_node.check_last_announcement(inv=[tip]), True)
-                assert_equal(test_node.check_last_announcement(inv=[tip]), True)
+                assert_equal(test_node.check_last_announcement(headers=[tip]), True)
                 if i == 0:
                     # Just get the data -- shouldn't cause headers announcements to resume
                     test_node.get_data([tip])
