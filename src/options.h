@@ -14,10 +14,11 @@ struct Opt {
     std::vector<std::string> UAComment(bool validate = false);
     int ScriptCheckThreads();
     int64_t CheckpointDays();
+    bool UsePeerSelection(bool validate = false) const;
 
     // Thin block options
     bool UsingThinBlocks();
-    bool AvoidFullBlocks();
+    bool AvoidFullBlocks() const;
     bool XThinBlocksOnly();
     int ThinBlocksMaxParallel();
 };
@@ -28,7 +29,7 @@ static const int MAX_SCRIPTCHECK_THREADS = 16;
 static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
 // Blocks newer than n days will have their script validated during sync.
 static const int DEFAULT_CHECKPOINT_DAYS = 30;
-
+static const int DEFAULT_USE_PEER_SELECTION = 1;
 //
 // For unit testing
 //

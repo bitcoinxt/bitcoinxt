@@ -20,6 +20,7 @@ struct NullFinder : public TxFinder {
 struct DummyNode : public CNode {
     DummyNode() : CNode(INVALID_SOCKET, CAddress()) {
         id = 42;
+        nVersion = PROTOCOL_VERSION;
     }
     virtual void BeginMessage(const char* pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend) {
         messages.push_back(pszCommand);

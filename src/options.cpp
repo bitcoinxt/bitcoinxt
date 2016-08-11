@@ -76,7 +76,7 @@ bool Opt::UsingThinBlocks() {
 }
 
 /// Don't request blocks from nodes hat don't support thin blocks.
-bool Opt::AvoidFullBlocks() {
+bool Opt::AvoidFullBlocks() const {
     return Args->GetArg("-use-thin-blocks", 1) == 2
         || Args->GetArg("-use-thin-blocks", 1) == 3;
 }
@@ -94,6 +94,23 @@ int Opt::ThinBlocksMaxParallel() {
 std::unique_ptr<ArgReset> SetDummyArgGetter(std::unique_ptr<ArgGetter> getter) {
     Args.reset(getter.release());
     return std::unique_ptr<ArgReset>(new ArgReset);
+}
+
+bool Opt::UsePeerSelection(bool validate) const {
+
+    bool enabled = Args->GetBool("-use-peer-selection", bool(DEFAULT_USE_PEER_SELECTION));
+
+    if (validate) {
+        if (!enabled && AvoidFullBlocks())
+        {
+            std::stringstream err;
+            err << "Can't disable peer selection when full block download is diabled. "
+                << "See -use-peer-selection and -use-thin-blocks";
+            throw std::invalid_argument(err.str());
+        }
+    }
+
+    return enabled;
 }
 
 ArgReset::~ArgReset() {
