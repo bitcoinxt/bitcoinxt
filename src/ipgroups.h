@@ -75,7 +75,7 @@ void InitIPGroups(CScheduler *scheduler);
 
 // Creates a group slot for given IP.
 // If IP does not belong to a group then a new group will be created.
-std::auto_ptr<IPGroupSlot> AssignIPGroupSlot(const CNetAddr& ip);
+std::unique_ptr<IPGroupSlot> AssignIPGroupSlot(const CNetAddr& ip);
 
 
 #endif //BITCOIN_CIPGROUPS_H

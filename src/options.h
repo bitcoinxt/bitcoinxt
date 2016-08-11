@@ -14,6 +14,13 @@ struct Opt {
     std::vector<std::string> UAComment(bool validate = false);
     int ScriptCheckThreads();
     int64_t CheckpointDays();
+    bool UsePeerSelection(bool validate = false) const;
+
+    // Thin block options
+    bool UsingThinBlocks();
+    bool AvoidFullBlocks() const;
+    bool XThinBlocksOnly();
+    int ThinBlocksMaxParallel();
 };
 
 /** Maximum number of script-checking threads allowed */
@@ -22,7 +29,7 @@ static const int MAX_SCRIPTCHECK_THREADS = 16;
 static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
 // Blocks newer than n days will have their script validated during sync.
 static const int DEFAULT_CHECKPOINT_DAYS = 30;
-
+static const int DEFAULT_USE_PEER_SELECTION = 1;
 //
 // For unit testing
 //
@@ -40,6 +47,6 @@ struct ArgReset {
 // Temporary replace the global getter for fetching user configurations.
 //
 // Returns a RAII object that sets system back to default state.
-std::auto_ptr<ArgReset> SetDummyArgGetter(std::auto_ptr<ArgGetter>);
+std::unique_ptr<ArgReset> SetDummyArgGetter(std::unique_ptr<ArgGetter>);
 
 #endif

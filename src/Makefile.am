@@ -113,6 +113,7 @@ BITCOIN_CORE_H = \
   miner.h \
   net.h \
   netbase.h \
+  nodestate.h \
   noui.h \
   options.h \
   policy/fees.h \
@@ -286,6 +287,7 @@ libbitcoin_common_a_SOURCES = \
   key.cpp \
   keystore.cpp \
   netbase.cpp \
+  nodestate.cpp \
   primitives/block.cpp \
   primitives/transaction.cpp \
   protocol.cpp \

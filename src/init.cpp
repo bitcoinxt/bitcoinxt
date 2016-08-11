@@ -330,6 +330,8 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-stealth-mode", _("Make this node act like a Bitcoin Core node from the wire perspective"));
     strUsage += HelpMessageOpt("-timeout=<n>", strprintf(_("Specify connection timeout in milliseconds (minimum: 1, default: %d)"), DEFAULT_CONNECT_TIMEOUT));
     strUsage += HelpMessageOpt("-uacomment", _("Add a comment into the user agent visible to other nodes"));
+    strUsage += HelpMessageOpt("-use-peer-selection", strprintf(_("Strict selection for outgoing peers (require thin blocks etc., default: %d)"),
+                DEFAULT_USE_PEER_SELECTION));
     strUsage += HelpMessageOpt("-use-thin-blocks", _("Use thin blocks (low bandwidth block relay). (enable: 1, avoid full blocks: 2)"));
 #ifdef USE_UPNP
 #if USE_UPNP
@@ -986,7 +988,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 
     RegisterNodeSignals(GetNodeSignals());
 
-    try { Opt().UAComment(true /* validate */); }
+    try {
+        bool validate = true;
+        Opt().UAComment(validate);
+        Opt().UsePeerSelection(validate);
+
+    }
     catch (const std::invalid_argument& e) {
         return InitError(e.what());
     }

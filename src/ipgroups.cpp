@@ -137,7 +137,7 @@ static CURLcode ssl_context_setup(CURL *curl, void *sslctx, void *param) {
 
 static CIPGroup *LoadIPDataFromWeb(const string &url, const string &groupname, int priority) {
     try {
-        std::auto_ptr<CurlWrapper> curlWrapper = MakeCurl();
+        std::unique_ptr<CurlWrapper> curlWrapper = MakeCurl();
         curl_easy_setopt(curlWrapper->getHandle(), CURLOPT_SSL_CTX_FUNCTION, &ssl_context_setup);
 
         // This will block until the download is done.
@@ -376,14 +376,14 @@ CIPGroupData IPGroupSlot::Group() {
     return CIPGroupData();
 }
 
-std::auto_ptr<IPGroupSlot> AssignIPGroupSlot(const CNetAddr& ip) {
+std::unique_ptr<IPGroupSlot> AssignIPGroupSlot(const CNetAddr& ip) {
     LOCK(*cs_groups);
 
     CIPGroupData group = FindGroupForIP(ip);
 
     // IP belongs to a group already.
     if (!group.name.empty())
-        return std::auto_ptr<IPGroupSlot>(new IPGroupSlot(group.name));
+        return std::unique_ptr<IPGroupSlot>(new IPGroupSlot(group.name));
 
     // If IP does not belong to a group, create a new group
     // for only this IP. This group is used to de-prioritize multiple
@@ -399,5 +399,5 @@ std::auto_ptr<IPGroupSlot> AssignIPGroupSlot(const CNetAddr& ip) {
     newGroup.subnets.push_back(CSubNet(ip.ToStringIP() + "/32"));
     groups.push_back(newGroup);
 
-    return std::auto_ptr<IPGroupSlot>(new IPGroupSlot(newGroup.header.name));
+    return std::unique_ptr<IPGroupSlot>(new IPGroupSlot(newGroup.header.name));
 }

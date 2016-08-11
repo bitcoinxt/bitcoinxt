@@ -18,4 +18,7 @@ public:
 };
 inline BlockHeaderProcessor::~BlockHeaderProcessor() { }
 
+// If node matches our criteria for outgoing connections.
+bool KeepOutgoingPeer(const CNode&);
+
 #endif

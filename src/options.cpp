@@ -3,7 +3,7 @@
 #include <stdexcept>
 #include <boost/thread.hpp>
 
-static std::auto_ptr<ArgGetter> Args;
+static std::unique_ptr<ArgGetter> Args;
 
 struct DefaultGetter : public ArgGetter {
     virtual bool GetBool(const std::string& arg, bool def) {
@@ -69,9 +69,48 @@ int64_t Opt::CheckpointDays() {
     return std::max(int64_t(1), Args->GetArg("-checkpoint-days", def));
 }
 
-std::auto_ptr<ArgReset> SetDummyArgGetter(std::auto_ptr<ArgGetter> getter) {
+bool Opt::UsingThinBlocks() {
+    if (IsStealthMode())
+        return false;
+    return Args->GetBool("-use-thin-blocks", true);
+}
+
+/// Don't request blocks from nodes hat don't support thin blocks.
+bool Opt::AvoidFullBlocks() const {
+    return Args->GetArg("-use-thin-blocks", 1) == 2
+        || Args->GetArg("-use-thin-blocks", 1) == 3;
+}
+
+// Makes only outbound connection to xthin-supporting nodes.
+// Implicitly enables "avoid full blocks".
+bool Opt::XThinBlocksOnly() {
+    return Args->GetArg("-use-thin-blocks", 1) == 3;
+}
+
+int Opt::ThinBlocksMaxParallel() {
+    return Args->GetArg("-thin-blocks-max-parallel", 3);
+}
+
+std::unique_ptr<ArgReset> SetDummyArgGetter(std::unique_ptr<ArgGetter> getter) {
     Args.reset(getter.release());
-    return std::auto_ptr<ArgReset>(new ArgReset);
+    return std::unique_ptr<ArgReset>(new ArgReset);
+}
+
+bool Opt::UsePeerSelection(bool validate) const {
+
+    bool enabled = Args->GetBool("-use-peer-selection", bool(DEFAULT_USE_PEER_SELECTION));
+
+    if (validate) {
+        if (!enabled && AvoidFullBlocks())
+        {
+            std::stringstream err;
+            err << "Can't disable peer selection when full block download is diabled. "
+                << "See -use-peer-selection and -use-thin-blocks";
+            throw std::invalid_argument(err.str());
+        }
+    }
+
+    return enabled;
 }
 
 ArgReset::~ArgReset() {
