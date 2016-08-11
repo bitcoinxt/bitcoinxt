@@ -29,7 +29,6 @@ static const int MAX_SCRIPTCHECK_THREADS = 16;
 static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
 // Blocks newer than n days will have their script validated during sync.
 static const int DEFAULT_CHECKPOINT_DAYS = 30;
-
 //
 // For unit testing
 //
