@@ -7,8 +7,8 @@
 #include "util.h"
 
 ThinBlockManager::ThinBlockManager(
-        std::auto_ptr<ThinBlockFinishedCallb> callb,
-        std::auto_ptr<InFlightEraser> inFlightEraser) :
+        std::unique_ptr<ThinBlockFinishedCallb> callb,
+        std::unique_ptr<InFlightEraser> inFlightEraser) :
     finishedCallb(callb.release()), inFlightEraser(inFlightEraser.release())
 { }
 

@@ -64,8 +64,8 @@ struct ConcluderSetup {
 
     ConcluderSetup() :
         mstream(SER_NETWORK, PROTOCOL_VERSION),
-        tmgr(std::auto_ptr<ThinBlockFinishedCallb>(new DummyFinishedCallb),
-             std::auto_ptr<InFlightEraser>(new DummyInFlightEraser))
+        tmgr(std::unique_ptr<ThinBlockFinishedCallb>(new DummyFinishedCallb),
+             std::unique_ptr<InFlightEraser>(new DummyInFlightEraser))
     {
         CBloomFilter emptyFilter;
         block = TestBlock2();
