@@ -191,7 +191,7 @@ public:
 
 class PartiallyDownloadedBlock {
 protected:
-    std::vector<std::shared_ptr<const CTransaction> > txn_available;
+    std::vector<std::unique_ptr<CTransaction> > txn_available;
     size_t prefilled_count = 0, mempool_count = 0;
     CTxMemPool* pool;
 public:
