@@ -8,8 +8,7 @@
 #endif
 
 #include "init.h"
-#include "sodium.h"
-
+#include "crypto/common.h"
 #include "addrman.h"
 #include "amount.h"
 #include "checkpoints.h"
@@ -711,10 +710,6 @@ bool AppInitServers()
  */
 bool AppInit2()
 {
-    // Perform libsodium initialization
-    if (sodium_init() == -1) {
-        return false;
-    }
     // ********************************************************* Step 1: setup
 #ifdef _MSC_VER
     // Turn off Microsoft heap dump noise
@@ -1035,6 +1030,10 @@ bool AppInit2()
         nLocalServices |= NODE_BITCOIN_CASH;
 
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
+    // Initialize libsodium
+    if (init_and_check_sodium() == -1) {
+        return false;
+    }
 
     // Initialize elliptic curve code
     ECC_Start();
