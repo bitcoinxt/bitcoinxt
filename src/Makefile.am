@@ -79,6 +79,7 @@ BITCOIN_CORE_H = \
   blockannounce.h \
   blockheaderprocessor.h \
   blockencodings.h \
+  blockprocessor.h \
   blocksender.h \
   bloom.h \
   bloomthin.h \
@@ -101,6 +102,8 @@ BITCOIN_CORE_H = \
   consensus/validation.h \
   core_io.h \
   curl_wrapper.h \
+  compactblockprocessor.h \
+  compactthin.h \
   core_memusage.h \
   dummythin.h \
   hash.h \
@@ -200,11 +203,14 @@ libbitcoin_server_a_SOURCES = \
   blockannounce.cpp \
   blockheaderprocessor.cpp \
   blockencodings.cpp \
+  blockprocessor.cpp \
   blocksender.cpp \
   bloom.cpp \
   bloomthin.cpp \
   chain.cpp \
   checkpoints.cpp \
+  compactblockprocessor.cpp \
+  compactthin.cpp \
   curl_wrapper.cpp \
   inflightindex.cpp \
   init.cpp \

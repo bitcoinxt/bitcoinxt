@@ -6,8 +6,14 @@
 #define BITCOIN_BLOCK_ENCODINGS_H
 
 #include "primitives/block.h"
+#include "bloom.h"
 
 #include <memory>
+
+uint64_t GetShortID(
+        const uint64_t& shorttxidk0,
+        const uint64_t& shorttxidk1,
+        const uint256& txhash);
 
 class CTxMemPool;
 
@@ -26,9 +32,9 @@ public:
     }
 };
 
-class BlockTransactionsRequest {
+class CompactReRequest {
 public:
-    // A BlockTransactionsRequest message
+    // A CompactReRequest message
     uint256 blockhash;
     std::vector<uint16_t> indexes;
 
@@ -68,15 +74,25 @@ public:
     }
 };
 
-class BlockTransactions {
+class CompactReReqResponse {
 public:
-    // A BlockTransactions message
     uint256 blockhash;
     std::vector<CTransaction> txn;
 
-    BlockTransactions() {}
-    BlockTransactions(const BlockTransactionsRequest& req) :
+    CompactReReqResponse() {}
+    CompactReReqResponse(const CompactReRequest& req) :
         blockhash(req.blockhash), txn(req.indexes.size()) {}
+
+    CompactReReqResponse(const CBlock& block, const std::vector<uint16_t>& indexes) {
+        blockhash = block.GetHash();
+        if (indexes.size() > block.vtx.size())
+            throw std::invalid_argument("request more transactions than are in a block");
+        for (uint16_t i : indexes) {
+            if (i >= block.vtx.size())
+                throw std::invalid_argument("out of bound tx in rerequest");
+            txn.push_back(block.vtx.at(i));
+        }
+    }
 
     ADD_SERIALIZE_METHODS;
 
@@ -99,10 +115,9 @@ public:
     }
 };
 
-// Dumb serialization/storage-helper for CBlockHeaderAndShortTxIDs and PartiallyDownlaodedBlock
+// Dumb serialization/storage-helper for CompactBlock
 struct PrefilledTransaction {
-    // Used as an offset since last prefilled tx in CBlockHeaderAndShortTxIDs,
-    // as a proper transaction-in-block-index in PartiallyDownloadedBlock
+    // Used as an offset since last prefilled tx in CompactBlock,
     uint16_t index;
     CTransaction tx;
 
@@ -119,34 +134,26 @@ struct PrefilledTransaction {
     }
 };
 
-typedef enum ReadStatus_t
-{
-    READ_STATUS_OK,
-    READ_STATUS_INVALID, // Invalid object, peer is sending bogus crap
-    READ_STATUS_FAILED, // Failed to process object
-} ReadStatus;
-
-class CBlockHeaderAndShortTxIDs {
-private:
+class CompactBlock {
+public:
     mutable uint64_t shorttxidk0, shorttxidk1;
+private:
     uint64_t nonce;
 
     void FillShortTxIDSelector() const;
 
-    friend class PartiallyDownloadedBlock;
-
+public:
     static const int SHORTTXIDS_LENGTH = 6;
-protected:
+
     std::vector<uint64_t> shorttxids;
     std::vector<PrefilledTransaction> prefilledtxn;
 
-public:
     CBlockHeader header;
 
     // Dummy for deserialization
-    CBlockHeaderAndShortTxIDs() {}
+    CompactBlock() {}
 
-    CBlockHeaderAndShortTxIDs(const CBlock& block);
+    CompactBlock(const CBlock& block, const CRollingBloomFilter* inventoryKnown = nullptr);
 
     uint64_t GetShortID(const uint256& txhash) const;
 
@@ -189,18 +196,6 @@ public:
     }
 };
 
-class PartiallyDownloadedBlock {
-protected:
-    std::vector<std::unique_ptr<CTransaction> > txn_available;
-    size_t prefilled_count = 0, mempool_count = 0;
-    CTxMemPool* pool;
-public:
-    CBlockHeader header;
-    PartiallyDownloadedBlock(CTxMemPool* poolIn) : pool(poolIn) {}
-
-    ReadStatus InitData(const CBlockHeaderAndShortTxIDs& cmpctblock);
-    bool IsTxAvailable(size_t index) const;
-    ReadStatus FillBlock(CBlock& block, const std::vector<CTransaction>& vtx_missing) const;
-};
+void validateCompactBlock(const CompactBlock& cmpctblock);
 
 #endif

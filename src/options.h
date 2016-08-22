@@ -18,7 +18,7 @@ struct Opt {
     // Thin block options
     bool UsingThinBlocks();
     bool AvoidFullBlocks();
-    bool XThinBlocksOnly();
+    bool OptimalThinBlocksOnly();
     int ThinBlocksMaxParallel();
 };
 

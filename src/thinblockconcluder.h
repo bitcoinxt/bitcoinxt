@@ -11,6 +11,7 @@ typedef int NodeId;
 class CBlockIndex;
 class uint256;
 struct XThinReReqResponse;
+class CompactReReqResponse;
 
 namespace Consensus { struct Params; }
 
@@ -46,6 +47,12 @@ struct BloomBlockConcluder {
 // Finishes a block using response from a transaction re-request.
 struct XThinBlockConcluder {
     void operator()(const XThinReReqResponse& resp,
+        CNode& pfrom, ThinBlockWorker& worker);
+};
+
+// Finishes a block using response from a transaction re-request.
+struct CompactBlockConcluder {
+    void operator()(const CompactReReqResponse& resp,
         CNode& pfrom, ThinBlockWorker& worker);
 };
 

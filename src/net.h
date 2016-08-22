@@ -661,6 +661,7 @@ public:
 
     bool SupportsBloomThinBlocks() const;
     bool SupportsXThinBlocks() const;
+    bool SupportsCompactBlocks() const;
 };
 
 

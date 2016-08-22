@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include <boost/test/unit_test.hpp>
 #include "test/thinblockutil.h"
+#include "blockencodings.h"
 #include "blocksender.h"
 #include "net.h"
 #include "uint256.h"
@@ -21,6 +22,7 @@ BOOST_AUTO_TEST_CASE(inv_type_check) {
     BOOST_CHECK(b.isBlockType(MSG_FILTERED_BLOCK));
     BOOST_CHECK(b.isBlockType(MSG_THINBLOCK));
     BOOST_CHECK(b.isBlockType(MSG_XTHINBLOCK));
+    BOOST_CHECK(b.isBlockType(MSG_CMPCT_BLOCK));
     BOOST_CHECK(!b.isBlockType(MSG_TX));
 }
 
@@ -115,6 +117,7 @@ BOOST_AUTO_TEST_CASE(send_msg_thinblock) {
     CBlockIndex index;
     BlockSenderDummy bs;
     DummyNode node;
+    NodeStatePtr(node.id)->supportsCompactBlocks = false;
 
     bs.sendBlock(node, index, MSG_THINBLOCK);
     BOOST_CHECK_EQUAL("block", node.messages.at(0));
@@ -165,7 +168,32 @@ BOOST_AUTO_TEST_CASE(send_msg_xblocktx) {
     req.txRequesting = requesting;
     bs.sendReReqReponse(node, index, req);
     BOOST_CHECK_EQUAL("xblocktx", node.messages.at(0));
-
 }
+
+BOOST_AUTO_TEST_CASE(send_msg_cmpct_block) {
+    CBlockIndex index;
+    BlockSenderDummy bs;
+
+    DummyNode node;
+    NodeStatePtr(node.id)->supportsCompactBlocks = true;
+    bs.readBlock = TestBlock2();
+    bs.sendBlock(node, index, MSG_CMPCT_BLOCK);
+    BOOST_CHECK_EQUAL("cmpctblock", node.messages.at(0));
+};
+
+BOOST_AUTO_TEST_CASE(send_msg_blocktxn) {
+    CBlockIndex index;
+    BlockSenderDummy bs;
+    DummyNode node;
+    CBlock block = TestBlock1();
+
+    CompactReRequest req;
+    req.indexes.push_back(1);
+    req.indexes.push_back(4);
+    req.blockhash = block.GetHash();
+    bs.sendReReqReponse(node, index, req);
+    BOOST_CHECK_EQUAL("blocktxn", node.messages.at(0));
+}
+
 
 BOOST_AUTO_TEST_SUITE_END();

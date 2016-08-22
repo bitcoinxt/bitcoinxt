@@ -50,16 +50,14 @@ struct WrappedFinder : public TxFinder {
 
     virtual CTransaction operator()(const ThinTx& hash) const {
 
-        typedef std::vector<CTransaction>::const_iterator auto_;
-
-        for (auto_ t = txs.begin(); t != txs.end(); ++t)
-            if (t->GetHash().GetCheapHash() == hash.cheap())
-                return *t;
+        for (const CTransaction& t : txs)
+            if (hash.equals(t.GetHash()))
+                return t;
 
         return wrapped(hash);
     }
 
-    std::vector<CTransaction> txs;
+    const std::vector<CTransaction> txs;
     const TxFinder& wrapped;
 };
 
@@ -81,13 +79,13 @@ void ThinBlockManager::buildStub(const StubData& s, const TxFinder& txFinder)
             // all workers working on block as misbehaving. We don't know
             // who provided a bad stub.
             removeIfExists(h);
+            return;
         }
 
         // The stub may provide transactions we're missing.
-        typedef std::vector<CTransaction>::const_iterator auto_;
         std::vector<CTransaction> provided = s.missingProvided();
-        for (auto_ tx = provided.begin(); tx != provided.end(); ++tx)
-            builders[h].builder->addTransaction(*tx);
+        for (auto& tx : provided)
+            builders[h].builder->addTransaction(tx);
     }
     else {
         WrappedFinder wfinder(s.missingProvided(), txFinder);

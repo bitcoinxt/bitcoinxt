@@ -81,9 +81,10 @@ enum {
     // Core nodes with protocol >= 70011 do not support bloom-filter unless this bit is advertised.
     NODE_BLOOM = (1 << 2),
 
-    // FIXME: Remove or rename. This one will likely be used for segwit.
-    NODE_RESERVED_1 = (1 << 3),
+    // Indicates that node is sewgit enabled
+    NODE_WITNESS = (1 << 3),
 
+    // Node supports xthin
     NODE_THIN = (1 << 4)
 
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
@@ -164,8 +165,13 @@ enum {
     // of the entire block contents.
     MSG_FILTERED_BLOCK,
 
-    // BUIP010 thin block. We don't support these.
+    // BUIP010 thin block. We respond with a full block to these.
     MSG_THINBLOCK,
+
+    // Core didn't play nice and used the value taken by MSG_THINBLOCK for
+    // MSG_CMPCT_BLOCK. Treat this value as MSG_CMPCT_BLOCK only if peer has
+    // sent 'sendcmpct' first.
+    MSG_CMPCT_BLOCK = MSG_THINBLOCK,
 
     // BUIP010 xthin block. An xthin block contains the first 8 bytes of all
     // tx hashes in a block + transactions node is missing to reconstruct the

@@ -2201,3 +2201,11 @@ bool CNode::SupportsBloomThinBlocks() const {
 bool CNode::SupportsXThinBlocks() const {
     return nServices & NODE_THIN;
 }
+
+bool CNode::SupportsCompactBlocks() const {
+
+    // If a Core node activates segwit, it also
+    // disables support for compact blocks v1
+    return nVersion >= SHORT_IDS_BLOCKS_VERSION
+        && !(nServices & NODE_WITNESS);
+}

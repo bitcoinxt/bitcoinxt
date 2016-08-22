@@ -50,6 +50,7 @@ BITCOIN_TESTS =\
   test/Checkpoints_tests.cpp \
   test/clientversion_tests.cpp \
   test/coins_tests.cpp \
+  test/compactthin_tests.cpp \
   test/compress_tests.cpp \
   test/crypto_tests.cpp \
   test/curl_tests.cpp \
@@ -84,6 +85,7 @@ BITCOIN_TESTS =\
   test/test_bitcoin.cpp \
   test/test_bitcoin.h \
   test/testutil.h \
+  test/thinblock_tests.cpp \
   test/thinblockbuilder_tests.cpp \
   test/thinblockconcluder_tests.cpp \
   test/thinblockmanager_tests.cpp \

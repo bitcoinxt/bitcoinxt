@@ -7,6 +7,7 @@
 #include "thinblock.h"
 #include "serialize.h"
 #include "primitives/block.h"
+#include "util.h"
 #include <memory>
 #include <stdexcept>
 
@@ -58,8 +59,8 @@ class XThinWorker : public ThinBlockWorker {
         // only for unit testing
         XThinWorker(ThinBlockManager&, NodeId);
 
-        virtual void requestBlock(const uint256& block,
-                std::vector<CInv>& getDataReq, CNode& node);
+        void requestBlock(const uint256& block,
+                std::vector<CInv>& getDataReq, CNode& node) override;
 
     private:
         std::unique_ptr<struct TxHashProvider> HashProvider;
@@ -82,6 +83,9 @@ struct XThinStub : public StubData {
         catch (const std::exception& e) {
             throw thinblock_error(e.what());
         }
+
+        LogPrint("thin", "Created xthin stub for %s, %d transactions.\n",
+                header().GetHash().ToString(), allTransactions().size());
     }
 
     virtual CBlockHeader header() const {

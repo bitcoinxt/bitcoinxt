@@ -10,6 +10,7 @@ class CInv;
 class CNode;
 class CBlock;
 class XThinReRequest;
+class CompactReRequest;
 
 // Handles network 'getdata' requests for blocks.
 class BlockSender {
@@ -33,6 +34,11 @@ class BlockSender {
         // from a thin block.
         void sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
             const XThinReRequest& req);
+
+        // Creates a response for a re-request for transactions missing
+        // from a compact thin block.
+        void sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
+            const CompactReRequest& req);
 
     protected: // used in unit tests
         void triggerNextRequest(const CChain& activeChain, const CInv& inv, CNode& node);
