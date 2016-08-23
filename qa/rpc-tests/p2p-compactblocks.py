@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python2
 # Copyright (c) 2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -81,7 +81,7 @@ class TestNode(SingleNodeConnCB):
 
 class CompactBlocksTest(BitcoinTestFramework):
     def __init__(self):
-        super().__init__()
+        super(CompactBlocksTest, self).__init__()
         self.setup_clean_chain = True
         self.num_nodes = 1
         self.utxos = []
