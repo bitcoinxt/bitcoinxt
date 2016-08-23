@@ -40,12 +40,15 @@ for Debian-based Linux systems. If you compile bitcoind/bitcoin-qt yourself, the
 Gavin's notes on getting gitian builds up and running using KVM.
 
 ### [Gitian-downloader](/contrib/gitian-downloader)
-Various PGP files of core developers. 
+Various PGP files of core developers.
 
 ### [MacDeploy](/contrib/macdeploy) ###
-Scripts and notes for Mac builds. 
+Scripts and notes for Mac builds.
 
-Test and Verify Tools 
+### [Gitian-build](/contrib/gitian-build.sh) ###
+Script for running full gitian builds.
+
+Test and Verify Tools
 ---------------------
 
 ### [TestGen](/contrib/testgen) ###
