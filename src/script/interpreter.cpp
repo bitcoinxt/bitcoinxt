@@ -1173,7 +1173,7 @@ uint256 GetOutputsHash(const CTransaction& txTo) {
 
 } // anon namespace
 
-CachedHashes::CachedHashes(const CTransaction& txTo)
+PrecomputedTransactionData::PrecomputedTransactionData(const CTransaction& txTo)
 {
     hashPrevouts = GetPrevoutHash(txTo);
     hashSequence = GetSequenceHash(txTo);
@@ -1181,7 +1181,7 @@ CachedHashes::CachedHashes(const CTransaction& txTo)
 }
 
 uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsigned int nIn, uint32_t nHashType,
-                      const CAmount &amount, unsigned int flags, const CachedHashes* cache)
+                      const CAmount &amount, unsigned int flags, const PrecomputedTransactionData* cache)
 {
     if ((nHashType & SIGHASH_FORKID) &&
         (flags & SCRIPT_ENABLE_SIGHASH_FORKID)) {
@@ -1274,7 +1274,7 @@ bool TransactionSignatureChecker::CheckSig(const vector<unsigned char>& vchSigIn
     uint32_t nHashType = GetHashType(vchSig);
     vchSig.pop_back();
 
-    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, flags, this->cachedHashes);
+    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, flags, this->txdata);
 
     if (!VerifySignature(vchSig, pubkey, sighash))
         return false;
