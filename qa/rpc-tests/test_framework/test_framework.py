@@ -19,6 +19,10 @@ from util import *
 
 class BitcoinTestFramework(object):
 
+    def __init__(self):
+        self.setup_clean_chain = False
+        self.num_nodes = 4
+
     # These may be over-ridden by subclasses:
     def run_test(self):
         for node in self.nodes:
@@ -29,8 +33,13 @@ class BitcoinTestFramework(object):
         pass
 
     def setup_chain(self):
-        print("Initializing test directory "+self.options.tmpdir)
-        initialize_chain(self.options.tmpdir)
+        print("Initializing test directory "+self.options.tmpdir \
+                + " (clean: %s)" % self.setup_clean_chain)
+
+        if self.setup_clean_chain:
+            initialize_chain_clean(self.options.tmpdir, self.num_nodes)
+        else:
+            initialize_chain(self.options.tmpdir)
 
     def setup_nodes(self):
         return start_nodes(4, self.options.tmpdir)
@@ -157,7 +166,9 @@ class ComparisonTestFramework(BitcoinTestFramework):
 
     # Can override the num_nodes variable to indicate how many nodes to run.
     def __init__(self):
+        super(ComparisonTestFramework, self).__init__()
         self.num_nodes = 2
+        self.setup_clean_chain = True
 
     def add_options(self, parser):
         parser.add_option("--testbinary", dest="testbinary",
