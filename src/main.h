@@ -45,8 +45,8 @@ class CConnman;
 class CScriptCheck;
 class CValidationInterface;
 class CValidationState;
-class PrecomputedTransactionData;
 
+struct PrecomputedTransactionData;
 struct CNodeStateStats;
 struct LockPoints;
 
