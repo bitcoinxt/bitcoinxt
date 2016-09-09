@@ -238,7 +238,7 @@ public:
 
         // Don't throw "Bitcoin is not connected"
         globalBackup.reset(g_connman.release());
-        g_connman.reset(new CConnman);
+        g_connman.reset(new CConnman(0, 0));
         g_connman->AddTestNode(&dummynode);
     }
     ~RpcMineState() {

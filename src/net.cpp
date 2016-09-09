@@ -1780,10 +1780,10 @@ void InitNetworkShapers() {
     sendShaper.set(GetArg("-sendburst", 0) * 1000, GetArg("-sendavg", 0) * 1000);
 }
 
-CConnman::CConnman() : nSendBufferMaxSize(0), nReceiveFloodSize(0),
+CConnman::CConnman(uint64_t seed0, uint64_t seed1) : nSendBufferMaxSize(0), nReceiveFloodSize(0),
                        fAddressesInitialized(false),  nLastNodeId(0), semOutbound(nullptr),
                        nMaxConnections(0), nMaxOutbound(0), nBestHeight(0), clientInterface(nullptr),
-                       flagInterruptMsgProc(false)
+                       nSeed0(seed0), nSeed1(seed1), flagInterruptMsgProc(false)
 {
 }
 
@@ -2353,4 +2353,9 @@ bool CNode::SupportsCompactBlocks() const {
 
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds) {
     return nNow + (int64_t)(log1p(GetRand(1ULL << 48) * -0.0000000000000035527136788 /* -1/2^48 */) * average_interval_seconds * -1000000.0 + 0.5);
+}
+
+CSipHasher CConnman::GetDeterministicRandomizer(uint64_t id)
+{
+    return CSipHasher(nSeed0, nSeed1).Write(id);
 }

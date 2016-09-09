@@ -14,11 +14,14 @@ BOOST_FIXTURE_TEST_SUITE(p2p_protocol_tests, TestingSetup)
 
 namespace {
 class DummyConnman : public CConnman {
-        bool CheckIncomingNonce(uint64_t nonce) override {
-            // this trips the version message logic to end shortly after reading
-            // the data (which is the focus the tests using this dummy object)
-            return false;
-        }
+public:
+    DummyConnman() : CConnman(0, 0) { }
+protected:
+    bool CheckIncomingNonce(uint64_t nonce) override {
+        // this trips the version message logic to end shortly after reading
+        // the data (which is the focus the tests using this dummy object)
+        return false;
+    }
 };
 } // ns anon
 
@@ -75,7 +78,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
     BOOST_CHECK_EQUAL(size_t(126), s.size());
     auto temp = logCategories.load();
     logCategories |= Log::NET;
-    CConnman dummy;
+    CConnman dummy(0, 0);
     std::atomic<bool> interruptDummy(false);
     BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, &dummy, interruptDummy));
     logCategories.store(temp);
@@ -93,7 +96,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeValidRejectMessage)
     BOOST_CHECK_EQUAL(size_t(151), s.size());
     auto temp = logCategories.load();
     logCategories |= Log::NET;
-    CConnman dummy;
+    CConnman dummy(0, 0);
     std::atomic<bool> interruptDummy(false);
     BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, &dummy, interruptDummy));
     logCategories.store(temp);
@@ -110,7 +113,7 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeWeirdRejectMessage)
     BOOST_CHECK_EQUAL(size_t(127), s.size());
     auto temp = logCategories.load();
     logCategories |= Log::NET;
-    CConnman dummy;
+    CConnman dummy(0, 0);
     std::atomic<bool> interruptDummy(false);
     BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, &dummy, interruptDummy)); // check this way since the reject message processing swallows the exception
     logCategories.store(temp);
@@ -128,7 +131,7 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeValidRejectMessage)
     BOOST_CHECK_EQUAL(size_t(152), s.size());
     auto temp = logCategories.load();
     logCategories |= Log::NET;
-    CConnman dummy;
+    CConnman dummy(0, 0);
     std::atomic<bool> interruptDummy(false);
     BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, &dummy, interruptDummy)); // check this way since the reject message processing swallows the exception
     logCategories.store(temp);

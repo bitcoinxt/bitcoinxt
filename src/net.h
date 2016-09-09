@@ -113,7 +113,7 @@ public:
         unsigned int nSendBufferMaxSize = 0;
         unsigned int nReceiveFloodSize = 0;
     };
-    CConnman();
+    CConnman(uint64_t seed0, uint64_t seed1);
     virtual ~CConnman();
     bool Start(CScheduler& scheduler, std::string& strNodeError, Options options);
     void Stop();
@@ -259,6 +259,9 @@ public:
     void AddTestNode(CNode*);
     void RemoveTestNode(CNode*);
 
+    /** Get a unique deterministic randomizer. */
+    CSipHasher GetDeterministicRandomizer(uint64_t id);
+
 private:
     struct ListenSocket {
         SOCKET socket;
@@ -336,6 +339,8 @@ private:
     std::atomic<int> nBestHeight;
     CClientUIInterface* clientInterface;
 
+    /** SipHasher seeds for deterministic randomness */
+    const uint64_t nSeed0, nSeed1;
     std::condition_variable condMsgProc;
     std::mutex mutexMsgProc;
     std::atomic<bool> flagInterruptMsgProc;

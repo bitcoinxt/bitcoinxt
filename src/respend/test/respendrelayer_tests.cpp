@@ -15,7 +15,7 @@ using namespace respend;
 BOOST_FIXTURE_TEST_SUITE(respendrelayer_tests, BasicTestingSetup);
 
 BOOST_AUTO_TEST_CASE(not_interesting) {
-    CConnman connman;
+    CConnman connman(0, 0);
     RespendRelayer r(&connman);
     BOOST_CHECK(!r.IsInteresting());
     CTxMemPool::txiter dummy;
@@ -33,7 +33,7 @@ BOOST_AUTO_TEST_CASE(not_interesting) {
 }
 
 BOOST_AUTO_TEST_CASE(is_interesting) {
-    CConnman connman;
+    CConnman connman(0, 0);
     RespendRelayer r(&connman);
     CTxMemPool::txiter dummy;
     bool lookAtMore;
@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
 
     DummyNode node;
     node.fRelayTxes = true;
-    CConnman connman;
+    CConnman connman(0, 0);
     connman.AddTestNode(&node);
 
     // Create a "not interesting" respend
