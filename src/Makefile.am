@@ -103,6 +103,7 @@ BITCOIN_CORE_H = \
   core_io.h \
   curl_wrapper.h \
   compactblockprocessor.h \
+  compactprefiller.h \
   compactthin.h \
   core_memusage.h \
   dummythin.h \
@@ -210,6 +211,7 @@ libbitcoin_server_a_SOURCES = \
   chain.cpp \
   checkpoints.cpp \
   compactblockprocessor.cpp \
+  compactprefiller.cpp \
   compactthin.cpp \
   curl_wrapper.cpp \
   inflightindex.cpp \

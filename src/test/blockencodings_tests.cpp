@@ -42,7 +42,7 @@ BOOST_AUTO_TEST_CASE(TransactionsRequestSerializationTest) {
 
 BOOST_AUTO_TEST_CASE(validate_compact_block) {
     CBlock block = TestBlock1(); // valid block
-    CompactBlock a(block);
+    CompactBlock a(block, CoinbaseOnlyPrefiller{});
     BOOST_CHECK_NO_THROW(validateCompactBlock(a));
 
     // Invalid header
@@ -71,43 +71,6 @@ BOOST_AUTO_TEST_CASE(validate_compact_block) {
     f.shorttxids.clear();
     f.prefilledtxn.clear();
     BOOST_CHECK_THROW(validateCompactBlock(f), std::invalid_argument);
-}
-
-BOOST_AUTO_TEST_CASE(prefill_transactions) {
-
-    CBlock block = TestBlock1();
-
-    // Transactions that we know that peer knows about.
-    uint256 known1 = block.vtx[2].GetHash();
-    uint256 known2 = block.vtx[3].GetHash();
-    uint256 known3 = block.vtx[5].GetHash();
-
-    CRollingBloomFilter inventoryKnown(100, 0.000001);
-
-    inventoryKnown.insert(known1);
-    inventoryKnown.insert(known2);
-    inventoryKnown.insert(known3);
-
-    CompactBlock thin(block, &inventoryKnown);
-
-    // Should have 3 prefilled, coinbase + known1 + known2
-    BOOST_CHECK_EQUAL(block.vtx.size() - 3, thin.prefilledtxn.size());
-
-    // inventoryKnown should not be included
-    auto findFunc = [&known1, &known2, &known3](const PrefilledTransaction& tx) {
-        return tx.tx.GetHash() == known1
-            || tx.tx.GetHash() == known2
-            || tx.tx.GetHash() == known3;
-    };
-    auto res = std::find_if(
-            begin(thin.prefilledtxn), end(thin.prefilledtxn), findFunc);
-    BOOST_CHECK(res == end(thin.prefilledtxn));
-
-    // indexes should be "differentially encoded"
-    BOOST_CHECK_EQUAL(thin.prefilledtxn.at(0).index, 0);
-    BOOST_CHECK_EQUAL(thin.prefilledtxn.at(1).index, 1);
-    BOOST_CHECK_EQUAL(thin.prefilledtxn.at(2).index, 3);
-    BOOST_CHECK_EQUAL(thin.prefilledtxn.at(3).index, 2);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

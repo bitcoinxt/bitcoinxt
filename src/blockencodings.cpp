@@ -27,8 +27,7 @@ uint64_t GetShortID(
 
 #define MIN_TRANSACTION_SIZE (::GetSerializeSize(CTransaction(), SER_NETWORK, PROTOCOL_VERSION))
 
-CompactBlock::CompactBlock(const CBlock& block,
-    const CRollingBloomFilter* inventoryKnown) :
+CompactBlock::CompactBlock(const CBlock& block, const CompactPrefiller& prefiller) :
         nonce(GetRand(std::numeric_limits<uint64_t>::max())), header(block)
 {
     FillShortTxIDSelector();
@@ -36,21 +35,21 @@ CompactBlock::CompactBlock(const CBlock& block,
     if (block.vtx.empty())
         throw std::invalid_argument(__func__ + std::string(" expects coinbase tx"));
 
-    //< Index of a prefilled tx is its diff from last index.
-    size_t prevIndex = 0;
-    prefilledtxn.push_back(PrefilledTransaction{0, block.vtx[0]});
+    prefilledtxn = prefiller.fillFrom(block);
 
-    for (size_t i = 1; i < block.vtx.size(); i++) {
-        const CTransaction& tx = block.vtx[i];
+    auto isPrefilled = [this](const uint256& tx) {
+        for (auto& p : this->prefilledtxn)
+            if (p.tx.GetHash() == tx)
+                return true;
+        return false;
+    };
 
-        if (inventoryKnown && !inventoryKnown->contains(tx.GetHash()))
-        {
-            prefilledtxn.push_back(PrefilledTransaction{
-                    static_cast<uint16_t>(i - prevIndex), tx});
-            prevIndex = i;
-        }
-        else
-            shorttxids.push_back(GetShortID(tx.GetHash()));
+    // Fill short IDs.
+    for (const CTransaction& tx : block.vtx) {
+        if (isPrefilled(tx.GetHash()))
+            continue;
+
+        shorttxids.push_back(GetShortID(tx.GetHash()));
     }
 }
 

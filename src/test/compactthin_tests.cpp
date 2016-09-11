@@ -23,11 +23,11 @@ BOOST_FIXTURE_TEST_SUITE(compactthin_tests, Workaround);
 
 BOOST_AUTO_TEST_CASE(stub_tx_hashtypes) {
     CBlock block = TestBlock1();
-    CompactBlock cmpctblock(block);
+    CompactBlock cmpctblock(block, CoinbaseOnlyPrefiller{});
 
     // CompactBlock is initialized with coinbase prefilled.
     // Prefilled transactions have full hash.
-    CompactStub stub(block);
+    CompactStub stub(cmpctblock);
     std::vector<ThinTx> all = stub.allTransactions();
     for (auto& t : all)
         BOOST_CHECK(!t.isNull());
@@ -52,16 +52,16 @@ BOOST_AUTO_TEST_CASE(stub_tx_hashtypes) {
 BOOST_AUTO_TEST_CASE(ids_are_correct) {
     CBlock testblock = TestBlock1();
 
-    CRollingBloomFilter inventoryKnown(100, 0.000001);
+    std::unique_ptr<CRollingBloomFilter> inventoryKnown(new CRollingBloomFilter(100, 0.000001));
     for (size_t i = 1; i < testblock.vtx.size(); ++i) {
 
         if (i == 3 || i == 5)
             continue;
 
-        inventoryKnown.insert(testblock.vtx[i].GetHash());
+        inventoryKnown->insert(testblock.vtx[i].GetHash());
     }
 
-    CompactBlock thin(testblock, &inventoryKnown);
+    CompactBlock thin(testblock, InventoryKnownPrefiller(std::move(inventoryKnown)));
     CompactStub stub(thin);
 
     auto all = stub.allTransactions();

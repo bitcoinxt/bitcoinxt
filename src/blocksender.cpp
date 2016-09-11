@@ -138,12 +138,7 @@ void BlockSender::sendBlock(CNode& node,
     }
 
     if (invType == MSG_CMPCT_BLOCK && NodeStatePtr(node.id)->supportsCompactBlocks) {
-        std::unique_ptr<CRollingBloomFilter> filter;
-        {
-            LOCK(node.cs_inventory);
-            filter.reset(new CRollingBloomFilter(node.filterInventoryKnown));
-        }
-        CompactBlock cmpct(block, filter.get());
+        CompactBlock cmpct(block, *choosePrefiller(node));
         node.PushMessage("cmpctblock", cmpct);
         return;
     }

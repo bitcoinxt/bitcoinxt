@@ -1,4 +1,5 @@
 // Copyright (c) 2016 The Bitcoin Core developers
+// Copyright (c) 2016 The Bitcoin XT developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -6,7 +7,7 @@
 #define BITCOIN_BLOCK_ENCODINGS_H
 
 #include "primitives/block.h"
-#include "bloom.h"
+#include "compactprefiller.h"
 
 #include <memory>
 
@@ -16,21 +17,6 @@ uint64_t GetShortID(
         const uint256& txhash);
 
 class CTxMemPool;
-
-// Dumb helper to handle CTransaction compression at serialize-time
-struct TransactionCompressor {
-private:
-    CTransaction& tx;
-public:
-    TransactionCompressor(CTransaction& txIn) : tx(txIn) {}
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        READWRITE(tx); //TODO: Compress tx encoding
-    }
-};
 
 class CompactReRequest {
 public:
@@ -115,25 +101,6 @@ public:
     }
 };
 
-// Dumb serialization/storage-helper for CompactBlock
-struct PrefilledTransaction {
-    // Used as an offset since last prefilled tx in CompactBlock,
-    uint16_t index;
-    CTransaction tx;
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
-        uint64_t idx = index;
-        READWRITE(COMPACTSIZE(idx));
-        if (idx > std::numeric_limits<uint16_t>::max())
-            throw std::ios_base::failure("index overflowed 16-bits");
-        index = idx;
-        READWRITE(REF(TransactionCompressor(tx)));
-    }
-};
-
 class CompactBlock {
 public:
     mutable uint64_t shorttxidk0, shorttxidk1;
@@ -153,7 +120,7 @@ public:
     // Dummy for deserialization
     CompactBlock() {}
 
-    CompactBlock(const CBlock& block, const CRollingBloomFilter* inventoryKnown = nullptr);
+    CompactBlock(const CBlock& block, const CompactPrefiller& prefiller);
 
     uint64_t GetShortID(const uint256& txhash) const;
 
