@@ -4665,12 +4665,25 @@ struct TxFinderImpl : public TxFinder {
 
     CTransaction lookup(const ThinTx& hash) const {
 
+        CTransaction match;
         {
             LOCK(mempool.cs);
-            for (auto t = mempool.mapTx.begin(); t != mempool.mapTx.end(); ++t)
-                if (hash.equals(t->GetTx().GetHash()))
-                    return t->GetTx();
+            for (auto& t : mempool.mapTx) {
+                if (!hash.equals(t.GetTx().GetHash()))
+                    continue;
+
+                if (!match.IsNull()) {
+                    LogPrintf("Info: Hash collision in thin block for tx %s\n",
+                            t.GetTx().GetHash().ToString());
+                    // Return empty tx so it is re-requested.
+                    return CTransaction();
+
+                }
+                match = t.GetTx();
+            }
         }
+        if (!match.IsNull())
+            return match;
 
         for (auto t : mapOrphanTransactions)
             if (hash.equals(t.second.tx.GetHash()))
