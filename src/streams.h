@@ -78,6 +78,13 @@ public:
         Init(nTypeIn, nVersionIn);
     }
 
+    template <typename... Args>
+    CDataStream(int nTypeIn, int nVersionIn, Args&&... args)
+    {
+        Init(nTypeIn, nVersionIn);
+        ::SerializeMany(*this, std::forward<Args>(args)...);
+    }
+
     void Init(int nTypeIn, int nVersionIn)
     {
         nReadPos = 0;
@@ -312,7 +319,7 @@ private:
     const int nType;
     const int nVersion;
 
-    FILE* file;	
+    FILE* file;
 
 public:
     CAutoFile(FILE* filenew, int nTypeIn, int nVersionIn) : nType(nTypeIn), nVersion(nVersionIn)
