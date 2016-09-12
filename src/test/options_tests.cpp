@@ -38,10 +38,10 @@ struct DummyArgGetter : public ArgGetter {
 BOOST_AUTO_TEST_SUITE(options_tests);
 
 BOOST_AUTO_TEST_CASE(scripthreads) {
-    std::auto_ptr<DummyArgGetter> arg(new DummyArgGetter);
+    std::unique_ptr<DummyArgGetter> arg(new DummyArgGetter);
     DummyArgGetter* argPtr = arg.get();
-    std::auto_ptr<ArgReset> argraii
-        = SetDummyArgGetter(std::auto_ptr<ArgGetter>(arg.release()));
+    std::unique_ptr<ArgReset> argraii
+        = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg.release()));
 
     argPtr->par = 0; // auto
     BOOST_CHECK(Opt().ScriptCheckThreads() > 0);
@@ -54,10 +54,10 @@ BOOST_AUTO_TEST_CASE(scripthreads) {
 }
 
 BOOST_AUTO_TEST_CASE(checkpointdays) {
-    std::auto_ptr<DummyArgGetter> arg(new DummyArgGetter);
+    std::unique_ptr<DummyArgGetter> arg(new DummyArgGetter);
     DummyArgGetter* argPtr = arg.get();
-    std::auto_ptr<ArgReset> argraii
-        = SetDummyArgGetter(std::auto_ptr<ArgGetter>(arg.release()));
+    std::unique_ptr<ArgReset> argraii
+        = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg.release()));
 
     // No multiplier
     argPtr->par = 1;

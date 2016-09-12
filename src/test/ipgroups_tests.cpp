@@ -100,7 +100,7 @@ BOOST_AUTO_TEST_CASE(assign_creates_ipgroup) {
     BOOST_CHECK_EQUAL(DEFAULT_IPGROUP_PRI, newip.priority);
 
     // A node with this IP connects and taks a slot.
-    std::auto_ptr<IPGroupSlot> slot = AssignIPGroupSlot(ip);
+    std::unique_ptr<IPGroupSlot> slot = AssignIPGroupSlot(ip);
 
     // IP should now have its own group.
     newip = FindGroupForIP(ip);
@@ -112,12 +112,12 @@ BOOST_AUTO_TEST_CASE(multiple_connections_decr_pri) {
     CNetAddr ip("10.0.0.2");
 
     // IP with one connection should have normal pri.
-    std::auto_ptr<IPGroupSlot> slot1 = AssignIPGroupSlot(ip);
+    std::unique_ptr<IPGroupSlot> slot1 = AssignIPGroupSlot(ip);
     CIPGroupData newip = FindGroupForIP(ip);
     BOOST_CHECK_EQUAL(DEFAULT_IPGROUP_PRI, newip.priority);
 
     // IP with two connections should have lower.
-    std::auto_ptr<IPGroupSlot> slot2 = AssignIPGroupSlot(ip);
+    std::unique_ptr<IPGroupSlot> slot2 = AssignIPGroupSlot(ip);
     newip = FindGroupForIP(ip);
     BOOST_CHECK_EQUAL(DEFAULT_IPGROUP_PRI - IPGROUP_CONN_MODIFIER, newip.priority);
 
@@ -138,7 +138,7 @@ BOOST_AUTO_TEST_CASE(ipgroup_self_erases) {
 
     // When a new group is created for a single IP, that group
     // should self erase when last node from that IP disconnects.
-    std::auto_ptr<IPGroupSlot> slot1 = AssignIPGroupSlot(ip);
+    std::unique_ptr<IPGroupSlot> slot1 = AssignIPGroupSlot(ip);
     CIPGroupData newip = FindGroupForIP(ip);
     BOOST_CHECK(!newip.name.empty());
     BOOST_CHECK_EQUAL(1, newip.connCount);
@@ -155,7 +155,7 @@ BOOST_AUTO_TEST_CASE(add_or_replace_keeps_conncount) {
     AddOrReplace(g);
 
     CNetAddr ip("127.1.1.1");
-    std::auto_ptr<IPGroupSlot> slot1 = AssignIPGroupSlot(ip);
+    std::unique_ptr<IPGroupSlot> slot1 = AssignIPGroupSlot(ip);
 
     CIPGroup g2;
     g.header.name = "test";

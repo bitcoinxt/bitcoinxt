@@ -53,7 +53,7 @@ class XThinWorker : public ThinBlockWorker {
 
     public:
         XThinWorker(ThinBlockManager&, NodeId,
-                std::auto_ptr<struct TxHashProvider>);
+                std::unique_ptr<struct TxHashProvider>);
 
         // only for unit testing
         XThinWorker(ThinBlockManager&, NodeId);
@@ -62,7 +62,7 @@ class XThinWorker : public ThinBlockWorker {
                 std::vector<CInv>& getDataReq, CNode& node);
 
     private:
-        std::auto_ptr<struct TxHashProvider> HashProvider;
+        std::unique_ptr<struct TxHashProvider> HashProvider;
 
 };
 
