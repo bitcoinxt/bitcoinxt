@@ -187,10 +187,7 @@ void Shutdown()
 #endif
     GenerateBitcoins(false, 0, Params(), nullptr);
     MapPort(false);
-    if (g_connman) {
-        g_connman->Stop();
-        g_connman.reset();
-    }
+    g_connman.reset();
 
     // After everything has been shut down, but before things get flushed, stop the
     // CScheduler/checkqueue threadGroup
