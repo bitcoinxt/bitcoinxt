@@ -568,20 +568,6 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete
     return true;
 }
 
-unsigned int CNetMessage::FinalizeHeader(CDataStream& s)
-{
-    // Set the size
-    unsigned int nSize = s.size() - CMessageHeader::HEADER_SIZE;
-    WriteLE32((uint8_t*)&s[CMessageHeader::MESSAGE_SIZE_OFFSET], nSize);
-
-    // Set the checksum
-    uint256 hash = Hash(s.begin() + CMessageHeader::HEADER_SIZE, s.end());
-    assert(s.size () >= CMessageHeader::CHECKSUM_OFFSET + CMessageHeader::CHECKSUM_SIZE);
-    memcpy((char*)&s[CMessageHeader::CHECKSUM_OFFSET], hash.begin(), CMessageHeader::CHECKSUM_SIZE);
-
-    return nSize;
-}
-
 int CNetMessage::readHeader(const char *pch, unsigned int nBytes)
 {
     // copy data to temporary parsing buffer
@@ -2275,55 +2261,6 @@ void CNode::AskFor(const CInv& inv)
     else
         mapAlreadyAskedFor.insert(std::make_pair(inv, nRequestTime));
     mapAskFor.insert(std::make_pair(nRequestTime, inv));
-}
-
-void CNode::BeginMessage(const char* pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend)
-{
-    ENTER_CRITICAL_SECTION(cs_vSend);
-    assert(ssSend.size() == 0);
-    ssSend << CMessageHeader(Params().NetworkMagic(), pszCommand, 0);
-    LogPrint(Log::NET, "sending: %s ", SanitizeString(pszCommand));
-}
-
-void CNode::AbortMessage() UNLOCK_FUNCTION(cs_vSend)
-{
-    ssSend.clear();
-
-    LEAVE_CRITICAL_SECTION(cs_vSend);
-
-    LogPrint(Log::NET, "(aborted)\n");
-}
-
-void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
-{
-    // The -*messagestest options are intentionally not documented in the help message,
-    // since they are only used during development to debug the networking code and are
-    // not intended for end-users.
-    if (mapArgs.count("-dropmessagestest") && GetRand(GetArg("-dropmessagestest", 2)) == 0)
-    {
-        LogPrint(Log::NET, "dropmessages DROPPING SEND MESSAGE\n");
-        AbortMessage();
-        return;
-    }
-    if (mapArgs.count("-fuzzmessagestest"))
-        Fuzz(GetArg("-fuzzmessagestest", 10));
-
-    if (ssSend.size() == 0)
-        return;
-
-    unsigned int nSize = CNetMessage::FinalizeHeader(ssSend);
-
-    LogPrint(Log::NET, "(%d bytes) peer=%d\n", nSize, id);
-
-    std::deque<CSerializeData>::iterator it = vSendMsg.insert(vSendMsg.end(), CSerializeData());
-    ssSend.GetAndClear(*it);
-    nSendSize += (*it).size();
-
-    // If write queue empty, attempt "optimistic write"
-    if (it == vSendMsg.begin())
-        SocketSendData(this);
-
-    LEAVE_CRITICAL_SECTION(cs_vSend);
 }
 
 CDataStream CConnman::BeginMessage(CNode* pnode, int nVersion, int flags, const std::string& sCommand)

@@ -63,7 +63,7 @@ struct WrappedFinder : public TxFinder {
 };
 
 void ThinBlockManager::buildStub(const StubData& s, const TxFinder& txFinder,
-        ThinBlockWorker& worker, CNode& from)
+                                 ThinBlockWorker& worker, CConnman& connman, CNode& from)
 {
     uint256 h = s.header().GetHash();
     assert(builders.count(h));
@@ -96,7 +96,7 @@ void ThinBlockManager::buildStub(const StubData& s, const TxFinder& txFinder,
 
         // Node was first to provide us
         // a thin block. Select for block announcements with thin blocks.
-        requestBlockAnnouncements(worker, from);
+        requestBlockAnnouncements(worker, connman, from);
     }
 
     if (builders[h].builder->numTxsMissing() == 0)
@@ -188,8 +188,9 @@ void ThinBlockManager::finishBlock(const uint256& h, ThinBlockBuilder& builder) 
 
 // We ask for announcements with blocks from the
 // last 3 peers to provide a thin block first.
-void ThinBlockManager::requestBlockAnnouncements(ThinBlockWorker& w, CNode& node) {
-
+void ThinBlockManager::requestBlockAnnouncements(ThinBlockWorker& w,
+                                                 CConnman& connman, CNode& node)
+{
     typedef std::unique_ptr<BlockAnnHandle> annh;
     auto it = std::find_if(
             begin(announcers), end(announcers), [&w](const annh& h) {
@@ -203,7 +204,7 @@ void ThinBlockManager::requestBlockAnnouncements(ThinBlockWorker& w, CNode& node
         return;
     }
 
-    auto handle = w.requestBlockAnnouncements(node);
+    auto handle = w.requestBlockAnnouncements(connman, node);
     if (!bool(handle)) {
         // Peer cannot provide block announcements
         // with thin blocks.

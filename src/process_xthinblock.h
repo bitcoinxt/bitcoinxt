@@ -8,8 +8,8 @@ class TxFinder;
 
 class XThinBlockProcessor : private BlockProcessor {
     public:
-        XThinBlockProcessor(CNode& f, ThinBlockWorker& w, BlockHeaderProcessor& h) :
-            BlockProcessor(f, w, "xthinblock", h)
+        XThinBlockProcessor(CConnman& c, CNode& f, ThinBlockWorker& w, BlockHeaderProcessor& h) :
+            BlockProcessor(c, f, w, "xthinblock", h)
         {
         }
 

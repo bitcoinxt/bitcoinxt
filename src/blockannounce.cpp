@@ -4,6 +4,7 @@
 #include "blockannounce.h"
 #include "blocksender.h"
 #include "main.h" // for mapBlockIndex, UpdateBlockAvailability, IsInitialBlockDownload
+#include "net.h" // CConnman
 #include "options.h"
 #include "timedata.h"
 #include "inflightindex.h"
@@ -94,9 +95,9 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
     return DOWNL_THIN_NOW;
 }
 
-void requestHeaders(CNode& from, const uint256& block) {
+static void requestHeaders(CConnman& connman, CNode& from, const uint256& block) {
 
-    from.PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), block);
+    connman.PushMessage(&from, "getheaders", chainActive.GetLocator(pindexBestHeader), block);
     LogPrint(Log::NET, "getheaders (%d) %s to peer=%d\n",
             pindexBestHeader->nHeight, block.ToString(), from.id);
 }
@@ -117,14 +118,14 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch) {
     // validated. Not doing this will result in block being discarded and
     // re-downloaded later.
     if (!hasBlockData() && !blockHeaderIsKnown() && !blocksInFlight.isInFlight(block))
-        requestHeaders(from, block);
+        requestHeaders(connman, from, block);
 
     if (s == DOWNL_THIN_NOW) {
         int numDownloading = thinmg.numWorkers(block);
         LogPrint(Log::BLOCK, "requesting %s from peer %d (%d of %d parallel)\n",
             block.ToString(), from.id, (numDownloading + 1), Opt().ThinBlocksMaxParallel());
 
-        nodestate->thinblock->requestBlock(block, toFetch, from);
+        nodestate->thinblock->requestBlock(block, toFetch, connman, from);
         nodestate->thinblock->addWork(block);
         return true;
     }
@@ -302,7 +303,7 @@ bool BlockAnnounceSender::announceWithHeaders() {
             headers.front().GetHash().ToString(),
             headers.back().GetHash().ToString(), to.id);
 
-    to.PushMessage("headers", headers);
+    connman.PushMessage(&to, "headers", headers);
     UpdateBestHeaderSent(to, best);
 
     return true;
@@ -318,7 +319,7 @@ void BlockAnnounceSender::announceWithBlock(BlockSender& sender) {
         return;
     }
 
-    sender.sendBlock(to, *block, MSG_CMPCT_BLOCK, block->nHeight);
+    sender.sendBlock(connman, to, *block, MSG_CMPCT_BLOCK, block->nHeight);
     UpdateBestHeaderSent(to, block);
 
     LogPrint(Log::NET, "%s: block %s to peer=%d\n",

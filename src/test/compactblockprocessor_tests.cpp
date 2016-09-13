@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include <boost/test/unit_test.hpp>
 
+#include "test/dummyconnman.h"
 #include "test/thinblockutil.h"
 #include "compactblockprocessor.h"
 #include "blockheaderprocessor.h"
@@ -22,7 +23,7 @@ struct CmpctDummyHeaderProcessor : public BlockHeaderProcessor {
         index.nHeight = 2;
         return &index;
     }
-    bool requestConnectHeaders(const CBlockHeader& h, CNode& from, bool) override {
+    bool requestConnectHeaders(const CBlockHeader& h, CConnman&, CNode& from, bool) override {
         return reqConnHeadResp;
     }
     bool reqConnHeadResp;
@@ -51,6 +52,7 @@ struct CBProcessorFixture {
     std::unique_ptr<ThinBlockManager> thinmg;
     CmpctDummyHeaderProcessor headerp;
     CTxMemPool mpool;
+    DummyConnman connman;
 };
 
 BOOST_FIXTURE_TEST_SUITE(compactblockprocessor_tests, CBProcessorFixture);
@@ -69,7 +71,7 @@ BOOST_AUTO_TEST_CASE(accepts_parallel_compacts) {
     uint256 block1 = uint256S("0xf00");
     w.addWork(block1);
 
-    CompactBlockProcessor p(node, w, headerp);
+    CompactBlockProcessor p(connman, node, w, headerp);
 
     CBlock block2 = TestBlock1();
     CDataStream blockstream = toStream(
@@ -102,8 +104,8 @@ BOOST_AUTO_TEST_CASE(two_process_same) {
     CompactBlock c1(block, CoinbaseOnlyPrefiller{});
     CompactBlock c2(block, CoinbaseOnlyPrefiller{}); // Has differet idks
 
-    CompactBlockProcessor p1(node1, w1, headerp);
-    CompactBlockProcessor p2(node2, w2, headerp);
+    CompactBlockProcessor p1(connman, node1, w1, headerp);
+    CompactBlockProcessor p2(connman, node2, w2, headerp);
 
     CDataStream s1 = toStream(c1);
     CDataStream s2 = toStream(c2);
@@ -115,12 +117,8 @@ BOOST_AUTO_TEST_CASE(two_process_same) {
     BOOST_CHECK(w2.isWorkingOn(block.GetHash()));
 
     // both should have sent a transaction re-request
-    auto has_msg = [](DummyNode& n, const std::string& msg) {
-        return std::find(begin(n.messages), end(n.messages), msg)
-            != end(n.messages);
-    };
-    BOOST_CHECK(has_msg(node1, "getblocktxn"));
-    BOOST_CHECK(has_msg(node2, "getblocktxn"));
+    BOOST_CHECK(connman.MsgWasSent(node1, "getblocktxn"));
+    BOOST_CHECK(connman.MsgWasSent(node2, "getblocktxn"));
 };
 
 BOOST_AUTO_TEST_CASE(discard_if_missing_prev) {
@@ -130,13 +128,14 @@ BOOST_AUTO_TEST_CASE(discard_if_missing_prev) {
     CBlock block = TestBlock1();
 
     DummyNode node(11, thinmg.get());
+    DummyConnman connman;
     CompactWorker w(*thinmg, node.id);
     CompactBlock c(block, CoinbaseOnlyPrefiller{});
     CDataStream s = toStream(c);
 
     headerp.reqConnHeadResp = true; // we need to request prev header (we don't have it)
 
-    CompactBlockProcessor p(node, w, headerp);
+    CompactBlockProcessor p(connman, node, w, headerp);
     p(s, mpool, MAX_BLOCK_SIZE, 1);
 
     // should have discarded block.

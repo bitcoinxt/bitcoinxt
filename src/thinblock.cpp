@@ -107,9 +107,11 @@ ThinBlockWorker::~ThinBlockWorker() {
     stopAllWork();
 }
 
-void ThinBlockWorker::buildStub(const StubData& d, const TxFinder& f, CNode& from) {
+void ThinBlockWorker::buildStub(const StubData& d, const TxFinder& f,
+                                CConnman& connman, CNode& from)
+{
     assert(isWorkingOn(d.header().GetHash()));
-    return mg.buildStub(d, f, *this, from);
+    return mg.buildStub(d, f, *this, connman, from);
 }
 
 bool ThinBlockWorker::isStubBuilt(const uint256& block) const {

@@ -59,16 +59,17 @@ bool BlockSender::canSend(const CChain& activeChain, const CBlockIndex& block,
     return send;
 }
 
-void BlockSender::send(const CChain& activeChain, CNode& node,
+void BlockSender::send(const CChain& activeChain, CConnman& connman, CNode& node,
         CBlockIndex& blockIndex, const CInv& inv)
 {
-    sendBlock(node, blockIndex, inv.type, activeChain.Height());
+    sendBlock(connman, node, blockIndex, inv.type, activeChain.Height());
     UpdateBestHeaderSent(node, &blockIndex);
-    triggerNextRequest(activeChain, inv, node);
+    triggerNextRequest(activeChain, inv, connman, node);
 }
 
 // Trigger the peer node to send a getblocks request for the next batch of inventory
-void BlockSender::triggerNextRequest(const CChain& activeChain, const CInv& inv, CNode& node) {
+void BlockSender::triggerNextRequest(const CChain& activeChain, const CInv& inv,
+                                     CConnman& connman, CNode& node) {
 
     if (inv.hash != node.hashContinue)
         return;
@@ -78,7 +79,7 @@ void BlockSender::triggerNextRequest(const CChain& activeChain, const CInv& inv,
     // wait for other stuff first.
     std::vector<CInv> vInv;
     vInv.push_back(CInv(MSG_BLOCK, activeChain.Tip()->GetBlockHash()));
-    node.PushMessage("inv", vInv);
+    connman.PushMessage(&node, "inv", vInv);
     node.hashContinue.SetNull();
 }
 
@@ -91,7 +92,7 @@ static bool withinDepthLimits(int depth, int blockHeight, int activeChainHeight)
     return blockHeight >= activeChainHeight - depth;
 }
 
-void BlockSender::sendBlock(CNode& node,
+void BlockSender::sendBlock(CConnman& connman, CNode& node,
         const CBlockIndex& blockIndex, int invType, int activeChainHeight)
 {
 
@@ -113,7 +114,7 @@ void BlockSender::sendBlock(CNode& node,
         // "Nodes MUST NOT send a request for a MSG_CMPCT_BLOCK object to a
         // peer before having received a sendcmpct message from that peer."
 
-        node.PushMessage("block", block);
+        connman.PushMessage(&node, "block", block);
         return;
     }
 
@@ -129,19 +130,19 @@ void BlockSender::sendBlock(CNode& node,
             if (withinDepthLimits(MAX_CMPCTBLOCK_DEPTH, blockIndex.nHeight, activeChainHeight)) {
                 XThinBlock thinb(block, filter);
                 if (thinIsSmaller(block, thinb)) {
-                    node.PushMessage("xthinblock", thinb);
+                    connman.PushMessage(&node, "xthinblock", thinb);
                     sent = true;
                 }
             }
             if (!sent)
-                node.PushMessage("block", block);
+                connman.PushMessage(&node, "block", block);
         }
         catch (const xthin_collision_error& e) {
             LogPrintf("tx collision in thin block %s\n",
                     block.GetHash().ToString());
 
             // fall back to full block
-            node.PushMessage("block", block);
+            connman.PushMessage(&node, "block", block);
         }
         return;
     }
@@ -149,12 +150,12 @@ void BlockSender::sendBlock(CNode& node,
     if (invType == MSG_CMPCT_BLOCK && NodeStatePtr(node.id)->supportsCompactBlocks) {
         if (withinDepthLimits(MAX_CMPCTBLOCK_DEPTH, blockIndex.nHeight, activeChainHeight)) {
             CompactBlock cmpct(block, *choosePrefiller(node));
-            node.PushMessage("cmpctblock", cmpct);
+            connman.PushMessage(&node, "cmpctblock", cmpct);
         }
         else {
             LogPrint(Log::NET, "cmpctblock outside depth %d, %d peer=%d\n",
                     blockIndex.nHeight, activeChainHeight, node.id);
-            node.PushMessage("block", block);
+            connman.PushMessage(&node, "block", block);
         }
         return;
     }
@@ -166,7 +167,7 @@ void BlockSender::sendBlock(CNode& node,
         filter = *node.pfilter;
     }
     CMerkleBlock merkleBlock(block, filter);
-    node.PushMessage("merkleblock", merkleBlock);
+    connman.PushMessage(&node, "merkleblock", merkleBlock);
     // CMerkleBlock just contains hashes, so also push any transactions in the block the client did not see
     // This avoids hurting performance by pointlessly requiring a round-trip
     // Note that there is currently no way for a node to request any single transactions we didn't send here -
@@ -177,10 +178,10 @@ void BlockSender::sendBlock(CNode& node,
     typedef std::pair<unsigned int, uint256> PairType;
     BOOST_FOREACH(PairType& pair, merkleBlock.vMatchedTxn)
         if (!node.filterInventoryKnown.contains(pair.second))
-            node.PushMessage("tx", block.vtx[pair.first]);
+            connman.PushMessage(&node, "tx", block.vtx[pair.first]);
 }
 
-void BlockSender::sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
+void BlockSender::sendReReqReponse(CConnman& connman, CNode& node, const CBlockIndex& blockIndex,
         const XThinReRequest& req, int activeChainHeight)
 {
     CBlock block;
@@ -189,14 +190,14 @@ void BlockSender::sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
 
     if (withinDepthLimits(MAX_BLOCKTXN_DEPTH, blockIndex.nHeight, activeChainHeight)) {
         XThinReReqResponse resp(block, req.txRequesting);
-        node.PushMessage("xblocktx", resp);
+        connman.PushMessage(&node, "xblocktx", resp);
     }
     else {
-        node.PushMessage("block", block);
+        connman.PushMessage(&node, "block", block);
     }
 }
 
-void BlockSender::sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
+void BlockSender::sendReReqReponse(CConnman& connman, CNode& node, const CBlockIndex& blockIndex,
         const CompactReRequest& req, int activeChainHeight)
 {
     CBlock block;
@@ -205,10 +206,10 @@ void BlockSender::sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
 
     if (withinDepthLimits(MAX_BLOCKTXN_DEPTH, blockIndex.nHeight, activeChainHeight)) {
         CompactReReqResponse resp(block, req.indexes);
-        node.PushMessage("blocktxn", resp);
+        connman.PushMessage(&node, "blocktxn", resp);
     }
     else {
-        node.PushMessage("block", block);
+        connman.PushMessage(&node, "block", block);
     }
 }
 

@@ -504,7 +504,7 @@ void OnBlockFinished::rejectAndPunish(const CValidationState& state,
 
     auto rejectPunishFunc = [=](CNode* pnode) {
         if (!strCommand.empty()) {
-            pnode->PushMessage("reject", strCommand, state.GetRejectCode(),
+            g_connman->PushMessage(pnode, "reject", strCommand, state.GetRejectCode(),
                     reason.substr(0, MAX_REJECT_MESSAGE_LENGTH), hash);
         }
         if (dos <= 0)
@@ -4324,7 +4324,7 @@ void static ProcessGetData(CNode* pfrom, CConnman* connman, std::atomic<bool>& i
                         chainActive, *(mi->second), pindexBestHeader);
 
                 if (canSend)
-                    blockSender.send(chainActive, *pfrom, *(mi->second), inv);
+                    blockSender.send(chainActive, *connman, *pfrom, *(mi->second), inv);
             }
             else if (inv.IsKnownType())
             {
@@ -4334,7 +4334,7 @@ void static ProcessGetData(CNode* pfrom, CConnman* connman, std::atomic<bool>& i
                     LOCK(cs_mapRelay);
                     map<CInv, CDataStream>::iterator mi = mapRelay.find(inv);
                     if (mi != mapRelay.end()) {
-                        pfrom->PushMessage(inv.GetCommand(), (*mi).second);
+                        connman->PushMessage(pfrom, inv.GetCommand(), (*mi).second);
                         pushed = true;
                     }
                 }
@@ -4344,7 +4344,7 @@ void static ProcessGetData(CNode* pfrom, CConnman* connman, std::atomic<bool>& i
                         CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
                         ss.reserve(1000);
                         ss << tx;
-                        pfrom->PushMessage("tx", ss);
+                        connman->PushMessage(pfrom, "tx", ss);
                         pushed = true;
                     }
                 }
@@ -4371,7 +4371,7 @@ void static ProcessGetData(CNode* pfrom, CConnman* connman, std::atomic<bool>& i
         // do that because they want to know about (and store and rebroadcast and
         // risk analyze) the dependencies of transactions relevant to them, without
         // having to download the entire memory pool.
-        pfrom->PushMessage("notfound", vNotFound);
+        connman->PushMessage(pfrom, "notfound", vNotFound);
     }
 }
 
@@ -4485,14 +4485,14 @@ struct MempoolHashProvider : public TxHashProvider {
     }
 };
 
-void unexpectedThinError(const std::string& cmd, CNode& from, const std::string& err) {
+void unexpectedThinError(const std::string& cmd, CConnman& connman, CNode& from, const std::string& err) {
     LogPrintf("Unexpected error handling cmd '%s': '%s' peer=%d\n", cmd, err, from.id);
     {
         LOCK(cs_main);
         NodeStatePtr(from.id)->thinblock->stopAllWork();
         Misbehaving(from.id, 10, "thinblock: " + err);
     }
-    from.PushMessage("reject", cmd, REJECT_MALFORMED, err);
+    connman.PushMessage(&from, "reject", cmd, REJECT_MALFORMED, err);
 }
 
 bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
@@ -4625,7 +4625,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             // Get recent addresses
             if (pfrom->fOneShot || pfrom->nVersion >= CADDR_TIME_VERSION || connman->GetAddressCount() < 1000)
             {
-                pfrom->PushMessage("getaddr");
+                connman->PushMessage(pfrom, "getaddr");
                 pfrom->fGetAddr = true;
             }
             connman->MarkAddressGood(pfrom->addr);
@@ -4679,12 +4679,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             // We send this to non-NODE NETWORK peers as well, because even
             // non-NODE NETWORK peers can announce blocks (such as pruning
             // nodes)
-            pfrom->PushMessage("sendheaders");
+            connman->PushMessage(pfrom, "sendheaders");
         }
 
         if (pfrom->nVersion >= SHORT_IDS_BLOCKS_VERSION
                 && !(pfrom->SupportsXThinBlocks() && Opt().PreferXThinBlocks())) {
-            enableCompactBlocks(*pfrom, false);
+            enableCompactBlocks(*connman, *pfrom, false);
         }
     }
 
@@ -4791,7 +4791,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
                 pfrom->AskFor(inv);
 
             if (inv.type == MSG_BLOCK) {
-                BlockAnnounceReceiver ann(inv.hash, *pfrom, thinblockmg, blocksInFlight);
+                BlockAnnounceReceiver ann(inv.hash, *connman, *pfrom, thinblockmg, blocksInFlight);
                 if (ann.onBlockAnnounced(vToFetch)) {
                     // This block has been requested from peer.
                     MarkBlockAsInFlight()(pfrom->id, inv.hash, Params().GetConsensus());
@@ -4808,7 +4808,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         }
 
         if (!vToFetch.empty())
-            pfrom->PushMessage("getdata", vToFetch);
+            connman->PushMessage(pfrom, "getdata", vToFetch);
     }
 
     else if (strCommand == "getblocktxn")
@@ -4832,7 +4832,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
         try {
             if (canSend) {
-                bs.sendReReqReponse(*pfrom, *(mi->second), req,
+                bs.sendReReqReponse(*connman, *pfrom, *(mi->second), req,
                         chainActive.Height());
             }
             else {
@@ -4955,7 +4955,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         // headers message). In both cases it's safe to update
         // bestHeaderSent to be our tip.
         NodeStatePtr(pfrom->id)->bestHeaderSent = pindex ? pindex : chainActive.Tip();
-        pfrom->PushMessage("headers", vHeaders);
+        connman->PushMessage(pfrom, "headers", vHeaders);
     }
     else if (strCommand == "getutxos")
     {
@@ -4972,12 +4972,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
                 LOCK(cs_main);
                 tie(bitmap, outs) = ProcessGetUTXOs(vOutPoints, fCheckMemPool, maxBytes);
             }
-            pfrom->PushMessage("utxos",
+            connman->PushMessage(pfrom, "utxos",
                                static_cast<uint32_t>(chainActive.Height()),
                                chainActive.Tip()->GetBlockHash(), bitmap, outs);
         }
         catch (const std::exception& e) {
-            pfrom->PushMessage("reject", strCommand, REJECT_INVALID,
+            connman->PushMessage(pfrom, "reject", strCommand, REJECT_INVALID,
                                std::string(e.what()).substr(0, MAX_REJECT_MESSAGE_LENGTH));
             Misbehaving(pfrom->GetId(), 20, "getutxos request invalid");
         }
@@ -5101,7 +5101,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             LogPrint(Log::MEMPOOL, "%s from peer=%d %s was not accepted into the memory pool: %s\n", tx.GetHash().ToString(),
                 pfrom->id, pfrom->cleanSubVer,
                 state.GetRejectReason());
-            pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
+            connman->PushMessage(pfrom, "reject", strCommand, state.GetRejectCode(),
                                state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
             if (nDoS > 0)
                 Misbehaving(pfrom->GetId(), nDoS, "tx rejected: " + state.GetRejectReason());
@@ -5131,9 +5131,9 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         }
 
         MarkBlockAsInFlight inFlight;
-        DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight, CheckBlockIndex);
+        DefaultHeaderProcessor p(*connman, pfrom, blocksInFlight, thinblockmg, inFlight, CheckBlockIndex);
 
-        if (p.requestConnectHeaders(headers.at(0), *pfrom, true)) {
+        if (p.requestConnectHeaders(headers.at(0), *connman, *pfrom, true)) {
             // headers don't connect to active chain, requested
             // new headers to connect.
             return true;
@@ -5155,14 +5155,14 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             LOCK(cs_main);
             NodeStatePtr nodestate(pfrom->id);
             MarkBlockAsInFlight inFlight;
-            DefaultHeaderProcessor headerp(pfrom, blocksInFlight, thinblockmg,
-                inFlight, CheckBlockIndex);
-            XThinBlockProcessor blockp(*pfrom, *(nodestate->thinblock), headerp);
+            DefaultHeaderProcessor headerp(*connman, pfrom, blocksInFlight,
+                                           thinblockmg, inFlight, CheckBlockIndex);
+            XThinBlockProcessor blockp(*connman, *pfrom, *(nodestate->thinblock), headerp);
             blockp(vRecv, TxFinderImpl(),
                     chainActive.Tip()->nMaxBlockSize, chainActive.Height());
         }
         catch (const std::exception& e) {
-            unexpectedThinError(strCommand, *pfrom, e.what());
+            unexpectedThinError(strCommand, *connman, *pfrom, e.what());
             throw;
         }
     }
@@ -5175,13 +5175,13 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             LOCK(cs_main);
             NodeStatePtr nodestate(pfrom->id);
             MarkBlockAsInFlight inFlight;
-            DefaultHeaderProcessor headerp(pfrom, blocksInFlight, thinblockmg,
-                    inFlight, CheckBlockIndex);
-            CompactBlockProcessor blockp(*pfrom, *(nodestate->thinblock), headerp);
+            DefaultHeaderProcessor headerp(*connman, pfrom, blocksInFlight,
+                                           thinblockmg, inFlight, CheckBlockIndex);
+            CompactBlockProcessor blockp(*connman, *pfrom, *(nodestate->thinblock), headerp);
             blockp(vRecv, mempool, chainActive.Tip()->nMaxBlockSize, chainActive.Height());
         }
         catch (const std::exception& e) {
-            unexpectedThinError(strCommand, *pfrom, e.what());
+            unexpectedThinError(strCommand, *connman, *pfrom, e.what());
             throw;
         }
     }
@@ -5197,9 +5197,10 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
         LOCK(cs_main);
         MarkBlockAsInFlight inFlight;
-        DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight, CheckBlockIndex);
+        DefaultHeaderProcessor p(*connman, pfrom, blocksInFlight, thinblockmg,
+                                 inFlight, CheckBlockIndex);
 
-        if (p.requestConnectHeaders(block.GetBlockHeader(), *pfrom, true)) {
+        if (p.requestConnectHeaders(block.GetBlockHeader(), *connman, *pfrom, true)) {
             LogPrintf("Received block %s from peer=%d, but headers do "
                     "not connect. Discarding.\n",
                     inv.hash.ToString(), pfrom->id);
@@ -5258,7 +5259,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
         try {
             if (canSend)
-                bs.sendReReqReponse(*pfrom, *(mi->second), req,
+                bs.sendReReqReponse(*connman, *pfrom, *(mi->second), req,
                         chainActive.Height());
         }
         catch (const std::exception& e) {
@@ -5280,7 +5281,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         LOCK(cs_main);
         NodeStatePtr statePtr(pfrom->id);
         MarkBlockAsInFlight m;
-        XThinBlockConcluder()(resp, *pfrom, *(statePtr->thinblock), m);
+        XThinBlockConcluder()(resp, *connman, *pfrom, *(statePtr->thinblock), m);
     }
 
     else if (strCommand == "blocktxn") {
@@ -5297,7 +5298,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         LOCK(cs_main);
         NodeStatePtr statePtr(pfrom->id);
         MarkBlockAsInFlight m;
-        CompactBlockConcluder()(resp, *pfrom, *(statePtr->thinblock), m);
+        CompactBlockConcluder()(resp, *connman, *pfrom, *(statePtr->thinblock), m);
     }
 
     // This asymmetric behavior for inbound and outbound connections was introduced
@@ -5350,13 +5351,13 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
                 if (hashFound == hash || (pfrom->pfilter && pfrom->pfilter->WantsAncestors()))
                     vInv.insert(CInv(MSG_TX, hashFound));
                 if (vInv.size() == MAX_INV_SZ) {
-                    pfrom->PushMessage("inv", vInv);
+                    connman->PushMessage(pfrom, "inv", vInv);
                     vInv.clear();
                 }
             }
         }
         if (vInv.size() > 0)
-            pfrom->PushMessage("inv", vInv);
+            connman->PushMessage(pfrom, "inv", vInv);
     }
 
 
@@ -5377,7 +5378,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             // it, if the remote node sends a ping once per second and this node takes 5
             // seconds to respond to each, the 5th ping the remote sends would appear to
             // return very quickly.
-            pfrom->PushMessage("pong", nonce);
+            connman->PushMessage(pfrom, "pong", nonce);
         }
     }
 
@@ -5699,11 +5700,11 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
             pto->nPingUsecStart = GetTimeMicros();
             if (pto->nVersion > BIP0031_VERSION) {
                 pto->nPingNonceSent = nonce;
-                pto->PushMessage("ping", nonce);
+                connman->PushMessage(pto, "ping", nonce);
             } else {
                 // Peer is too old to support ping command with nonce, pong will never arrive.
                 pto->nPingNonceSent = 0;
-                pto->PushMessage("ping");
+                connman->PushMessage(pto, "ping");
             }
         }
 
@@ -5734,14 +5735,14 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
                     // receiver rejects addr messages larger than 1000
                     if (vAddr.size() >= 1000)
                     {
-                        pto->PushMessage("addr", vAddr);
+                        connman->PushMessage(pto, "addr", vAddr);
                         vAddr.clear();
                     }
                 }
             }
             pto->vAddrToSend.clear();
             if (!vAddr.empty())
-                pto->PushMessage("addr", vAddr);
+                connman->PushMessage(pto, "addr", vAddr);
         }
 
         NodeStatePtr statePtr(pto->GetId());
@@ -5760,8 +5761,9 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
             statePtr->fShouldBan = false;
         }
 
-        BOOST_FOREACH(const CBlockReject& reject, statePtr->rejects)
-            pto->PushMessage("reject", (string)"block", reject.chRejectCode, reject.strRejectReason, reject.hashBlock);
+        for (const CBlockReject& reject : statePtr->rejects) {
+            connman->PushMessage(pto, "reject", (string)"block", reject.chRejectCode, reject.strRejectReason, reject.hashBlock);
+        }
         statePtr->rejects.clear();
 
         // Start block sync
@@ -5775,7 +5777,7 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
                 nSyncStarted++;
                 CBlockIndex *pindexStart = pindexBestHeader->pprev ? pindexBestHeader->pprev : pindexBestHeader;
                 LogPrint(Log::NET, "initial getheaders (%d) to peer=%d (startheight:%d)\n", pindexStart->nHeight, pto->id, pto->nStartingHeight);
-                pto->PushMessage("getheaders", chainActive.GetLocator(pindexStart), uint256());
+                connman->PushMessage(pto, "getheaders", chainActive.GetLocator(pindexStart), uint256());
             }
         }
 
@@ -5789,7 +5791,7 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
 
         // Try sending block announcements via headers
         ProcessBlockAvailability(statePtr); // ensure pindexBestKnownBlock is up-to-date
-        BlockAnnounceSender ann(*pto);
+        BlockAnnounceSender ann(*connman, *pto);
         ann.announce();
 
         //
@@ -5834,14 +5836,14 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
                 vInv.push_back(inv);
                 if (vInv.size() >= 1000)
                 {
-                    pto->PushMessage("inv", vInv);
+                    connman->PushMessage(pto, "inv", vInv);
                     vInv.clear();
                 }
             }
             pto->vInventoryToSend = vInvWait;
         }
         if (!vInv.empty())
-            pto->PushMessage("inv", vInv);
+            connman->PushMessage(pto, "inv", vInv);
 
         // Detect whether we're stalling
         nNow = GetTimeMicros();
@@ -5888,7 +5890,7 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
             for (const CBlockIndex *pindex : vToDownload) {
 
                 if (ThinBlocksActive(pto)) {
-                    worker.requestBlock(pindex->GetBlockHash(), vGetData, *pto);
+                    worker.requestBlock(pindex->GetBlockHash(), vGetData, *connman, *pto);
                     worker.addWork(pindex->GetBlockHash());
                     LogPrint(Log::NET, "Requesting thin block %s (%d) peer=%d\n",
                             pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
@@ -5926,14 +5928,14 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
                 vGetData.push_back(inv);
                 if (vGetData.size() >= 1000)
                 {
-                    pto->PushMessage("getdata", vGetData);
+                    connman->PushMessage(pto, "getdata", vGetData);
                     vGetData.clear();
                 }
             }
             pto->mapAskFor.erase(pto->mapAskFor.begin());
         }
         if (!vGetData.empty())
-            pto->PushMessage("getdata", vGetData);
+            connman->PushMessage(pto, "getdata", vGetData);
     }
     return true;
 }

@@ -43,7 +43,7 @@ void XThinBlockProcessor::operator()(
 
     try {
         XThinStub stub(block);
-        worker.buildStub(stub, txfinder, from);
+        worker.buildStub(stub, txfinder, connman, from);
     }
     catch (const thinblock_error& e) {
         rejectBlock(hash, e.what(), 10);
@@ -68,5 +68,5 @@ void XThinBlockProcessor::operator()(
     LogPrintf("re-requesting xthin %d missing transactions for %s from peer=%d\n",
             missing.size(), hash.ToString(), from.id);
 
-    from.PushMessage("get_xblocktx", req);
+    connman.PushMessage(&from, "get_xblocktx", req);
 }

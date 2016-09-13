@@ -13,6 +13,7 @@
 #include <vector>
 
 class CBlock;
+class CConnman;
 class CNode;
 class TxFinder;
 struct ThinBloomStub;
@@ -51,7 +52,8 @@ class ThinBlockManager : boost::noncopyable {
         void delWorker(const uint256& block, ThinBlockWorker& w);
         int numWorkers(const uint256& block) const;
 
-        void buildStub(const StubData&, const TxFinder&, ThinBlockWorker&, CNode& from);
+        void buildStub(const StubData&, const TxFinder&, ThinBlockWorker&,
+                       CConnman&, CNode& from);
         bool isStubBuilt(const uint256& block);
 
         bool addTx(const uint256& block, const CTransaction& tx);
@@ -59,7 +61,7 @@ class ThinBlockManager : boost::noncopyable {
         std::vector<std::pair<int, ThinTx> > getTxsMissing(const uint256& block) const;
 
         // public for unittest
-        void requestBlockAnnouncements(ThinBlockWorker& w, CNode& n);
+        void requestBlockAnnouncements(ThinBlockWorker& w, CConnman&, CNode& n);
 
     private:
         struct ActiveBuilder {

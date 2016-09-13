@@ -2,6 +2,7 @@
 #define BLOCKPROCESSOR_H
 
 #include <string>
+class CConnman;
 class CNode;
 class ThinBlockWorker;
 class BlockHeaderProcessor;
@@ -12,9 +13,9 @@ class CBlockIndex;
 class BlockProcessor {
 
     public:
-        BlockProcessor(CNode& f, ThinBlockWorker& w,
+        BlockProcessor(CConnman& c, CNode& f, ThinBlockWorker& w,
                 const std::string& netcmd, BlockHeaderProcessor& h) :
-            from(f), worker(w), netcmd(netcmd), headerProcessor(h)
+            connman(c), from(f), worker(w), netcmd(netcmd), headerProcessor(h)
         {
         }
 
@@ -23,6 +24,7 @@ class BlockProcessor {
         bool setToWork(const CBlockHeader& hash, int activeChainHeight);
 
     protected:
+        CConnman& connman;
         CNode& from;
         ThinBlockWorker& worker;
         virtual void misbehave(int howmuch, const std::string& what);

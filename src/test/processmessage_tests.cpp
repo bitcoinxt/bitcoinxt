@@ -1,3 +1,4 @@
+#include "test/dummyconnman.h"
 #include "test/thinblockutil.h"
 #include "blockheaderprocessor.h"
 #include "bloom.h"
@@ -22,9 +23,9 @@ struct DummyWorker : public WORKER_TYPE {
         WORKER_TYPE(m, i), isBuilt(false), buildStubCalled(false)
     { }
 
-    void buildStub(const StubData& s, const TxFinder& f, CNode& n) override {
+    void buildStub(const StubData& s, const TxFinder& f, CConnman& c, CNode& n) override {
         buildStubCalled = true;
-        WORKER_TYPE::buildStub(s, f, n);
+        WORKER_TYPE::buildStub(s, f, c, n);
     }
     bool isStubBuilt(const uint256& block) const override {
         return isBuilt;
@@ -46,7 +47,7 @@ struct DummyHeaderProcessor : public BlockHeaderProcessor {
         index.nHeight = 2;
         return &index;
     }
-    bool requestConnectHeaders(const CBlockHeader& h, CNode& from, bool) override {
+    bool requestConnectHeaders(const CBlockHeader& h, CConnman&, CNode& from, bool) override {
         return false;
     }
     bool headerOK;
@@ -71,6 +72,7 @@ struct XThinBlockSetup {
     }
 
     XThinBlock xblock;
+    DummyConnman connman;
     DummyNode pfrom;
     ThinBlockManager tmgr;
     DummyHeaderProcessor headerprocessor;
@@ -78,8 +80,9 @@ struct XThinBlockSetup {
 
 struct DummyXThinProcessor : public XThinBlockProcessor {
 
-    DummyXThinProcessor(CNode& f, ThinBlockWorker& w,
-        BlockHeaderProcessor& h) : XThinBlockProcessor(f, w, h), misbehaved(0)
+    DummyXThinProcessor(CConnman& c, CNode& f, ThinBlockWorker& w,
+                        BlockHeaderProcessor& h) :
+        XThinBlockProcessor(c, f, w, h), misbehaved(0)
     { }
 
     void misbehave(int howmuch, const std::string&) override {
@@ -97,7 +100,7 @@ BOOST_AUTO_TEST_CASE(xthinblock_ignore_invalid) {
     DummyWorker<XThinWorker> worker(tmgr, 42);
     worker.addWork(xblock.header.GetHash());
     CDataStream s = stream(xblock);
-    DummyXThinProcessor process(pfrom, worker, headerprocessor);
+    DummyXThinProcessor process(connman, pfrom, worker, headerprocessor);
     process(s, NullFinder(), MAX_BLOCK_SIZE, 1);
 
     // Should reset the worker.
@@ -106,7 +109,7 @@ BOOST_AUTO_TEST_CASE(xthinblock_ignore_invalid) {
     // ...and misbehave the client.
     BOOST_CHECK_EQUAL(20, process.misbehaved);
     BOOST_CHECK(!worker.buildStubCalled);
-    BOOST_CHECK_EQUAL("reject", pfrom.messages.at(0));
+    BOOST_CHECK(connman.MsgWasSent(pfrom, "reject", 0));
 }
 
 BOOST_AUTO_TEST_CASE(xthinblock_ignore_if_has_block_data) {
@@ -117,12 +120,12 @@ BOOST_AUTO_TEST_CASE(xthinblock_ignore_if_has_block_data) {
     DummyWorker<XThinWorker> worker(tmgr, 42);
     worker.addWork(xblock.header.GetHash());
     CDataStream s = stream(xblock);
-    DummyXThinProcessor process(pfrom, worker, headerprocessor);
+    DummyXThinProcessor process(connman, pfrom, worker, headerprocessor);
     process(s, NullFinder(), MAX_BLOCK_SIZE, 1);
 
     // peer should not be working on anything
     BOOST_CHECK(!worker.isWorking());
-    BOOST_CHECK(pfrom.messages.empty()); //<- no re-requesting
+    BOOST_CHECK(connman.NumMessagesSent(pfrom) == 0); //<- no re-requesting
 }
 
 BOOST_AUTO_TEST_CASE(xthinblock_header_is_processed) {
@@ -130,7 +133,7 @@ BOOST_AUTO_TEST_CASE(xthinblock_header_is_processed) {
     XThinBlock xblock(TestBlock1(), CBloomFilter());
     worker.addWork(xblock.header.GetHash());
     CDataStream s = stream(xblock);
-    DummyXThinProcessor process(pfrom, worker, headerprocessor);
+    DummyXThinProcessor process(connman, pfrom, worker, headerprocessor);
     process(s, NullFinder(), MAX_BLOCK_SIZE, 1);
 
     BOOST_CHECK(headerprocessor.called);
@@ -144,7 +147,7 @@ BOOST_AUTO_TEST_CASE(xthinblock_stop_if_header_fails) {
     worker.addWork(xblock.header.GetHash());
     headerprocessor.headerOK = false;
     CDataStream s = stream(xblock);
-    DummyXThinProcessor process(pfrom, worker, headerprocessor);
+    DummyXThinProcessor process(connman, pfrom, worker, headerprocessor);
     process(s, NullFinder(), MAX_BLOCK_SIZE, 1);
 
     BOOST_CHECK(!worker.isWorkingOn(xblock.header.GetHash()));
@@ -160,7 +163,7 @@ BOOST_AUTO_TEST_CASE(xthinblock_rerequest_missing) {
 
     worker.addWork(xblock.header.GetHash());
     CDataStream s = stream(xblock);
-    DummyXThinProcessor process(pfrom, worker, headerprocessor);
+    DummyXThinProcessor process(connman, pfrom, worker, headerprocessor);
     process(s, NullFinder(), MAX_BLOCK_SIZE, 1);
 
     BOOST_CHECK(headerprocessor.called);
@@ -168,17 +171,17 @@ BOOST_AUTO_TEST_CASE(xthinblock_rerequest_missing) {
     BOOST_CHECK(worker.isWorkingOn(xblock.header.GetHash()));
 
     // should have re-requested missing transaction
-    BOOST_CHECK_EQUAL("get_xblocktx", pfrom.messages.at(0));
+    BOOST_CHECK(connman.MsgWasSent(pfrom, "get_xblocktx", 0));
 
     // create a bloom filter that matches non, so we
     // don't have to re-request.
     CBloomFilter f;
     f.clear();
-    pfrom.messages.clear();
+    connman.ClearMessages(pfrom);
     xblock = XThinBlock(TestBlock1(), f);
     s = stream(xblock);
     process(s, NullFinder(), MAX_BLOCK_SIZE, 1);
-    BOOST_CHECK(pfrom.messages.empty());
+    BOOST_CHECK(connman.NumMessagesSent(pfrom) == 0);
 }
 
 // We want to call build stub even if we have one.
@@ -189,7 +192,7 @@ BOOST_AUTO_TEST_CASE(rebuild_stub) {
     worker.addWork(xblock.header.GetHash());
     worker.isBuilt = true;
     CDataStream s = stream(xblock);
-    DummyXThinProcessor process(pfrom, worker, headerprocessor);
+    DummyXThinProcessor process(connman, pfrom, worker, headerprocessor);
     process(s, NullFinder(), MAX_BLOCK_SIZE, 1);
 
     BOOST_CHECK(worker.buildStubCalled);
@@ -203,11 +206,12 @@ BOOST_AUTO_TEST_SUITE(compactblockprocessor_tests);
 BOOST_AUTO_TEST_CASE(compactblockprocessor_fetch_full) {
     CBlock testblock = TestBlock1();
 
+    DummyConnman connman;
     DummyNode node;
     std::unique_ptr<ThinBlockManager> tmgr = GetDummyThinBlockMg();
     CompactWorker worker(*tmgr, node.id);
     DummyHeaderProcessor hprocessor;
-    CompactBlockProcessor p(node, worker, hprocessor);
+    CompactBlockProcessor p(connman, node, worker, hprocessor);
 
     // create a invalid compact block (obviously too big)
     CompactBlock block(TestBlock1(), CoinbaseOnlyPrefiller{});
@@ -222,8 +226,8 @@ BOOST_AUTO_TEST_CASE(compactblockprocessor_fetch_full) {
     p(stream, mpool, currMaxBlockSize, 1);
 
     // should have rejected the block
-    BOOST_CHECK_EQUAL(size_t(1), node.messages.size());
-    BOOST_CHECK_EQUAL("reject", node.messages.at(0));
+    BOOST_CHECK_EQUAL(size_t(1), connman.NumMessagesSent(node));
+    BOOST_CHECK(connman.MsgWasSent(node, "reject", 0));
 }
 
 BOOST_AUTO_TEST_SUITE_END();

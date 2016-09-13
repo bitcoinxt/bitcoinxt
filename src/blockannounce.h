@@ -10,6 +10,7 @@
 class BlockSender;
 class CInv;
 class CNode;
+class CConnman;
 class ThinBlockManager;
 class InFlightIndex;
 
@@ -17,9 +18,9 @@ class InFlightIndex;
 class BlockAnnounceReceiver {
 
     public:
-        BlockAnnounceReceiver(uint256 block,
+        BlockAnnounceReceiver(uint256 block, CConnman& c,
                 CNode& from, ThinBlockManager& thinmg, InFlightIndex& inFlightIndex) :
-            block(block), from(from), thinmg(thinmg), blocksInFlight(inFlightIndex)
+            block(block), connman(c), from(from), thinmg(thinmg), blocksInFlight(inFlightIndex)
         {
         }
 	virtual ~BlockAnnounceReceiver() { }
@@ -45,6 +46,7 @@ class BlockAnnounceReceiver {
 
     private:
         uint256 block;
+        CConnman& connman;
         CNode& from;
         ThinBlockManager& thinmg;
         InFlightIndex& blocksInFlight;
@@ -59,7 +61,7 @@ static const unsigned int MAX_BLOCKS_TO_ANNOUNCE = 8;
 class BlockAnnounceSender {
 
     public:
-        BlockAnnounceSender(CNode& to) : to(to) { }
+        BlockAnnounceSender(CConnman& c, CNode& to) : connman(c), to(to) { }
         virtual ~BlockAnnounceSender() { }
 
         void announce();
@@ -75,6 +77,7 @@ class BlockAnnounceSender {
     private:
         bool peerHasHeader(const class CBlockIndex*) const;
 
+        CConnman& connman;
         CNode& to;
 };
 

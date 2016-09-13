@@ -325,9 +325,11 @@ private:
 
     unsigned int GetReceiveFloodSize() const;
 
-    CDataStream BeginMessage(CNode* node, int nVersion, int flags, const std::string& sCommand);
+protected: // protected instead of private for unit tests
+    virtual CDataStream BeginMessage(CNode* node, int nVersion, int flags, const std::string& sCommand);
+    virtual void EndMessage(CDataStream& strm);
+private:
     void PushMessage(CNode* pnode, CDataStream& strm, const std::string& sCommand);
-    void EndMessage(CDataStream& strm);
 
     // Network stats
     void RecordBytesRecv(uint64_t bytes);
@@ -520,9 +522,6 @@ public:
         nDataPos = 0;
         nTime = 0;
     }
-
-    // Called by CNode::EndMessage() and unit tests: modify stream to set size/checksum of header
-    static unsigned int FinalizeHeader(CDataStream& s);
 
     bool complete() const
     {
@@ -766,173 +765,6 @@ public:
     }
 
     void AskFor(const CInv& inv);
-
-    // TODO: Document the postcondition of this function.  Is cs_vSend locked?
-    virtual void BeginMessage(const char* pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend);
-
-    // TODO: Document the precondition of this function.  Is cs_vSend locked?
-    void AbortMessage() UNLOCK_FUNCTION(cs_vSend);
-
-    // TODO: Document the precondition of this function.  Is cs_vSend locked?
-    void EndMessage() UNLOCK_FUNCTION(cs_vSend);
-
-    void PushMessage(const char* pszCommand)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1>
-    void PushMessage(const char* pszCommand, const T1& a1)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3, typename T4>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3 << a4;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3, typename T4, typename T5>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3 << a4 << a5;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3 << a4 << a5 << a6;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3 << a4 << a5 << a6 << a7;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3 << a4 << a5 << a6 << a7 << a8;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8, typename T9>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8, const T9& a9)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3 << a4 << a5 << a6 << a7 << a8 << a9;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
 
     void CloseSocketDisconnect();
 

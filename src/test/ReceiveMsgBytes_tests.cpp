@@ -15,6 +15,7 @@
 #include "maxblocksize.h"
 #include "thinblockutil.h"
 
+#include "test/dummyconnman.h"
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
@@ -30,7 +31,7 @@ BOOST_AUTO_TEST_CASE(FullMessages)
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     s << CMessageHeader(Params().NetworkMagic(), "ping", 0);
     s << (uint64_t)11; // ping nonce
-    CNetMessage::FinalizeHeader(s);
+    DummyConnman{}.EndMessage(s);
 
     LOCK(testNode.cs_vRecvMsg);
 
@@ -86,7 +87,7 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
     // Test: too large
     size_t nMaxMessageSize = NextBlockRaiseCap(chainActive.Tip()->nMaxBlockSize);
     s.resize(nMaxMessageSize + headerLen + 1);
-    CNetMessage::FinalizeHeader(s);
+    DummyConnman{}.EndMessage(s);
 
     bool complete;
     BOOST_CHECK(!testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
@@ -95,7 +96,7 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
 
     // Test: exactly at max:
     s.resize(nMaxMessageSize + headerLen);
-    CNetMessage::FinalizeHeader(s);
+    DummyConnman{}.EndMessage(s);
 
     BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
 }
@@ -109,13 +110,13 @@ BOOST_AUTO_TEST_CASE(TooLargeVerack)
     s << CMessageHeader(Params().NetworkMagic(), "verack", 0);
     size_t headerLen = s.size();
 
-    CNetMessage::FinalizeHeader(s);
+    DummyConnman{}.EndMessage(s);
     bool complete;
     BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
 
     // verack is zero-length, so even one byte bigger is too big:
     s.resize(headerLen+1);
-    CNetMessage::FinalizeHeader(s);
+    DummyConnman{}.EndMessage(s);
     BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
     CNodeStateStats stats;
     GetNodeStateStats(testNode.GetId(), stats);
@@ -131,13 +132,13 @@ BOOST_AUTO_TEST_CASE(TooLargePing)
     s << CMessageHeader(Params().NetworkMagic(), "ping", 0);
     s << (uint64_t)11; // 8-byte nonce
 
-    CNetMessage::FinalizeHeader(s);
+    DummyConnman{}.EndMessage(s);
     bool complete;
     BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
 
     // Add another nonce, sanity check should fail
     s << (uint64_t)11; // 8-byte nonce
-    CNetMessage::FinalizeHeader(s);
+    DummyConnman{}.EndMessage(s);
     BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
     CNodeStateStats stats;
     GetNodeStateStats(testNode.GetId(), stats);

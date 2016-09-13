@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <boost/test/unit_test.hpp>
+#include "test/dummyconnman.h"
 #include "test/testutil.h"
 #include "blockannounce.h"
 #include "blocksender.h"
@@ -15,8 +16,9 @@
 struct DummyBlockAnnounceReceiver : public BlockAnnounceReceiver {
 
     DummyBlockAnnounceReceiver(uint256 block,
-            CNode& from, ThinBlockManager& thinmg, InFlightIndex& inFlightIndex) :
-        BlockAnnounceReceiver(block, from, thinmg, inFlightIndex),
+                               CConnman& connman, CNode& from,
+                               ThinBlockManager& thinmg, InFlightIndex& inFlightIndex) :
+        BlockAnnounceReceiver(block, connman, from, thinmg, inFlightIndex),
         updateCalled(0),
         isAlmostSynced(true),
         overrideStrategy(BlockAnnounceReceiver::INVALID)
@@ -65,7 +67,7 @@ struct BlockAnnounceRecvFixture {
         block(uint256S("0xF00BAA")),
         thinmg(GetDummyThinBlockMg()),
         node(42, thinmg.get()),
-        ann(block, node, *thinmg, inFlightIndex),
+        ann(block, connman, node, *thinmg, inFlightIndex),
         nodestate(node.id)
     {
         SelectParams(CBaseChainParams::MAIN);
@@ -73,6 +75,7 @@ struct BlockAnnounceRecvFixture {
 
     uint256 block;
     std::unique_ptr<ThinBlockManager> thinmg;
+    DummyConnman connman;
     DummyNode node;
     DummyInFlightIndex inFlightIndex;
     DummyBlockAnnounceReceiver ann;
@@ -239,7 +242,8 @@ struct RequestBlockWorker : public DummyThinWorker {
         : DummyThinWorker(mg, id), reqs(0) { }
 
     void requestBlock(const uint256& block,
-        std::vector<CInv>& getDataReq, CNode& node) override {
+                      std::vector<CInv>& getDataReq,
+                      CConnman&, CNode& node) override {
         ++reqs;
     }
     int reqs;
@@ -260,7 +264,7 @@ BOOST_AUTO_TEST_CASE(onannounced_downl_thin) {
     BOOST_CHECK_EQUAL(1, worker->reqs);
 
     // we should request headers also, to avoid unconnected headers
-    BOOST_CHECK_EQUAL("getheaders", node.messages.at(0));
+    connman.MsgWasSent(node, "getheaders", 0);
 }
 
 BOOST_AUTO_TEST_CASE(onannounced_downl_full) {
@@ -275,7 +279,7 @@ BOOST_AUTO_TEST_CASE(onannounced_downl_full) {
     BOOST_CHECK_EQUAL(block.ToString(), toFetch.at(0).hash.ToString());
 
     // Should also have requested headers.
-    BOOST_CHECK_EQUAL("getheaders", node.messages.at(0));
+    connman.MsgWasSent(node, "getheaders", 0);
 }
 
 BOOST_AUTO_TEST_CASE(onannounced_dont_downl) {
@@ -293,8 +297,8 @@ BOOST_AUTO_TEST_CASE(onannounced_dont_downl) {
     BOOST_CHECK_EQUAL(size_t(0), toFetch.size());
 
     // If we don't download, we should still ask for the header.
-    BOOST_ASSERT(node.messages.size() > 0);
-    BOOST_CHECK_EQUAL("getheaders", node.messages.at(0));
+    BOOST_ASSERT(connman.NumMessagesSent(node) > 0);
+    BOOST_CHECK(connman.MsgWasSent(node, "getheaders", 0));
 }
 
 BOOST_AUTO_TEST_CASE(onannounced_dowl_thin_later) {
@@ -312,16 +316,19 @@ BOOST_AUTO_TEST_CASE(onannounced_dowl_thin_later) {
     BOOST_CHECK_EQUAL(size_t(0), toFetch.size());
 
     // If we don't download, we should still ask for the header.
-    BOOST_ASSERT(node.messages.size() > 0);
-    BOOST_CHECK_EQUAL("getheaders", node.messages.at(0));
+    BOOST_ASSERT(connman.NumMessagesSent(node) > 0);
+    BOOST_CHECK(connman.MsgWasSent(node, "getheaders", 0));
 }
 
 BOOST_AUTO_TEST_SUITE_END();
 
 // Inherit to test protected methods
-class DummyBlockAnnounceSender : BlockAnnounceSender {
+class DummyBlockAnnounceSender : public BlockAnnounceSender {
     public:
-        DummyBlockAnnounceSender(CNode& to) : BlockAnnounceSender(to) { }
+        DummyBlockAnnounceSender(CConnman& c, CNode& to) :
+            BlockAnnounceSender(c, to)
+        {
+        }
         bool canAnnounceWithHeaders() const override {
             return BlockAnnounceSender::canAnnounceWithHeaders();
         }
@@ -341,11 +348,12 @@ class DummyBlockAnnounceSender : BlockAnnounceSender {
 
 struct BlockAnnounceSenderFixture {
     BlockAnnounceSenderFixture() :
-        ann(to)
+        ann(connman, to)
     {
         SelectParams(CBaseChainParams::MAIN);
     }
 
+    DummyConnman connman;
     DummyNode to;
     DummyBlockAnnounceSender ann;
 };
@@ -453,14 +461,14 @@ BOOST_AUTO_TEST_CASE(announce_with_headers) {
     // Can't connect headers with known best on peer, bail out.
     to.blocksToAnnounce = { entry2.hash, entry3.hash };
     BOOST_CHECK(!ann.announceWithHeaders());
-    BOOST_CHECK_EQUAL(size_t(0), to.messages.size());
+    BOOST_CHECK_EQUAL(size_t(0), connman.NumMessagesSent(to));
 
     // Peer knows about entry1. Should announce entry2 and entry3.
     to.blocksToAnnounce = { entry1.hash, entry2.hash, entry3.hash };
     NodeStatePtr(to.id)->bestHeaderSent = &entry1.index;
     BOOST_CHECK(ann.announceWithHeaders());
-    BOOST_CHECK_EQUAL(size_t(1), to.messages.size());
-    BOOST_CHECK_EQUAL("headers", to.messages.at(0));
+    BOOST_CHECK_EQUAL(size_t(1), connman.NumMessagesSent(to));
+    BOOST_CHECK(connman.MsgWasSent(to, "headers", 0));
 
     // bestHeaderSent should now be entry3
     BOOST_CHECK(NodeStatePtr(to.id)->bestHeaderSent == &entry3.index);
@@ -531,8 +539,8 @@ BOOST_AUTO_TEST_CASE(announce_with_block) {
     };
     DummyBlockSender sender;
     ann.announceWithBlock(sender);
-    BOOST_CHECK_EQUAL(size_t(1), to.messages.size());
-    BOOST_CHECK_EQUAL("cmpctblock", to.messages.at(0));
+    BOOST_CHECK_EQUAL(size_t(1), connman.NumMessagesSent(to));
+    BOOST_CHECK(connman.MsgWasSent(to, "cmpctblock", 0));
 
     // bestHeaderSent should now be entry3
     BOOST_CHECK(NodeStatePtr(to.id)->bestHeaderSent == &entry2.index);
@@ -559,7 +567,7 @@ BOOST_AUTO_TEST_CASE(dont_announce_if_peer_knows) {
         DummyBlockSender() : BlockSender(), sendBlockCalls(0) {
         }
 
-        void sendBlock(CNode& node, const CBlockIndex& blockIndex,
+        void sendBlock(CConnman&, CNode& node, const CBlockIndex& blockIndex,
                 int invType, int activeChainHeight) override {
             sendBlockCalls++;
         }

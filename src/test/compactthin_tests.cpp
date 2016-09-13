@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include <boost/test/unit_test.hpp>
 
+#include "test/dummyconnman.h"
 #include "test/thinblockutil.h"
 #include "compactthin.h"
 #include "chainparams.h"
@@ -84,19 +85,20 @@ BOOST_AUTO_TEST_CASE(ids_are_correct) {
 BOOST_AUTO_TEST_CASE(request_block_announcements) {
     auto mg = GetDummyThinBlockMg();
 
+    DummyConnman connman;
     DummyNode node(42, mg.get());
     CompactWorker w(*mg, node.id);
     {
-        auto h = w.requestBlockAnnouncements(node);
+        auto h = w.requestBlockAnnouncements(connman, node);
 
         // Should send a request for header announcements
-        BOOST_CHECK_EQUAL(size_t(1), node.messages.size());
-        BOOST_CHECK_EQUAL("sendcmpct", node.messages.at(0));
+        BOOST_CHECK_EQUAL(size_t(1), connman.NumMessagesSent(node));
+        BOOST_CHECK(connman.MsgWasSent(node, "sendcmpct", 0));
     }
     // hande goes out of scope,
     // should send a request to disable header announcements
-    BOOST_CHECK_EQUAL(size_t(2), node.messages.size());
-    BOOST_CHECK_EQUAL("sendcmpct", node.messages.at(1));
+    BOOST_CHECK_EQUAL(size_t(2), connman.NumMessagesSent(node));
+    BOOST_CHECK(connman.MsgWasSent(node, "sendcmpct", 1));
 }
 
 BOOST_AUTO_TEST_SUITE_END();

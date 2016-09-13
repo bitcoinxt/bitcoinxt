@@ -11,6 +11,7 @@
 #include <memory>
 
 class CNode;
+class CConnman;
 class CInv;
 class CTransaction;
 class ThinBlockManager;
@@ -109,7 +110,7 @@ class ThinBlockWorker : boost::noncopyable {
 
         virtual std::vector<std::pair<int, ThinTx> > getTxsMissing(const uint256&) const;
 
-        virtual void buildStub(const StubData&, const TxFinder&, CNode& from);
+        virtual void buildStub(const StubData&, const TxFinder&, CConnman& connman, CNode& from);
         virtual bool isStubBuilt(const uint256& block) const;
         virtual void addWork(const uint256& block);
         virtual void stopWork(const uint256& block);
@@ -120,7 +121,8 @@ class ThinBlockWorker : boost::noncopyable {
         // getDataReq or implement a more specialized behavour.
         // Method is called during ProcessGetData.
         virtual void requestBlock(const uint256& block,
-                std::vector<CInv>& getDataReq, CNode& node) = 0;
+                                  std::vector<CInv>& getDataReq,
+                                  CConnman&, CNode& node) = 0;
 
         bool isReRequesting(const uint256& block) const;
         void setReRequesting(const uint256& block, bool);
@@ -138,7 +140,7 @@ class ThinBlockWorker : boost::noncopyable {
         // Enables block announcements with thin blocks.
         // Returns a RAII object that disables them on destruct.
         // Returns nullptr if peer does ont support this.
-        virtual std::unique_ptr<BlockAnnHandle> requestBlockAnnouncements(CNode&)
+        virtual std::unique_ptr<BlockAnnHandle> requestBlockAnnouncements(CConnman&, CNode&)
         {
             return nullptr;
         }

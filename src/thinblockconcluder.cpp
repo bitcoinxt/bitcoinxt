@@ -11,19 +11,20 @@
 #include <vector>
 #include "compactthin.h"
 
-static void fallbackDownload(CNode& from,
+static void fallbackDownload(CConnman& connman, CNode& from,
         const uint256& block, BlockInFlightMarker& markInFlight) {
 
     LogPrint(Log::BLOCK, "Falling back on full block download for %s peer=%d\n",
             block.ToString(), from.id);
 
     CInv req(MSG_BLOCK, block);
-    from.PushMessage("getdata", std::vector<CInv>(1, req));
+    connman.PushMessage(&from, "getdata", std::vector<CInv>(1, req));
     markInFlight(from.id, block, Params().GetConsensus(), NULL);
 }
 
-static void handleReRequestFailed(ThinBlockWorker& worker, CNode& from, uint256 block,
-        BlockInFlightMarker& markInFlight) {
+static void handleReRequestFailed(ThinBlockWorker& worker,
+                                  CConnman& connman, CNode& from, uint256 block,
+                                  BlockInFlightMarker& markInFlight) {
 
     LogPrint(Log::BLOCK, "Did not provide all missing transactions in a"
             "thin block re-request for %s peer=%d\n",
@@ -34,14 +35,15 @@ static void handleReRequestFailed(ThinBlockWorker& worker, CNode& from, uint256 
     if (wasLastWorker) {
         // Node deserves misbehave, but we'll give it a chance
         // to send us the full block.
-        fallbackDownload(from, block, markInFlight);
+        fallbackDownload(connman, from, block, markInFlight);
     }
     else
         Misbehaving(worker.nodeID(), 10, "unfulfilled-rerequest");
 }
 
 void XThinBlockConcluder::operator()(const XThinReReqResponse& resp,
-        CNode& pfrom, ThinBlockWorker& worker, BlockInFlightMarker& markInFlight) {
+                                     CConnman& connman, CNode& pfrom,
+                                     ThinBlockWorker& worker, BlockInFlightMarker& markInFlight) {
 
     if (!worker.isWorkingOn(resp.block))
     {
@@ -55,11 +57,12 @@ void XThinBlockConcluder::operator()(const XThinReReqResponse& resp,
 
     // Block fully constructed?
     if (worker.isWorkingOn(resp.block))
-        handleReRequestFailed(worker, pfrom, resp.block, markInFlight);
+        handleReRequestFailed(worker, connman, pfrom, resp.block, markInFlight);
 }
 
 void CompactBlockConcluder::operator()(const CompactReReqResponse& resp,
-        CNode& pfrom, ThinBlockWorker& worker, BlockInFlightMarker& markInFlight) {
+                                       CConnman& connman, CNode& pfrom,
+                                       ThinBlockWorker& worker, BlockInFlightMarker& markInFlight) {
 
     if (!worker.isWorkingOn(resp.blockhash))
     {
@@ -73,5 +76,5 @@ void CompactBlockConcluder::operator()(const CompactReReqResponse& resp,
 
     // Block fully constructed?
     if (worker.isWorkingOn(resp.blockhash))
-        handleReRequestFailed(worker, pfrom, resp.blockhash, markInFlight);
+        handleReRequestFailed(worker, connman, pfrom, resp.blockhash, markInFlight);
 }

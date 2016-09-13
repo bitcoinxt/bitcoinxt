@@ -60,7 +60,8 @@ class XThinWorker : public ThinBlockWorker {
         XThinWorker(ThinBlockManager&, NodeId);
 
         void requestBlock(const uint256& block,
-                std::vector<CInv>& getDataReq, CNode& node) override;
+                std::vector<CInv>& getDataReq,
+                          CConnman&, CNode& node) override;
 
     private:
         std::unique_ptr<struct TxHashProvider> HashProvider;

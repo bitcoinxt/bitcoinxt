@@ -5,6 +5,7 @@
 #include <tuple>
 #include <stdexcept>
 
+class CConnman;
 class CNode;
 class CBlockHeader;
 class CBlockIndex;
@@ -23,7 +24,8 @@ class BlockHeaderProcessor {
                 bool peerSentMax,
                 bool maybeAnnouncement) = 0;
         virtual ~BlockHeaderProcessor() = 0;
-        virtual bool requestConnectHeaders(const CBlockHeader& h, CNode& from,
+        virtual bool requestConnectHeaders(const CBlockHeader& h,
+                                           CConnman&, CNode& from,
                                            bool bumpUnconnecting) = 0;
 };
 inline BlockHeaderProcessor::~BlockHeaderProcessor() { }
@@ -31,8 +33,7 @@ inline BlockHeaderProcessor::~BlockHeaderProcessor() { }
 /// Process a block header received from another peer on the network.
 class DefaultHeaderProcessor : public BlockHeaderProcessor {
     public:
-
-        DefaultHeaderProcessor(CNode* pfrom,
+        DefaultHeaderProcessor(CConnman&, CNode* pfrom,
                 InFlightIndex&, ThinBlockManager&, BlockInFlightMarker&,
                 std::function<void()> checkBlockIndex);
 
@@ -40,7 +41,8 @@ class DefaultHeaderProcessor : public BlockHeaderProcessor {
                 bool peerSentMax,
                 bool maybeAnnouncement) override;
 
-        bool requestConnectHeaders(const CBlockHeader& h, CNode& from,
+        bool requestConnectHeaders(const CBlockHeader& h,
+                                   CConnman&, CNode& from,
                                    bool bumpUnconnecting) override;
 
     protected:
@@ -55,6 +57,7 @@ class DefaultHeaderProcessor : public BlockHeaderProcessor {
         void suggestDownload(
                 const std::vector<CBlockIndex*>& toFetch, CBlockIndex* last);
 
+        CConnman& connman;
         CNode* pfrom;
         InFlightIndex& blocksInFlight;
         ThinBlockManager& thinmg;
