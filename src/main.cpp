@@ -4519,7 +4519,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         // Each connection can only send one version message
         if (pfrom->nVersion != 0)
         {
-            pfrom->PushMessage("reject", strCommand, REJECT_DUPLICATE, string("Duplicate version message"));
+            connman->PushMessageWithVersion(pfrom, INIT_PROTO_VERSION, "reject", strCommand, REJECT_DUPLICATE, string("Duplicate version message"));
             Misbehaving(pfrom->GetId(), 1, "duplicate version messge");
             return false;
         }
@@ -4533,7 +4533,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         {
             // disconnect from peers older than this proto version
             LogPrintf("peer=%d using obsolete version %i; disconnecting\n", pfrom->id, pfrom->nVersion);
-            pfrom->PushMessage("reject", strCommand, REJECT_OBSOLETE,
+            connman->PushMessageWithVersion(pfrom, INIT_PROTO_VERSION, "reject", strCommand, REJECT_OBSOLETE,
                                strprintf("Version must be %d or greater", MIN_PEER_PROTO_VERSION));
             pfrom->fDisconnect = true;
             return false;
@@ -4592,7 +4592,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
         // Be shy and don't send version until we hear
         if (pfrom->fInbound)
-            pfrom->PushVersion();
+            connman->PushVersion(pfrom, GetAdjustedTime());
 
         pfrom->fClient = !(pfrom->nServices & NODE_NETWORK);
 
@@ -4603,8 +4603,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         }
 
         // Change version
-        pfrom->PushMessage("verack");
-        pfrom->ssSend.SetVersion(min(pfrom->nVersion, PROTOCOL_VERSION));
+        connman->PushMessageWithVersion(pfrom, INIT_PROTO_VERSION, "verack");
+        pfrom->SetSendVersion(min(pfrom->nVersion, PROTOCOL_VERSION));
 
         if (!pfrom->fInbound)
         {
@@ -5609,7 +5609,7 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman, std::atomic<bool>& interru
         }
         catch (const std::ios_base::failure& e)
         {
-            pfrom->PushMessage("reject", strCommand, REJECT_MALFORMED, string("error parsing message"));
+            connman->PushMessageWithVersion(pfrom, INIT_PROTO_VERSION, "reject", strCommand, REJECT_MALFORMED, string("error parsing message"));
             if (strstr(e.what(), "end of data"))
             {
                 // Allow exceptions from under-length message on vRecv
