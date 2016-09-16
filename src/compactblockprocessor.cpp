@@ -7,8 +7,9 @@
 #include "net.h"
 #include "utilprocessmsg.h"
 #include "consensus/validation.h"
+#include "compacttxfinder.h"
 
-void CompactBlockProcessor::operator()(CDataStream& vRecv, const TxFinder& txfinder)
+void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mempool)
 {
     CompactBlock block;
     vRecv >> block;
@@ -26,6 +27,9 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const TxFinder& txfin
         rejectBlock(hash, e.what(), 20);
         return;
     }
+
+    CompactTxFinder txfinder(mempool,
+            block.shorttxidk0, block.shorttxidk1);
 
     processHeader(block.header);
 

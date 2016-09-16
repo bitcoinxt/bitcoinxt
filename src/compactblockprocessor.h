@@ -4,7 +4,7 @@
 #include "blockprocessor.h"
 
 class CDataStream;
-class TxFinder;
+class CTxMemPool;
 
 class CompactBlockProcessor : public BlockProcessor {
     public:
@@ -14,7 +14,7 @@ class CompactBlockProcessor : public BlockProcessor {
         {
         }
 
-        void operator()(CDataStream& vRecv, const TxFinder& txfinde);
+        void operator()(CDataStream& vRecv, const CTxMemPool& mempool);
 };
 
 #endif

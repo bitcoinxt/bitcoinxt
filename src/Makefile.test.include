@@ -52,6 +52,7 @@ BITCOIN_TESTS =\
   test/coins_tests.cpp \
   test/compactprefiller_tests.cpp \
   test/compactthin_tests.cpp \
+  test/compacttxfinder_tests.cpp \
   test/compress_tests.cpp \
   test/crypto_tests.cpp \
   test/curl_tests.cpp \
