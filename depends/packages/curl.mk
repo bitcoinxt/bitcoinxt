@@ -6,7 +6,7 @@ $(package)_sha256_hash=1a084da1edbfc3bd632861358b26af45ba91aaadfb15d6482de55748b
 $(package)_dependencies=openssl
 
 define $(package)_set_vars
-  $(package)_config_opts=--disable-shared --with-ssl
+  $(package)_config_opts=--disable-shared --with-ssl --with-pic
 endef
 
 define $(package)_config_cmds
