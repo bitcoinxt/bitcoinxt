@@ -95,7 +95,7 @@ CBloomFilter createDontWantFilter(TxHashProvider& hashProvider)
 };
 
 XThinWorker::XThinWorker(ThinBlockManager& m, NodeId n,
-                std::auto_ptr<TxHashProvider> h) :
+                std::unique_ptr<TxHashProvider> h) :
     ThinBlockWorker(m, n),
     HashProvider(h.release())
 {

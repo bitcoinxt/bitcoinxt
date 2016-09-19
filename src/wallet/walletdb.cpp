@@ -1,7 +1,14 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
 // Copyright (c) 2009-2014 The Bitcoin Core developers
+// Copyright (c) 2016 The Bitcoin XT developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+#if BOOST_VERSION < 105700 // Boost older than 1.57
+#define BOOST_NO_CXX11_SCOPED_ENUMS
+// Workaround boost c+11 issue: https://svn.boost.org/trac/boost/ticket/10038
+#endif
+
 
 #include "wallet/walletdb.h"
 
