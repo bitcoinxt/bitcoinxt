@@ -44,7 +44,7 @@ UniValue getinfo(const JSONRPCRequest& request)
     if (request.fHelp || request.params.size() != 0)
         throw runtime_error(
             "getinfo\n"
-            "Returns an object containing various state info.\n"
+            "\nDEPRECATED. Returns an object containing various state info.\n"
             "\nResult:\n"
             "{\n"
             "  \"version\": xxxxx,           (numeric) the server version\n"
