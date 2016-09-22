@@ -21,9 +21,9 @@
 
 using namespace std;
 
-UniValue getconnectioncount(const UniValue& params, bool fHelp)
+UniValue getconnectioncount(const JSONRPCRequest& request)
 {
-    if (fHelp || params.size() != 0)
+    if (request.fHelp || request.params.size() != 0)
         throw runtime_error(
             "getconnectioncount\n"
             "\nReturns the number of connections to other nodes.\n"
@@ -40,9 +40,9 @@ UniValue getconnectioncount(const UniValue& params, bool fHelp)
     return (int)g_connman->GetNodeCount(CConnman::CONNECTIONS_ALL);
 }
 
-UniValue ping(const UniValue& params, bool fHelp)
+UniValue ping(const JSONRPCRequest& request)
 {
-    if (fHelp || params.size() != 0)
+    if (request.fHelp || request.params.size() != 0)
         throw runtime_error(
             "ping\n"
             "\nRequests that a ping be sent to all other nodes, to measure ping time.\n"
@@ -63,9 +63,9 @@ UniValue ping(const UniValue& params, bool fHelp)
     return NullUniValue;
 }
 
-UniValue getpeerinfo(const UniValue& params, bool fHelp)
+UniValue getpeerinfo(const JSONRPCRequest& request)
 {
-    if (fHelp || params.size() != 0)
+    if (request.fHelp || request.params.size() != 0)
         throw runtime_error(
             "getpeerinfo\n"
             "\nReturns data about each connected network node as a json array of objects.\n"
@@ -154,15 +154,15 @@ UniValue getpeerinfo(const UniValue& params, bool fHelp)
     return ret;
 }
 
-UniValue gettrafficshaping(const UniValue& params, bool fHelp)
+UniValue gettrafficshaping(const JSONRPCRequest& request)
 {
     string strCommand;
-    if (params.size() == 1)
+    if (request.params.size() == 1)
     {
-        strCommand = params[0].get_str();
+        strCommand = request.params[0].get_str();
     }
 
-    if (fHelp || params.size() != 0)
+    if (request.fHelp || request.params.size() != 0)
         throw runtime_error(
             "gettrafficshaping"
             "\nReturns the current settings for the network send and receive bandwidth and burst in KB per second.\n"
@@ -193,32 +193,32 @@ UniValue gettrafficshaping(const UniValue& params, bool fHelp)
     return ret;
 }
 
-UniValue settrafficshaping(const UniValue& params, bool fHelp)
+UniValue settrafficshaping(const JSONRPCRequest& request)
 {
     bool disable = false;
     bool badArg = false;
     string strCommand;
     CLeakyBucket* bucket = NULL;
-    if (params.size() >= 2)
+    if (request.params.size() >= 2)
     {
         extern CLeakyBucket receiveShaper;
         extern CLeakyBucket sendShaper;
-        strCommand = params[0].get_str();
+        strCommand = request.params[0].get_str();
         if (strCommand=="send") bucket = &sendShaper;
         if (strCommand=="receive") bucket = &receiveShaper;
         if (strCommand=="recv") bucket = &receiveShaper;
     }
-    if (params.size() == 2)
+    if (request.params.size() == 2)
     {
-        if (params[1].get_str() == "disable")
+        if (request.params[1].get_str() == "disable")
             disable=true;
         else
             badArg = true;
     }
-    else if (params.size() != 3)
+    else if (request.params.size() != 3)
         badArg = true;
 
-    if (fHelp || badArg || bucket==NULL)
+    if (request.fHelp || badArg || bucket==NULL)
         throw runtime_error(
             "settrafficshaping \"send|receive\" \"burstKB\" \"averageKB\""
             "\nSets the network send or receive bandwidth and burst in KB per second.\n"
@@ -240,15 +240,15 @@ UniValue settrafficshaping(const UniValue& params, bool fHelp)
     {
         int burst;
         int ave;
-        if (params[1].isNum())
-            burst = params[1].get_int();
+        if (request.params[1].isNum())
+            burst = request.params[1].get_int();
         else
-            burst = boost::lexical_cast<int>(params[1].getValStr());
+            burst = boost::lexical_cast<int>(request.params[1].getValStr());
 
-        if (params[2].isNum())
-            ave = params[2].get_int();
+        if (request.params[2].isNum())
+            ave = request.params[2].get_int();
         else
-            ave = boost::lexical_cast<int>(params[2].getValStr());
+            ave = boost::lexical_cast<int>(request.params[2].getValStr());
 
         if (burst < ave)
             throw runtime_error("Burst rate must be greater than the average rate"
@@ -260,12 +260,12 @@ UniValue settrafficshaping(const UniValue& params, bool fHelp)
     return NullUniValue;
 }
 
-UniValue addnode(const UniValue& params, bool fHelp)
+UniValue addnode(const JSONRPCRequest& request)
 {
     string strCommand;
-    if (params.size() == 2)
-        strCommand = params[1].get_str();
-    if (fHelp || params.size() != 2 ||
+    if (request.params.size() == 2)
+        strCommand = request.params[1].get_str();
+    if (request.fHelp || request.params.size() != 2 ||
         (strCommand != "onetry" && strCommand != "add" && strCommand != "remove"))
         throw runtime_error(
             "addnode \"node\" \"add|remove|onetry\"\n"
@@ -282,7 +282,7 @@ UniValue addnode(const UniValue& params, bool fHelp)
     if(!g_connman)
         throw JSONRPCError(RPC_CLIENT_P2P_DISABLED, "Error: Peer-to-peer functionality missing or disabled");
 
-    string strNode = params[0].get_str();
+    string strNode = request.params[0].get_str();
 
     if (strCommand == "onetry")
     {
@@ -305,9 +305,9 @@ UniValue addnode(const UniValue& params, bool fHelp)
     return NullUniValue;
 }
 
-UniValue getaddednodeinfo(const UniValue& params, bool fHelp)
+UniValue getaddednodeinfo(const JSONRPCRequest& request)
 {
-    if (fHelp || params.size() > 1)
+    if (request.fHelp || request.params.size() > 1)
         throw runtime_error(
             "getaddednodeinfo ( \"node\" )\n"
             "\nReturns information about the given added node, or all added nodes\n"
@@ -339,10 +339,10 @@ UniValue getaddednodeinfo(const UniValue& params, bool fHelp)
 
     std::vector<AddedNodeInfo> vInfo = g_connman->GetAddedNodeInfo();
 
-    if (params.size() == 1) {
+    if (request.params.size() == 1) {
         bool found = false;
         for (const AddedNodeInfo& info : vInfo) {
-            if (info.strAddedNode == params[0].get_str()) {
+            if (info.strAddedNode == request.params[0].get_str()) {
                 vInfo.assign(1, info);
                 found = true;
                 break;
@@ -373,9 +373,9 @@ UniValue getaddednodeinfo(const UniValue& params, bool fHelp)
     return ret;
 }
 
-UniValue getnettotals(const UniValue& params, bool fHelp)
+UniValue getnettotals(const JSONRPCRequest& request)
 {
-    if (fHelp || params.size() > 0)
+    if (request.fHelp || request.params.size() > 0)
         throw runtime_error(
             "getnettotals\n"
             "\nReturns information about network traffic, including bytes in, bytes out,\n"
@@ -424,9 +424,9 @@ static UniValue GetNetworksInfo()
     return networks;
 }
 
-UniValue getnetworkinfo(const UniValue& params, bool fHelp)
+UniValue getnetworkinfo(const JSONRPCRequest& request)
 {
-    if (fHelp || params.size() != 0)
+    if (request.fHelp || request.params.size() != 0)
         throw runtime_error(
             "getnetworkinfo\n"
             "Returns an object containing various state info regarding P2P networking.\n"
