@@ -580,10 +580,8 @@ unsigned int CNetMessage::FinalizeHeader(CDataStream& s)
 
     // Set the checksum
     uint256 hash = Hash(s.begin() + CMessageHeader::HEADER_SIZE, s.end());
-    unsigned int nChecksum = 0;
-    memcpy(&nChecksum, &hash, sizeof(nChecksum));
-    assert(s.size () >= CMessageHeader::CHECKSUM_OFFSET + sizeof(nChecksum));
-    memcpy((char*)&s[CMessageHeader::CHECKSUM_OFFSET], &nChecksum, sizeof(nChecksum));
+    assert(s.size () >= CMessageHeader::CHECKSUM_OFFSET + CMessageHeader::CHECKSUM_SIZE);
+    memcpy((char*)&s[CMessageHeader::CHECKSUM_OFFSET], hash.begin(), CMessageHeader::CHECKSUM_SIZE);
 
     return nSize;
 }
