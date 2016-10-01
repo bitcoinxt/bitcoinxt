@@ -72,7 +72,6 @@ class BigBlockTest(BitcoinTestFramework):
             tx_file.close()
 
             stop_nodes(self.nodes)
-            wait_bitcoinds()
             self.nodes = []
             for i in range(4):
                 os.remove(log_filename(CACHE_DIR, i, "db.log"))
