@@ -14,10 +14,6 @@ from test_framework.script import CScript, OP_TRUE
 CompactBlocksTest -- test compact blocks (BIP 152)
 '''
 
-# These tweaks work around:
-# 1) XT not yet supporting hight bandwith mode
-# 2) XTs sligtly different, but valid behavior (compared to Core)
-XT_TWEAKS = True
 
 # TestNode: A peer we use to send messages to bitcoind, and store responses.
 class TestNode(SingleNodeConnCB):
@@ -59,9 +55,6 @@ class TestNode(SingleNodeConnCB):
 
     def on_blocktxn(self, conn, message):
         self.last_blocktxn = message
-
-    def on_getheaders(self, conn, message):
-        self.last_getheaders = message
 
     # Requires caller to hold mininode_lock
     def received_block_announcement(self):
@@ -107,17 +100,13 @@ class CompactBlocksTest(BitcoinTestFramework):
         # with segwit.  (After BIP 152 is updated to support segwit, we can
         # test behavior with and without segwit enabled by adding a second node
         # to the test.)
-        self.nodes = start_nodes(self.num_nodes, self.options.tmpdir, [[
-            "-prefer-compact-blocks",
-            "-debug", "-logtimemicros=1", "-bip9params=segwit:0:0" ]])
+        self.nodes = start_nodes(self.num_nodes, self.options.tmpdir, [["-debug", "-logtimemicros=1", "-bip9params=segwit:0:0"]])
 
     def build_block_on_tip(self):
         height = self.nodes[0].getblockcount()
         tip = self.nodes[0].getbestblockhash()
         mtp = self.nodes[0].getblockheader(tip)['mediantime']
-        block = create_block(int(tip, 16), create_coinbase(absoluteHeight = height + 1), mtp + 1)
-        if XT_TWEAKS:
-            block.nVersion = 4
+        block = create_block(int(tip, 16), create_coinbase(height + 1), mtp + 1)
         block.solve()
         return block
 
@@ -132,7 +121,6 @@ class CompactBlocksTest(BitcoinTestFramework):
         out_value = total_value // 10
         tx = CTransaction()
         tx.vin.append(CTxIn(COutPoint(block.vtx[0].sha256, 0), b''))
-
         for i in range(10):
             tx.vout.append(CTxOut(out_value, CScript([OP_TRUE])))
         tx.rehash()
@@ -203,10 +191,6 @@ class CompactBlocksTest(BitcoinTestFramework):
 
         # Headers sync before next test.
         self.test_node.request_headers_and_sync(locator=[tip])
-
-        if XT_TWEAKS:
-            print("TODO: High bandwith mode NYI. Tests disabled.")
-            return
 
         # Finally, try a SENDCMPCT message with announce=True
         sendcmpct.version = 1
@@ -330,15 +314,6 @@ class CompactBlocksTest(BitcoinTestFramework):
 
             if announce == "inv":
                 self.test_node.send_message(msg_inv([CInv(2, block.sha256)]))
-
-                if XT_TWEAKS:
-                    # If a node is expected to send header announcement, but sends
-                    # inv, XT will send a getheaders. Normally it is likely there
-                    # was a re-org.
-                    success = wait_until(lambda: self.test_node.last_getheaders is not None, timeout = 10)
-                    if success:
-                        self.test_node.send_header_for_blocks([block])
-                        self.test_node.last_getheaders = None
             else:
                 self.test_node.send_header_for_blocks([block])
             success = wait_until(lambda: self.test_node.last_getdata is not None, timeout=30)
@@ -352,13 +327,6 @@ class CompactBlocksTest(BitcoinTestFramework):
             comp_block.header = CBlockHeader(block)
             comp_block.nonce = 0
             comp_block.shortids = [1]  # this is useless, and wrong
-            if XT_TWEAKS:
-                # XT misbehaves the original test due
-                # to shortid being wrong. Fix shortids.
-                [k0, k1] = comp_block.get_siphash_keys()
-                comp_block.shortids = [
-                        calculate_shortid(k0, k1, block.vtx[0].sha256) ]
-
             self.test_node.send_and_ping(msg_cmpctblock(comp_block.to_p2p()))
             assert_equal(int(self.nodes[0].getbestblockhash(), 16), block.hashPrevBlock)
             # Expect a getblocktxn message.
@@ -390,13 +358,6 @@ class CompactBlocksTest(BitcoinTestFramework):
         block.solve()
         return block
 
-    # XT does not (yet) accept blocks as announcements
-    # Announce with header before sending a compact block.
-    def announce_with_header(self, block):
-        self.test_node.send_header_for_blocks([block])
-        success = wait_until(lambda: self.test_node.last_getdata is not None, timeout=30)
-
-
     # Test that we only receive getblocktxn requests for transactions that the
     # node needs, and that responding to them causes the block to be
     # reconstructed.
@@ -412,9 +373,6 @@ class CompactBlocksTest(BitcoinTestFramework):
 
         comp_block = HeaderAndShortIDs()
         comp_block.initialize_from_block(block)
-
-        if XT_TWEAKS:
-            self.announce_with_header(block)
 
         self.test_node.send_and_ping(msg_cmpctblock(comp_block.to_p2p()))
         with mininode_lock:
@@ -432,8 +390,6 @@ class CompactBlocksTest(BitcoinTestFramework):
 
         # Now try interspersing the prefilled transactions
         comp_block.initialize_from_block(block, prefill_list=[0, 1, 5])
-        if XT_TWEAKS:
-            self.announce_with_header(block)
         self.test_node.send_and_ping(msg_cmpctblock(comp_block.to_p2p()))
         with mininode_lock:
             assert(self.test_node.last_getblocktxn is not None)
@@ -453,8 +409,6 @@ class CompactBlocksTest(BitcoinTestFramework):
         # Prefill 4 out of the 6 transactions, and verify that only the one
         # that was not in the mempool is requested.
         comp_block.initialize_from_block(block, prefill_list=[0, 2, 3, 4])
-        if XT_TWEAKS:
-            self.announce_with_header(block)
         self.test_node.send_and_ping(msg_cmpctblock(comp_block.to_p2p()))
         with mininode_lock:
             assert(self.test_node.last_getblocktxn is not None)
@@ -484,8 +438,6 @@ class CompactBlocksTest(BitcoinTestFramework):
 
         # Send compact block
         comp_block.initialize_from_block(block, prefill_list=[0])
-        if XT_TWEAKS:
-            self.announce_with_header(block)
         self.test_node.send_and_ping(msg_cmpctblock(comp_block.to_p2p()))
         with mininode_lock:
             # Shouldn't have gotten a request for any transaction
@@ -516,9 +468,6 @@ class CompactBlocksTest(BitcoinTestFramework):
         # Send compact block
         comp_block = HeaderAndShortIDs()
         comp_block.initialize_from_block(block, prefill_list=[0])
-        xttweak = True
-        if XT_TWEAKS:
-            self.announce_with_header(block)
         self.test_node.send_and_ping(msg_cmpctblock(comp_block.to_p2p()))
         absolute_indexes = []
         with mininode_lock:
@@ -582,10 +531,6 @@ class CompactBlocksTest(BitcoinTestFramework):
                     assert_equal(tx.sha256, block.vtx[index].sha256)
                 self.test_node.last_blocktxn = None
             current_height -= 1
-
-        # XT does have a special depth criteria for compact block re-requests.
-        if XT_TWEAKS:
-            return
 
         # Next request should be ignored, as we're past the allowed depth.
         block_hash = self.nodes[0].getblockhash(current_height)
