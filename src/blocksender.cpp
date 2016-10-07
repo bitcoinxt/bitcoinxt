@@ -60,7 +60,7 @@ void updateBestHeaderSent(CNode& node, CBlockIndex* blockIndex) {
 void BlockSender::send(const CChain& activeChain, CNode& node,
         CBlockIndex& blockIndex, const CInv& inv)
 {
-    sendBlock(node, blockIndex, inv.type);
+    sendBlock(node, blockIndex, inv.type, activeChain.Height());
     updateBestHeaderSent(node, &blockIndex);
     triggerNextRequest(activeChain, inv, node);
 }
@@ -86,7 +86,7 @@ bool thinIsSmaller(const CBlock& b, const XThinBlock& x) {
 }
 
 void BlockSender::sendBlock(CNode& node,
-        const CBlockIndex& blockIndex, int invType)
+        const CBlockIndex& blockIndex, int invType, int activeChainHeight)
 {
 
     // Send block from disk
@@ -138,8 +138,12 @@ void BlockSender::sendBlock(CNode& node,
     }
 
     if (invType == MSG_CMPCT_BLOCK && NodeStatePtr(node.id)->supportsCompactBlocks) {
-        CompactBlock cmpct(block, *choosePrefiller(node));
-        node.PushMessage("cmpctblock", cmpct);
+        if (blockIndex.nHeight >= activeChainHeight - 10) {
+            CompactBlock cmpct(block, *choosePrefiller(node));
+            node.PushMessage("cmpctblock", cmpct);
+        }
+        else
+            node.PushMessage("block", block);
         return;
     }
 

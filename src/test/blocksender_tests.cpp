@@ -107,7 +107,7 @@ BOOST_AUTO_TEST_CASE(send_msg_block) {
     BlockSenderDummy bs;
     DummyNode node;
 
-    bs.sendBlock(node, index, MSG_BLOCK);
+    bs.sendBlock(node, index, MSG_BLOCK, index.nHeight);
     BOOST_CHECK_EQUAL("block", node.messages.at(0));
 }
 
@@ -119,7 +119,7 @@ BOOST_AUTO_TEST_CASE(send_msg_thinblock) {
     DummyNode node;
     NodeStatePtr(node.id)->supportsCompactBlocks = false;
 
-    bs.sendBlock(node, index, MSG_THINBLOCK);
+    bs.sendBlock(node, index, MSG_THINBLOCK, index.nHeight);
     BOOST_CHECK_EQUAL("block", node.messages.at(0));
 }
 
@@ -132,7 +132,7 @@ BOOST_AUTO_TEST_CASE(send_msg_xthinblock) {
     DummyNode node;
     node.xthinFilter->clear();
     bs.readBlock = TestBlock2(); // "big" block. No transactions filtered!
-    bs.sendBlock(node, index, MSG_XTHINBLOCK);
+    bs.sendBlock(node, index, MSG_XTHINBLOCK, index.nHeight);
     BOOST_CHECK_EQUAL("block", node.messages.at(0));
 
     // Case 2 - send block with filtered transactions.
@@ -143,7 +143,7 @@ BOOST_AUTO_TEST_CASE(send_msg_xthinblock) {
     filter->insert(bs.readBlock.vtx[1].GetHash());
     filter->insert(bs.readBlock.vtx[2].GetHash());
     node2.xthinFilter.reset(filter);
-    bs.sendBlock(node2, index, MSG_XTHINBLOCK);
+    bs.sendBlock(node2, index, MSG_XTHINBLOCK, index.nHeight);
     BOOST_CHECK_EQUAL("xthinblock", node2.messages.at(0));
 }
 
@@ -151,7 +151,7 @@ BOOST_AUTO_TEST_CASE(send_msg_filteredblock) {
     CBlockIndex index;
     BlockSenderDummy bs;
     DummyNode node;
-    bs.sendBlock(node, index, MSG_FILTERED_BLOCK);
+    bs.sendBlock(node, index, MSG_FILTERED_BLOCK, index.nHeight);
     BOOST_CHECK_EQUAL("merkleblock", node.messages.at(0));
 }
 
@@ -177,9 +177,24 @@ BOOST_AUTO_TEST_CASE(send_msg_cmpct_block) {
     DummyNode node;
     NodeStatePtr(node.id)->supportsCompactBlocks = true;
     bs.readBlock = TestBlock2();
-    bs.sendBlock(node, index, MSG_CMPCT_BLOCK);
+    bs.sendBlock(node, index, MSG_CMPCT_BLOCK, index.nHeight);
     BOOST_CHECK_EQUAL("cmpctblock", node.messages.at(0));
 };
+
+BOOST_AUTO_TEST_CASE(send_old_cmpct_block) {
+    // If someone requests an old compact block,
+    // send them an full block instead.
+    CBlockIndex index;
+    BlockSenderDummy bs;
+
+    DummyNode node;
+    NodeStatePtr(node.id)->supportsCompactBlocks = true;
+    bs.readBlock = TestBlock2();
+    index.nHeight = 89;
+    bs.sendBlock(node, index, MSG_CMPCT_BLOCK, index.nHeight + 11);
+    BOOST_CHECK_EQUAL("block", node.messages.at(0));
+
+}
 
 BOOST_AUTO_TEST_CASE(send_msg_blocktxn) {
     CBlockIndex index;

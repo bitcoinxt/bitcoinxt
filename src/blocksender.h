@@ -28,7 +28,7 @@ class BlockSender {
             CBlockIndex& blockIndex, const CInv& inv);
 
         void sendBlock(CNode& node,
-            const CBlockIndex& blockIndex, int invType);
+            const CBlockIndex& blockIndex, int invType, int activeChainHeight);
 
         // Creates a response for a re-request for transactions missing
         // from a thin block.
