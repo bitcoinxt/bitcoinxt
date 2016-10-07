@@ -724,11 +724,14 @@ class PrefilledTransaction(object):
     def serialize(self, with_witness=False):
         r = b""
         r += ser_compact_size(self.index)
-        if with_witness:
-            r += self.tx.serialize_with_witness()
-        else:
-            r += self.tx.serialize_without_witness()
+        assert(not with_witness) # Witness support not added
+        r += self.tx.serialize()
         return r
+        #if with_witness:
+        #    r += self.tx.serialize_with_witness()
+        #else:
+        #    r += self.tx.serialize_without_witness()
+        #return r
 
     def __repr__(self):
         return "PrefilledTransaction(index=%d, tx=%s)" % (self.index, repr(self.tx))
