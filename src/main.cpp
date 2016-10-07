@@ -4898,7 +4898,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         }
 
         if (pfrom->nVersion >= SHORT_IDS_BLOCKS_VERSION
-                && !(pfrom->nServices & NODE_THIN)) {
+                && (!(pfrom->nServices & NODE_THIN) || Opt().PreferCompactBlocks())) {
 
             // We prefer xthin, however if node does not support it,
             // we ask it for thin block variant compact blocks.

@@ -93,6 +93,10 @@ int Opt::ThinBlocksMaxParallel() {
     return Args->GetArg("-thin-blocks-max-parallel", 3);
 }
 
+bool Opt::PreferCompactBlocks() const {
+    return Args->GetBool("-prefer-compact-blocks", false);
+}
+
 std::unique_ptr<ArgReset> SetDummyArgGetter(std::unique_ptr<ArgGetter> getter) {
     Args.reset(getter.release());
     return std::unique_ptr<ArgReset>(new ArgReset);

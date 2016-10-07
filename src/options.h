@@ -20,6 +20,7 @@ struct Opt {
     bool AvoidFullBlocks();
     bool OptimalThinBlocksOnly();
     int ThinBlocksMaxParallel();
+    bool PreferCompactBlocks() const; // Added for rpc test
 };
 
 /** Maximum number of script-checking threads allowed */
