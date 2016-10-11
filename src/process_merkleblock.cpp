@@ -1,4 +1,5 @@
 #include "process_merkleblock.h"
+#include "blockheaderprocessor.h"
 #include "bloomthin.h"
 #include "consensus/validation.h"
 #include "main.h" // Misbehaving, mapBlockIndex

@@ -1,4 +1,5 @@
 #include "test/thinblockutil.h"
+#include "blockheaderprocessor.h"
 #include "bloom.h"
 #include "bloomthin.h"
 #include "chain.h"
@@ -10,7 +11,6 @@
 #include "process_xthinblock.h"
 #include "testutil.h"
 #include "util.h" // for fPrintToDebugLog
-#include "utilprocessmsg.h"
 #include "xthin.h"
 #include <boost/test/unit_test_suite.hpp>
 #include <boost/test/test_tools.hpp>

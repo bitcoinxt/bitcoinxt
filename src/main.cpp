@@ -8,6 +8,7 @@
 #include "addrman.h"
 #include "arith_uint256.h"
 #include "blockannounce.h"
+#include "blockheaderprocessor.h"
 #include "blocksender.h"
 #include "bloomthin.h"
 #include "chainparams.h"
@@ -31,7 +32,6 @@
 #include "ui_interface.h"
 #include "undo.h"
 #include "util.h"
-#include "utilprocessmsg.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
 #include "xthin.h"
@@ -48,7 +48,6 @@
 #include <boost/filesystem/fstream.hpp>
 #include <boost/math/distributions/poisson.hpp>
 #include <boost/thread.hpp>
-#include <boost/range/adaptor/reversed.hpp>
 
 using namespace std;
 
@@ -827,7 +826,7 @@ bool CheckFinalTx(const CTransaction &tx, int flags)
 /**
  * Check transaction inputs to mitigate two
  * potential denial-of-service attacks:
- * 
+ *
  * 1. scriptSigs with extra data stuffed into them,
  *    not consumed by scriptPubKey (or P2SH script)
  * 2. P2SH scripts with a crazy number of expensive
@@ -2761,7 +2760,7 @@ static int64_t nTimeFlush = 0;
 static int64_t nTimeChainState = 0;
 static int64_t nTimePostConnect = 0;
 
-/** 
+/**
  * Connect a new block to chainActive. pblock is either NULL or a pointer to a CBlock
  * corresponding to pindexNew, to bypass loading it again from disk.
  */
@@ -4573,7 +4572,7 @@ bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, ve
 {
     // Defined by BIP 64.
     //
-    // Allows a peer to retrieve the CTxOut structures corresponding to the given COutPoints. 
+    // Allows a peer to retrieve the CTxOut structures corresponding to the given COutPoints.
     // Note that this data is not authenticated by anything: this code could just invent any
     // old rubbish and hand it back, with the peer being unable to tell unless they are checking
     // the outpoints against some out of band data.
@@ -4696,119 +4695,6 @@ struct MempoolHashProvider : public TxHashProvider {
         mempool.queryHashes(dst);
     }
 };
-
-struct BlockHeaderProcessorImpl : public BlockHeaderProcessor {
-
-    BlockHeaderProcessorImpl(CNode* pfrom) : pfrom(pfrom) { }
-
-    // maybeAnnouncement: Header *might* have been received as a block announcement.
-    bool operator()(const std::vector<CBlockHeader>& headers,
-            bool peerSentMax,
-            bool maybeAnnouncement) override
-    {
-        CBlockIndex *pindexLast = NULL;
-        BOOST_FOREACH(const CBlockHeader& header, headers) {
-            CValidationState state;
-            if (pindexLast != NULL && header.hashPrevBlock != pindexLast->GetBlockHash()) {
-                Misbehaving(pfrom->GetId(), 20);
-                return error("non-continuous headers sequence");
-            }
-            if (!AcceptBlockHeader(header, state, &pindexLast)) {
-                int nDoS;
-                if (state.IsInvalid(nDoS)) {
-                    if (nDoS > 0)
-                        Misbehaving(pfrom->GetId(), nDoS);
-                    return error("invalid header received");
-                }
-            }
-        }
-
-        if (pindexLast)
-            UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
-
-        if (peerSentMax && pindexLast) {
-            // Headers message had its maximum size; the peer may have more headers.
-            // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
-            // from there instead.
-            LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
-            pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256());
-        }
-
-        if (pindexLast && maybeAnnouncement) {
-            std::vector<CBlockIndex*> toFetch = findMissingBlocks(pindexLast);
-
-            // We may or may not start downloading the blocks
-            // from this peer now.
-            suggestDownload(toFetch, pindexLast);
-        }
-
-        CheckBlockIndex();
-        return true;
-    }
-
-    std::vector<CBlockIndex*> findMissingBlocks(CBlockIndex* last) {
-        assert(last);
-
-        vector<CBlockIndex*> toFetch;
-        CBlockIndex* walk = last;
-
-        // Calculate all the blocks we'd need to switch to last, up to a limit.
-        do {
-            if (toFetch.size() == MAX_BLOCKS_IN_TRANSIT_PER_PEER)
-                break;
-
-            if (chainActive.Contains(walk))
-                break;
-
-            if (walk->nStatus & BLOCK_HAVE_DATA)
-                continue;
-
-            if (blocksInFlight.isInFlight(walk->GetBlockHash()))
-                continue;
-
-            // We don't have this block, and it's not yet in flight.
-            toFetch.push_back(walk);
-
-        } while ((walk = walk->pprev));
-
-        return toFetch;
-    }
-
-    bool hasEqualOrMoreWork(CBlockIndex* last) {
-        return last->IsValid(BLOCK_VALID_TREE)
-            && chainActive.Tip()->nChainWork <= last->nChainWork;
-    }
-
-    void suggestDownload(const std::vector<CBlockIndex*>& toFetch, CBlockIndex* last) {
-        std::vector<CInv> toGet;
-
-        if (!hasEqualOrMoreWork(last))
-            return;
-
-        for (auto b : boost::adaptors::reverse(toFetch)) {
-
-            BlockAnnounceReceiver ann(b->GetBlockHash(),
-                    *pfrom, thinblockmg, blocksInFlight);
-
-            // Stop if we don't want to download this block now.
-            // Won't want next.
-            if (!ann.onBlockAnnounced(toGet, true))
-                break;
-
-            // This block has been requested from peer.
-            MarkBlockAsInFlight()(pfrom->id, b->GetBlockHash(), Params().GetConsensus());
-        }
-
-        if (!toGet.empty()) {
-            LogPrint("net", "Downloading blocks toward %s (%d) via headers direct fetch\n",
-                    last->GetBlockHash().ToString(), last->nHeight);
-            pfrom->PushMessage("getdata", toGet);
-        }
-    }
-
-    CNode* pfrom;
-};
-
 
 bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived)
 {
@@ -5272,7 +5158,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             CValidationState state;
 
             mapAlreadyAskedFor.erase(inv);
-        
+
             if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
             {
                 mempool.check(pcoinsTip);
@@ -5405,7 +5291,9 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         NodeStatePtr(pfrom->id)->initialHeadersReceived = true;
 
-        BlockHeaderProcessorImpl p(pfrom);
+        MarkBlockAsInFlight inFlight;
+        DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight,
+                CheckBlockIndex);
         if (!p(headers, nCount == MAX_HEADERS_RESULTS, true))
             return false;
     }
@@ -5414,7 +5302,9 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         try {
             LOCK(cs_main);
             NodeStatePtr nodestate(pfrom->id);
-            BlockHeaderProcessorImpl p(pfrom);
+            MarkBlockAsInFlight inFlight;
+            DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg,
+                inFlight, CheckBlockIndex);
             ProcessMerkleBlock(*pfrom, vRecv, *(nodestate->thinblock), TxFinderImpl(), p);
         }
         catch (...) {
@@ -5433,7 +5323,9 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         try {
             LOCK(cs_main);
             NodeStatePtr nodestate(pfrom->id);
-            BlockHeaderProcessorImpl headerp(pfrom);
+            MarkBlockAsInFlight inFlight;
+            DefaultHeaderProcessor headerp(pfrom, blocksInFlight, thinblockmg,
+                inFlight, CheckBlockIndex);
             XThinBlockProcessor blockp(*pfrom);
             blockp(vRecv, *(nodestate->thinblock), TxFinderImpl(), headerp);
         }

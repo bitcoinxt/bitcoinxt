@@ -1,4 +1,5 @@
 #include "process_xthinblock.h"
+#include "blockheaderprocessor.h"
 #include "consensus/validation.h"
 #include "main.h" // Misbehaving, mapBlockIndex
 #include "thinblock.h"

@@ -77,6 +77,7 @@ BITCOIN_CORE_H = \
   arith_uint256.h \
   base58.h \
   blockannounce.h \
+  blockheaderprocessor.h \
   blocksender.h \
   bloom.h \
   bloomthin.h \
@@ -196,6 +197,7 @@ libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
   addrman.cpp \
   blockannounce.cpp \
+  blockheaderprocessor.cpp \
   blocksender.cpp \
   bloom.cpp \
   bloomthin.cpp \
