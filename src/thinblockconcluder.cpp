@@ -6,6 +6,7 @@
 #include "chainparams.h"
 #include "main.h" // For Misbehaving
 #include "xthin.h"
+#include "utilprocessmsg.h"
 #include <vector>
 
 

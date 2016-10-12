@@ -10,6 +10,7 @@ CNodeState::CNodeState(NodeId id, ThinBlockManager& thinblockmg) {
     hashLastUnknownBlock.SetNull();
     pindexLastCommonBlock = NULL;
     bestHeaderSent = nullptr;
+    unconnectingHeaders = 0;
     fSyncStarted = false;
     nStallingSince = 0;
     nBlocksInFlight = 0;

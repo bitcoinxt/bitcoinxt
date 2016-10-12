@@ -4,43 +4,60 @@
 #include "consensus/validation.h"
 #include "main.h" // Misbehaving, UpdateBlockAvailability
 #include "net.h"
+#include "nodestate.h"
 #include "primitives/block.h"
 #include "util.h"
 #include "inflightindex.h"
-#include "thinblockconcluder.h" // BlockInFlightMarker
+#include "utilprocessmsg.h" // BlockInFlightMarker
 #include <boost/range/adaptor/reversed.hpp>
 
 using namespace std;
+
+/** Maximum number of unconnecting headers announcements before DoS score */
+const int MAX_UNCONNECTING_HEADERS = 10;
+
+// Check if header connects with active chain
+bool headerConnects(const CBlockHeader& h) {
+    return mapBlockIndex.find(h.hashPrevBlock) != mapBlockIndex.end();
+}
 
 DefaultHeaderProcessor::DefaultHeaderProcessor(CNode* pfrom,
         InFlightIndex& i,
         ThinBlockManager& mg,
         BlockInFlightMarker& inFlight,
-        std::function<void()> checkBlockIndex) :
-    pfrom(pfrom), blocksInFlight(i), thinmg(mg),
-    markAsInFlight(inFlight), checkBlockIndex(checkBlockIndex) { }
+        std::function<void()> checkBlockIndex,
+        std::function<void()> sendGetHeaders) :
+    pfrom(pfrom), blocksInFlight(i), thinmg(mg), markAsInFlight(inFlight),
+    checkBlockIndex(checkBlockIndex), sendGetHeaders(sendGetHeaders)
+{
+}
 
 // maybeAnnouncement: Header *might* have been received as a block announcement.
 bool DefaultHeaderProcessor::operator()(const std::vector<CBlockHeader>& headers,
         bool peerSentMax,
         bool maybeAnnouncement)
 {
-    CBlockIndex *pindexLast = nullptr;
-    for (const CBlockHeader& header : headers) {
-        CValidationState state;
-        if (pindexLast != nullptr && header.hashPrevBlock != pindexLast->GetBlockHash()) {
-            Misbehaving(pfrom->GetId(), 20);
-            return error("non-continuous headers sequence");
-        }
-        if (!AcceptBlockHeader(header, state, &pindexLast)) {
-            int nDoS;
-            if (state.IsInvalid(nDoS)) {
-                if (nDoS > 0)
-                    Misbehaving(pfrom->GetId(), nDoS);
-                return error("invalid header received");
-            }
-        }
+    if (maybeAnnouncement && !headerConnects(headers.at(0)))
+    {
+        // Send a getheaders message in response to try to connect the chain.
+        // Once a headers message is received that is valid and does connect,
+        // nUnconnectingHeaders gets reset back to 0.
+        NodeStatePtr(pfrom->id)->unconnectingHeaders++;
+        sendGetHeaders();
+        UpdateBlockAvailability(pfrom->id, headers.back().GetHash());
+
+        if (NodeStatePtr(pfrom->id)->unconnectingHeaders % MAX_UNCONNECTING_HEADERS == 0)
+            Misbehaving(pfrom->id, 20);
+        return true;
     }
+
+    bool ok;
+    CBlockIndex* pindexLast;
+    std::tie(ok, pindexLast) = acceptHeaders(headers);
+    if (!ok)
+        return false;
+
+    NodeStatePtr(pfrom->id)->unconnectingHeaders = 0;
 
     if (pindexLast)
         UpdateBlockAvailability(pfrom->GetId(), pindexLast->GetBlockHash());
@@ -63,6 +80,30 @@ bool DefaultHeaderProcessor::operator()(const std::vector<CBlockHeader>& headers
 
     checkBlockIndex();
     return true;
+}
+
+std::tuple<bool, CBlockIndex*> DefaultHeaderProcessor::acceptHeaders(
+        const std::vector<CBlockHeader>& headers) {
+
+    CBlockIndex *pindexLast = nullptr;
+    for (const CBlockHeader& header : headers) {
+        CValidationState state;
+        if (pindexLast != nullptr && header.hashPrevBlock != pindexLast->GetBlockHash()) {
+            Misbehaving(pfrom->GetId(), 20);
+            return std::make_tuple(
+                    error("non-continuous headers sequence"), pindexLast);
+        }
+        if (!AcceptBlockHeader(header, state, &pindexLast)) {
+            int nDoS;
+            if (state.IsInvalid(nDoS)) {
+                if (nDoS > 0)
+                    Misbehaving(pfrom->GetId(), nDoS);
+                return std::make_tuple(
+                        error("invalid header received"), pindexLast);
+            }
+        }
+    }
+    return std::make_tuple(true, pindexLast);
 }
 
 std::vector<CBlockIndex*> DefaultHeaderProcessor::findMissingBlocks(CBlockIndex* last) {

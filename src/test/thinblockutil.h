@@ -6,6 +6,7 @@
 #include "nodestate.h"
 #include "thinblockmanager.h"
 #include "protocol.h"
+#include "utilprocessmsg.h"
 #include <memory>
 
 class CBlock;
@@ -47,5 +48,18 @@ struct DummyFinishedCallb : public ThinBlockFinishedCallb {
 struct DummyInFlightEraser : public InFlightEraser {
     virtual void operator()(NodeId, const uint256& hash) { }
 };
+
+struct DummyMarkAsInFlight : public BlockInFlightMarker {
+
+    virtual void operator()(
+        NodeId nodeid, const uint256& hash,
+        const Consensus::Params& consensusParams,
+        CBlockIndex *pindex)
+    {
+        block = hash;
+    }
+    uint256 block;
+};
+
 
 #endif

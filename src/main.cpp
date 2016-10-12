@@ -33,6 +33,7 @@
 #include "undo.h"
 #include "util.h"
 #include "utilmoneystr.h"
+#include "utilprocessmsg.h"
 #include "validationinterface.h"
 #include "xthin.h"
 #include "versionbits.h"
@@ -5291,9 +5292,13 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         NodeStatePtr(pfrom->id)->initialHeadersReceived = true;
 
+        auto sendGetHeaders = [pfrom](){
+            pfrom->PushMessage("getheaders",
+                    chainActive.GetLocator(pindexBestHeader), uint256());
+        };
         MarkBlockAsInFlight inFlight;
         DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight,
-                CheckBlockIndex);
+                CheckBlockIndex, sendGetHeaders);
         if (!p(headers, nCount == MAX_HEADERS_RESULTS, true))
             return false;
     }

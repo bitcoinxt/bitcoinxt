@@ -2,6 +2,7 @@
 
 #include <vector>
 #include <functional>
+#include <tuple>
 
 class CNode;
 class CBlockHeader;
@@ -24,11 +25,16 @@ class DefaultHeaderProcessor : public BlockHeaderProcessor {
 
         DefaultHeaderProcessor(CNode* pfrom,
                 InFlightIndex&, ThinBlockManager&, BlockInFlightMarker&,
-                std::function<void()> checkBlockIndex);
+                std::function<void()> checkBlockIndex,
+                std::function<void()> sendGetHeaders = [](){ });
 
-        virtual bool operator()(const std::vector<CBlockHeader>& headers,
+        bool operator()(const std::vector<CBlockHeader>& headers,
                 bool peerSentMax,
                 bool maybeAnnouncement) override;
+
+    protected:
+        virtual std::tuple<bool, CBlockIndex*> acceptHeaders(
+                const std::vector<CBlockHeader>& headers);
 
     private:
 
@@ -38,12 +44,12 @@ class DefaultHeaderProcessor : public BlockHeaderProcessor {
         void suggestDownload(
                 const std::vector<CBlockIndex*>& toFetch, CBlockIndex* last);
 
-
         CNode* pfrom;
         InFlightIndex& blocksInFlight;
         ThinBlockManager& thinmg;
         BlockInFlightMarker& markAsInFlight;
         std::function<void()> checkBlockIndex;
+        std::function<void()> sendGetHeaders;
 };
 
 #endif
