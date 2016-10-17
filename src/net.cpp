@@ -1360,7 +1360,6 @@ void ThreadOpenConnections()
                 }
             }
         }
-        assert(nOutbound <= (MAX_OUTBOUND_CONNECTIONS + MAX_FEELER_CONNECTIONS));
 
         // Feeler Connections
         //
