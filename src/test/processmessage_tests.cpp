@@ -1,31 +1,19 @@
 #include "test/thinblockutil.h"
+#include "blockheaderprocessor.h"
 #include "bloom.h"
 #include "bloomthin.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "inflightindex.h"
-#include "main.h"
 #include "merkleblock.h"
 #include "net.h"
 #include "process_merkleblock.h"
 #include "process_xthinblock.h"
+#include "testutil.h"
 #include "util.h" // for fPrintToDebugLog
-#include "utilprocessmsg.h"
 #include "xthin.h"
 #include <boost/test/unit_test_suite.hpp>
 #include <boost/test/test_tools.hpp>
-
-struct DummyBlockIndexEntry {
-DummyBlockIndexEntry(const uint256& hash) : hash(hash) {
-    index.nStatus = BLOCK_HAVE_DATA;
-    mapBlockIndex.insert(std::make_pair(hash, &index));
-    }
-    ~DummyBlockIndexEntry() {
-        mapBlockIndex.erase(hash);
-    }
-    CBlockIndex index;
-    uint256 hash;
-};
 
 template <class WORKER_TYPE>
 struct DummyWorker : public WORKER_TYPE {
@@ -48,7 +36,7 @@ struct DummyHeaderProcessor : public BlockHeaderProcessor {
 
     DummyHeaderProcessor() : headerOK(true), called(false) { }
 
-    bool operator()(const std::vector<CBlockHeader>&, bool) {
+    bool operator()(const std::vector<CBlockHeader>&, bool, bool) override {
         called = true;
         return headerOK;
     }

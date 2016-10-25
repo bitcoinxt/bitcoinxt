@@ -24,7 +24,7 @@ class BlockSender {
             CBlockIndex *pindexBestHeader);
 
         void send(const CChain& activeChain, CNode& node,
-            const CBlockIndex& blockIndex, const CInv& inv);
+            CBlockIndex& blockIndex, const CInv& inv);
 
         void sendBlock(CNode& node,
             const CBlockIndex& blockIndex, int invType);
@@ -33,7 +33,6 @@ class BlockSender {
         // from a thin block.
         void sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
             const XThinReRequest& req);
-
 
     protected: // used in unit tests
         void triggerNextRequest(const CChain& activeChain, const CInv& inv, CNode& node);

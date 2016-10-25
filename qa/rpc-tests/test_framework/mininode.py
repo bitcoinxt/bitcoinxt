@@ -991,6 +991,20 @@ class msg_mempool(object):
     def __repr__(self):
         return "msg_mempool()"
 
+class msg_sendheaders(object):
+    command = "sendheaders"
+
+    def __init__(self):
+        pass
+
+    def deserialize(self, f):
+        pass
+
+    def serialize(self):
+        return ""
+
+    def __repr__(self):
+        return "msg_sendheaders()"
 
 # getheaders message has
 # number of entries
@@ -1104,6 +1118,28 @@ class NodeConnCB(object):
                 if self.verack_received:
                     return
             time.sleep(0.05)
+
+    # Derived classes should call this function once to set the message map
+    # which associates the derived classes' functions to incoming messages
+    def create_callback_map(self):
+        self.cbmap = {
+            "version": self.on_version,
+            "verack": self.on_verack,
+            "addr": self.on_addr,
+            "alert": self.on_alert,
+            "inv": self.on_inv,
+            "getdata": self.on_getdata,
+            "getblocks": self.on_getblocks,
+            "tx": self.on_tx,
+            "block": self.on_block,
+            "getaddr": self.on_getaddr,
+            "ping": self.on_ping,
+            "pong": self.on_pong,
+            "headers": self.on_headers,
+            "getheaders": self.on_getheaders,
+            "reject": self.on_reject,
+            "mempool": self.on_mempool
+        }
 
     def deliver(self, conn, message):
         with mininode_lock:

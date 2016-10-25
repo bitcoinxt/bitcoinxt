@@ -5,17 +5,20 @@
 class uint256;
 class CNode;
 class CBlockHeader;
+class CBlockIndex;
+namespace Consensus { struct Params; }
+
+typedef int NodeId;
 
 bool HaveBlockData(const uint256& hash);
 
-// Process received block header.
-class BlockHeaderProcessor {
-public:
-    // returns false on error
-    virtual bool operator()(const std::vector<CBlockHeader>& headers, bool peerSentMax) = 0;
-
-    virtual ~BlockHeaderProcessor() = 0;
+struct BlockInFlightMarker {
+    virtual ~BlockInFlightMarker() = 0;
+    virtual void operator()(
+        NodeId nodeid, const uint256& hash,
+        const Consensus::Params& consensusParams,
+        CBlockIndex* pindex) = 0;
 };
-inline BlockHeaderProcessor::~BlockHeaderProcessor() { }
+inline BlockInFlightMarker::~BlockInFlightMarker() { }
 
 #endif

@@ -24,4 +24,8 @@ CBlock TestBlock2() {
     return block;
 }
 
-
+std::unique_ptr<ThinBlockManager> GetDummyThinBlockMg() {
+    return std::unique_ptr<ThinBlockManager>(new ThinBlockManager(
+        std::unique_ptr<ThinBlockFinishedCallb>(new DummyFinishedCallb),
+        std::unique_ptr<InFlightEraser>(new DummyInFlightEraser)));
+}

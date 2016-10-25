@@ -11,18 +11,6 @@
 #include "xthin.h"
 #include <memory>
 
-struct DummyMarkAsInFlight : public BlockInFlightMarker {
-
-    virtual void operator()(
-        NodeId nodeid, const uint256& hash,
-        const Consensus::Params& consensusParams,
-        CBlockIndex *pindex)
-    {
-        block = hash;
-    }
-    uint256 block;
-};
-
 struct DummyBloomConcluder : public BloomBlockConcluder {
 
     DummyBloomConcluder() :

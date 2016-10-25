@@ -43,15 +43,6 @@ struct BloomBlockConcluder {
         BlockInFlightMarker& markInFlight;
 };
 
-struct BlockInFlightMarker {
-    virtual ~BlockInFlightMarker() = 0;
-    virtual void operator()(
-        NodeId nodeid, const uint256& hash,
-        const Consensus::Params& consensusParams,
-        CBlockIndex *pindex) = 0;
-};
-inline BlockInFlightMarker::~BlockInFlightMarker() { }
-
 // Finishes a block using response from a transaction re-request.
 struct XThinBlockConcluder {
     void operator()(const XThinReReqResponse& resp,

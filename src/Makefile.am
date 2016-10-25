@@ -76,6 +76,8 @@ BITCOIN_CORE_H = \
   amount.h \
   arith_uint256.h \
   base58.h \
+  blockannounce.h \
+  blockheaderprocessor.h \
   blocksender.h \
   bloom.h \
   bloomthin.h \
@@ -115,6 +117,7 @@ BITCOIN_CORE_H = \
   miner.h \
   net.h \
   netbase.h \
+  nodestate.h \
   noui.h \
   options.h \
   policy/fees.h \
@@ -193,6 +196,8 @@ libbitcoin_server_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES) $(MINIUPNPC_CP
 libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
   addrman.cpp \
+  blockannounce.cpp \
+  blockheaderprocessor.cpp \
   blocksender.cpp \
   bloom.cpp \
   bloomthin.cpp \
@@ -294,6 +299,7 @@ libbitcoin_common_a_SOURCES = \
   key.cpp \
   keystore.cpp \
   netbase.cpp \
+  nodestate.cpp \
   primitives/block.cpp \
   primitives/transaction.cpp \
   protocol.cpp \
