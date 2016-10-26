@@ -157,18 +157,18 @@ BOOST_AUTO_TEST_CASE(cnode_simple_test)
     bool fInboundIn = false;
 
     // Test that fFeeler is false by default.
-    CNode* pnode1 = new CNode(id++, NODE_NETWORK, height, hSocket, addr, pszDest, fInboundIn);
+    CNode* pnode1 = new CNode(id++, NODE_NETWORK, height, hSocket, addr, 0, pszDest, fInboundIn);
     BOOST_CHECK(pnode1->fInbound == false);
     BOOST_CHECK(pnode1->fFeeler == false);
 
     fInboundIn = true;
-    CNode* pnode2 = new CNode(id++, NODE_NETWORK, height, hSocket, addr, pszDest, fInboundIn);
+    CNode* pnode2 = new CNode(id++, NODE_NETWORK, height, hSocket, addr, 1, pszDest, fInboundIn);
     BOOST_CHECK(pnode2->fInbound == true);
     BOOST_CHECK(pnode2->fFeeler == false);
 }
 
 BOOST_AUTO_TEST_CASE(support_xthin_test) {
-    CNode node(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress());
+    CNode node(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(), 0);
 
     BOOST_CHECK(!node.SupportsXThinBlocks());
     node.nServices |= NODE_THIN;
@@ -180,7 +180,8 @@ BOOST_AUTO_TEST_CASE(support_xthin_test) {
 BOOST_AUTO_TEST_CASE(ipgroup_assigned) {
     CNetAddr ip("10.0.0.1");
     std::unique_ptr<CNode> node(new CNode(42, NODE_NETWORK, 0,
-                INVALID_SOCKET, CAddress(CService(ip, 1234))));
+                                          INVALID_SOCKET,
+                                          CAddress(CService(ip, 1234)), 0));
 
     CIPGroupData ipgroup = FindGroupForIP(ip);
     BOOST_CHECK_EQUAL(1, ipgroup.connCount);

@@ -604,14 +604,14 @@ public:
     // adds connection to ipgroup (for prioritising connection slots)
     std::unique_ptr<IPGroupSlot> ipgroupSlot;
 
-    CNode(NodeId id, uint64_t nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
+    CNode(NodeId id, uint64_t nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress &addrIn, uint64_t nLocalHostNonceIn, const std::string &addrNameIn = "", bool fInboundIn = false);
     virtual ~CNode();
 
 private:
     CNode(const CNode&);
     void operator=(const CNode&);
 
-    uint64_t nLocalHostNonce;
+    const uint64_t nLocalHostNonce;
     const uint64_t nLocalServices;
     const int nMyStartingHeight;
 public:
