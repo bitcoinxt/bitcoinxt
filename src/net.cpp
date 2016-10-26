@@ -387,19 +387,14 @@ CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCo
         NodeId id = GetNewNodeId();
         uint64_t nonce = GetDeterministicRandomizer(RANDOMIZER_ID_LOCALHOSTNONCE).Write(id).Finalize();
         CNode* pnode = new CNode(id, nLocalServices, GetBestHeight(), hSocket, addrConnect, nonce, pszDest ? pszDest : "", false);
+        pnode->nTimeConnected = GetTime();
 
-
-        PushVersion(pnode, GetTime());
-
-        GetNodeSignals().InitializeNode(pnode->GetId(), pnode);
         pnode->AddRef();
-
+        GetNodeSignals().InitializeNode(pnode, *this);
         {
             LOCK(cs_vNodes);
             vNodes.push_back(pnode);
         }
-
-        pnode->nTimeConnected = GetTime();
 
         return pnode;
     } else if (!proxyConnectionFailed) {
@@ -409,24 +404,6 @@ CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCo
     }
 
     return NULL;
-}
-
-void CConnman::PushVersion(CNode* pnode, int64_t nTime)
-{
-    uint64_t nLocalNodeServices = pnode->GetLocalServices();
-    CAddress addrYou = (pnode->addr.IsRoutable() && !IsProxy(pnode->addr) ? pnode->addr : CAddress(CService("0.0.0.0", 0)));
-    CAddress addrMe = CAddress(CService(), nLocalNodeServices);
-    uint64_t nonce = pnode->GetLocalNonce();
-    int nNodeStartingHeight = pnode->nMyStartingHeight;
-    NodeId id = pnode->GetId();
-
-    int nMaxBlockSize = g_signals.GetMaxBlockSizeInsecure().get_value_or(0);
-    PushMessageWithVersion(pnode, INIT_PROTO_VERSION, "version", PROTOCOL_VERSION, nLocalNodeServices, nTime, addrYou, addrMe, nonce, XTSubVersion(nMaxBlockSize), nNodeStartingHeight, true);
-
-    if (fLogIPs)
-        LogPrint(Log::NET, "send version message: version %d, blocks=%d, us=%s, them=%s, peer=%d\n", PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(), addrYou.ToString(), id);
-    else
-        LogPrint(Log::NET, "send version message: version %d, blocks=%d, us=%s, peer=%d\n", PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(), id);
 }
 
 void CNode::CloseSocketDisconnect()
@@ -770,9 +747,9 @@ void CConnman::AcceptConnection(const ListenSocket& hListenSocket) {
     uint64_t nonce = GetDeterministicRandomizer(RANDOMIZER_ID_LOCALHOSTNONCE).Write(id).Finalize();
 
     CNode* pnode = new CNode(id, nLocalServices, GetBestHeight(), hSocket, addr, nonce, "", true);
-    GetNodeSignals().InitializeNode(pnode->GetId(), pnode);
     pnode->AddRef();
     pnode->fWhitelisted = whitelisted;
+    GetNodeSignals().InitializeNode(pnode, *this);
 
     {
         LOCK(cs_vNodes);
@@ -1831,7 +1808,7 @@ bool CConnman::Start(CScheduler& scheduler, std::string& strNodeError, Options c
         uint64_t nonce = GetDeterministicRandomizer(RANDOMIZER_ID_LOCALHOSTNONCE).Write(id).Finalize();
 
         pnodeLocalHost = new CNode(id, nLocalServices, GetBestHeight(), INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), nLocalServices), nonce);
-        GetNodeSignals().InitializeNode(pnodeLocalHost->GetId(), pnodeLocalHost);
+        GetNodeSignals().InitializeNode(pnodeLocalHost, *this);
     }
 
     //

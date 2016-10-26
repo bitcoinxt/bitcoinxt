@@ -25,6 +25,7 @@
 #include "maxblocksize.h"
 #include "merkleblock.h"
 #include "net.h"
+#include "netbase.h"
 #include "nodestate.h"
 #include "options.h"
 #include "policy/policy.h"
@@ -271,8 +272,30 @@ int64_t GetBlockTimeout(int64_t nTime, int nValidatedQueuedBefore, const Consens
     return nTime + 500000 * consensusParams.nPowTargetSpacing * (4 + nValidatedQueuedBefore);
 }
 
-void InitializeNode(NodeId nodeid, const CNode *pnode) {
-    NodeStatePtr::insert(nodeid, pnode, thinblockmg);
+void PushNodeVersion(CNode *pnode, CConnman& connman, int64_t nTime)
+{
+    uint64_t nLocalNodeServices = pnode->GetLocalServices();
+    uint64_t nonce = pnode->GetLocalNonce();
+    int nNodeStartingHeight = pnode->GetMyStartingHeight();
+    NodeId nodeid = pnode->GetId();
+    CAddress addr = pnode->addr;
+
+    CAddress addrYou = (addr.IsRoutable() && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0"), 0));
+    CAddress addrMe = CAddress(CService(), nLocalNodeServices);
+
+    int nMaxBlockSize = GetMaxBlockSizeInsecure();
+    connman.PushMessageWithVersion(pnode, INIT_PROTO_VERSION, "version", PROTOCOL_VERSION, nLocalNodeServices, nTime, addrYou, addrMe, nonce, XTSubVersion(nMaxBlockSize), nNodeStartingHeight, true);
+
+    if (fLogIPs)
+        LogPrint(Log::NET, "send version message: version %d, blocks=%d, us=%s, them=%s, peer=%d\n", PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(), addrYou.ToString(), nodeid);
+    else
+        LogPrint(Log::NET, "send version message: version %d, blocks=%d, us=%s, peer=%d\n", PROTOCOL_VERSION, nNodeStartingHeight, addrMe.ToString(), nodeid);
+}
+
+void InitializeNode(CNode *pnode, CConnman& connman) {
+    NodeStatePtr::insert(pnode->GetId(), pnode, thinblockmg);
+    if(!pnode->fInbound)
+        PushNodeVersion(pnode, connman, GetTime());
 }
 
 void FinalizeNode(NodeId nodeid, bool& fUpdateConnectionTime) {
@@ -4592,7 +4615,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
         // Be shy and don't send version until we hear
         if (pfrom->fInbound)
-            connman->PushVersion(pfrom, GetAdjustedTime());
+            PushNodeVersion(pfrom, *connman, GetAdjustedTime());
 
         pfrom->fClient = !(pfrom->nServices & NODE_NETWORK);
 

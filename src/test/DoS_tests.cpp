@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_CASE(DoS_banning)
     CAddress addr1(ip(0xa0b0c001));
     CNode dummyNode1(id++, NODE_NETWORK, 0, INVALID_SOCKET, addr1, 0, "", true);
     dummyNode1.SetSendVersion(PROTOCOL_VERSION);
-    GetNodeSignals().InitializeNode(dummyNode1.GetId(), &dummyNode1);
+    GetNodeSignals().InitializeNode(&dummyNode1, *connman);
     dummyNode1.nVersion = 1;
     Misbehaving(dummyNode1.GetId(), 100, ""); // Should get banned
     SendMessages(&dummyNode1, connman, interruptDummy);
@@ -65,7 +65,7 @@ BOOST_AUTO_TEST_CASE(DoS_banning)
     CAddress addr2(ip(0xa0b0c002));
     CNode dummyNode2(id++, NODE_NETWORK, 0, INVALID_SOCKET, addr2, 1, "", true);
     dummyNode2.SetSendVersion(PROTOCOL_VERSION);
-    GetNodeSignals().InitializeNode(dummyNode2.GetId(), &dummyNode2);
+    GetNodeSignals().InitializeNode(&dummyNode2, *connman);
     dummyNode2.nVersion = 1;
     Misbehaving(dummyNode2.GetId(), 50, "");
     SendMessages(&dummyNode2, connman, interruptDummy);
@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE(DoS_banscore)
     CAddress addr1(ip(0xa0b0c001));
     CNode dummyNode1(id++, NODE_NETWORK, 0, INVALID_SOCKET, addr1, 1, "", true);
     dummyNode1.SetSendVersion(PROTOCOL_VERSION);
-    GetNodeSignals().InitializeNode(dummyNode1.GetId(), &dummyNode1);
+    GetNodeSignals().InitializeNode(&dummyNode1, *connman);
     dummyNode1.nVersion = 1;
     Misbehaving(dummyNode1.GetId(), 100, "");
     SendMessages(&dummyNode1, connman, interruptDummy);
@@ -110,7 +110,7 @@ BOOST_AUTO_TEST_CASE(DoS_bantime)
     CAddress addr(ip(0xa0b0c001));
     CNode dummyNode(id++, NODE_NETWORK, 0, INVALID_SOCKET, addr, 4, "", true);
     dummyNode.SetSendVersion(PROTOCOL_VERSION);
-    GetNodeSignals().InitializeNode(dummyNode.GetId(), &dummyNode);
+    GetNodeSignals().InitializeNode(&dummyNode, *connman);
     dummyNode.nVersion = 1;
 
     Misbehaving(dummyNode.GetId(), 100, "");

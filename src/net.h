@@ -151,9 +151,6 @@ public:
         PushMessageWithVersionAndFlag(pnode, 0, 0, sCommand, std::forward<Args>(args)...);
     }
 
-    void PushVersion(CNode* pnode, int64_t nTime);
-
-
     template<typename Callable>
     bool ForEachNodeContinueIf(Callable&& func)
     {
@@ -422,7 +419,7 @@ struct CNodeSignals
     boost::signals2::signal<bool (CNode*, const CNetMessage&), CombinerAll> SanityCheckMessages;
     boost::signals2::signal<bool (CNode*, CConnman*, std::atomic<bool>&), CombinerAll> ProcessMessages;
     boost::signals2::signal<bool (CNode*, CConnman*, std::atomic<bool>&), CombinerAll> SendMessages;
-    boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
+    boost::signals2::signal<void (CNode*, CConnman&)> InitializeNode;
     boost::signals2::signal<void (NodeId, bool&)> FinalizeNode;
     boost::signals2::signal<uint64_t ()> GetMaxBlockSizeInsecure;
 };
@@ -652,6 +649,10 @@ public:
 
     uint64_t GetLocalNonce() const {
       return nLocalHostNonce;
+    }
+
+    int GetMyStartingHeight() const {
+      return nMyStartingHeight;
     }
 
     int GetRefCount()
