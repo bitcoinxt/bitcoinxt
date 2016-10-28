@@ -138,7 +138,7 @@ CBlock ThinBlockBuilder::finishBlock() {
 
     LogPrintf("reassembled thin block for %s (%d bytes)\n",
             thinBlock.GetHash().ToString(),
-            thinBlock.GetSerializeSize(SER_NETWORK, thinBlock.nVersion));
+              GetSerializeSize(thinBlock, SER_NETWORK, thinBlock.nVersion));
 
 
     CBlock block = thinBlock;
