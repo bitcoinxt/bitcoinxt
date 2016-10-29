@@ -215,7 +215,7 @@ public:
     void SetVersion(int n)       { nVersion = n; }
     int GetVersion()             { return nVersion; }
 
-    CDataStream& read(char* pch, size_t nSize)
+    void read(char* pch, size_t nSize)
     {
         // Read from the beginning of the buffer
         unsigned int nReadPosNext = nReadPos + nSize;
@@ -228,14 +228,13 @@ public:
             memcpy(pch, &vch[nReadPos], nSize);
             nReadPos = 0;
             vch.clear();
-            return (*this);
+            return;
         }
         memcpy(pch, &vch[nReadPos], nSize);
         nReadPos = nReadPosNext;
-        return (*this);
     }
 
-    CDataStream& ignore(int nSize)
+    void ignore(int nSize)
     {
         // Ignore from the beginning of the buffer
         if (nSize < 0) {
@@ -248,17 +247,15 @@ public:
                 throw std::ios_base::failure("CDataStream::ignore(): end of data");
             nReadPos = 0;
             vch.clear();
-            return (*this);
+            return;
         }
         nReadPos = nReadPosNext;
-        return (*this);
     }
 
-    CDataStream& write(const char* pch, size_t nSize)
+    void write(const char* pch, size_t nSize)
     {
         // Write to the end of the buffer
         vch.insert(vch.end(), pch, pch + nSize);
-        return (*this);
     }
 
     template<typename Stream>
@@ -370,16 +367,15 @@ public:
     void SetVersion(int n)       { nVersion = n; }
     int GetVersion()             { return nVersion; }
 
-    CAutoFile& read(char* pch, size_t nSize)
+    void read(char* pch, size_t nSize)
     {
         if (!file)
             throw std::ios_base::failure("CAutoFile::read: file handle is NULL");
         if (fread(pch, 1, nSize, file) != nSize)
             throw std::ios_base::failure(feof(file) ? "CAutoFile::read: end of file" : "CAutoFile::read: fread failed");
-        return (*this);
     }
 
-    CAutoFile& ignore(size_t nSize)
+    void ignore(size_t nSize)
     {
         if (!file)
             throw std::ios_base::failure("CAutoFile::ignore: file handle is NULL");
@@ -390,16 +386,14 @@ public:
                 throw std::ios_base::failure(feof(file) ? "CAutoFile::ignore: end of file" : "CAutoFile::read: fread failed");
             nSize -= nNow;
         }
-        return (*this);
     }
 
-    CAutoFile& write(const char* pch, size_t nSize)
+    void write(const char* pch, size_t nSize)
     {
         if (!file)
             throw std::ios_base::failure("CAutoFile::write: file handle is NULL");
         if (fwrite(pch, 1, nSize, file) != nSize)
             throw std::ios_base::failure("CAutoFile::write: write failed");
-        return (*this);
     }
 
     template<typename T>
@@ -500,7 +494,7 @@ public:
     }
 
     // read a number of bytes
-    CBufferedFile& read(char *pch, size_t nSize) {
+    void read(char *pch, size_t nSize) {
         if (nSize + nReadPos > nReadLimit)
             throw std::ios_base::failure("Read attempted past buffer limit");
         if (nSize + nRewind > vchBuf.size())
@@ -519,7 +513,6 @@ public:
             pch += nNow;
             nSize -= nNow;
         }
-        return (*this);
     }
 
     // return the current reading position
