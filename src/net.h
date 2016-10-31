@@ -548,7 +548,7 @@ public:
     bool fFeeler; // If true this node is being used as a short lived feeler.
     bool fOneShot;
     bool fClient;
-    bool fInbound;
+    const bool fInbound;
     bool fNetworkNode;
     bool fSuccessfullyConnected;
     bool fDisconnect;
@@ -563,7 +563,7 @@ public:
     CBloomFilter* pfilter;
     std::unique_ptr<CBloomFilter> xthinFilter;
     int nRefCount;
-    NodeId id;
+    const NodeId id;
 
 protected:
     // Basic fuzz-testing
@@ -612,8 +612,8 @@ private:
     void operator=(const CNode&);
 
     uint64_t nLocalHostNonce;
-    uint64_t nLocalServices;
-    int nMyStartingHeight;
+    const uint64_t nLocalServices;
+    const int nMyStartingHeight;
 public:
 
     NodeId GetId() const {
