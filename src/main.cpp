@@ -5892,7 +5892,7 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
 
         // Detect whether we're stalling
         nNow = GetTimeMicros();
-        if (!pto->fDisconnect && statePtr->nStallingSince && statePtr->nStallingSince < nNow - 1000000 * BLOCK_STALLING_TIMEOUT) {
+        if (statePtr->nStallingSince && statePtr->nStallingSince < nNow - 1000000 * BLOCK_STALLING_TIMEOUT) {
             // Stalling only triggers when the block download window cannot move. During normal steady state,
             // the download window should be much larger than the to-be-downloaded set of blocks, so disconnection
             // should only happen during initial block download.
@@ -5910,7 +5910,7 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
         // only looking at this peer's oldest request).  This way a large queue in the past doesn't result in a
         // permanently large window for this block to be delivered (ie if the number of blocks in flight is decreasing
         // more quickly than once every 5 minutes, then we'll shorten the download window for this block).
-        if (!pto->fDisconnect && statePtr->vBlocksInFlight.size() > 0) {
+        if (statePtr->vBlocksInFlight.size() > 0) {
             QueuedBlock &queuedBlock = statePtr->vBlocksInFlight.front();
             int64_t nTimeoutIfRequestedNow = GetBlockTimeout(nNow, nQueuedValidatedHeaders - statePtr->nBlocksInFlightValidHeaders, consensusParams);
             if (queuedBlock.nTimeDisconnect > nTimeoutIfRequestedNow) {
@@ -5930,7 +5930,7 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
         ThinBlockWorker& worker = *(statePtr->thinblock);
         bool fetchData = WillDownloadFromNode(pto, worker);
         vector<CInv> vGetData;
-        if (fetchData && !pto->fDisconnect && !pto->fClient && (fFetch || !IsInitialBlockDownload()) && statePtr->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
+        if (fetchData && !pto->fClient && (fFetch || !IsInitialBlockDownload()) && statePtr->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
             vector<const CBlockIndex*> vToDownload;
             std::set<NodeId> stallers;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - statePtr->nBlocksInFlight, vToDownload, stallers);
@@ -5965,7 +5965,7 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
         //
         // Message: getdata (non-blocks)
         //
-        while (!pto->fDisconnect && !pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow)
+        while (!pto->mapAskFor.empty() && (*pto->mapAskFor.begin()).first <= nNow)
         {
             const CInv& inv = (*pto->mapAskFor.begin()).second;
             if (!AlreadyHave(inv))
