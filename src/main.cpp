@@ -5693,13 +5693,48 @@ bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
         || NodeStatePtr(pto->id)->supportsCompactBlocks;
 }
 
+/**
+ * Handle async rejects and ban flags.
+ *
+ * Helper function for SendMessages, returns true if parent function should return.
+ */
+static bool ProcessRejectsAndBans(CConnman* connman, CNode* pto) {
+    NodeStatePtr statePtr(pto->GetId());
+    if (connman == nullptr || pto == nullptr || statePtr.IsNull()) {
+        LogPrint(Log::NET, "%s got invalid argments\n", __func__);
+        return true;
+    }
+
+    for (const CBlockReject& reject : statePtr->rejects) {
+        connman->PushMessage(pto, "reject", std::string("block"),
+                reject.chRejectCode, reject.strRejectReason, reject.hashBlock);
+    }
+    statePtr->rejects.clear();
+
+    if (!statePtr->fShouldBan)
+        return false;
+
+    statePtr->fShouldBan = false;
+    if (pto->fWhitelisted) {
+        LogPrintf("Warning: not punishing whitelisted peer %s!\n", pto->addr.ToString());
+        return false;
+    }
+    pto->fDisconnect = true;
+    if (pto->addr.IsLocal()) {
+        LogPrintf("Warning: not banning local peer %s!\n", pto->addr.ToString());
+    }
+    else {
+        connman->Ban(pto->addr);
+    }
+    return true;
+}
 
 bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsgProc)
 {
     const Consensus::Params& consensusParams = Params().GetConsensus();
     {
         // Don't send anything until we get its version message
-        if (pto->nVersion == 0)
+        if (pto->nVersion == 0 || pto->fDisconnect)
             return true;
 
         //
@@ -5735,6 +5770,9 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
         if (!lockMain)
             return true;
 
+        if (ProcessRejectsAndBans(connman, pto))
+            return true;
+
         // Address refresh broadcast
         int64_t nNow = GetTimeMicros();
         if (!IsInitialBlockDownload() && pto->nNextLocalAddrSend < nNow) {
@@ -5768,30 +5806,14 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
                 connman->PushMessage(pto, "addr", vAddr);
         }
 
-        NodeStatePtr statePtr(pto->GetId());
-        if (statePtr->fShouldBan) {
-            if (pto->fWhitelisted)
-                LogPrintf("Warning: not punishing whitelisted peer %s!\n", pto->addr.ToString());
-            else {
-                pto->fDisconnect = true;
-                if (pto->addr.IsLocal())
-                    LogPrintf("Warning: not banning local peer %s!\n", pto->addr.ToString());
-                else
-                {
-                    connman->Ban(pto->addr);
-                }
-            }
-            statePtr->fShouldBan = false;
-        }
-
-        for (const CBlockReject& reject : statePtr->rejects) {
-            connman->PushMessage(pto, "reject", (string)"block", reject.chRejectCode, reject.strRejectReason, reject.hashBlock);
-        }
-        statePtr->rejects.clear();
-
         // Start block sync
         if (pindexBestHeader == NULL)
             pindexBestHeader = chainActive.Tip();
+        NodeStatePtr statePtr(pto->GetId());
+        if (statePtr.IsNull()) {
+            LogPrint(Log::NET, "%s statePtr = NULL\n");
+            return true;
+        }
         bool fFetch = statePtr->fPreferredDownload || (nPreferredDownload == 0 && !pto->fClient && !pto->fOneShot); // Download if this is a nice peer, or we have no nice peers and this one might do.
         if (!statePtr->fSyncStarted && !pto->fClient && !fImporting && !fReindex) {
             // Only actively request headers from a single peer, unless we're close to today.
@@ -5876,6 +5898,7 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
             // should only happen during initial block download.
             LogPrintf("Peer=%d is stalling block download, disconnecting\n", pto->id);
             pto->fDisconnect = true;
+            return true;
         }
         // In case there is a block that has been in flight from this peer for (2 + 0.5 * N) times the block interval
         // (with N the number of validated blocks that were in flight at the time it was requested), disconnect due to
@@ -5897,6 +5920,7 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
             if (queuedBlock.nTimeDisconnect < nNow) {
                 LogPrintf("Timeout downloading block %s from peer=%d, disconnecting\n", queuedBlock.hash.ToString(), pto->id);
                 pto->fDisconnect = true;
+                return true;
             }
         }
 
