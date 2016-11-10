@@ -132,6 +132,7 @@ BITCOIN_CORE_H = \
   miner.h \
   net.h \
   netbase.h \
+  netmessagemaker.h \
   nodestate.h \
   noui.h \
   options.h \
