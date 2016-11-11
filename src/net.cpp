@@ -612,11 +612,11 @@ const uint256& CNetMessage::GetMessageHash() const
 // requires LOCK(cs_vSend)
 size_t SocketSendData(CNode *pnode)
 {
-    std::deque<CSerializeData>::iterator it = pnode->vSendMsg.begin();
+    auto it = pnode->vSendMsg.begin();
     size_t nSentSize = 0;
 
     while (it != pnode->vSendMsg.end()) {
-        const CSerializeData &data = *it;
+        const auto &data = *it;
         assert(data.size() > pnode->nSendOffset);
 
         int amt2Send = min((int)(data.size() - pnode->nSendOffset),
@@ -631,7 +631,7 @@ size_t SocketSendData(CNode *pnode)
             LOCK(pnode->cs_hSocket);
             if (pnode->hSocket == INVALID_SOCKET)
                 break;
-            nBytes = send(pnode->hSocket, &data[pnode->nSendOffset], amt2Send, MSG_NOSIGNAL | MSG_DONTWAIT);
+            nBytes = send(pnode->hSocket, reinterpret_cast<const char*>(data.data()) + pnode->nSendOffset, amt2Send, MSG_NOSIGNAL | MSG_DONTWAIT);
         }
         if (nBytes > 0) {
             pnode->nLastSend = GetTime();
@@ -2204,30 +2204,19 @@ void CNode::AskFor(const CInv& inv)
     mapAskFor.insert(std::make_pair(nRequestTime, inv));
 }
 
-CDataStream CConnman::BeginMessage(CNode* pnode, int nVersion, int flags, const std::string& sCommand)
+void CConnman::PushMessage(CNode* pnode, CSerializedNetMsg&& msg)
 {
-    return {SER_NETWORK, (nVersion ? nVersion : pnode->GetSendVersion()) | flags, CMessageHeader(Params().NetworkMagic(), sCommand.c_str(), 0) };
-}
+    size_t nMessageSize = msg.data.size();
+    size_t nTotalSize = nMessageSize + CMessageHeader::HEADER_SIZE;
+    LogPrint(Log::NET, "sending %s (%d bytes) peer=%d\n",  SanitizeString(msg.command.c_str()), nMessageSize, pnode->id);
 
-void CConnman::EndMessage(CDataStream& strm)
-{
-    // Set the size
-    assert(strm.size () >= CMessageHeader::HEADER_SIZE);
-    unsigned int nSize = strm.size() - CMessageHeader::HEADER_SIZE;
-    WriteLE32((uint8_t*)&strm[CMessageHeader::MESSAGE_SIZE_OFFSET], nSize);
-    // Set the checksum
-    uint256 hash = Hash(strm.begin() + CMessageHeader::HEADER_SIZE, strm.end());
-    memcpy((char*)&strm[CMessageHeader::CHECKSUM_OFFSET], hash.begin(), CMessageHeader::CHECKSUM_SIZE);
+    std::vector<unsigned char> serializedHeader;
+    serializedHeader.reserve(CMessageHeader::HEADER_SIZE);
+    uint256 hash = Hash(msg.data.data(), msg.data.data() + nMessageSize);
+    CMessageHeader hdr(Params().NetworkMagic(), msg.command.c_str(), nMessageSize);
+    memcpy(hdr.pchChecksum, hash.begin(), CMessageHeader::CHECKSUM_SIZE);
 
-}
-
-void CConnman::PushMessage(CNode* pnode, CDataStream& strm, const std::string& sCommand)
-{
-    if(strm.empty())
-        return;
-
-    unsigned int nSize = strm.size() - CMessageHeader::HEADER_SIZE;
-    LogPrint(Log::NET, "sending %s (%d bytes) peer=%d\n",  SanitizeString(sCommand.c_str()), nSize, pnode->id);
+    CVectorWriter{SER_NETWORK, INIT_PROTO_VERSION, serializedHeader, 0, hdr};
 
     size_t nBytesSent = 0;
     {
@@ -2236,9 +2225,12 @@ void CConnman::PushMessage(CNode* pnode, CDataStream& strm, const std::string& s
             return;
         }
         bool optimisticSend(pnode->vSendMsg.empty());
-        pnode->vSendMsg.emplace_back(strm.begin(), strm.end());
 
-        pnode->nSendSize += strm.size();
+        pnode->nSendSize += nTotalSize;
+
+        pnode->vSendMsg.push_back(std::move(serializedHeader));
+        if (nMessageSize)
+            pnode->vSendMsg.push_back(std::move(msg.data));
 
         // If write queue empty, attempt "optimistic write"
         if (optimisticSend == true)

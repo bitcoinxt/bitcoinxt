@@ -12,11 +12,6 @@ public:
     DummyConnman() : CConnman(11, 42) {
     }
 
-    // inherit to make public
-    void EndMessage(CDataStream& strm) override {
-        return CConnman::EndMessage(strm);
-    }
-
     bool MsgWasSent(CNode& n, const std::string msg, int sequence = -1) {
         auto f = messages.find(&n);
         if (f == end(messages)) {
@@ -44,10 +39,9 @@ public:
     }
 private:
     std::map<CNode*, std::vector<std::string> > messages;
-
-    CDataStream BeginMessage(CNode* node, int nVersion, int flags, const std::string& sCommand) override {
-        messages[node].push_back(sCommand);
-        return CConnman::BeginMessage(node, nVersion, flags, sCommand);
+    void PushMessage(CNode* pnode, CSerializedNetMsg&& msg) override {
+        messages[pnode].push_back(msg.command);
+        CConnman::PushMessage(pnode, std::forward<CSerializedNetMsg&&>(msg));
     }
 
 };

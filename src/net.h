@@ -138,32 +138,7 @@ public:
 
     bool ForNode(NodeId id, std::function<bool(CNode* pnode)> func);
 
-    template <typename... Args>
-    void PushMessageWithVersionAndFlag(CNode* pnode, int nVersion, int flag, const std::string& sCommand, Args&&... args)
-    {
-        auto msg(BeginMessage(pnode, nVersion, flag, sCommand));
-        ::SerializeMany(msg, std::forward<Args>(args)...);
-        EndMessage(msg);
-        PushMessage(pnode, msg, sCommand);
-    }
-
-    template <typename... Args>
-    void PushMessageWithFlag(CNode* pnode, int flag, const std::string& sCommand, Args&&... args)
-    {
-        PushMessageWithVersionAndFlag(pnode, 0, flag, sCommand, std::forward<Args>(args)...);
-    }
-
-    template <typename... Args>
-    void PushMessageWithVersion(CNode* pnode, int nVersion, const std::string& sCommand, Args&&... args)
-    {
-        PushMessageWithVersionAndFlag(pnode, nVersion, 0, sCommand, std::forward<Args>(args)...);
-    }
-
-    template <typename... Args>
-    void PushMessage(CNode* pnode, const std::string& sCommand, Args&&... args)
-    {
-        PushMessageWithVersionAndFlag(pnode, 0, 0, sCommand, std::forward<Args>(args)...);
-    }
+    virtual void PushMessage(CNode* pnode, CSerializedNetMsg&& msg);
 
     template<typename Callable>
     bool ForEachNodeContinueIf(Callable&& func)
@@ -335,12 +310,6 @@ private:
     void DumpAddresses();
 
     unsigned int GetReceiveFloodSize() const;
-
-protected: // protected instead of private for unit tests
-    virtual CDataStream BeginMessage(CNode* node, int nVersion, int flags, const std::string& sCommand);
-    virtual void EndMessage(CDataStream& strm);
-private:
-    void PushMessage(CNode* pnode, CDataStream& strm, const std::string& sCommand);
 
     // Network stats
     void RecordBytesRecv(uint64_t bytes);
@@ -565,7 +534,7 @@ public:
     size_t nSendSize; // total size of all vSendMsg entries
     size_t nSendOffset; // offset inside the first vSendMsg already sent
     uint64_t nSendBytes;
-    std::deque<CSerializeData> vSendMsg;
+    std::deque<std::vector<unsigned char>> vSendMsg;
     CCriticalSection cs_vSend;
     CCriticalSection cs_hSocket;
 
@@ -709,7 +678,7 @@ public:
     {
         // The send version should always be explicitly set to
         // INIT_PROTO_VERSION rather than using this value until the handshake
-        // is complete. See PushMessageWithVersion().
+        // is complete.
         assert(nSendVersion != 0);
         return nSendVersion;
     }

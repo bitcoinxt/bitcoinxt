@@ -33,4 +33,12 @@ private:
     const int nVersion;
 };
 
+template <typename... Args>
+CSerializedNetMsg NetMsg(CNode* to, Args&&... args) {
+    if (to == nullptr) {
+        throw std::invalid_argument("NetMsg: to == nullptr");
+    }
+    return CNetMsgMaker(to->GetSendVersion()).Make(std::forward<Args>(args)...);
+}
+
 #endif // BITCOIN_NETMESSAGEMAKER_H

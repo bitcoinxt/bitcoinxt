@@ -5,6 +5,7 @@
 #include "blocksender.h"
 #include "main.h" // for mapBlockIndex, UpdateBlockAvailability, IsInitialBlockDownload
 #include "net.h" // CConnman
+#include "netmessagemaker.h"
 #include "options.h"
 #include "timedata.h"
 #include "inflightindex.h"
@@ -97,7 +98,8 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
 
 static void requestHeaders(CConnman& connman, CNode& from, const uint256& block) {
 
-    connman.PushMessage(&from, "getheaders", chainActive.GetLocator(pindexBestHeader), block);
+    connman.PushMessage(&from, NetMsg(&from, NetMsgType::GETHEADERS,
+                                      chainActive.GetLocator(pindexBestHeader), block));
     LogPrint(Log::NET, "getheaders (%d) %s to peer=%d\n",
             pindexBestHeader->nHeight, block.ToString(), from.id);
 }
@@ -303,7 +305,7 @@ bool BlockAnnounceSender::announceWithHeaders() {
             headers.front().GetHash().ToString(),
             headers.back().GetHash().ToString(), to.id);
 
-    connman.PushMessage(&to, "headers", headers);
+    connman.PushMessage(&to, NetMsg(&to, NetMsgType::HEADERS, headers));
     UpdateBestHeaderSent(to, best);
 
     return true;

@@ -8,8 +8,9 @@
 #include "chain.h"
 #include "chainparams.h"
 #include "util.h"
-#include "utilprocessmsg.h" //
+#include "utilprocessmsg.h"
 #include "net.h"
+#include "netmessagemaker.h"
 #include "xthin.h"
 #include "merkleblock.h"
 #include "main.h" // ReadBlockFromDisk
@@ -79,7 +80,7 @@ void BlockSender::triggerNextRequest(const CChain& activeChain, const CInv& inv,
     // wait for other stuff first.
     std::vector<CInv> vInv;
     vInv.push_back(CInv(MSG_BLOCK, activeChain.Tip()->GetBlockHash()));
-    connman.PushMessage(&node, "inv", vInv);
+    connman.PushMessage(&node, NetMsg(&node, NetMsgType::INV, vInv));
     node.hashContinue.SetNull();
 }
 
@@ -114,7 +115,7 @@ void BlockSender::sendBlock(CConnman& connman, CNode& node,
         // "Nodes MUST NOT send a request for a MSG_CMPCT_BLOCK object to a
         // peer before having received a sendcmpct message from that peer."
 
-        connman.PushMessage(&node, "block", block);
+        connman.PushMessage(&node, NetMsg(&node, NetMsgType::BLOCK, block));
         return;
     }
 
@@ -130,19 +131,19 @@ void BlockSender::sendBlock(CConnman& connman, CNode& node,
             if (withinDepthLimits(MAX_CMPCTBLOCK_DEPTH, blockIndex.nHeight, activeChainHeight)) {
                 XThinBlock thinb(block, filter);
                 if (thinIsSmaller(block, thinb)) {
-                    connman.PushMessage(&node, "xthinblock", thinb);
+                    connman.PushMessage(&node, NetMsg(&node, NetMsgType::XTHINBLOCK, thinb));
                     sent = true;
                 }
             }
             if (!sent)
-                connman.PushMessage(&node, "block", block);
+                connman.PushMessage(&node, NetMsg(&node, NetMsgType::BLOCK, block));
         }
         catch (const xthin_collision_error& e) {
             LogPrintf("tx collision in thin block %s\n",
                     block.GetHash().ToString());
 
             // fall back to full block
-            connman.PushMessage(&node, "block", block);
+            connman.PushMessage(&node, NetMsg(&node, NetMsgType::BLOCK, block));
         }
         return;
     }
@@ -150,12 +151,12 @@ void BlockSender::sendBlock(CConnman& connman, CNode& node,
     if (invType == MSG_CMPCT_BLOCK && NodeStatePtr(node.id)->supportsCompactBlocks) {
         if (withinDepthLimits(MAX_CMPCTBLOCK_DEPTH, blockIndex.nHeight, activeChainHeight)) {
             CompactBlock cmpct(block, *choosePrefiller(node));
-            connman.PushMessage(&node, "cmpctblock", cmpct);
+            connman.PushMessage(&node, NetMsg(&node, NetMsgType::CMPCTBLOCK, cmpct));
         }
         else {
             LogPrint(Log::NET, "cmpctblock outside depth %d, %d peer=%d\n",
                     blockIndex.nHeight, activeChainHeight, node.id);
-            connman.PushMessage(&node, "block", block);
+            connman.PushMessage(&node, NetMsg(&node, NetMsgType::BLOCK, block));
         }
         return;
     }
@@ -167,7 +168,7 @@ void BlockSender::sendBlock(CConnman& connman, CNode& node,
         filter = *node.pfilter;
     }
     CMerkleBlock merkleBlock(block, filter);
-    connman.PushMessage(&node, "merkleblock", merkleBlock);
+    connman.PushMessage(&node, NetMsg(&node, NetMsgType::MERKLEBLOCK, merkleBlock));
     // CMerkleBlock just contains hashes, so also push any transactions in the block the client did not see
     // This avoids hurting performance by pointlessly requiring a round-trip
     // Note that there is currently no way for a node to request any single transactions we didn't send here -
@@ -175,10 +176,11 @@ void BlockSender::sendBlock(CConnman& connman, CNode& node,
     // Thus, the protocol spec specified allows for us to provide duplicate txn here,
     // however we MUST always provide at least what the remote peer needs
     LOCK(node.cs_inventory);
-    typedef std::pair<unsigned int, uint256> PairType;
-    BOOST_FOREACH(PairType& pair, merkleBlock.vMatchedTxn)
-        if (!node.filterInventoryKnown.contains(pair.second))
-            connman.PushMessage(&node, "tx", block.vtx[pair.first]);
+    for (auto& tx : merkleBlock.vMatchedTxn) {
+        if (!node.filterInventoryKnown.contains(tx.second)) {
+            connman.PushMessage(&node, NetMsg(&node, NetMsgType::TX, block.vtx[tx.first]));
+        }
+    }
 }
 
 void BlockSender::sendReReqReponse(CConnman& connman, CNode& node, const CBlockIndex& blockIndex,
@@ -190,10 +192,10 @@ void BlockSender::sendReReqReponse(CConnman& connman, CNode& node, const CBlockI
 
     if (withinDepthLimits(MAX_BLOCKTXN_DEPTH, blockIndex.nHeight, activeChainHeight)) {
         XThinReReqResponse resp(block, req.txRequesting);
-        connman.PushMessage(&node, "xblocktx", resp);
+        connman.PushMessage(&node, NetMsg(&node, NetMsgType::XBLOCKTX, resp));
     }
     else {
-        connman.PushMessage(&node, "block", block);
+        connman.PushMessage(&node, NetMsg(&node, NetMsgType::BLOCK, block));
     }
 }
 
@@ -206,10 +208,10 @@ void BlockSender::sendReReqReponse(CConnman& connman, CNode& node, const CBlockI
 
     if (withinDepthLimits(MAX_BLOCKTXN_DEPTH, blockIndex.nHeight, activeChainHeight)) {
         CompactReReqResponse resp(block, req.indexes);
-        connman.PushMessage(&node, "blocktxn", resp);
+        connman.PushMessage(&node, NetMsg(&node, NetMsgType::BLOCKTXN, resp));
     }
     else {
-        connman.PushMessage(&node, "block", block);
+        connman.PushMessage(&node, NetMsg(&node, NetMsgType::BLOCK, block));
     }
 }
 

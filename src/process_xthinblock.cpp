@@ -3,6 +3,7 @@
 #include "consensus/validation.h"
 #include "main.h" // Misbehaving, mapBlockIndex
 #include "net.h"
+#include "netmessagemaker.h"
 #include "streams.h"
 #include "thinblock.h"
 #include "util.h"
@@ -68,5 +69,5 @@ void XThinBlockProcessor::operator()(
     LogPrintf("re-requesting xthin %d missing transactions for %s from peer=%d\n",
             missing.size(), hash.ToString(), from.id);
 
-    connman.PushMessage(&from, "get_xblocktx", req);
+    connman.PushMessage(&from, NetMsg(&from, NetMsgType::GET_XBLOCKTX, req));
 }

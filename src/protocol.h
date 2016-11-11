@@ -218,7 +218,15 @@ extern const char *REJECT;
  * @see https://bitcoin.org/en/developer-reference#sendheaders
  */
 extern const char *SENDHEADERS;
-
+extern const char *GETBLOCKTXN;
+extern const char *SENDCMPCT;
+extern const char *GET_XTHIN;
+extern const char *XTHINBLOCK;
+extern const char *GET_XBLOCKTX;
+extern const char *CMPCTBLOCK;
+extern const char *XBLOCKTX;
+extern const char *BLOCKTXN;
+extern const char *UTXOS;
 };
 
 /* Get a vector of all valid message types (see above) */

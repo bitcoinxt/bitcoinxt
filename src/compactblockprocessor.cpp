@@ -5,6 +5,7 @@
 #include "streams.h"
 #include "util.h" // LogPrintf
 #include "net.h"
+#include "netmessagemaker.h"
 #include "utilprocessmsg.h"
 #include "consensus/validation.h"
 #include "compacttxfinder.h"
@@ -73,5 +74,5 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
 
     LogPrint(Log::BLOCK, "re-requesting %d compact txs for %s peer=%d\n",
             req.indexes.size(), hash.ToString(), from.id);
-    connman.PushMessage(&from, "getblocktxn", req);
+    connman.PushMessage(&from, NetMsg(&from, NetMsgType::GETBLOCKTXN, req));
 }

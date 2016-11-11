@@ -1,5 +1,6 @@
 #include "blockencodings.h"
 #include "net.h"
+#include "netmessagemaker.h"
 #include "thinblockbuilder.h"
 #include "thinblockconcluder.h"
 #include "util.h"
@@ -18,7 +19,7 @@ static void fallbackDownload(CConnman& connman, CNode& from,
             block.ToString(), from.id);
 
     CInv req(MSG_BLOCK, block);
-    connman.PushMessage(&from, "getdata", std::vector<CInv>(1, req));
+    connman.PushMessage(&from, NetMsg(&from, NetMsgType::GETDATA, std::vector<CInv>(1, req)));
     markInFlight(from.id, block, Params().GetConsensus(), NULL);
 }
 

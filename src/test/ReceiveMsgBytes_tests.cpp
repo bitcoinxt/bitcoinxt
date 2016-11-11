@@ -20,6 +20,17 @@
 
 #include <boost/test/unit_test.hpp>
 
+static void EndMessage(CDataStream& strm)
+{
+    // Set the size
+    assert(strm.size () >= CMessageHeader::HEADER_SIZE);
+    unsigned int nSize = strm.size() - CMessageHeader::HEADER_SIZE;
+    WriteLE32((uint8_t*)&strm[CMessageHeader::MESSAGE_SIZE_OFFSET], nSize);
+    // Set the checksum
+    uint256 hash = Hash(strm.begin() + CMessageHeader::HEADER_SIZE, strm.end());
+    memcpy((char*)&strm[CMessageHeader::CHECKSUM_OFFSET], hash.begin(), CMessageHeader::CHECKSUM_SIZE);
+}
+
 BOOST_FIXTURE_TEST_SUITE(ReceiveMsgBytes_tests, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(FullMessages)
@@ -31,7 +42,7 @@ BOOST_AUTO_TEST_CASE(FullMessages)
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     s << CMessageHeader(Params().NetworkMagic(), "ping", 0);
     s << (uint64_t)11; // ping nonce
-    DummyConnman{}.EndMessage(s);
+    EndMessage(s);
 
     LOCK(testNode.cs_vRecvMsg);
 
@@ -87,7 +98,7 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
     // Test: too large
     size_t nMaxMessageSize = NextBlockRaiseCap(chainActive.Tip()->nMaxBlockSize);
     s.resize(nMaxMessageSize + headerLen + 1);
-    DummyConnman{}.EndMessage(s);
+    EndMessage(s);
 
     bool complete;
     BOOST_CHECK(!testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
@@ -96,7 +107,7 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
 
     // Test: exactly at max:
     s.resize(nMaxMessageSize + headerLen);
-    DummyConnman{}.EndMessage(s);
+    EndMessage(s);
 
     BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
 }
@@ -110,13 +121,13 @@ BOOST_AUTO_TEST_CASE(TooLargeVerack)
     s << CMessageHeader(Params().NetworkMagic(), "verack", 0);
     size_t headerLen = s.size();
 
-    DummyConnman{}.EndMessage(s);
+    EndMessage(s);
     bool complete;
     BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
 
     // verack is zero-length, so even one byte bigger is too big:
     s.resize(headerLen+1);
-    DummyConnman{}.EndMessage(s);
+    EndMessage(s);
     BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
     CNodeStateStats stats;
     GetNodeStateStats(testNode.GetId(), stats);
@@ -132,13 +143,13 @@ BOOST_AUTO_TEST_CASE(TooLargePing)
     s << CMessageHeader(Params().NetworkMagic(), "ping", 0);
     s << (uint64_t)11; // 8-byte nonce
 
-    DummyConnman{}.EndMessage(s);
+    EndMessage(s);
     bool complete;
     BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
 
     // Add another nonce, sanity check should fail
     s << (uint64_t)11; // 8-byte nonce
-    DummyConnman{}.EndMessage(s);
+    EndMessage(s);
     BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
     CNodeStateStats stats;
     GetNodeStateStats(testNode.GetId(), stats);

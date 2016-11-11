@@ -5,6 +5,7 @@
 #include "compactthin.h"
 #include "blockencodings.h"
 #include "net.h"
+#include "netmessagemaker.h"
 #include "protocol.h"
 #include "util.h"
 
@@ -104,5 +105,5 @@ std::vector<ThinTx> CompactStub::allTransactions() const {
 
 void enableCompactBlocks(CConnman& connman, CNode& node, bool highBandwidth) {
     uint64_t version = 1;
-    connman.PushMessage(&node, "sendcmpct", highBandwidth, version);
+    connman.PushMessage(&node, NetMsg(&node, NetMsgType::SENDCMPCT, highBandwidth, version));
 }
