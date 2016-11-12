@@ -190,7 +190,7 @@ UniValue gettrafficshaping(const UniValue& params, bool fHelp)
                 + HelpExampleRpc("gettrafficshaping", "")
             );
 
-    Object ret;
+    UniValue ret;
     int max, ave;
     extern CLeakyBucket sendShaper;
 
@@ -251,15 +251,15 @@ UniValue settrafficshaping(const UniValue& params, bool fHelp)
     {
         int burst;
         int ave;
-        if (params[1].type() == json_spirit::int_type)
+        if (params[1].isReal())
             burst = params[1].get_int();
         else
-            burst = boost::lexical_cast<int>(params[1].get_str());
+            burst = boost::lexical_cast<int>(params[1].getValStr());
 
-        if (params[2].type() == json_spirit::int_type)
+        if (params[2].isReal())
             ave = params[2].get_int();
         else
-            ave = boost::lexical_cast<int>(params[2].get_str());
+            ave = boost::lexical_cast<int>(params[2].getValStr());
 
         if (burst < ave)
             throw runtime_error("Burst rate must be greater than the average rate"
@@ -268,7 +268,7 @@ UniValue settrafficshaping(const UniValue& params, bool fHelp)
         bucket->set(burst * 1000, ave * 1000);
     }
 
-    return Value::null;
+    return NullUniValue;
 }
 
 UniValue addnode(const UniValue& params, bool fHelp)

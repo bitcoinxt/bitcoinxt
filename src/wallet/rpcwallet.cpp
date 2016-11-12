@@ -71,7 +71,7 @@ void WalletTxToJSON(const CWalletTx& wtx, UniValue& entry)
     BOOST_FOREACH(const uint256& conflict, wtx.GetConflicts())
         conflicts.push_back(conflict.GetHex());
     entry.push_back(Pair("walletconflicts", conflicts));
-    Array respends;
+    UniValue respends(UniValue::VARR);
     BOOST_FOREACH(const uint256& respend, wtx.GetConflicts(false))
         respends.push_back(respend.GetHex());
     entry.push_back(Pair("respendsobserved", respends));
