@@ -103,7 +103,7 @@ UniValue getnewaddress(const JSONRPCRequest& request)
             "\nArguments:\n"
             "1. \"account\"        (string, optional) DEPRECATED. The account name for the address to be linked to. If not provided, the default account \"\" is used. It can also be set to the empty string \"\" to represent the default account. The account does not need to exist, it will be created if there is no account by the given name.\n"
             "\nResult:\n"
-            "\"bitcoinaddress\"    (string) The new bitcoin address\n"
+            "\"address\"    (string) The new bitcoin address\n"
             "\nExamples:\n"
             + HelpExampleCli("getnewaddress", "")
             + HelpExampleRpc("getnewaddress", "")
@@ -180,7 +180,7 @@ UniValue getaccountaddress(const JSONRPCRequest& request)
             "\nArguments:\n"
             "1. \"account\"       (string, required) The account name for the address. It can also be set to the empty string \"\" to represent the default account. The account does not need to exist, it will be created and a new address created  if there is no account by the given name.\n"
             "\nResult:\n"
-            "\"bitcoinaddress\"   (string) The account bitcoin address\n"
+            "\"address\"   (string) The account bitcoin address\n"
             "\nExamples:\n"
             + HelpExampleCli("getaccountaddress", "")
             + HelpExampleCli("getaccountaddress", "\"\"")
@@ -242,10 +242,10 @@ UniValue setaccount(const JSONRPCRequest& request)
 
     if (request.fHelp || request.params.size() < 1 || request.params.size() > 2)
         throw runtime_error(
-            "setaccount \"bitcoinaddress\" \"account\"\n"
+            "setaccount \"address\" \"account\"\n"
             "\nDEPRECATED. Sets the account associated with the given address.\n"
             "\nArguments:\n"
-            "1. \"bitcoinaddress\"  (string, required) The bitcoin address to be associated with an account.\n"
+            "1. \"address\"  (string, required) The bitcoin address to be associated with an account.\n"
             "2. \"account\"         (string, required) The account to assign the address to.\n"
             "\nExamples:\n"
             + HelpExampleCli("setaccount", "\"1D1ZrZNe3JUo7ZycKEYQQiQAWd9y54F4XZ\" \"tabby\"")
@@ -289,10 +289,10 @@ UniValue getaccount(const JSONRPCRequest& request)
 
     if (request.fHelp || request.params.size() != 1)
         throw runtime_error(
-            "getaccount \"bitcoinaddress\"\n"
+            "getaccount \"address\"\n"
             "\nDEPRECATED. Returns the account associated with the given address.\n"
             "\nArguments:\n"
-            "1. \"bitcoinaddress\"  (string, required) The bitcoin address for account lookup.\n"
+            "1. \"address\"  (string, required) The bitcoin address for account lookup.\n"
             "\nResult:\n"
             "\"accountname\"        (string) the account address\n"
             "\nExamples:\n"
@@ -328,7 +328,7 @@ UniValue getaddressesbyaccount(const JSONRPCRequest& request)
             "1. \"account\"  (string, required) The account name.\n"
             "\nResult:\n"
             "[                     (json array of string)\n"
-            "  \"bitcoinaddress\"  (string) a bitcoin address associated with the given account\n"
+            "  \"address\"  (string) a bitcoin address associated with the given account\n"
             "  ,...\n"
             "]\n"
             "\nExamples:\n"
@@ -393,11 +393,11 @@ UniValue sendtoaddress(const JSONRPCRequest& request)
 
     if (request.fHelp || request.params.size() < 2 || request.params.size() > 5)
         throw runtime_error(
-            "sendtoaddress \"bitcoinaddress\" amount ( \"comment\" \"comment_to\" subtractfeefromamount )\n"
+            "sendtoaddress \"address\" amount ( \"comment\" \"comment_to\" subtractfeefromamount )\n"
             "\nSend an amount to a given address.\n"
             + HelpRequiringPassphrase() +
             "\nArguments:\n"
-            "1. \"bitcoinaddress\"  (string, required) The bitcoin address to send to.\n"
+            "1. \"address\"  (string, required) The bitcoin address to send to.\n"
             "2. \"amount\"      (numeric or string, required) The amount in BCH to send. eg 0.1\n"
             "3. \"comment\"     (string, optional) A comment used to store what the transaction is for. \n"
             "                             This is not part of the transaction, just kept in your wallet.\n"
@@ -460,7 +460,7 @@ UniValue listaddressgroupings(const JSONRPCRequest& request)
             "[\n"
             "  [\n"
             "    [\n"
-            "      \"bitcoinaddress\",     (string) The bitcoin address\n"
+            "      \"address\",     (string) The bitcoin address\n"
             "      amount,                 (numeric) The amount in bch\n"
             "      \"account\"             (string, optional) The account (DEPRECATED)\n"
             "    ]\n"
@@ -503,11 +503,11 @@ UniValue signmessage(const JSONRPCRequest& request)
 
     if (request.fHelp || request.params.size() != 2)
         throw runtime_error(
-            "signmessage \"bitcoinaddress\" \"message\"\n"
+            "signmessage \"address\" \"message\"\n"
             "\nSign a message with the private key of an address"
             + HelpRequiringPassphrase() + "\n"
             "\nArguments:\n"
-            "1. \"bitcoinaddress\"  (string, required) The bitcoin address to use for the private key.\n"
+            "1. \"address\"  (string, required) The bitcoin address to use for the private key.\n"
             "2. \"message\"         (string, required) The message to create a signature of.\n"
             "\nResult:\n"
             "\"signature\"          (string) The signature of the message encoded in base 64\n"
@@ -561,10 +561,10 @@ UniValue getreceivedbyaddress(const JSONRPCRequest& request)
 
     if (request.fHelp || request.params.size() < 1 || request.params.size() > 2)
         throw runtime_error(
-            "getreceivedbyaddress \"bitcoinaddress\" ( minconf )\n"
-            "\nReturns the total amount received by the given bitcoinaddress in transactions with at least minconf confirmations.\n"
+            "getreceivedbyaddress \"address\" ( minconf )\n"
+            "\nReturns the total amount received by the given address in transactions with at least minconf confirmations.\n"
             "\nArguments:\n"
-            "1. \"bitcoinaddress\"  (string, required) The bitcoin address for transactions.\n"
+            "1. \"address\"  (string, required) The bitcoin address for transactions.\n"
             "2. minconf             (numeric, optional, default=1) Only include transactions confirmed at least this many times.\n"
             "\nResult:\n"
             "amount   (numeric) The total amount in bch received at this address.\n"
@@ -873,12 +873,12 @@ UniValue sendfrom(const JSONRPCRequest& request)
 
     if (request.fHelp || request.params.size() < 3 || request.params.size() > 6)
         throw runtime_error(
-            "sendfrom \"fromaccount\" \"tobitcoinaddress\" amount ( minconf \"comment\" \"comment_to\" )\n"
+            "sendfrom \"fromaccount\" \"toaddress\" amount ( minconf \"comment\" \"comment_to\" )\n"
             "\nDEPRECATED (use sendtoaddress). Sent an amount from an account to a bitcoin address."
             + HelpRequiringPassphrase() + "\n"
             "\nArguments:\n"
             "1. \"fromaccount\"       (string, required) The name of the account to send funds from. May be the default account using \"\".\n"
-            "2. \"tobitcoinaddress\"  (string, required) The bitcoin address to send funds to.\n"
+            "2. \"toaddress\"  (string, required) The bitcoin address to send funds to.\n"
             "3. amount                (numeric or string, required) The amount in BCH (transaction fee is added on top).\n"
             "4. minconf               (numeric, optional, default=1) Only use funds with at least this many confirmations.\n"
             "5. \"comment\"           (string, optional) A comment used to store what the transaction is for. \n"
@@ -1071,7 +1071,7 @@ UniValue addmultisigaddress(const JSONRPCRequest& request)
             "3. \"account\"      (string, optional) DEPRECATED. An account to assign the addresses to.\n"
 
             "\nResult:\n"
-            "\"bitcoinaddress\"  (string) A bitcoin address associated with the keys.\n"
+            "\"address\"  (string) A bitcoin address associated with the keys.\n"
 
             "\nExamples:\n"
             "\nAdd a multisig address from 2 addresses\n"
@@ -1413,7 +1413,7 @@ UniValue listtransactions(const JSONRPCRequest& request)
             "  {\n"
             "    \"account\":\"accountname\",       (string) DEPRECATED. The account name associated with the transaction. \n"
             "                                                It will be \"\" for the default account.\n"
-            "    \"address\":\"bitcoinaddress\",    (string) The bitcoin address of the transaction. Not present for \n"
+            "    \"address\":\"address\",    (string) The bitcoin address of the transaction. Not present for \n"
             "                                                move transactions (category = move).\n"
             "    \"category\":\"send|receive|move\", (string) The transaction category. 'move' is a local (off blockchain)\n"
             "                                                transaction between accounts, and not associated with an address,\n"
@@ -1618,7 +1618,7 @@ UniValue listsinceblock(const JSONRPCRequest& request)
             "{\n"
             "  \"transactions\": [\n"
             "    \"account\":\"accountname\",       (string) DEPRECATED. The account name associated with the transaction. Will be \"\" for the default account.\n"
-            "    \"address\":\"bitcoinaddress\",    (string) The bitcoin address of the transaction. Not present for move transactions (category = move).\n"
+            "    \"address\":\"address\",    (string) The bitcoin address of the transaction. Not present for move transactions (category = move).\n"
             "    \"category\":\"send|receive\",     (string) The transaction category. 'send' has negative amounts, 'receive' has positive amounts.\n"
             "    \"amount\": x.xxx,          (numeric) The amount in bch. This is negative for the 'send' category, and for the 'move' category for moves \n"
             "                                          outbound. It is positive for the 'receive' category, and for the 'move' category for inbound funds.\n"
@@ -1729,7 +1729,7 @@ UniValue gettransaction(const JSONRPCRequest& request)
             "  \"details\" : [\n"
             "    {\n"
             "      \"account\" : \"accountname\",  (string) DEPRECATED. The account name involved in the transaction, can be \"\" for the default account.\n"
-            "      \"address\" : \"bitcoinaddress\",   (string) The bitcoin address involved in the transaction\n"
+            "      \"address\" : \"address\",   (string) The bitcoin address involved in the transaction\n"
             "      \"category\" : \"send|receive\",    (string) The category, either 'send' or 'receive'\n"
             "      \"amount\" : x.xxx                  (numeric) The amount in bch\n"
             "      \"vout\" : n,                       (numeric) the vout value\n"
@@ -2019,7 +2019,7 @@ UniValue encryptwallet(const JSONRPCRequest& request)
             "\nNow set the passphrase to use the wallet, such as for signing or sending bitcoin\n"
             + HelpExampleCli("walletpassphrase", "\"my pass phrase\"") +
             "\nNow we can so something like sign\n"
-            + HelpExampleCli("signmessage", "\"bitcoinaddress\" \"test message\"") +
+            + HelpExampleCli("signmessage", "\"address\" \"test message\"") +
             "\nNow lock the wallet again by removing the passphrase\n"
             + HelpExampleCli("walletlock", "") +
             "\nAs a json rpc call\n"
@@ -2540,21 +2540,21 @@ static const CRPCCommand commands[] =
     { "hidden",             "resendwallettransactions", &resendwallettransactions, true,   {} },
     { "wallet",             "addmultisigaddress",       &addmultisigaddress,       true,   {"nrequired","keys","account"} },
     { "wallet",             "backupwallet",             &backupwallet,             true,   {"destination"} },
-    { "wallet",             "dumpprivkey",              &dumpprivkey,              true,   {"bitcoinaddress"}  },
+    { "wallet",             "dumpprivkey",              &dumpprivkey,              true,   {"address"}  },
     { "wallet",             "dumpwallet",               &dumpwallet,               true,   {"filename"} },
     { "wallet",             "encryptwallet",            &encryptwallet,            true,   {"passphrase"} },
     { "wallet",             "getaccountaddress",        &getaccountaddress,        true,   {"account"} },
-    { "wallet",             "getaccount",               &getaccount,               true,   {"bitcoinaddress"} },
+    { "wallet",             "getaccount",               &getaccount,               true,   {"address"} },
     { "wallet",             "getaddressesbyaccount",    &getaddressesbyaccount,    true,   {"account"} },
     { "wallet",             "getbalance",               &getbalance,               false,  {"account","minconf","include_watchonly"} },
     { "wallet",             "getnewaddress",            &getnewaddress,            true,   {"account"} },
     { "wallet",             "getrawchangeaddress",      &getrawchangeaddress,      true,   {} },
     { "wallet",             "getreceivedbyaccount",     &getreceivedbyaccount,     false,  {"account","minconf"} },
-    { "wallet",             "getreceivedbyaddress",     &getreceivedbyaddress,     false,  {"bitcoinaddress","minconf"} },
+    { "wallet",             "getreceivedbyaddress",     &getreceivedbyaddress,     false,  {"address","minconf"} },
     { "wallet",             "gettransaction",           &gettransaction,           false,  {"txid","include_watchonly"} },
     { "wallet",             "getunconfirmedbalance",    &getunconfirmedbalance,    false,  {} },
     { "wallet",             "getwalletinfo",            &getwalletinfo,            false,  {} },
-    { "wallet",             "importprivkey",            &importprivkey,            true,   {"bitcoinprivkey","label","rescan"} },
+    { "wallet",             "importprivkey",            &importprivkey,            true,   {"privkey","label","rescan"} },
     { "wallet",             "importwallet",             &importwallet,             true,   {"filename"} },
     { "wallet",             "importaddress",            &importaddress,            true,   {"address","label","rescan","p2sh"} },
     { "wallet",             "importpubkey",             &importpubkey,             true,   {"pubkey","label","rescan"} },
@@ -2569,12 +2569,12 @@ static const CRPCCommand commands[] =
     { "wallet",             "listunspent",              &listunspent,              false,  {"minconf","maxconf","addresses"} },
     { "wallet",             "lockunspent",              &lockunspent,              true,   {"unlock","transactions"} },
     { "wallet",             "move",                     &movecmd,                  false,  {"fromaccount","toaccount","amount","minconf","comment"} },
-    { "wallet",             "sendfrom",                 &sendfrom,                 false,  {"fromaccount","tobitcoinaddress","amount","minconf","comment","comment_to"} },
+    { "wallet",             "sendfrom",                 &sendfrom,                 false,  {"fromaccount","toaddress","amount","minconf","comment","comment_to"} },
     { "wallet",             "sendmany",                 &sendmany,                 false,  {"fromaccount","amounts","minconf","comment","subtractfeefrom"} },
-    { "wallet",             "sendtoaddress",            &sendtoaddress,            false,  {"bitcoinaddress","amount","comment","comment_to","subtractfeefromamount"} },
-    { "wallet",             "setaccount",               &setaccount,               true,   {"bitcoinaddress","account"} },
+    { "wallet",             "sendtoaddress",            &sendtoaddress,            false,  {"address","amount","comment","comment_to","subtractfeefromamount"} },
+    { "wallet",             "setaccount",               &setaccount,               true,   {"address","account"} },
     { "wallet",             "settxfee",                 &settxfee,                 true,   {"amount"} },
-    { "wallet",             "signmessage",              &signmessage,              true,   {"bitcoinaddress","message"} },
+    { "wallet",             "signmessage",              &signmessage,              true,   {"address","message"} },
     { "wallet",             "walletlock",               &walletlock,               true,   {} },
     { "wallet",             "walletpassphrasechange",   &walletpassphrasechange,   true,   {"oldpassphrase","newpassphrase"} },
     { "wallet",             "walletpassphrase",         &walletpassphrase,         true,   {"passphrase","timeout"} },
