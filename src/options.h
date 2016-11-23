@@ -18,8 +18,9 @@ struct Opt {
     // Thin block options
     bool UsingThinBlocks();
     bool AvoidFullBlocks();
-    bool XThinBlocksOnly();
+    bool OptimalThinBlocksOnly();
     int ThinBlocksMaxParallel();
+    bool PreferCompactBlocks() const; // Added for rpc test
 };
 
 /** Maximum number of script-checking threads allowed */

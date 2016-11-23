@@ -38,6 +38,7 @@ testScripts=(
     'p2p-versionbits-warning.py'
     'decodescript.py'
     'sendheaders.py'
+    'p2p-compactblocks.py'
 );
 testScriptsExt=(
     'bigblocks.py'

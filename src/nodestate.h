@@ -11,8 +11,6 @@
 #include "inflightindex.h" // QueuedBlock
 #include "sync.h" // CCriticalSection
 
-#include <boost/shared_ptr.hpp>
-
 #include <string>
 #include <set>
 #include <map>
@@ -76,11 +74,14 @@ struct CNodeState {
     // request a block.
     bool initialHeadersReceived;
 
+    bool supportsCompactBlocks;
+
     //! the thin block the node is currently providing to us
-    boost::shared_ptr<ThinBlockWorker> thinblock;
+    std::shared_ptr<ThinBlockWorker> thinblock;
     std::set<uint256> recentThinBlockTx;
 
     CNodeState(NodeId id, ThinBlockManager&);
+    ~CNodeState();
 };
 
 // Class that maintains per-node state, and

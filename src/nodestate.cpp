@@ -1,6 +1,8 @@
 #include "nodestate.h"
 #include "dummythin.h"
 #include "net.h" // for CNode
+#include "thinblock.h"
+#include <utility>
 
 CNodeState::CNodeState(NodeId id, ThinBlockManager& thinblockmg) {
     fCurrentlyConnected = false;
@@ -18,6 +20,7 @@ CNodeState::CNodeState(NodeId id, ThinBlockManager& thinblockmg) {
     fPreferredDownload = false;
     prefersHeaders = false;
     initialHeadersReceived = false;
+    supportsCompactBlocks = false;
     thinblock.reset(new DummyThinWorker(thinblockmg, id));
 }
 
@@ -30,4 +33,8 @@ void NodeStatePtr::insert(NodeId nodeid, const CNode *pnode, ThinBlockManager& t
                 nodeid, CNodeState(nodeid, thinblockmg))).first->second;
     state.name = pnode->addrName;
     state.address = pnode->addr;
+}
+
+CNodeState::~CNodeState()
+{
 }

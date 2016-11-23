@@ -1,26 +1,19 @@
 #ifndef PROCESS_XTHINBLOCK_H
 #define PROCESS_XTHINBLOCK_H
 
-class CNode;
+#include "blockprocessor.h"
+
 class CDataStream;
-class ThinBlockWorker;
 class TxFinder;
-class BlockHeaderProcessor;
 
-class XThinBlockProcessor {
+class XThinBlockProcessor : private BlockProcessor {
     public:
-        XThinBlockProcessor(CNode& n) : pfrom(n) { }
-        ~XThinBlockProcessor() { }
+        XThinBlockProcessor(CNode& f, ThinBlockWorker& w, BlockHeaderProcessor& h) :
+            BlockProcessor(f, w, "xthinblock", h)
+        {
+        }
 
-        void operator()(CDataStream& vRecv,
-            ThinBlockWorker& worker, const TxFinder& txfinder,
-            BlockHeaderProcessor& processHeader);
-
-
-        virtual void misbehave(int howmuch);
-
-    private:
-        CNode& pfrom;
+        void operator()(CDataStream& vRecv, const TxFinder& txfinder);
 };
 
 #endif

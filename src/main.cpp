@@ -9,11 +9,14 @@
 #include "arith_uint256.h"
 #include "blockannounce.h"
 #include "blockheaderprocessor.h"
+#include "blockencodings.h"
 #include "blocksender.h"
 #include "bloomthin.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "checkqueue.h"
+#include "compactblockprocessor.h"
+#include "compactthin.h"
 #include "consensus/validation.h"
 #include "inflightindex.h"
 #include "init.h"
@@ -4660,21 +4663,31 @@ struct TxFinderImpl : public TxFinder {
         return tx;
     }
 
-    // "Cheap" refers to the hash. This lookup is much more expensive.
-    CTransaction cheapLookup(const uint64_t& h) const {
+    CTransaction lookup(const ThinTx& hash) const {
 
-        { // mempool
+        CTransaction match;
+        {
             LOCK(mempool.cs);
-            typedef CTxMemPool::indexed_transaction_set::const_iterator auto_;
-            for (auto_ t = mempool.mapTx.begin(); t != mempool.mapTx.end(); ++t)
-                if (t->GetTx().GetHash().GetCheapHash() == h)
-                    return t->GetTx();
-        }
+            for (auto& t : mempool.mapTx) {
+                if (!hash.equals(t.GetTx().GetHash()))
+                    continue;
 
-        typedef map<uint256, COrphanTx>::const_iterator auto_;
-        for (auto_ t = mapOrphanTransactions.begin(); t != mapOrphanTransactions.end(); ++t)
-            if (t->second.tx.GetHash().GetCheapHash() == h)
-                return t->second.tx;
+                if (!match.IsNull()) {
+                    LogPrintf("Info: Hash collision in thin block for tx %s\n",
+                            t.GetTx().GetHash().ToString());
+                    // Return empty tx so it is re-requested.
+                    return CTransaction();
+
+                }
+                match = t.GetTx();
+            }
+        }
+        if (!match.IsNull())
+            return match;
+
+        for (auto t : mapOrphanTransactions)
+            if (hash.equals(t.second.tx.GetHash()))
+                return t.second.tx;
 
         // Skip relay map.
         return CTransaction();
@@ -4682,9 +4695,11 @@ struct TxFinderImpl : public TxFinder {
 
     CTransaction operator()(const ThinTx& hash) const {
         AssertLockHeld(cs_main);
-        return hash.hasFull()
-            ? fullLookup(hash.full())
-            : cheapLookup(hash.cheap());
+
+        if (hash.hasFull())
+            return fullLookup(hash.full()); // faster lookup
+
+        return lookup(hash);
     }
 };
 
@@ -4769,9 +4784,10 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                 ns->thinblock.reset(new BloomThinWorker(thinblockmg, pfrom->id));
             else { /* keep DummyThinWorker */ }
 
-            bool hasRequiredThinSupport = Opt().XThinBlocksOnly()
-                ? pfrom->SupportsXThinBlocks()
-                : pfrom->SupportsBloomThinBlocks() || pfrom->SupportsXThinBlocks();
+            bool hasRequiredThinSupport = pfrom->SupportsXThinBlocks() || pfrom->SupportsCompactBlocks();
+            if (!Opt().OptimalThinBlocksOnly())
+                hasRequiredThinSupport = hasRequiredThinSupport || pfrom->SupportsBloomThinBlocks();
+
             // Disconnect outbound connections that don't support thin blocks.
             if (Opt().UsingThinBlocks() && !pfrom->fInbound && !hasRequiredThinSupport) {
                 LogPrintf("'%s' - peer=%d does not support thin blocks, disconnecting\n", pfrom->cleanSubVer, pfrom->id);
@@ -4850,11 +4866,9 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         pfrom->nTimeOffset = nTimeOffset;
         AddTimeData(pfrom->addr, nTimeOffset);
 
+        // Enable bloom thin blocks on peer
         if (Opt().UsingThinBlocks() && pfrom->SupportsBloomThinBlocks() && !pfrom->SupportsXThinBlocks())
-        {
-            LogPrint("thin", "Enabling bloom thin blocks on peer %d\n", pfrom->id);
             pfrom->PushMessage("filterload", CBloomFilter());
-	}
     }
 
 
@@ -4881,6 +4895,20 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             // non-NODE NETWORK peers can announce blocks (such as pruning
             // nodes)
             pfrom->PushMessage("sendheaders");
+        }
+
+        if (pfrom->nVersion >= SHORT_IDS_BLOCKS_VERSION
+                && (!(pfrom->nServices & NODE_THIN) || Opt().PreferCompactBlocks())) {
+
+            // We prefer xthin, however if node does not support it,
+            // we ask it for thin block variant compact blocks.
+            //
+            // This also acts as announcement to tell the peer that we
+            // support compact blocks.
+
+            bool highBandwidth = false;
+            uint64_t version = 1;
+            pfrom->PushMessage("sendcmpct", highBandwidth, version);
         }
     }
 
@@ -4951,6 +4979,20 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             pfrom->fDisconnect = true;
     }
 
+    else if (strCommand == "sendcmpct") {
+        bool highBandwidth = false;
+        uint64_t version = 1;
+        vRecv >> highBandwidth >> version;
+
+        if (version != 1)
+            return true; // Ignore as per BIP152
+
+        LOCK(cs_main);
+        NodeStatePtr(pfrom->id)->supportsCompactBlocks = true;
+        NodeStatePtr(pfrom->id)->thinblock.reset(
+                new CompactWorker(thinblockmg, pfrom->id));
+    }
+
     else if (strCommand == "sendheaders")
     {
         LOCK(cs_main);
@@ -5009,6 +5051,31 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             pfrom->PushMessage("getdata", vToFetch);
     }
 
+    else if (strCommand == "getblocktxn")
+    {
+        // Remote peer is requesting more transactions as part of compact block
+        // transfer.
+        CompactReRequest req;
+        vRecv >> req;
+
+        LogPrint("thin", "peer=%d is compactthin re-requesting %d transactions for %s\n",
+                pfrom->id, req.indexes.size(), req.blockhash.ToString());
+
+        auto mi = mapBlockIndex.find(req.blockhash);
+        bool haveBlock = mi != mapBlockIndex.end();
+        BlockSender bs;
+        bool canSend = haveBlock && bs.canSend(
+                chainActive, *(mi->second), pindexBestHeader);
+
+        try {
+            if (canSend)
+                bs.sendReReqReponse(*pfrom, *(mi->second), req);
+        }
+        catch (const std::exception& e) {
+            LogPrintf("error in re-request from peer=%d: %s\n",
+                    pfrom->id, e.what());
+        }
+    }
 
     else if (strCommand == "getdata")
     {
@@ -5330,18 +5397,39 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
     }
     else if (strCommand == "xthinblock" && !fImporting && !fReindex) // Ignore blocks received while importing
     {
-        // This is a reponose to a xthin block request.
+        // We are receiving a xthin block.
         try {
             LOCK(cs_main);
             NodeStatePtr nodestate(pfrom->id);
             MarkBlockAsInFlight inFlight;
             DefaultHeaderProcessor headerp(pfrom, blocksInFlight, thinblockmg,
                 inFlight, CheckBlockIndex);
-            XThinBlockProcessor blockp(*pfrom);
-            blockp(vRecv, *(nodestate->thinblock), TxFinderImpl(), headerp);
+            XThinBlockProcessor blockp(*pfrom, *(nodestate->thinblock), headerp);
+            blockp(vRecv, TxFinderImpl());
         }
         catch (...) {
             LogPrintf("Unexpected error receiving xthinblock from %d\n", pfrom->id);
+            LOCK(cs_main);
+            NodeStatePtr nodestate(pfrom->id);
+            nodestate->thinblock->setAvailable();
+            Misbehaving(pfrom->GetId(), 10); // FIXME: Is this DoS policy reasonable? May not be pfrom's fault.
+            throw;
+        }
+    }
+    else if (strCommand == "cmpctblock" && !fImporting && !fReindex) // Ignore blocks received while importing
+    {
+        // We are receiving a compact block.
+        try {
+            LOCK(cs_main);
+            NodeStatePtr nodestate(pfrom->id);
+            MarkBlockAsInFlight inFlight;
+            DefaultHeaderProcessor headerp(pfrom, blocksInFlight, thinblockmg,
+                    inFlight, CheckBlockIndex);
+            CompactBlockProcessor blockp(*pfrom, *(nodestate->thinblock), headerp);
+            blockp(vRecv, mempool);
+        }
+        catch (...) {
+            LogPrintf("Unexpected error receiving cmpctblock from %d\n", pfrom->id);
             LOCK(cs_main);
             NodeStatePtr nodestate(pfrom->id);
             nodestate->thinblock->setAvailable();
@@ -5389,7 +5477,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         XThinReRequest req;
         vRecv >> req;
-        LogPrint("thin", "peer=%d is re-requesting %d transactions for %s\n",
+        LogPrint("thin", "peer=%d is xthin re-requesting %d transactions for %s\n",
                 pfrom->id, req.txRequesting.size(), req.block.ToString());
 
         BlockMap::iterator mi = mapBlockIndex.find(req.block);
@@ -5403,7 +5491,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                 bs.sendReReqReponse(*pfrom, *(mi->second), req);
         }
         catch (const std::exception& e) {
-            LogPrintf("error in re-request from peer=%d: %s\n",
+            LogPrintf("error in xthin re-request from peer=%d: %s\n",
                     pfrom->id, e.what());
         }
     }
@@ -5419,6 +5507,20 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         LOCK(cs_main);
         NodeStatePtr statePtr(pfrom->id);
         XThinBlockConcluder()(resp, *pfrom, *(statePtr->thinblock));
+    }
+
+    else if (strCommand == "blocktxn") {
+        // This is a response for us requesting missing transactions from
+        // xthinblocks.
+
+        CompactReReqResponse resp;
+        vRecv >> resp;
+        LogPrint("thin", "recieved re-request response from peer=%d with %d txs for %s\n",
+            pfrom->id, resp.txn.size(), resp.blockhash.ToString());
+
+        LOCK(cs_main);
+        NodeStatePtr statePtr(pfrom->id);
+        CompactBlockConcluder()(resp, *pfrom, *(statePtr->thinblock));
     }
 
     // This asymmetric behavior for inbound and outbound connections was introduced
@@ -5777,11 +5879,13 @@ bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
         return true;
 
     // We want thin blocks only, but peer does not support it.
-    if (!(pto->SupportsBloomThinBlocks() || pto->SupportsXThinBlocks()))
+    if (!(pto->SupportsBloomThinBlocks() || pto->SupportsXThinBlocks()
+                || NodeStatePtr(pto->id)->supportsCompactBlocks))
         return false;
 
-    // We want xthin only, but peer does not support it.
-    if (Opt().XThinBlocksOnly() && !pto->SupportsXThinBlocks())
+    // We want optimal thin blocks only, but peer does not support it.
+    if (Opt().OptimalThinBlocksOnly() && !(pto->SupportsXThinBlocks()
+            || NodeStatePtr(pto->id)->supportsCompactBlocks))
         return false;
 
     // Is node busy serving a thin block already?

@@ -16,8 +16,19 @@ bool BlockAnnounceReceiver::isInitialBlockDownload() const {
 }
 
 bool BlockAnnounceReceiver::fetchAsThin() const {
-    return !isInitialBlockDownload() && Opt().UsingThinBlocks()
-        && (from.SupportsBloomThinBlocks() || from.SupportsXThinBlocks());
+    if (isInitialBlockDownload())
+        return false;
+
+    if (!Opt().UsingThinBlocks())
+        return false;
+
+    if (from.SupportsBloomThinBlocks() || from.SupportsXThinBlocks())
+        return true;
+
+    if (NodeStatePtr(from.id)->supportsCompactBlocks)
+        return true;
+
+    return false;
 }
 
 bool BlockAnnounceReceiver::blockHeaderIsKnown() const {
@@ -37,7 +48,7 @@ bool BlockAnnounceReceiver::almostSynced() {
     return chainActive.Tip()->GetBlockTime() > GetAdjustedTime() - Params().GetConsensus().nPowTargetSpacing * 20;
 }
 
-        
+
 BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrategy() {
 
     if (!almostSynced())
@@ -47,7 +58,7 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
         return DONT_DOWNL;
 
     if (!fetchAsThin()) {
-    
+
         if (blocksInFlight.isInFlight(block))
             return DONT_DOWNL;
 
@@ -61,7 +72,7 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
 
             return DONT_DOWNL;
         }
-        
+
         return DOWNL_FULL_NOW;
     }
 
@@ -79,8 +90,8 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
     }
 
     if (!state->thinblock->isAvailable()) {
-        LogPrint("thin", "peer %d is busy, won't req %s\n",
-                from.id, block.ToString());
+        LogPrint("thin", "peer %d is busy with %s, won't req %s\n",
+                from.id, state->thinblock->blockStr(), block.ToString());
         return DOWNL_THIN_LATER;
     }
     return DOWNL_THIN_NOW;
@@ -104,7 +115,7 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch,
 
     NodeStatePtr nodestate(from.id);
     DownloadStrategy s = pickDownloadStrategy();
-    
+
     if (s == DOWNL_THIN_NOW) {
 
         if (!announcedAsHeader && nodestate->prefersHeaders) {
@@ -138,13 +149,13 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch,
     if (!blocksInFlight.isInFlight(block) || !nodestate->initialHeadersReceived) {
         requestHeaders(from, block);
     }
-    
+
     if (s == DONT_DOWNL)
         return false;
 
     if (s == DOWNL_THIN_LATER)
         return false;
-    
+
     assert(s == DOWNL_FULL_NOW);
 
     LogPrint("thin", "full block download of %s from %d\n",

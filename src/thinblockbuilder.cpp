@@ -18,14 +18,12 @@ ThinBlockBuilder::ThinBlockBuilder(const CBlockHeader& header,
     thinBlock.hashPrevBlock = header.hashPrevBlock;
 
     missing = wantedTxs.size();
-    typedef std::vector<ThinTx>::const_iterator auto_;
-    for (auto_ h = wantedTxs.begin(); h != wantedTxs.end(); ++h) {
-        CTransaction tx = txFinder(*h);
+    for (const ThinTx& h : wantedTxs) {
+        CTransaction tx = txFinder(h);
         if (!tx.IsNull())
             --missing;
 
         // keep null txs, we'll download them later.
-        // coinbase is guaranteed to be missing
         thinBlock.vtx.push_back(tx);
     }
     LogPrint("thin", "%d out of %d txs missing\n", missing, wantedTxs.size());
@@ -33,9 +31,10 @@ ThinBlockBuilder::ThinBlockBuilder(const CBlockHeader& header,
 
 ThinBlockBuilder::TXAddRes ThinBlockBuilder::addTransaction(const CTransaction& tx) {
     assert(!tx.IsNull());
-    typedef std::vector<ThinTx>::iterator auto_;
-    auto_ loc = std::find(
-            wantedTxs.begin(), wantedTxs.end(), ThinTx(tx.GetHash()));
+
+    auto loc = std::find_if(wantedTxs.begin(), wantedTxs.end(), [&tx](const ThinTx& b) {
+        return b.equals(tx.GetHash());
+    });
 
     if (loc == wantedTxs.end()){
         // TX does not belong to block
@@ -102,18 +101,15 @@ CBlock ThinBlockBuilder::finishBlock() {
 void ThinBlockBuilder::replaceWantedTx(const std::vector<ThinTx>& tx) {
     assert(!tx.empty());
 
-    if (wantedTxs.at(0).hasFull())
-        return;
-
-    if (!tx.at(0).hasFull())
-        return;
-
     if (tx.size() != wantedTxs.size())
         throw thinblock_error("transactions in stub do not match previous stub provided");
 
-    for (size_t i = 0; i < tx.size(); ++i)
-        if (tx[i].cheap() != wantedTxs[i].cheap())
+    for (size_t i = 0; i < tx.size(); ++i) {
+        if (wantedTxs[i].hasCheap() && tx[i].hasCheap()
+                && (tx[i].cheap() != wantedTxs[i].cheap()))
             throw thinblock_error("txhash mismatch between provided stubs");
+    }
 
-    wantedTxs = tx;
+    for (size_t i = 0; i < tx.size(); ++i)
+        wantedTxs[i].merge(tx[i]);
 }

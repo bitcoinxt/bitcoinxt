@@ -15,39 +15,45 @@ class ThinBlockManager;
 typedef int NodeId;
 class CBlockHeader;
 
-// We may, or may not have the full uint256 hash of transactions in block.
+// Transactions IDs are in different format for each thin block implemenation.
+// ThisTx is an encapsulation for all the formats.
 class ThinTx {
 public:
-    ThinTx(const uint256& h) :
-        hash(h), cheapHash(h.GetCheapHash())  { }
+    ThinTx(const uint256& full);
+    ThinTx(const uint64_t& cheap);
+    ThinTx(const uint64_t& obfuscated,
+            const uint64_t& idk0, const uint64_t& idk1);
+    static ThinTx Null() { return ThinTx(uint256()); }
 
-    ThinTx(const uint64_t& h) : cheapHash(h) { }
+    // If it is known that tx is the same as this
+    // one, grab any additional info possible.
+    void merge(const ThinTx& tx);
 
-    bool hasFull() const {
-        return !hash.IsNull();
+    bool hasFull() const;
+    const uint256& full() const;
+    const uint64_t& cheap() const;
+    uint64_t obfuscated() const;
+    bool hasCheap() const { return cheap_ != 0; }
+
+    bool isNull() const {
+        return !hasFull() && !hasCheap() && !hasObfuscated();
     }
 
-    const uint256& full() const {
-        if (!hasFull())
-            throw std::runtime_error("full hash not available");
-        return hash;
-    }
-    const uint64_t& cheap() const { return cheapHash; }
-
-    bool operator==(const ThinTx& b) const {
-        if (b.hasFull() && this->hasFull())
-            return b.full() == this->full();
-
-        return b.cheap() == this->cheap();
-    }
-
-    bool operator!=(const ThinTx& b) const {
-        return !(b == *this);
-    }
+    bool equals(const ThinTx& b) const;
+    bool equals(const uint256& b) const;
 
 private:
-        uint256 hash;
-        uint64_t cheapHash;
+
+    uint256 full_; //< Used by bloom thin
+    uint64_t cheap_; //< Used by xthin
+    struct {
+        uint64_t id;
+        uint64_t idk0;
+        uint64_t idk1;
+    } obfuscated_; //< Used by compact thin
+
+    bool hasObfuscated() const;
+
 };
 
 struct StubData {

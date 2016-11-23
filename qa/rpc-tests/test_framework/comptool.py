@@ -38,9 +38,9 @@ class TestNode(NodeConnCB):
         self.tx_store = tx_store
         self.tx_request_map = {}
 
-        # When the pingmap is non-empty we're waiting for 
+        # When the pingmap is non-empty we're waiting for
         # a response
-        self.pingMap = {} 
+        self.pingMap = {}
         self.lastInv = []
 
     def add_connection(self, conn):
@@ -104,7 +104,7 @@ class TestNode(NodeConnCB):
 # comptool.
 #
 # "blocks_and_transactions" should be an array of [obj, True/False/None]:
-#  - obj is either a CBlock or a CTransaction, and 
+#  - obj is either a CBlock or a CTransaction, and
 #  - the second value indicates whether the object should be accepted
 #    into the blockchain or mempool (for tests where we expect a certain
 #    answer), or "None" if we don't expect a certain answer and are just
@@ -113,7 +113,7 @@ class TestNode(NodeConnCB):
 #    nodes will be tested based on the outcome for the block.  If False,
 #    then inv's accumulate until all blocks are processed (or max inv size
 #    is reached) and then sent out in one inv message.  Then the final block
-#    will be synced across all connections, and the outcome of the final 
+#    will be synced across all connections, and the outcome of the final
 #    block will be tested.
 # sync_every_tx: analagous to behavior for sync_every_block, except if outcome
 #    on the final tx is None, then contents of entire mempool are compared
@@ -138,7 +138,7 @@ class TestManager(object):
     def add_all_connections(self, nodes):
         for i in range(len(nodes)):
             # Create a p2p connection to each node
-            self.connections.append(NodeConn('127.0.0.1', p2p_port(i), 
+            self.connections.append(NodeConn('127.0.0.1', p2p_port(i),
                         nodes[i], TestNode(self.block_store, self.tx_store)))
             # Make sure the TestNode (callback class) has a reference to its
             # associated NodeConn

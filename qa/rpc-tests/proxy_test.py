@@ -34,8 +34,9 @@ addnode connect to onion
 addnode connect to generic DNS name
 '''
 
-class ProxyTest(BitcoinTestFramework):        
+class ProxyTest(BitcoinTestFramework):
     def __init__(self):
+        super(ProxyTest, self).__init__()
         # Create two proxies on different ports
         # ... one unauthenticated
         self.conf1 = Socks5Configuration()

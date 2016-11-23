@@ -1,7 +1,9 @@
 // Copyright (c) 2016 The Bitcoin XT developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
+#include "blockencodings.h"
 #include "blocksender.h"
+#include "bloom.h"
 #include "protocol.h"
 #include "chain.h"
 #include "chainparams.h"
@@ -18,7 +20,7 @@ BlockSender::BlockSender() {
 
 bool BlockSender::isBlockType(int t) const {
     return t == MSG_BLOCK || t == MSG_FILTERED_BLOCK
-        || t == MSG_THINBLOCK || t == MSG_XTHINBLOCK;
+        || t == MSG_THINBLOCK || t == MSG_XTHINBLOCK || t == MSG_CMPCT_BLOCK;
 }
 
 bool BlockSender::canSend(const CChain& activeChain, const CBlockIndex& block,
@@ -58,7 +60,7 @@ void updateBestHeaderSent(CNode& node, CBlockIndex* blockIndex) {
 void BlockSender::send(const CChain& activeChain, CNode& node,
         CBlockIndex& blockIndex, const CInv& inv)
 {
-    sendBlock(node, blockIndex, inv.type);
+    sendBlock(node, blockIndex, inv.type, activeChain.Height());
     updateBestHeaderSent(node, &blockIndex);
     triggerNextRequest(activeChain, inv, node);
 }
@@ -84,7 +86,7 @@ bool thinIsSmaller(const CBlock& b, const XThinBlock& x) {
 }
 
 void BlockSender::sendBlock(CNode& node,
-        const CBlockIndex& blockIndex, int invType)
+        const CBlockIndex& blockIndex, int invType, int activeChainHeight)
 {
 
     // Send block from disk
@@ -96,21 +98,28 @@ void BlockSender::sendBlock(CNode& node,
 
     // We only support MSG_XTHINBLOCK, if peer wants MSG_THINBLOCK,
     // fallback to full one.
-    if (invType == MSG_BLOCK || invType == MSG_THINBLOCK)
+    if (invType == MSG_BLOCK || (invType == MSG_THINBLOCK
+                && !NodeStatePtr(node.id)->supportsCompactBlocks))
     {
+        // Fun fact:
+        // Responding to a BUIP010 MSG_THINBLOCK is actually a BIP152 violation.
+        // MSG_CMPCT_BLOCK uses the same enum value as MSG_THINBLOCK.
+        //
+        // BIP152 states:
+        // "Nodes MUST NOT send a request for a MSG_CMPCT_BLOCK object to a
+        // peer before having received a sendcmpct message from that peer."
+
         node.PushMessage("block", block);
         return;
     }
 
-    CBloomFilter filter;
-    {
-        LOCK(node.cs_xfilter);
-        assert(bool(node.xthinFilter.get())); // a filter is always allocated.
-        filter = *node.xthinFilter;
-    }
-
-
     if (invType == MSG_XTHINBLOCK) {
+        CBloomFilter filter;
+        {
+            LOCK(node.cs_xfilter);
+            filter = *node.xthinFilter;
+        }
+
         try {
             XThinBlock thinb(block, filter);
             if (thinIsSmaller(block, thinb))
@@ -128,8 +137,22 @@ void BlockSender::sendBlock(CNode& node,
         return;
     }
 
-    // MSG_FILTERED_BLOCK
+    if (invType == MSG_CMPCT_BLOCK && NodeStatePtr(node.id)->supportsCompactBlocks) {
+        if (blockIndex.nHeight >= activeChainHeight - 10) {
+            CompactBlock cmpct(block, *choosePrefiller(node));
+            node.PushMessage("cmpctblock", cmpct);
+        }
+        else
+            node.PushMessage("block", block);
+        return;
+    }
 
+    // MSG_FILTERED_BLOCK
+    CBloomFilter filter;
+    {
+        LOCK(node.cs_filter);
+        filter = *node.pfilter;
+    }
     CMerkleBlock merkleBlock(block, filter);
     node.PushMessage("merkleblock", merkleBlock);
     // CMerkleBlock just contains hashes, so also push any transactions in the block the client did not see
@@ -154,6 +177,17 @@ void BlockSender::sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
 
     XThinReReqResponse resp(block, req.txRequesting);
     node.PushMessage("xblocktx", resp);
+}
+
+void BlockSender::sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
+        const CompactReRequest& req)
+{
+    CBlock block;
+    if (!readBlockFromDisk(block, &blockIndex))
+        assert(!"cannot load block from disk");
+
+    CompactReReqResponse resp(block, req.indexes);
+    node.PushMessage("blocktxn", resp);
 }
 
 bool BlockSender::readBlockFromDisk(CBlock& block, const CBlockIndex* pindex) {

@@ -32,15 +32,16 @@ import logging
 import copy
 import math
 from murmurhash import MurmurHash3
+from siphash import siphash256
 
 BIP0031_VERSION = 60000
-MY_VERSION = 70011 # So we can signal that we don't support merkleblocks (no thin blocks)
-MY_SUBVERSION = "/python-mininode-tester:0.0.1/"
+MY_VERSION = 70014
+MY_SUBVERSION = b"/python-mininode-tester:0.0.3/"
 
 MAX_INV_SZ = 50000
 
 # Keep our own socket map for asyncore, so that we can track disconnects
-# ourselves (to workaround an issue with closing an asyncore socket when 
+# ourselves (to workaround an issue with closing an asyncore socket when
 # using select)
 mininode_socket_map = dict()
 
@@ -60,8 +61,19 @@ def sha256(s):
 def hash256(s):
     return sha256(sha256(s))
 
+def ser_compact_size(l):
+    r = b""
+    if l < 253:
+        r = struct.pack("B", l)
+    elif l < 0x10000:
+        r = struct.pack("<BH", 253, l)
+    elif l < 0x100000000:
+        r = struct.pack("<BI", 254, l)
+    else:
+        r = struct.pack("<BQ", 255, l)
+    return r
 
-def deser_string(f):
+def deser_compact_size(f):
     nit = struct.unpack("<B", f.read(1))[0]
     if nit == 253:
         nit = struct.unpack("<H", f.read(2))[0]
@@ -69,18 +81,15 @@ def deser_string(f):
         nit = struct.unpack("<I", f.read(4))[0]
     elif nit == 255:
         nit = struct.unpack("<Q", f.read(8))[0]
+    return nit
+
+def deser_string(f):
+    nit = deser_compact_size(f)
     return f.read(nit)
 
 
 def ser_string(s):
-    if len(s) < 253:
-        return chr(len(s)) + s
-    elif len(s) < 0x10000:
-        return chr(253) + struct.pack("<H", len(s)) + s
-    elif len(s) < 0x100000000L:
-        return chr(254) + struct.pack("<I", len(s)) + s
-    return chr(255) + struct.pack("<Q", len(s)) + s
-
+    return ser_compact_size(len(s)) + s
 
 def deser_uint256(f):
     r = 0L
@@ -113,13 +122,7 @@ def uint256_from_compact(c):
 
 
 def deser_vector(f, c):
-    nit = struct.unpack("<B", f.read(1))[0]
-    if nit == 253:
-        nit = struct.unpack("<H", f.read(2))[0]
-    elif nit == 254:
-        nit = struct.unpack("<I", f.read(4))[0]
-    elif nit == 255:
-        nit = struct.unpack("<Q", f.read(8))[0]
+    nit = deser_compact_size(f)
     r = []
     for i in xrange(nit):
         t = c()
@@ -128,29 +131,19 @@ def deser_vector(f, c):
     return r
 
 
+# ser_function_name: Allow for an alternate serialization function on the
+# entries in the vector (we use this for serializing the vector of transactions
+# for a witness block).
 def ser_vector(l):
-    r = ""
-    if len(l) < 253:
-        r = chr(len(l))
-    elif len(l) < 0x10000:
-        r = chr(253) + struct.pack("<H", len(l))
-    elif len(l) < 0x100000000L:
-        r = chr(254) + struct.pack("<I", len(l))
-    else:
-        r = chr(255) + struct.pack("<Q", len(l))
+    r = ser_compact_size(len(l))
+
     for i in l:
         r += i.serialize()
     return r
 
 
 def deser_uint256_vector(f):
-    nit = struct.unpack("<B", f.read(1))[0]
-    if nit == 253:
-        nit = struct.unpack("<H", f.read(2))[0]
-    elif nit == 254:
-        nit = struct.unpack("<I", f.read(4))[0]
-    elif nit == 255:
-        nit = struct.unpack("<Q", f.read(8))[0]
+    nit = deser_compact_size(f)
     r = []
     for i in xrange(nit):
         t = deser_uint256(f)
@@ -159,28 +152,14 @@ def deser_uint256_vector(f):
 
 
 def ser_uint256_vector(l):
-    r = ""
-    if len(l) < 253:
-        r = chr(len(l))
-    elif len(l) < 0x10000:
-        r = chr(253) + struct.pack("<H", len(l))
-    elif len(l) < 0x100000000L:
-        r = chr(254) + struct.pack("<I", len(l))
-    else:
-        r = chr(255) + struct.pack("<Q", len(l))
+    r = ser_compact_size(len(l))
     for i in l:
         r += ser_uint256(i)
     return r
 
 
 def deser_string_vector(f):
-    nit = struct.unpack("<B", f.read(1))[0]
-    if nit == 253:
-        nit = struct.unpack("<H", f.read(2))[0]
-    elif nit == 254:
-        nit = struct.unpack("<I", f.read(4))[0]
-    elif nit == 255:
-        nit = struct.unpack("<Q", f.read(8))[0]
+    nit = deser_compact_size(f)
     r = []
     for i in xrange(nit):
         t = deser_string(f)
@@ -189,28 +168,14 @@ def deser_string_vector(f):
 
 
 def ser_string_vector(l):
-    r = ""
-    if len(l) < 253:
-        r = chr(len(l))
-    elif len(l) < 0x10000:
-        r = chr(253) + struct.pack("<H", len(l))
-    elif len(l) < 0x100000000L:
-        r = chr(254) + struct.pack("<I", len(l))
-    else:
-        r = chr(255) + struct.pack("<Q", len(l))
+    r = ser_compact_size(len(l))
     for sv in l:
         r += ser_string(sv)
     return r
 
 
 def deser_int_vector(f):
-    nit = struct.unpack("<B", f.read(1))[0]
-    if nit == 253:
-        nit = struct.unpack("<H", f.read(2))[0]
-    elif nit == 254:
-        nit = struct.unpack("<I", f.read(4))[0]
-    elif nit == 255:
-        nit = struct.unpack("<Q", f.read(8))[0]
+    nit = deser_compact_size(f)
     r = []
     for i in xrange(nit):
         t = struct.unpack("<i", f.read(4))[0]
@@ -219,15 +184,7 @@ def deser_int_vector(f):
 
 
 def ser_int_vector(l):
-    r = ""
-    if len(l) < 253:
-        r = chr(len(l))
-    elif len(l) < 0x10000:
-        r = chr(253) + struct.pack("<H", len(l))
-    elif len(l) < 0x100000000L:
-        r = chr(254) + struct.pack("<I", len(l))
-    else:
-        r = chr(255) + struct.pack("<Q", len(l))
+    r = ser_compact_size(len(l))
     for i in l:
         r += struct.pack("<i", i)
     return r
@@ -273,7 +230,9 @@ class CInv(object):
     typemap = {
         0: "Error",
         1: "TX",
-        2: "Block"}
+        2: "Block",
+        4: "CompactBlock"
+    }
 
     def __init__(self, t=0, h=0L):
         self.type = t
@@ -708,6 +667,190 @@ class CBloomFilter(object):
             % (len(self.vData), self.nHashFuncs, self.nTweak, self.nFlags)
 
 
+class PrefilledTransaction(object):
+    def __init__(self, index=0, tx = None):
+        self.index = index
+        self.tx = tx
+
+    def deserialize(self, f):
+        self.index = deser_compact_size(f)
+        self.tx = CTransaction()
+        self.tx.deserialize(f)
+
+    def serialize(self, with_witness=False):
+        r = b""
+        r += ser_compact_size(self.index)
+        assert(not with_witness) # Witness support not added
+        r += self.tx.serialize()
+        return r
+        #if with_witness:
+        #    r += self.tx.serialize_with_witness()
+        #else:
+        #    r += self.tx.serialize_without_witness()
+        #return r
+
+    def __repr__(self):
+        return "PrefilledTransaction(index=%d, tx=%s)" % (self.index, repr(self.tx))
+
+# This is what we send on the wire, in a cmpctblock message.
+class P2PHeaderAndShortIDs(object):
+    def __init__(self):
+        self.header = CBlockHeader()
+        self.nonce = 0
+        self.shortids_length = 0
+        self.shortids = []
+        self.prefilled_txn_length = 0
+        self.prefilled_txn = []
+
+    def deserialize(self, f):
+        self.header.deserialize(f)
+        self.nonce = struct.unpack("<Q", f.read(8))[0]
+        self.shortids_length = deser_compact_size(f)
+        for i in range(self.shortids_length):
+            # shortids are defined to be 6 bytes in the spec, so append
+            # two zero bytes and read it in as an 8-byte number
+            self.shortids.append(struct.unpack("<Q", f.read(6) + b'\x00\x00')[0])
+        self.prefilled_txn = deser_vector(f, PrefilledTransaction)
+        self.prefilled_txn_length = len(self.prefilled_txn)
+
+    def serialize(self, with_witness=False):
+        r = b""
+        r += self.header.serialize()
+        r += struct.pack("<Q", self.nonce)
+        r += ser_compact_size(self.shortids_length)
+        for x in self.shortids:
+            # We only want the first 6 bytes
+            r += struct.pack("<Q", x)[0:6]
+        r += ser_vector(self.prefilled_txn)
+        return r
+
+    def __repr__(self):
+        return "P2PHeaderAndShortIDs(header=%s, nonce=%d, shortids_length=%d, shortids=%s, prefilled_txn_length=%d, prefilledtxn=%s" % (repr(self.header), self.nonce, self.shortids_length, repr(self.shortids), self.prefilled_txn_length, repr(self.prefilled_txn))
+
+
+# Calculate the BIP 152-compact blocks shortid for a given transaction hash
+def calculate_shortid(k0, k1, tx_hash):
+    expected_shortid = siphash256(k0, k1, tx_hash)
+    expected_shortid &= 0x0000ffffffffffff
+    return expected_shortid
+
+# This version gets rid of the array lengths, and reinterprets the differential
+# encoding into indices that can be used for lookup.
+class HeaderAndShortIDs(object):
+    def __init__(self, p2pheaders_and_shortids = None):
+        self.header = CBlockHeader()
+        self.nonce = 0
+        self.shortids = []
+        self.prefilled_txn = []
+
+        if p2pheaders_and_shortids != None:
+            self.header = p2pheaders_and_shortids.header
+            self.nonce = p2pheaders_and_shortids.nonce
+            self.shortids = p2pheaders_and_shortids.shortids
+            last_index = -1
+            for x in p2pheaders_and_shortids.prefilled_txn:
+                self.prefilled_txn.append(PrefilledTransaction(x.index + last_index + 1, x.tx))
+                last_index = self.prefilled_txn[-1].index
+
+    def to_p2p(self):
+        ret = P2PHeaderAndShortIDs()
+        ret.header = self.header
+        ret.nonce = self.nonce
+        ret.shortids_length = len(self.shortids)
+        ret.shortids = self.shortids
+        ret.prefilled_txn_length = len(self.prefilled_txn)
+        ret.prefilled_txn = []
+        last_index = -1
+        for x in self.prefilled_txn:
+            ret.prefilled_txn.append(PrefilledTransaction(x.index - last_index - 1, x.tx))
+            last_index = x.index
+        return ret
+
+    def get_siphash_keys(self):
+        header_nonce = self.header.serialize()
+        header_nonce += struct.pack("<Q", self.nonce)
+        hash_header_nonce_as_str = sha256(header_nonce)
+        key0 = struct.unpack("<Q", hash_header_nonce_as_str[0:8])[0]
+        key1 = struct.unpack("<Q", hash_header_nonce_as_str[8:16])[0]
+        return [ key0, key1 ]
+
+    def initialize_from_block(self, block, nonce=0, prefill_list = [0]):
+        self.header = CBlockHeader(block)
+        self.nonce = nonce
+        self.prefilled_txn = [ PrefilledTransaction(i, block.vtx[i]) for i in prefill_list ]
+        self.shortids = []
+        [k0, k1] = self.get_siphash_keys()
+        for i in range(len(block.vtx)):
+            if i not in prefill_list:
+                self.shortids.append(calculate_shortid(k0, k1, block.vtx[i].sha256))
+
+    def __repr__(self):
+        return "HeaderAndShortIDs(header=%s, nonce=%d, shortids=%s, prefilledtxn=%s" % (repr(self.header), self.nonce, repr(self.shortids), repr(self.prefilled_txn))
+
+
+class BlockTransactionsRequest(object):
+
+    def __init__(self, blockhash=0, indexes = None):
+        self.blockhash = blockhash
+        self.indexes = indexes if indexes != None else []
+
+    def deserialize(self, f):
+        self.blockhash = deser_uint256(f)
+        indexes_length = deser_compact_size(f)
+        for i in range(indexes_length):
+            self.indexes.append(deser_compact_size(f))
+
+    def serialize(self):
+        r = b""
+        r += ser_uint256(self.blockhash)
+        r += ser_compact_size(len(self.indexes))
+        for x in self.indexes:
+            r += ser_compact_size(x)
+        return r
+
+    # helper to set the differentially encoded indexes from absolute ones
+    def from_absolute(self, absolute_indexes):
+        self.indexes = []
+        last_index = -1
+        for x in absolute_indexes:
+            self.indexes.append(x-last_index-1)
+            last_index = x
+
+    def to_absolute(self):
+        absolute_indexes = []
+        last_index = -1
+        for x in self.indexes:
+            absolute_indexes.append(x+last_index+1)
+            last_index = absolute_indexes[-1]
+        return absolute_indexes
+
+    def __repr__(self):
+        return "BlockTransactionsRequest(hash=%064x indexes=%s)" % (self.blockhash, repr(self.indexes))
+
+
+class BlockTransactions(object):
+
+    def __init__(self, blockhash=0, transactions = None):
+        self.blockhash = blockhash
+        self.transactions = transactions if transactions != None else []
+
+    def deserialize(self, f):
+        self.blockhash = deser_uint256(f)
+        self.transactions = deser_vector(f, CTransaction)
+
+    def serialize(self, with_witness=False):
+        r = b""
+        r += ser_uint256(self.blockhash)
+        if with_witness:
+            r += ser_vector(self.transactions, "serialize_with_witness")
+        else:
+            r += ser_vector(self.transactions)
+        return r
+
+    def __repr__(self):
+        return "BlockTransactions(hash=%064x transactions=%s)" % (self.blockhash, repr(self.transactions))
+
+
 # Objects that correspond to messages on the wire
 class msg_version(object):
     command = "version"
@@ -1083,6 +1226,20 @@ class msg_reject(object):
         return "msg_reject: %s %d %s [%064x]" \
             % (self.message, self.code, self.reason, self.data)
 
+# Helper function
+def wait_until(predicate, attempts=float('inf'), timeout=float('inf')):
+    attempt = 0
+    elapsed = 0
+
+    while attempt < attempts and elapsed < timeout:
+        with mininode_lock:
+            if predicate():
+                return True
+        attempt += 1
+        elapsed += 0.05
+        time.sleep(0.05)
+
+    return False
 
 class msg_filterload(object):
     command = "filterload"
@@ -1101,6 +1258,79 @@ class msg_filterload(object):
     def __repr__(self):
         return "msg_filterload(filter=%r)" % (self.filter)
 
+
+class msg_sendcmpct(object):
+    command = b"sendcmpct"
+
+    def __init__(self):
+        self.announce = False
+        self.version = 1
+
+    def deserialize(self, f):
+        self.announce = struct.unpack("<?", f.read(1))[0]
+        self.version = struct.unpack("<Q", f.read(8))[0]
+
+    def serialize(self):
+        r = b""
+        r += struct.pack("<?", self.announce)
+        r += struct.pack("<Q", self.version)
+        return r
+
+    def __repr__(self):
+        return "msg_sendcmpct(announce=%s, version=%lu)" % (self.announce, self.version)
+
+class msg_cmpctblock(object):
+    command = b"cmpctblock"
+
+    def __init__(self, header_and_shortids = None):
+        self.header_and_shortids = header_and_shortids
+
+    def deserialize(self, f):
+        self.header_and_shortids = P2PHeaderAndShortIDs()
+        self.header_and_shortids.deserialize(f)
+
+    def serialize(self):
+        r = b""
+        r += self.header_and_shortids.serialize()
+        return r
+
+    def __repr__(self):
+        return "msg_cmpctblock(HeaderAndShortIDs=%s)" % repr(self.header_and_shortids)
+
+class msg_getblocktxn(object):
+    command = b"getblocktxn"
+
+    def __init__(self):
+        self.block_txn_request = None
+
+    def deserialize(self, f):
+        self.block_txn_request = BlockTransactionsRequest()
+        self.block_txn_request.deserialize(f)
+
+    def serialize(self):
+        r = b""
+        r += self.block_txn_request.serialize()
+        return r
+
+    def __repr__(self):
+        return "msg_getblocktxn(block_txn_request=%s)" % (repr(self.block_txn_request))
+
+class msg_blocktxn(object):
+    command = b"blocktxn"
+
+    def __init__(self):
+        self.block_transactions = BlockTransactions()
+
+    def deserialize(self, f):
+        self.block_transactions.deserialize(f)
+
+    def serialize(self):
+        r = b""
+        r += self.block_transactions.serialize()
+        return r
+
+    def __repr__(self):
+        return "msg_blocktxn(block_transactions=%s)" % (repr(self.block_transactions))
 
 # This is what a callback should look like for NodeConn
 # Reimplement the on_* functions to provide handling for events
@@ -1184,7 +1414,42 @@ class NodeConnCB(object):
     def on_close(self, conn): pass
     def on_mempool(self, conn): pass
     def on_pong(self, conn, message): pass
+    def on_sendheaders(self, conn, message): pass
+    def on_sendcmpct(self, conn, message): pass
+    def on_cmpctblock(self, conn, message): pass
+    def on_getblocktxn(self, conn, message): pass
+    def on_blocktxn(self, conn, message): pass
 
+# More useful callbacks and functions for NodeConnCB's which have a single NodeConn
+class SingleNodeConnCB(NodeConnCB):
+    def __init__(self):
+        NodeConnCB.__init__(self)
+        self.connection = None
+        self.ping_counter = 1
+        self.last_pong = msg_pong()
+
+    def add_connection(self, conn):
+        self.connection = conn
+
+    # Wrapper for the NodeConn's send_message function
+    def send_message(self, message):
+        self.connection.send_message(message)
+
+    def send_and_ping(self, message):
+        self.send_message(message)
+        self.sync_with_ping()
+
+    def on_pong(self, conn, message):
+        self.last_pong = message
+
+    # Sync up with the node
+    def sync_with_ping(self, timeout=30):
+        def received_pong():
+            return (self.last_pong.nonce == self.ping_counter)
+        self.send_message(msg_ping(nonce=self.ping_counter))
+        success = wait_until(received_pong, timeout=timeout)
+        self.ping_counter += 1
+        return success
 
 # The actual NodeConn class
 # This class provides an interface for a p2p connection to a specified node
@@ -1206,7 +1471,12 @@ class NodeConn(asyncore.dispatcher):
         "getheaders": msg_getheaders,
         "reject": msg_reject,
         "mempool": msg_mempool,
-        "filterload": msg_filterload
+        "filterload": msg_filterload,
+        "sendheaders": msg_sendheaders,
+        "sendcmpct": msg_sendcmpct,
+        "cmpctblock": msg_cmpctblock,
+        "getblocktxn": msg_getblocktxn,
+        "blocktxn": msg_blocktxn
     }
     MAGIC_BYTES = {
         "mainnet": "\xf9\xbe\xb4\xd9",   # mainnet
