@@ -176,8 +176,8 @@ public:
 //! the maximum number of tried addr collisions to store
 #define ADDRMAN_SET_TRIED_COLLISION_SIZE 10
 
-/** 
- * Stochastical (IP) address manager 
+/**
+ * Stochastical (IP) address manager
  */
 class CAddrMan
 {
@@ -540,23 +540,19 @@ public:
     //! Mark an entry as accessible.
     void Good(const CService &addr, bool test_before_evict = true, int64_t nTime = GetAdjustedTime())
     {
-        {
-            LOCK(cs);
-            Check();
-            Good_(addr, test_before_evict, nTime);
-            Check();
-        }
+        LOCK(cs);
+        Check();
+        Good_(addr, test_before_evict, nTime);
+        Check();
     }
 
     //! Mark an entry as connection attempted to.
     void Attempt(const CService &addr, bool fCountFailure, int64_t nTime = GetAdjustedTime())
     {
-        {
-            LOCK(cs);
-            Check();
-            Attempt_(addr, fCountFailure, nTime);
-            Check();
-        }
+        LOCK(cs);
+        Check();
+        Attempt_(addr, fCountFailure, nTime);
+        Check();
     }
 
     //! See if any to-be-evicted tried table entries have been tested and if so resolve the collisions.
@@ -612,12 +608,10 @@ public:
     //! Mark an entry as currently-connected-to.
     void Connected(const CService &addr, int64_t nTime = GetAdjustedTime())
     {
-        {
-            LOCK(cs);
-            Check();
-            Connected_(addr, nTime);
-            Check();
-        }
+        LOCK(cs);
+        Check();
+        Connected_(addr, nTime);
+        Check();
     }
 
 };
