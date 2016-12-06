@@ -540,13 +540,16 @@ void InFlightEraserImpl::operator()(NodeId node, const uint256& hash) {
     if (q == QueuedBlockPtr())
         return;
 
-    NodeStatePtr state(q->node);
-    assert(!state.IsNull());
     nQueuedValidatedHeaders -= q->fValidatedHeaders;
-    state->nBlocksInFlightValidHeaders -= q->fValidatedHeaders;
-    state->vBlocksInFlight.erase(q);
-    state->nBlocksInFlight--;
-    state->nStallingSince = 0;
+    NodeStatePtr state(q->node);
+    if (!state.IsNull()) {
+        // state can be null if a node that has a block
+        // in flight is being destructed.
+        state->nBlocksInFlightValidHeaders -= q->fValidatedHeaders;
+        state->vBlocksInFlight.erase(q);
+        state->nBlocksInFlight--;
+        state->nStallingSince = 0;
+    }
     blocksInFlight.erase(q);
 
     int64_t getdataTime = q->nTime;
