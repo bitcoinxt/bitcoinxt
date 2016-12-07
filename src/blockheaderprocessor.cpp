@@ -66,7 +66,7 @@ bool DefaultHeaderProcessor::operator()(const std::vector<CBlockHeader>& headers
         // Headers message had its maximum size; the peer may have more headers.
         // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
         // from there instead.
-        LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
+        LogPrint("block", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
         pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256());
     }
 
@@ -160,7 +160,7 @@ void DefaultHeaderProcessor::suggestDownload(const std::vector<CBlockIndex*>& to
     }
 
     if (!toGet.empty()) {
-        LogPrint("net", "Downloading blocks toward %s (%d) via headers direct fetch\n",
+        LogPrint("block", "Downloading blocks toward %s (%d) via headers direct fetch\n",
                 last->GetBlockHash().ToString(), last->nHeight);
         pfrom->PushMessage("getdata", toGet);
     }
