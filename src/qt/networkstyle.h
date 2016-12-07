@@ -13,19 +13,22 @@
 class NetworkStyle
 {
 public:
-    /** Get style associated with provided BIP70 network id, or 0 if not known */
-    static const NetworkStyle *instantiate(const QString &networkId);
+    /**
+     * Create style associated with provided BIP70 network id
+     * The constructor throws an runtime error if the network id is unknown.
+     */
+    NetworkStyle(const QString &networkId);
 
-    const QString &getAppName() const { return appName; }
-    const QIcon &getAppIcon() const { return appIcon; }
-    const QIcon &getTrayAndWindowIcon() const { return trayAndWindowIcon; }
-    const QString &getTitleAddText() const { return titleAddText; }
+    QString getAppName() const { return appName; }
+    QString getTitleAddText() const { return titleAddText; }
+    QImage getAppIcon() const { return appIcon; }
+    QIcon getTrayAndWindowIcon() const { return trayAndWindowIcon; }
+
+
 
 private:
-    NetworkStyle(const QString &appName, const int iconColorHueShift, const int iconColorSaturationReduction, const char *titleAddText);
-
     QString appName;
-    QIcon appIcon;
+    QImage appIcon;
     QIcon trayAndWindowIcon;
     QString titleAddText;
 };

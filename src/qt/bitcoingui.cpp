@@ -60,7 +60,7 @@
 
 const QString BitcoinGUI::DEFAULT_WALLET = "~Default";
 
-BitcoinGUI::BitcoinGUI(const NetworkStyle *networkStyle, QWidget *parent) :
+BitcoinGUI::BitcoinGUI(const NetworkStyle &networkStyle, QWidget *parent) :
     QMainWindow(parent),
     clientModel(0),
     walletFrame(0),
@@ -115,12 +115,15 @@ BitcoinGUI::BitcoinGUI(const NetworkStyle *networkStyle, QWidget *parent) :
     } else {
         windowTitle += tr("Node");
     }
-    windowTitle += " " + networkStyle->getTitleAddText();
+    windowTitle += " " + networkStyle.getTitleAddText();
 #ifndef Q_OS_MAC
-    QApplication::setWindowIcon(networkStyle->getTrayAndWindowIcon());
-    setWindowIcon(networkStyle->getTrayAndWindowIcon());
+    QApplication::setWindowIcon(networkStyle.getTrayAndWindowIcon());
+    setWindowIcon(networkStyle.getTrayAndWindowIcon());
 #else
-    MacDockIconHandler::instance()->setIcon(networkStyle->getAppIcon());
+    // TODO we convert a QImage to a pixmap, to an icon and in the MacDockIconHandler we
+    //   do it in the opposite directoin just go arrive at a QImage again.
+    // A mac hacker should fix that so we just pass a QImage (networkStyle::getAppIcon()).
+    MacDockIconHandler::instance()->setIcon(networkStyle.getTrayAndWindowIcon());
 #endif
     setWindowTitle(windowTitle);
 
@@ -508,13 +511,13 @@ void BitcoinGUI::setWalletActionsEnabled(bool enabled)
     openAction->setEnabled(enabled);
 }
 
-void BitcoinGUI::createTrayIcon(const NetworkStyle *networkStyle)
+void BitcoinGUI::createTrayIcon(const NetworkStyle &networkStyle)
 {
 #ifndef Q_OS_MAC
     trayIcon = new QSystemTrayIcon(this);
-    QString toolTip = tr("Bitcoin XT client") + " " + networkStyle->getTitleAddText();
+    QString toolTip = tr("Bitcoin XT client") + " " + networkStyle.getTitleAddText();
     trayIcon->setToolTip(toolTip);
-    trayIcon->setIcon(networkStyle->getTrayAndWindowIcon());
+    trayIcon->setIcon(networkStyle.getTrayAndWindowIcon());
     trayIcon->show();
 #endif
 

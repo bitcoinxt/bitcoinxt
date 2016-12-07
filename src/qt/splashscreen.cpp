@@ -22,7 +22,7 @@
 #include <QPainter>
 #include <QRadialGradient>
 
-SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) :
+SplashScreen::SplashScreen(const NetworkStyle &networkStyle, Qt::WindowFlags f) :
     QWidget(0, f), curAlignment(0)
 {
     // set reference point, paddings
@@ -41,20 +41,20 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
     QString titleText       = tr("Bitcoin XT");
     QString versionText     = QString("Version %1").arg(QString::fromStdString(FormatFullVersion()));
     QString copyrightText   = QChar(0xA9)+QString(" 2009-%1 ").arg(COPYRIGHT_YEAR) + QString(tr("The Bitcoin developers"));
-    QString titleAddText    = networkStyle->getTitleAddText();
+    QString titleAddText    = networkStyle.getTitleAddText();
 
     QString font            = QApplication::font().toString();
 
     // create a bitmap according to device pixelratio
     QSize splashSize(480*devicePixelRatio,320*devicePixelRatio);
-    pixmap = QPixmap(splashSize);
+    QImage image = QImage(splashSize, QImage::Format_ARGB32);
 
 #if QT_VERSION > 0x050100
     // change to HiDPI if it makes sense
-    pixmap.setDevicePixelRatio(devicePixelRatio);
+    image.setDevicePixelRatio(devicePixelRatio);
 #endif
 
-    QPainter pixPaint(&pixmap);
+    QPainter pixPaint(&image);
     pixPaint.setPen(QColor(100,100,100));
 
     // draw a slighly radial gradient
@@ -65,12 +65,11 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
     pixPaint.fillRect(rGradient, gradient);
 
     // draw the bitcoin icon, expected size of PNG: 1024x1024
-    QRect rectIcon(QPoint(-165,-122), QSize(430,430));
-
-    const QSize requiredSize(1024,1024);
-    QPixmap icon(networkStyle->getAppIcon().pixmap(requiredSize));
-
-    pixPaint.drawPixmap(rectIcon, icon);
+    QImage icon = networkStyle.getAppIcon();
+    Q_ASSERT(icon.width() == 1024);
+    Q_ASSERT(icon.height() == 1024);
+    pixPaint.drawImage(QPoint(-165, -122),
+            icon.scaled(430, 430, Qt::IgnoreAspectRatio, Qt::SmoothTransformation));
 
     // check font size and drawing with
     pixPaint.setFont(QFont(font, 33*fontFactor));
@@ -84,7 +83,7 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
     pixPaint.setFont(QFont(font, 33*fontFactor));
     fm = pixPaint.fontMetrics();
     titleTextWidth  = fm.width(titleText);
-    pixPaint.drawText(pixmap.width()/devicePixelRatio-titleTextWidth-paddingRight,paddingTop,titleText);
+    pixPaint.drawText(image.width()/devicePixelRatio-titleTextWidth-paddingRight,paddingTop,titleText);
 
     pixPaint.setFont(QFont(font, 15*fontFactor));
 
@@ -95,11 +94,11 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
         pixPaint.setFont(QFont(font, 10*fontFactor));
         titleVersionVSpace -= 5;
     }
-    pixPaint.drawText(pixmap.width()/devicePixelRatio-titleTextWidth-paddingRight+2,paddingTop+titleVersionVSpace,versionText);
+    pixPaint.drawText(image.width()/devicePixelRatio-titleTextWidth-paddingRight+2,paddingTop+titleVersionVSpace,versionText);
 
     // draw copyright stuff
     pixPaint.setFont(QFont(font, 10*fontFactor));
-    pixPaint.drawText(pixmap.width()/devicePixelRatio-titleTextWidth-paddingRight,paddingTop+titleCopyrightVSpace,copyrightText);
+    pixPaint.drawText(image.width()/devicePixelRatio-titleTextWidth-paddingRight,paddingTop+titleCopyrightVSpace,copyrightText);
 
     // draw additional text if special network
     if(!titleAddText.isEmpty()) {
@@ -108,7 +107,7 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
         pixPaint.setFont(boldFont);
         fm = pixPaint.fontMetrics();
         int titleAddTextWidth  = fm.width(titleAddText);
-        pixPaint.drawText(pixmap.width()/devicePixelRatio-titleAddTextWidth-10,15,titleAddText);
+        pixPaint.drawText(image.width()/devicePixelRatio-titleAddTextWidth-10,15,titleAddText);
     }
 
     pixPaint.end();
@@ -117,12 +116,14 @@ SplashScreen::SplashScreen(Qt::WindowFlags f, const NetworkStyle *networkStyle) 
     setWindowTitle(titleText + " " + titleAddText);
 
     // Resize window and move to center of desktop, disallow resizing
-    QRect r(QPoint(), QSize(pixmap.size().width()/devicePixelRatio,pixmap.size().height()/devicePixelRatio));
+    QRect r(QPoint(), QSize(image.size().width()/devicePixelRatio,image.size().height()/devicePixelRatio));
     resize(r.size());
     setFixedSize(r.size());
     move(QApplication::desktop()->screenGeometry().center() - r.center());
 
     subscribeToCoreSignals();
+
+    pixmap = QPixmap::fromImage(image);
 }
 
 SplashScreen::~SplashScreen()
