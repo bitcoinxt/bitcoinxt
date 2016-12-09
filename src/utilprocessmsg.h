@@ -21,4 +21,7 @@ struct BlockInFlightMarker {
 };
 inline BlockInFlightMarker::~BlockInFlightMarker() { }
 
+// If node matches our criteria for outgoing connections.
+bool KeepOutgoingPeer(const CNode&);
+
 #endif

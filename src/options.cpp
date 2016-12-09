@@ -75,7 +75,7 @@ bool Opt::UsingThinBlocks() {
     return Args->GetBool("-use-thin-blocks", true);
 }
 
-/// Don't request blocks from nodes hat don't support thin blocks.
+/// Don't request blocks from nodes that don't support thin blocks.
 bool Opt::AvoidFullBlocks() {
     return Args->GetArg("-use-thin-blocks", 1) == 2
         || Args->GetArg("-use-thin-blocks", 1) == 3;

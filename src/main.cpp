@@ -4784,13 +4784,11 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                 ns->thinblock.reset(new BloomThinWorker(thinblockmg, pfrom->id));
             else { /* keep DummyThinWorker */ }
 
-            bool hasRequiredThinSupport = pfrom->SupportsXThinBlocks() || pfrom->SupportsCompactBlocks();
-            if (!Opt().OptimalThinBlocksOnly())
-                hasRequiredThinSupport = hasRequiredThinSupport || pfrom->SupportsBloomThinBlocks();
+            if (!pfrom->fInbound && !KeepOutgoingPeer(*pfrom)) {
+                LogPrintf("'%s' - peer=%d does not meet criteria for "
+                        "outgoing connections, disconnecting.\n",
+                        pfrom->cleanSubVer, pfrom->id);
 
-            // Disconnect outbound connections that don't support thin blocks.
-            if (Opt().UsingThinBlocks() && !pfrom->fInbound && !hasRequiredThinSupport) {
-                LogPrintf("'%s' - peer=%d does not support thin blocks, disconnecting\n", pfrom->cleanSubVer, pfrom->id);
                 pfrom->fDisconnect = true;
                 return true;
             }
