@@ -43,32 +43,37 @@ class CDBBatch
 private:
     leveldb::WriteBatch batch;
 
+    CDataStream ssKey;
+    CDataStream ssValue;
+
 public:
+    CDBBatch() : ssKey(SER_DISK, CLIENT_VERSION), ssValue(SER_DISK, CLIENT_VERSION) { };
+
     template <typename K, typename V>
     void Write(const K& key, const V& value)
     {
-        CDataStream ssKey(SER_DISK, CLIENT_VERSION);
         ssKey.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
         ssKey << key;
         leveldb::Slice slKey(&ssKey[0], ssKey.size());
 
-        CDataStream ssValue(SER_DISK, CLIENT_VERSION);
         ssValue.reserve(DBWRAPPER_PREALLOC_VALUE_SIZE);
         ssValue << value;
         leveldb::Slice slValue(&ssValue[0], ssValue.size());
 
         batch.Put(slKey, slValue);
+        ssKey.clear();
+        ssValue.clear();
     }
 
     template <typename K>
     void Erase(const K& key)
     {
-        CDataStream ssKey(SER_DISK, CLIENT_VERSION);
         ssKey.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
         ssKey << key;
         leveldb::Slice slKey(&ssKey[0], ssKey.size());
 
         batch.Delete(slKey);
+        ssKey.clear();
     }
 };
 
