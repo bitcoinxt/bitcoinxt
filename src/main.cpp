@@ -4554,19 +4554,22 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         CAddress addrMe;
         CAddress addrFrom;
         uint64_t nNonce = 1;
-        vRecv >> pfrom->nVersion >> pfrom->nServices >> nTime >> addrMe;
-        if (pfrom->nVersion < MIN_PEER_PROTO_VERSION)
+        uint64_t nServiceInt;
+        int nVersion;
+        vRecv >> nVersion >> nServiceInt >> nTime >> addrMe;
+        pfrom->nServices = nServiceInt;
+        if (nVersion < MIN_PEER_PROTO_VERSION)
         {
             // disconnect from peers older than this proto version
-            LogPrintf("peer=%d using obsolete version %i; disconnecting\n", pfrom->id, pfrom->nVersion);
+            LogPrintf("peer=%d using obsolete version %i; disconnecting\n", pfrom->id, nVersion);
             connman->PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::REJECT, strCommand, REJECT_OBSOLETE,
                                strprintf("Version must be %d or greater", MIN_PEER_PROTO_VERSION)));
             pfrom->fDisconnect = true;
             return false;
         }
 
-        if (pfrom->nVersion == 10300)
-            pfrom->nVersion = 300;
+        if (nVersion == 10300)
+            nVersion = 300;
         if (!vRecv.empty())
             vRecv >> addrFrom >> nNonce;
         if (!vRecv.empty()) {
@@ -4630,7 +4633,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
         // Change version
         connman->PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::VERACK));
-        int nSendVersion = std::min(pfrom->nVersion, PROTOCOL_VERSION);
+        int nSendVersion = std::min(nVersion, PROTOCOL_VERSION);
+        pfrom->nVersion = nVersion;
         pfrom->SetSendVersion(nSendVersion);
 
         if (!pfrom->fInbound)
