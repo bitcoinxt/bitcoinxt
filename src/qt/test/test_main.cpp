@@ -7,6 +7,7 @@
 #endif
 
 #include "bitcoinaddressvalidatortests.h"
+#include "compattests.h"
 #include "guiutiltests.h"
 #include "uritests.h"
 #include "util.h"
@@ -56,6 +57,9 @@ int main(int argc, char *argv[])
     BitcoinAddressValidatorTests test4;
     if (QTest::qExec(&test4) != 0)
 	    fInvalid = true;
+    CompatTests test5;
+    if (QTest::qExec(&test5) != 0)
+        fInvalid = true;
 
     return fInvalid;
 }
