@@ -47,7 +47,6 @@
 #include <boost/dynamic_bitset.hpp>
 #include <boost/algorithm/string/replace.hpp>
 #include <boost/assign/list_of.hpp>
-#include <boost/atomic.hpp>
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/math/distributions/poisson.hpp>
@@ -68,7 +67,6 @@ CCriticalSection cs_main;
 BlockMap mapBlockIndex;
 CChain chainActive;
 CBlockIndex *pindexBestHeader = NULL;
-boost::atomic<uint32_t> sizeForkTime(std::numeric_limits<uint32_t>::max());
 int64_t nTimeBestReceived = 0;
 CWaitableCriticalSection csBestBlock;
 CConditionVariable cvBlockChange;
@@ -99,16 +97,10 @@ void EraseOrphansFor(NodeId peer);
 static bool SanityCheckMessage(CNode* peer, const CNetMessage& msg);
 
 /**
- * Returns true if there are nRequired or more blocks with a version that matches
- * versionOrBitmask in the last Consensus::Params::nMajorityWindow blocks,
- * starting at pstart and going backwards.
- *
- * A bitmask is used to be compatible with BIP009,
- * so it is possible for multiple forks to be in-progress
- * at the same time. A simple >= version field is used for forks that
- * predate this proposal.
+ * Returns true if there are nRequired or more blocks of minVersion or above
+ * in the last Consensus::Params::nMajorityWindow blocks, starting at pstart and going backwards.
  */
-static bool IsSuperMajority(int versionOrBitmask, const CBlockIndex* pstart, unsigned nRequired, const Consensus::Params& consensusParams, bool useBitMask=false);
+static bool IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned nRequired, const Consensus::Params& consensusParams);
 static void CheckBlockIndex();
 
 /** Constant stuff for coinbase transactions we create: */
@@ -1418,22 +1410,10 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
-        ValidationCostTracker costTracker(MAX_BLOCK_SIGOPS, MAX_BLOCK_SIGHASH);
-        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS, true, &costTracker))
+        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS, true))
         {
             return error("AcceptToMemoryPool: ConnectInputs failed %s", hash.ToString());
         }
-        // Reject transactions with very high signature-hash cost:
-        uint64_t sighash_limit = (uint64_t)nSize * MAX_BLOCK_SIGHASH / MAX_BLOCK_SIZE;
-        if (costTracker.GetSighashBytes() > sighash_limit)
-        {
-            return state.DoS(0,
-                             error("AcceptToMemoryPool: too much signature hashing %s: %d > %d",
-                                   hash.ToString(), costTracker.GetSighashBytes(), sighash_limit),
-                             REJECT_NONSTANDARD, "bat-txns-too-many-sighash");
-        }
-        LogPrint("txcost", "txcost %s size: %d sigops: %d sighash: %d\n",
-                 hash.ToString(), nSize, costTracker.GetSigOps(), costTracker.GetSighashBytes());
 
         // Check again against just the consensus-critical mandatory script
         // verification flags, in case of bugs in the standard flags that cause
@@ -1444,7 +1424,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         // There is a similar check in CreateNewBlock() to prevent creating
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
-        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true, NULL))
+        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true))
         {
             return error("AcceptToMemoryPool: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s", hash.ToString());
         }
@@ -1838,23 +1818,14 @@ void UpdateCoins(const CTransaction& tx, CValidationState &state, CCoinsViewCach
 }
 
 bool CScriptCheck::operator()() {
-    if (costTracker && !costTracker->IsWithinLimits())
-        return false; // Don't do any more checks if already past limits
-
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
-    CachingTransactionSignatureChecker checker(ptxTo, nIn, cacheStore);
-    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, checker, &error)) {
+    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, CachingTransactionSignatureChecker(ptxTo, nIn, cacheStore), &error)) {
         return ::error("CScriptCheck(): %s:%d VerifySignature failed: %s", ptxTo->GetHash().ToString(), nIn, ScriptErrorString(error));
-    }
-    if (costTracker) {
-        if (!costTracker->Update(ptxTo->GetHash(), checker.GetNumSigops(), checker.GetBytesHashed()))
-            return ::error("CScriptCheck(): %s:%d sigop and/or sighash byte limit exceeded",
-                           ptxTo->GetHash().ToString(), nIn);
     }
     return true;
 }
 
-bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &inputs, bool fScriptChecks, unsigned int flags, bool cacheStore, ValidationCostTracker* costTracker, std::vector<CScriptCheck> *pvChecks)
+bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &inputs, bool fScriptChecks, unsigned int flags, bool cacheStore, std::vector<CScriptCheck> *pvChecks)
 {
     if (!tx.IsCoinBase())
     {
@@ -1923,7 +1894,7 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                 assert(coins);
 
                 // Verify signature
-                CScriptCheck check(costTracker, *coins, tx, i, flags, cacheStore);
+                CScriptCheck check(*coins, tx, i, flags, cacheStore);
                 if (pvChecks) {
                     pvChecks->push_back(CScriptCheck());
                     check.swap(pvChecks->back());
@@ -1935,7 +1906,7 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                         // arguments; if so, don't trigger DoS protection to
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
-                        CScriptCheck check(NULL, *coins, tx, i,
+                        CScriptCheck check(*coins, tx, i,
                                 flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheStore);
                         if (check())
                             return state.Invalid(false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
@@ -2289,21 +2260,6 @@ static int64_t nTimeIndex = 0;
 static int64_t nTimeCallbacks = 0;
 static int64_t nTimeTotal = 0;
 
-static bool DidBlockTriggerSizeFork(const CBlock &block, const CBlockIndex *pindex, const CChainParams &chainparams)
-{
-    if (pblocktree->ForkBitActivated(FORK_BIT_2MB) != uint256())
-        return false; // Already active
-    if (block.nTime > chainparams.GetConsensus().SizeForkExpiration()) {
-        // 2MB vote failed: this code is obsolete
-        strMiscWarning = _("Warning: This version is obsolete; upgrade required!");
-        AlertNotify(strMiscWarning, true);
-        return false;
-    }
-    if ((block.nVersion & FORK_BIT_2MB) != FORK_BIT_2MB)
-        return false;
-    return IsSuperMajority(FORK_BIT_2MB, pindex, chainparams.GetConsensus().ActivateSizeForkMajority(), chainparams.GetConsensus(), true /* use bitmask */);
-}
-
 bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pindex, CCoinsViewCache& view, bool fJustCheck)
 {
     const CChainParams& chainparams = Params();
@@ -2382,19 +2338,14 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     CBlockUndo blockundo;
 
-    int64_t nTimeStart = GetTimeMicros();
-
-    // Pre-fork, legacy sigop counting is used, unlimited resource tracker
-    // Post-fork, accurately counted sigop/sighash limits are used
-    ValidationCostTracker costTracker(MaxBlockSigops(block.nTime), MaxBlockSighash(block.nTime));
-
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && Opt().ScriptCheckThreads() ? &scriptcheckqueue : NULL);
 
     std::vector<int> prevheights;
+
+    int64_t nTimeStart = GetTimeMicros();
     CAmount nFees = 0;
     int nInputs = 0;
-    uint32_t nSigOps = 0;
-    uint32_t nMaxLegacySigops = MaxLegacySigops(block.nTime);
+    unsigned int nSigOps = 0;
     CDiskTxPos pos(pindex->GetBlockPos(), GetSizeOfCompactSize(block.vtx.size()));
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
     vPos.reserve(block.vtx.size());
@@ -2405,7 +2356,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
         nInputs += tx.vin.size();
         nSigOps += GetLegacySigOpCount(tx);
-        if (nSigOps > nMaxLegacySigops)
+        if (nSigOps > MAX_BLOCK_SIGOPS)
             return state.DoS(100, error("ConnectBlock(): too many sigops"),
                              REJECT_INVALID, "bad-blk-sigops");
 
@@ -2434,7 +2385,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 // this is to prevent a "rogue miner" from creating
                 // an incredibly-expensive-to-validate block.
                 nSigOps += GetP2SHSigOpCount(tx, view);
-                if (nSigOps > nMaxLegacySigops)
+                if (nSigOps > MAX_BLOCK_SIGOPS)
                     return state.DoS(100, error("ConnectBlock(): too many sigops"),
                                      REJECT_INVALID, "bad-blk-sigops");
             }
@@ -2443,7 +2394,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
             std::vector<CScriptCheck> vChecks;
             if (!CheckInputs(tx, state, view, fScriptChecks, flags, false,
-                             &costTracker, Opt().ScriptCheckThreads() ? &vChecks : NULL))
+                             Opt().ScriptCheckThreads() ? &vChecks : NULL))
                 return false;
             control.Add(vChecks);
         }
@@ -2469,7 +2420,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     if (!control.Wait())
         return state.DoS(100, false);
-
     int64_t nTime2 = GetTimeMicros(); nTimeVerify += nTime2 - nTimeStart;
     LogPrint("bench", "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs]\n", nInputs - 1, 0.001 * (nTime2 - nTimeStart), nInputs <= 1 ? 0 : 0.001 * (nTime2 - nTimeStart) / (nInputs-1), nTimeVerify * 0.000001);
 
@@ -2512,14 +2462,6 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     int64_t nTime4 = GetTimeMicros(); nTimeCallbacks += nTime4 - nTime3;
     LogPrint("bench", "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime4 - nTime3), nTimeCallbacks * 0.000001);
-
-    if (DidBlockTriggerSizeFork(block, pindex, chainparams)) {
-        uint32_t tAllowBigger = block.nTime + chainparams.GetConsensus().SizeForkGracePeriod();
-        LogPrintf("%s: Max block size fork activating at time %d, bigger blocks allowed at time %d\n",
-                  __func__, block.nTime, tAllowBigger);
-        pblocktree->ActivateForkBit(FORK_BIT_2MB, pindex->GetBlockHash());
-        sizeForkTime.store(tAllowBigger);
-    }
 
     return true;
 }
@@ -2684,8 +2626,7 @@ void static UpdateTip(CBlockIndex *pindexNew) {
         for (int i = 0; i < 100 && pindex != NULL; i++)
         {
             int32_t nExpectedVersion = ComputeBlockVersion(pindex->pprev, chainParams.GetConsensus());
-            int32_t nIgnoreForkVersion = pindex->nVersion & ~FORK_BIT_2MB;
-            if (nIgnoreForkVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION && (nIgnoreForkVersion & ~nExpectedVersion) != 0)
+            if (pindex->nVersion > VERSIONBITS_LAST_OLD_BLOCK_VERSION && (pindex->nVersion & ~nExpectedVersion) != 0)
                 ++nUpgraded;
             pindex = pindex->pprev;
         }
@@ -2742,12 +2683,6 @@ bool static DisconnectTip(CValidationState &state) {
     // block that were added back and cleans up the mempool state.
     mempool.UpdateTransactionsFromBlock(vHashUpdate);
 
-    // Re-org past the size fork, reset activation condition:
-    if (pblocktree->ForkBitActivated(FORK_BIT_2MB) == pindexDelete->GetBlockHash()) {
-        LogPrintf("%s: re-org past size fork\n", __func__);
-        pblocktree->ActivateForkBit(FORK_BIT_2MB, uint256());
-        sizeForkTime.store(std::numeric_limits<uint32_t>::max());
-    }
     // Update chainActive and related variables.
     UpdateTip(pindexDelete->pprev);
     // Let wallets know transactions went from 1-confirmed to
@@ -3309,16 +3244,14 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
                              REJECT_INVALID, "bad-txns-duplicate", true);
     }
 
-    // Size limits
-    unsigned int nSizeLimit = MaxBlockSize(block.nTime);
-
-    if (block.vtx.empty() || block.vtx.size() > nSizeLimit || ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION) > nSizeLimit)
-        return state.DoS(100, error("CheckBlock(): size limits failed"),
-                         REJECT_INVALID, "bad-blk-length");
-
     // All potential-corruption validation must be done before we do any
     // transaction validation, as otherwise we may mark the header as invalid
     // because we receive the wrong transactions for it.
+
+    // Size limits
+    if (block.vtx.empty() || block.vtx.size() > MAX_BLOCK_SIZE || ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
+        return state.DoS(100, error("CheckBlock(): size limits failed"),
+                         REJECT_INVALID, "bad-blk-length");
 
     // First transaction must be coinbase, the rest must not be
     if (block.vtx.empty() || !block.vtx[0].IsCoinBase())
@@ -3339,7 +3272,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     {
         nSigOps += GetLegacySigOpCount(tx);
     }
-    if (nSigOps > MaxLegacySigops(block.nTime))
+    if (nSigOps > MAX_BLOCK_SIGOPS)
         return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"),
                          REJECT_INVALID, "bad-blk-sigops", true);
 
@@ -3536,13 +3469,12 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
     return true;
 }
 
-static bool IsSuperMajority(int versionOrBitmask, const CBlockIndex* pstart, unsigned nRequired, const Consensus::Params& consensusParams, bool useBitMask)
+static bool IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned nRequired, const Consensus::Params& consensusParams)
 {
     unsigned int nFound = 0;
     for (int i = 0; i < consensusParams.nMajorityWindow && nFound < nRequired && pstart != NULL; i++)
     {
-        if ((useBitMask && ((pstart->nVersion & versionOrBitmask) == versionOrBitmask)) ||
-            (!useBitMask && (pstart->nVersion >= versionOrBitmask)))
+        if (pstart->nVersion >= minVersion)
             ++nFound;
         pstart = pstart->pprev;
     }
@@ -3781,15 +3713,6 @@ bool static LoadBlockIndexDB()
     const CChainParams& chainparams = Params();
     if (!pblocktree->LoadBlockIndexGuts())
         return false;
-
-    // If the max-block-size fork threshold was reached, update
-    // chainparams so big blocks are allowed:
-    uint256 sizeForkHash = pblocktree->ForkBitActivated(FORK_BIT_2MB);
-    if (sizeForkHash != uint256()) {
-        BlockMap::iterator it = mapBlockIndex.find(sizeForkHash);
-        assert(it != mapBlockIndex.end());
-        sizeForkTime.store(it->second->GetBlockTime() + chainparams.GetConsensus().SizeForkGracePeriod());
-    }
 
     boost::this_thread::interruption_point();
 
@@ -6168,42 +6091,12 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
      return strprintf("CBlockFileInfo(blocks=%u, size=%u, heights=%u...%u, time=%s...%s)", nBlocks, nSize, nHeightFirst, nHeightLast, DateTimeStrFormat("%Y-%m-%d", nTimeFirst), DateTimeStrFormat("%Y-%m-%d", nTimeLast));
  }
 
-/** Maximum size of a block */
-unsigned int MaxBlockSize(uint32_t nBlockTime)
-{
-    if (nBlockTime < sizeForkTime.load())
-        return OLD_MAX_BLOCK_SIZE;
-    return MAX_BLOCK_SIZE;
-}
-
-/** Maximum size of a block */
-unsigned int MaxBlockSigops(uint32_t nBlockTime)
-{
-    if (nBlockTime < sizeForkTime.load())
-        return std::numeric_limits<uint32_t>::max(); // Use old way of counting
-    return MAX_BLOCK_SIGOPS;
-}
-/** Maximum size of a block */
-unsigned int MaxBlockSighash(uint32_t nBlockTime)
-{
-    if (nBlockTime < sizeForkTime.load())
-        return std::numeric_limits<uint32_t>::max(); // no limit before
-    return MAX_BLOCK_SIGHASH;
-}
-
-/** Maximum legacy (miscounted) sigops in a block */
-uint32_t MaxLegacySigops(uint32_t nBlockTime)
-{
-    if (nBlockTime < sizeForkTime.load())
-        return MAX_BLOCK_SIGOPS;
-    return std::numeric_limits<uint32_t>::max(); // Use accurately-counted limit
-}
-
 ThresholdState VersionBitsTipState(const Consensus::Params& params, Consensus::DeploymentPos pos)
 {
     LOCK(cs_main);
     return VersionBitsState(chainActive.Tip(), params, pos, versionbitscache);
 }
+
 
 class CMainCleanup
 {

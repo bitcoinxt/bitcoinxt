@@ -10,9 +10,6 @@
 #include "serialize.h"
 #include "uint256.h"
 
-const uint32_t BIP_009_MASK = 0x20000000;
-const uint32_t FORK_BIT_2MB = 0x10000000;  // Vote for 2MB fork
-
 /** Nodes collect new transactions into a block, hash them into a hash tree,
  * and scan through nonce values to make the block's hash satisfy proof-of-work
  * requirements.  When they solve the proof-of-work, they broadcast the block
@@ -91,20 +88,6 @@ public:
     {
         SetNull();
         *((CBlockHeader*)this) = header;
-    }
-
-    static bool VersionKnown(int32_t nVersion, int32_t voteBits)
-    {
-        if (nVersion >= 1 && nVersion <= 4)
-            return true;
-        // BIP009 / versionbits:
-        if (nVersion & BIP_009_MASK)
-        {
-            uint32_t v = nVersion & ~BIP_009_MASK;
-            if ((v & ~voteBits) == 0)
-                return true;
-        }
-        return false;
     }
 
     ADD_SERIALIZE_METHODS;

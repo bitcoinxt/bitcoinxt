@@ -36,10 +36,8 @@
 #include <utility>
 #include <vector>
 
-#include <boost/atomic.hpp>
 #include <boost/unordered_map.hpp>
 
-class ValidationCostTracker;
 class CBlockIndex;
 class CBlockTreeDB;
 class CBloomFilter;
@@ -149,15 +147,15 @@ static const signed int MIN_BLOCKS_TO_KEEP = 288;
 static const signed int DEFAULT_CHECKBLOCKS = 6;
 static const unsigned int DEFAULT_CHECKLEVEL = 3;
 
-// Require that user allocate at least 950MB for block & undo files (blk???.dat and rev???.dat)
-// At 2MB per block, 288 blocks = 576MB.
-// Add 15% for Undo data = 662MB
-// Add 20% for Orphan block rate = 794MB
-// We want the low water mark after pruning to be at least 794 MB and since we prune in
+// Require that user allocate at least 550MB for block & undo files (blk???.dat and rev???.dat)
+// At 1MB per block, 288 blocks = 288MB.
+// Add 15% for Undo data = 331MB
+// Add 20% for Orphan block rate = 397MB
+// We want the low water mark after pruning to be at least 397 MB and since we prune in
 // full block file chunks, we need the high water mark which triggers the prune to be
-// one 128MB block file + added 15% undo data = 147MB greater for a total of 942MB
-// Setting the target to > than 950MB will make it likely we can respect the target.
-static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 950 * 1024 * 1024;
+// one 128MB block file + added 15% undo data = 147MB greater for a total of 545MB
+// Setting the target to > than 550MB will make it likely we can respect the target.
+static const uint64_t MIN_DISK_SPACE_FOR_BLOCK_FILES = 550 * 1024 * 1024;
 
 /** Register with a network node to receive its signals */
 void RegisterNodeSignals(CNodeSignals& nodeSignals);
@@ -338,8 +336,7 @@ unsigned int GetP2SHSigOpCount(const CTransaction& tx, const CCoinsViewCache& ma
  * instead of being performed inline.
  */
 bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsViewCache &view, bool fScriptChecks,
-                 unsigned int flags, bool cacheStore, ValidationCostTracker* costTracker,
-                 std::vector<CScriptCheck> *pvChecks = NULL);
+                 unsigned int flags, bool cacheStore, std::vector<CScriptCheck> *pvChecks = NULL);
 
 /** Apply the effects of this transaction on the UTXO set represented by view */
 void UpdateCoins(const CTransaction& tx, CValidationState &state, CCoinsViewCache &inputs, int nHeight);
@@ -366,44 +363,6 @@ bool IsFinalTx(const CTransaction &tx, int nBlockHeight, int64_t nBlockTime);
  * See consensus/consensus.h for flag definitions.
  */
 bool CheckFinalTx(const CTransaction &tx, int flags = -1);
-
-/**
- * Class that keeps track of number of signature operations
- * and bytes hashed to compute signature hashes.
- */
-class ValidationCostTracker
-{
-private:
-    mutable CCriticalSection cs;
-    uint32_t nSigops;
-    const uint32_t nMaxSigops;
-    uint32_t nSighashBytes;
-    const uint32_t nMaxSighashBytes;
-
-public:
-    ValidationCostTracker(uint32_t nMaxSigopsIn, uint32_t nMaxSighashBytesIn) :
-                                  nSigops(0), nMaxSigops(nMaxSigopsIn),
-                                  nSighashBytes(0), nMaxSighashBytes(nMaxSighashBytesIn) { }
-
-    bool IsWithinLimits() const {
-        LOCK(cs);
-        return (nSigops <= nMaxSigops && nSighashBytes <= nMaxSighashBytes);
-    }
-    bool Update(const uint256& txid, uint32_t nSigopsIn, uint32_t nSighashBytesIn) {
-        LOCK(cs);
-        nSigops += nSigopsIn;
-        nSighashBytes += nSighashBytesIn;
-        return (nSigops <= nMaxSigops && nSighashBytes <= nMaxSighashBytes);
-    }
-    uint32_t GetSigOps() const {
-        LOCK(cs);
-        return nSigops;
-    }
-    uint32_t GetSighashBytes() const {
-        LOCK(cs);
-        return nSighashBytes;
-    }
-};
 
 /** 
  * Test whether the LockPoints height and time are still valid on the current chain
@@ -436,7 +395,6 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp = NULL
 class CScriptCheck
 {
 private:
-    ValidationCostTracker* costTracker;
     CScript scriptPubKey;
     const CTransaction *ptxTo;
     unsigned int nIn;
@@ -445,15 +403,14 @@ private:
     ScriptError error;
 
 public:
-    CScriptCheck(): costTracker(NULL), ptxTo(0), nIn(0), nFlags(0), cacheStore(false), error(SCRIPT_ERR_UNKNOWN_ERROR) {}
-    CScriptCheck(ValidationCostTracker* costTrackerIn, const CCoins& txFromIn, const CTransaction& txToIn, unsigned int nInIn, unsigned int nFlagsIn, bool cacheIn) :
-        costTracker(costTrackerIn), scriptPubKey(txFromIn.vout[txToIn.vin[nInIn].prevout.n].scriptPubKey),
+    CScriptCheck(): ptxTo(0), nIn(0), nFlags(0), cacheStore(false), error(SCRIPT_ERR_UNKNOWN_ERROR) {}
+    CScriptCheck(const CCoins& txFromIn, const CTransaction& txToIn, unsigned int nInIn, unsigned int nFlagsIn, bool cacheIn) :
+        scriptPubKey(txFromIn.vout[txToIn.vin[nInIn].prevout.n].scriptPubKey),
         ptxTo(&txToIn), nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn), error(SCRIPT_ERR_UNKNOWN_ERROR) { }
 
     bool operator()();
 
     void swap(CScriptCheck &check) {
-        std::swap(costTracker, check.costTracker);
         scriptPubKey.swap(check.scriptPubKey);
         std::swap(ptxTo, check.ptxTo);
         std::swap(nIn, check.nIn);
@@ -579,18 +536,6 @@ extern CCoinsViewCache *pcoinsTip;
 
 /** Global variable that points to the active block tree (protected by cs_main) */
 extern CBlockTreeDB *pblocktree;
-
-/** Maximum size of a block */
-unsigned int MaxBlockSize(uint32_t nBlockTime);
-
-/** Max accurately-counted sigops in a block */
-uint32_t MaxBlockSigops(uint32_t nBlockTime);
-
-/** Max accurately-counted bytes hashed to compute signatures, per block */
-uint32_t MaxBlockSighash(uint32_t nBlockTime);
-
-/** Maximum number of legacy sigops in a block */
-uint32_t MaxLegacySigops(uint32_t nBlockTime);
 
 /**
  * Determine what nVersion a new block should use.

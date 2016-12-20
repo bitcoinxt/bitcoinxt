@@ -40,7 +40,6 @@ BITCOIN_TESTS =\
   test/base58_tests.cpp \
   test/base64_tests.cpp \
   test/bip32_tests.cpp \
-  test/block_size_tests.cpp \
   test/blockannounce_tests.cpp \
   test/blockheaderprocessor_tests.cpp \
   test/blocksender_tests.cpp \
