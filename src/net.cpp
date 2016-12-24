@@ -875,8 +875,8 @@ void CConnman::ThreadSocketHandler()
                 // * Hand off all complete messages to the processor, to be handled without
                 //   blocking here.
                 {
-                    TRY_LOCK(pnode->cs_vSend, lockSend);
-                    if (lockSend && !pnode->vSendMsg.empty()) {
+                    LOCK(pnode->cs_vSend);
+                    if (!pnode->vSendMsg.empty()) {
                         FD_SET(pnode->hSocket, &fdsetSend);
                         continue;
                     }
@@ -1019,8 +1019,8 @@ void CConnman::ThreadSocketHandler()
             //
             if (sendSet)
             {
-                TRY_LOCK(pnode->cs_vSend, lockSend);
-                if (lockSend && sendShaper.try_consume(0))
+                LOCK(pnode->cs_vSend);
+                if (sendShaper.try_consume(0))
                 {
                     progress++;
                     size_t nBytes = SocketSendData(pnode);
@@ -1566,7 +1566,7 @@ void CConnman::ThreadMessageHandler()
 
             // Send messages
             {
-                TRY_LOCK(pnode->cs_vSend, lockSend);
+                TRY_LOCK(pnode->cs_sendProcessing, lockSend);
                 if (lockSend)
                     GetNodeSignals().SendMessages(pnode, this, flagInterruptMsgProc);
             }
