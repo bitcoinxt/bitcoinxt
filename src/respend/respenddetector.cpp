@@ -25,7 +25,7 @@ std::vector<RespendActionPtr> CreateDefaultActions(CConnman* connman) {
     if (connman && !Opt().IsStealthMode()) {
         actions.push_back(RespendActionPtr(new RespendRelayer{connman}));
     }
-    if (LogAcceptCategory("respend")) {
+    if (LogAcceptCategory(Log::RESPEND)) {
         actions.push_back(RespendActionPtr(new RespendLogger{}));
     }
 #ifdef ENABLE_WALLET
@@ -55,7 +55,7 @@ RespendDetector::~RespendDetector() {
             a->Trigger();
         }
         catch (const std::exception& e) {
-            LogPrint("respend: ERROR - respend action threw: %s\n", e.what());
+            LogPrintf("respend: ERROR - respend action threw: %s\n", e.what());
         }
    }
 }

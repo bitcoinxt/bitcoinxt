@@ -48,7 +48,7 @@ CBlockIndex* DefaultHeaderProcessor::operator()(const std::vector<CBlockHeader>&
         // Headers message had its maximum size; the peer may have more headers.
         // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
         // from there instead.
-        LogPrint("net", "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
+        LogPrint(Log::NET, "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
         pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256());
     }
 
@@ -149,7 +149,7 @@ void DefaultHeaderProcessor::suggestDownload(const std::vector<CBlockIndex*>& to
     }
 
     if (!toGet.empty()) {
-        LogPrint("net", "Downloading blocks toward %s (%d) via headers direct fetch\n",
+        LogPrint(Log::NET, "Downloading blocks toward %s (%d) via headers direct fetch\n",
                 last->GetBlockHash().ToString(), last->nHeight);
         pfrom->PushMessage("getdata", toGet);
     }
@@ -169,7 +169,7 @@ bool DefaultHeaderProcessor::requestConnectHeaders(const CBlockHeader& h,
 
     UpdateBlockAvailability(from.id, h.GetHash());
 
-    LogPrint("net", "Headers for %s do not connect. We don't have pprev %s peer=%d\n",
+    LogPrint(Log::NET, "Headers for %s do not connect. We don't have pprev %s peer=%d\n",
             h.GetHash().ToString(), h.hashPrevBlock.ToString(), from.id);
 
 

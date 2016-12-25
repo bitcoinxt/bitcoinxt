@@ -25,7 +25,7 @@ class CompactAnn : public BlockAnnHandle {
     public:
         CompactAnn(CNode& n) : node(&n) {
 
-            LogPrint("ann", "requesting compact block announcements "
+            LogPrint(Log::ANN, "requesting compact block announcements "
                     "peer=%d\n", nodeID());
 
             enableCompactBlocks(*node, true);
@@ -42,7 +42,7 @@ class CompactAnn : public BlockAnnHandle {
             if (!node)
                 return;
 
-            LogPrint("ann", "un-requesting compact block announcements "
+            LogPrint(Log::ANN, "un-requesting compact block announcements "
                     "peer=%d\n", nodeID());
 
             enableCompactBlocks(*node, false);

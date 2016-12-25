@@ -21,7 +21,7 @@ void CompactTxFinder::initMapping(uint64_t idk0, uint64_t idk1) {
 
         if (mappedMempool.count(shortID)) {
 
-            LogPrint("thin", "ShortID hash collision in mempool");
+            LogPrint(Log::BLOCK, "ShortID hash collision in mempool");
 
             // Erase, so the tx re-fetched from peer instead.
             mappedMempool.erase(shortID);

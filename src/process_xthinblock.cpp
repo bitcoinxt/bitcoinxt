@@ -26,7 +26,7 @@ void XThinBlockProcessor::operator()(
         block.selfValidate(currMaxBlockSize);
     }
     catch (const std::invalid_argument& e) {
-        LogPrint("thin", "Invalid xthin block %s\n", e.what());
+        LogPrint(Log::BLOCK, "Invalid xthin block %s\n", e.what());
         rejectBlock(hash, e.what(), 20);
         return;
     }

@@ -77,7 +77,7 @@ inline TxHashProvider::~TxHashProvider() { }
 
 struct XThinStub : public StubData {
     XThinStub(const XThinBlock& b) : xblock(b) {
-        LogPrint("thin", "Created xthin stub for %s, %d transactions.\n",
+        LogPrint(Log::BLOCK, "Created xthin stub for %s, %d transactions.\n",
                 header().GetHash().ToString(), allTransactions().size());
     }
 

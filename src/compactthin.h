@@ -26,7 +26,7 @@ class CompactWorker : public ThinBlockWorker {
 
 struct CompactStub : public StubData {
     CompactStub(const CompactBlock& b) : block(b) {
-        LogPrint("thin", "Created compact stub for %s, %d transactions.\n",
+        LogPrint(Log::BLOCK, "Created compact stub for %s, %d transactions.\n",
                 header().GetHash().ToString(), allTransactions().size());
 
     }
