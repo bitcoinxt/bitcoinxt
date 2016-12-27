@@ -159,6 +159,8 @@ void Interrupt()
     InterruptHTTPRPC();
     InterruptRPC();
     InterruptREST();
+    if (g_connman)
+        g_connman->Interrupt();
     threadGroup.interrupt_all();
 }
 
@@ -1616,7 +1618,7 @@ bool AppInit2()
     connOptions.nSendBufferMaxSize = 1000*GetArg("-maxsendbuffer", DEFAULT_MAXSENDBUFFER);
     connOptions.nReceiveFloodSize = 1000*GetArg("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER);
 
-    if (!connman.Start(threadGroup, scheduler, strNodeError, connOptions))
+    if (!connman.Start(scheduler, strNodeError, connOptions))
         return InitError(strNodeError);
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected
