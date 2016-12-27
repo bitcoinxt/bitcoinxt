@@ -167,6 +167,7 @@ BITCOIN_CORE_H = \
   thinblockconcluder.h \
   thinblockmanager.h \
   threadsafety.h \
+  threadinterrupt.h \
   timedata.h \
   torips.h \
   txdb.h \
@@ -370,6 +371,7 @@ libbitcoin_util_a_SOURCES = \
   rpc/protocol.cpp \
   support/cleanse.cpp \
   sync.cpp \
+  threadinterrupt.cpp \
   uint256.cpp \
   util.cpp \
   utilmoneystr.cpp \
