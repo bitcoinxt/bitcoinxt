@@ -4215,7 +4215,7 @@ static void RelayAddress(const CAddress& addr, bool fReachable, CConnman* connma
     connman->ForEachNodeThen(std::move(sortfunc), std::move(pushfunc));
 }
 
-void static ProcessGetData(CNode* pfrom, CConnman* connman)
+void static ProcessGetData(CNode* pfrom, CConnman* connman, std::atomic<bool>& interruptMsgProc)
 {
     if (!connman)
         throw std::invalid_argument(std::string(__func__ )+ " requires connection manager");
@@ -4234,7 +4234,8 @@ void static ProcessGetData(CNode* pfrom, CConnman* connman)
 
         const CInv &inv = *it;
         {
-            boost::this_thread::interruption_point();
+            if (interruptMsgProc)
+                return;
             it++;
 
             BlockSender blockSender;
@@ -4465,7 +4466,7 @@ void unexpectedThinError(const std::string& cmd, CNode& from, const std::string&
 }
 
 bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
-                    int64_t nTimeReceived, CConnman* connman)
+                    int64_t nTimeReceived, CConnman* connman, std::atomic<bool>& interruptMsgProc)
 {
     if (!connman)
         throw std::invalid_argument(std::string(__func__ )+ " requires connection manager");
@@ -4678,7 +4679,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         int64_t nSince = nNow - 10 * 60;
         BOOST_FOREACH(CAddress& addr, vAddr)
         {
-            boost::this_thread::interruption_point();
+            if (interruptMsgProc)
+                return true;
 
             if (addr.nTime <= 100000000 || addr.nTime > nNow + 10 * 60)
                 addr.nTime = nNow - 5 * 24 * 60 * 60;
@@ -4742,7 +4744,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         {
             const CInv &inv = vInv[nInv];
 
-            boost::this_thread::interruption_point();
+            if (interruptMsgProc)
+                return true;
             // Ignore duplicate advertisements for the same item from the same peer. This check
             // prevents a peer from constantly promising to deliver an item that it never does,
             // thus blinding us to new transactions and blocks.
@@ -4831,7 +4834,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             LogPrint(Log::NET, "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
 
         pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
-        ProcessGetData(pfrom, connman);
+        ProcessGetData(pfrom, connman, interruptMsgProc);
     }
 
 
@@ -5196,7 +5199,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
 
             pfrom->vRecvGetData.push_back(inv);
-            ProcessGetData(pfrom, connman);
+            ProcessGetData(pfrom, connman, interruptMsgProc);
         }
 
     }
@@ -5486,7 +5489,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 }
 
 // requires LOCK(cs_vRecvMsg)
-bool ProcessMessages(CNode* pfrom, CConnman* connman)
+bool ProcessMessages(CNode* pfrom, CConnman* connman, std::atomic<bool>& interruptMsgProc)
 {
     unsigned int nMaxSendBufferSize = connman->GetSendBufferSize();
     //if (fDebug)
@@ -5503,7 +5506,7 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman)
     bool fOk = true;
 
     if (!pfrom->vRecvGetData.empty())
-        ProcessGetData(pfrom, connman);
+        ProcessGetData(pfrom, connman, interruptMsgProc);
 
     // this maintains the order of responses
     if (!pfrom->vRecvGetData.empty()) return fOk;
@@ -5564,8 +5567,9 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman)
         bool fRet = false;
         try
         {
-            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime, connman);
-            boost::this_thread::interruption_point();
+            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime, connman, interruptMsgProc);
+            if (interruptMsgProc)
+                return true;
         }
         catch (const std::ios_base::failure& e)
         {
@@ -5633,7 +5637,7 @@ bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
 }
 
 
-bool SendMessages(CNode* pto, CConnman* connman)
+bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsgProc)
 {
     const Consensus::Params& consensusParams = Params().GetConsensus();
     {

@@ -39,7 +39,8 @@ BOOST_AUTO_TEST_CASE(MaxSizeVersionMessage)
     s << n.fRelayTxes;
     BOOST_CHECK_EQUAL(size_t(352), s.size());
     DummyConnman dummy;
-    BOOST_CHECK(ProcessMessage(&n, "version", s, 0, &dummy));
+    std::atomic<bool> interruptDummy(false);
+    BOOST_CHECK(ProcessMessage(&n, "version", s, 0, &dummy, interruptDummy));
 }
 
 BOOST_AUTO_TEST_CASE(OverMaxSizeVersionMessage)
@@ -59,7 +60,8 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeVersionMessage)
     s << n.fRelayTxes;
     BOOST_CHECK_EQUAL(size_t(353), s.size());
     DummyConnman dummy;
-    BOOST_CHECK_THROW(ProcessMessage(&n, "version", s, 0, &dummy), std::ios_base::failure);
+    std::atomic<bool> interruptDummy(false);
+    BOOST_CHECK_THROW(ProcessMessage(&n, "version", s, 0, &dummy, interruptDummy), std::ios_base::failure);
 }
 
 BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
@@ -74,7 +76,8 @@ BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
     auto temp = logCategories.load();
     logCategories |= Log::NET;
     CConnman dummy;
-    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, &dummy));
+    std::atomic<bool> interruptDummy(false);
+    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, &dummy, interruptDummy));
     logCategories.store(temp);
 }
 
@@ -91,7 +94,8 @@ BOOST_AUTO_TEST_CASE(MaxSizeValidRejectMessage)
     auto temp = logCategories.load();
     logCategories |= Log::NET;
     CConnman dummy;
-    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, &dummy));
+    std::atomic<bool> interruptDummy(false);
+    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, &dummy, interruptDummy));
     logCategories.store(temp);
 }
 
@@ -107,7 +111,8 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeWeirdRejectMessage)
     auto temp = logCategories.load();
     logCategories |= Log::NET;
     CConnman dummy;
-    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, &dummy)); // check this way since the reject message processing swallows the exception
+    std::atomic<bool> interruptDummy(false);
+    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, &dummy, interruptDummy)); // check this way since the reject message processing swallows the exception
     logCategories.store(temp);
 }
 
@@ -124,7 +129,8 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeValidRejectMessage)
     auto temp = logCategories.load();
     logCategories |= Log::NET;
     CConnman dummy;
-    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, &dummy)); // check this way since the reject message processing swallows the exception
+    std::atomic<bool> interruptDummy(false);
+    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, &dummy, interruptDummy)); // check this way since the reject message processing swallows the exception
     logCategories.store(temp);
 }
 

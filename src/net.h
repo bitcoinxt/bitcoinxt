@@ -378,8 +378,8 @@ struct CNodeSignals
     // received. Note that the message may not be completely read (so this can be
     // used to prevent DoS attacks using over-size messages).
     boost::signals2::signal<bool (CNode*, const CNetMessage&), CombinerAll> SanityCheckMessages;
-    boost::signals2::signal<bool (CNode*, CConnman*), CombinerAll> ProcessMessages;
-    boost::signals2::signal<bool (CNode*, CConnman*), CombinerAll> SendMessages;
+    boost::signals2::signal<bool (CNode*, CConnman*, std::atomic<bool>&), CombinerAll> ProcessMessages;
+    boost::signals2::signal<bool (CNode*, CConnman*, std::atomic<bool>&), CombinerAll> SendMessages;
     boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
     boost::signals2::signal<void (NodeId, bool&)> FinalizeNode;
     boost::signals2::signal<uint64_t ()> GetMaxBlockSizeInsecure;
