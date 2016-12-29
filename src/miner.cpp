@@ -23,7 +23,7 @@
 
 #include <boost/thread.hpp>
 #include <boost/tuple/tuple.hpp>
-#include <queue>
+#include <stack>
 
 using namespace std;
 
@@ -40,17 +40,6 @@ using namespace std;
 
 uint64_t nLastBlockTx = 0;
 uint64_t nLastBlockSize = 0;
-
-class ScoreCompare
-{
-public:
-    ScoreCompare() {}
-
-    bool operator()(const CTxMemPool::txiter a, const CTxMemPool::txiter b)
-    {
-        return CompareTxMemPoolEntryByAncestorFee()(*b,*a); // Convert to less than
-    }
-};
 
 void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev)
 {
@@ -92,11 +81,9 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
 
     // Collect memory pool transactions into the block
     CTxMemPool::setEntries inBlock;
-    CTxMemPool::setEntries waitSet;
+    CTxMemPool::setEntries gotParents;
+    std::stack<CTxMemPool::txiter, std::vector<CTxMemPool::txiter>> clearedTxs;
 
-    std::map<CTxMemPool::txiter, double, CTxMemPool::CompareIteratorByHash> waitPriMap;
-
-    std::priority_queue<CTxMemPool::txiter, std::vector<CTxMemPool::txiter>, ScoreCompare> clearedTxs;
     uint64_t nBlockSize = 1000;
     uint64_t nBlockTx = 0;
     unsigned int nBlockSigOps = 100;
@@ -130,23 +117,46 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
                 iter = mempool.mapTx.project<0>(mi);
                 mi++;
             }
-            else {  // try to add a previously postponed child tx
+            else {  // try to add a previously cleared tx
                 iter = clearedTxs.top();
                 clearedTxs.pop();
             }
 
+            if (inBlock.count(iter)) {
+                continue;
+            }
+
             const CTransaction& tx = iter->GetTx();
 
-            bool fOrphan = false;
+            // To allow a free tx to be mined with fSkipFree set, use fee delta to push fees up to minimum
+            double dummy;
+            CAmount nFeeDelta = 0;
+            mempool.ApplyDeltas(tx.GetHash(), dummy, nFeeDelta);
+            if (fSkipFree && iter->GetFee() + nFeeDelta < ::minRelayTxFee.GetFee(iter->GetTxSize())) {
+                continue;
+            }
+
+            // Our index guarantees that all ancestors are paid for.
+            // If it has parents, push this tx, then its parents, onto the stack.
+            // The second time we process a tx, just make sure all parents are in the block
+            bool fAllParentsInBlock = true;
+            bool fPushedAParent = false;
+            bool fFirstTime = !gotParents.count(iter);
+            gotParents.insert(iter);
             BOOST_FOREACH(CTxMemPool::txiter parent, mempool.GetMemPoolParents(iter))
             {
                 if (!inBlock.count(parent)) {
-                    fOrphan = true;
-                    break;
+                    fAllParentsInBlock = false;
+                    if (fFirstTime) {
+                        if (!fPushedAParent) {
+                            clearedTxs.push(iter);
+                            fPushedAParent = true;
+                        }
+                        clearedTxs.push(parent);
+                    }
                 }
             }
-            if (fOrphan) {
-                waitSet.insert(iter);
+            if (fPushedAParent || !fAllParentsInBlock) {
                 continue;
             }
 
@@ -185,16 +195,8 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             nFees += nTxFees;
 
             inBlock.insert(iter);
-
-            // Add transactions that depend on this one to the priority queue
-            BOOST_FOREACH(CTxMemPool::txiter child, mempool.GetMemPoolChildren(iter))
-            {
-                if (waitSet.count(child)) {
-                    clearedTxs.push(child);
-                    waitSet.erase(child);
-                }
-            }
         }
+
         nLastBlockTx = nBlockTx;
         nLastBlockSize = nBlockSize;
         LogPrintf("CreateNewBlock(): total size %u txs: %u fees: %ld sigops %d\n", nBlockSize, nBlockTx, nFees, nBlockSigOps);
