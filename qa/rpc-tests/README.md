@@ -19,9 +19,13 @@ Bash-based tests, to be ported to Python:
 Notes
 =====
 
-You can run a single test by calling `qa/pull-tester/rpc-tests.sh <testname>`.
+You can run any single test by calling qa/pull-tester/rpc-tests.py <testname>
 
-Run all possible tests with `qa/pull-tester/rpc-tests.sh -extended`.
+Or you can run any combination of tests by calling `qa/pull-tester/rpc-tests.py <testname1> <testname2> <testname3> ...`
+
+Run the regression test suite with `qa/pull-tester/rpc-tests.py'
+
+Run all possible tests with `qa/pull-tester/rpc-tests.py -extended`
 
 Possible options:
 
@@ -35,7 +39,7 @@ Possible options:
   --tracerpc       Print out all RPC calls as they are made
 ```
 
-If you set the environment variable `PYTHON_DEBUG=1` you will get some debug output (example: `PYTHON_DEBUG=1 qa/pull-tester/rpc-tests.sh wallet`). 
+If you set the environment variable `PYTHON_DEBUG=1` you will get some debug output (example: `PYTHON_DEBUG=1 qa/pull-tester/rpc-tests.py wallet`). 
 
 A 200-block -regtest blockchain and wallets for four nodes
 is created the first time a regression test is run and
