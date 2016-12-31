@@ -51,7 +51,7 @@ BOOST_AUTO_TEST_CASE(FullMessages)
         bool complete;
         BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
         BOOST_CHECK_EQUAL(testNode.vRecvMsg.size(),1UL);
-        CNetMessage& msg = testNode.vRecvMsg[0];
+        CNetMessage& msg = testNode.vRecvMsg.front();
         BOOST_CHECK(msg.complete());
         BOOST_CHECK_EQUAL(msg.hdr.GetCommand(), "ping");
         uint64_t nonce;
@@ -69,7 +69,7 @@ BOOST_AUTO_TEST_CASE(FullMessages)
             BOOST_CHECK(testNode.ReceiveMsgBytes(&s[i], 1, complete));
         }
         BOOST_CHECK_EQUAL(testNode.vRecvMsg.size(),1UL);
-        CNetMessage& msg = testNode.vRecvMsg[0];
+        CNetMessage& msg = testNode.vRecvMsg.front();
         BOOST_CHECK(msg.complete());
         BOOST_CHECK_EQUAL(msg.hdr.GetCommand(), "ping");
         uint64_t nonce;
