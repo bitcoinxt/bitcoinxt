@@ -5585,6 +5585,8 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman, std::atomic<bool>& interru
                 return false;
             // Just take one message
             msgs.splice(msgs.begin(), pfrom->vProcessMsg, pfrom->vProcessMsg.begin());
+            pfrom->nProcessQueueSize -= msgs.front().vRecv.size() + CMessageHeader::HEADER_SIZE;
+            pfrom->fPauseRecv = pfrom->nProcessQueueSize > connman->GetReceiveFloodSize();
         }
         CNetMessage& msg(msgs.front());
 

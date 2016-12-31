@@ -545,6 +545,7 @@ public:
 
     CCriticalSection cs_vProcessMsg;
     std::list<CNetMessage> vProcessMsg;
+    size_t nProcessQueueSize;
 
     std::deque<CInv> vRecvGetData;
     std::list<CNetMessage> vRecvMsg;
@@ -584,6 +585,8 @@ public:
     std::unique_ptr<CBloomFilter> xthinFilter;
     int nRefCount;
     const NodeId id;
+
+    std::atomic_bool fPauseRecv;
 
 public:
     uint256 hashContinue;
@@ -649,15 +652,6 @@ public:
     {
         assert(nRefCount >= 0);
         return nRefCount;
-    }
-
-    // requires LOCK(cs_vRecvMsg)
-    unsigned int GetTotalRecvSize()
-    {
-        unsigned int total = 0;
-        BOOST_FOREACH(const CNetMessage &msg, vRecvMsg)
-            total += msg.vRecv.size() + 24;
-        return total;
     }
 
     // requires LOCK(cs_vRecvMsg)
