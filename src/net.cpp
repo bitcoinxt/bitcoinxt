@@ -1068,6 +1068,10 @@ void CConnman::ThreadSocketHandler()
 
 void CConnman::WakeMessageHandler()
 {
+    {
+        std::lock_guard<std::mutex> lock(mutexMsgProc);
+        fMsgProcWake = true;
+    }
     condMsgProc.notify_one();
 }
 
@@ -1544,7 +1548,7 @@ void CConnman::ThreadMessageHandler()
             }
         }
 
-        bool fSleep = true;
+        bool fMoreWork = false;
 
         BOOST_FOREACH(CNode* pnode, vNodesCopy)
         {
@@ -1556,16 +1560,8 @@ void CConnman::ThreadMessageHandler()
                 TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
                 if (lockRecv)
                 {
-                    if (!GetNodeSignals().ProcessMessages(pnode, this, flagInterruptMsgProc))
-                        pnode->CloseSocketDisconnect();
-
-                    if (pnode->nSendSize < GetSendBufferSize())
-                    {
-                        if (!pnode->vRecvGetData.empty() || (!pnode->vRecvMsg.empty() && pnode->vRecvMsg.front().complete()))
-                        {
-                            fSleep = false;
-                        }
-                    }
+                    bool fMoreNodeWork = GetNodeSignals().ProcessMessages(pnode, this, flagInterruptMsgProc);
+                    fMoreWork |= (fMoreNodeWork && pnode->nSendSize < GetSendBufferSize());
                 }
             }
             if (flagInterruptMsgProc)
@@ -1587,10 +1583,11 @@ void CConnman::ThreadMessageHandler()
                 pnode->Release();
         }
 
-        if (fSleep) {
-            std::unique_lock<std::mutex> lock(mutexMsgProc);
-            condMsgProc.wait_until(lock, std::chrono::steady_clock::now() + std::chrono::milliseconds(100));
+        std::unique_lock<std::mutex> lock(mutexMsgProc);
+        if (!fMoreWork) {
+            condMsgProc.wait_until(lock, std::chrono::steady_clock::now() + std::chrono::milliseconds(100), [this] { return fMsgProcWake; });
         }
+        fMsgProcWake = false;
     }
 }
 
@@ -1808,6 +1805,11 @@ bool CConnman::Start(CScheduler& scheduler, std::string& strNodeError, Options c
     InterruptSocks5(false);
     interruptNet.reset();
     flagInterruptMsgProc = false;
+
+    {
+        std::unique_lock<std::mutex> lock(mutexMsgProc);
+        fMsgProcWake = false;
+    }
 
     // Send and receive from sockets, accept connections
     threadSocketHandler = std::thread(&TraceThread<std::function<void()> >, "net", std::function<void()>(std::bind(&CConnman::ThreadSocketHandler, this)));
