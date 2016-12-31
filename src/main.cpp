@@ -5594,6 +5594,7 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman, std::atomic<bool>& interru
         // at this point, any failure means we can delete the current message
         it++;
 
+        msg.SetVersion(pfrom->GetRecvVersion());
         // Scan for message start
         if (memcmp(msg.hdr.pchMessageStart, Params().NetworkMagic(), MESSAGE_START_SIZE) != 0) {
             LogPrintf("PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%d\n", SanitizeString(msg.hdr.GetCommand()), pfrom->id);
