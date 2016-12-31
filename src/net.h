@@ -278,6 +278,7 @@ public:
     /** Get a unique deterministic randomizer. */
     CSipHasher GetDeterministicRandomizer(uint64_t id);
 
+    unsigned int GetReceiveFloodSize() const;
 private:
     struct ListenSocket {
         SOCKET socket;
@@ -308,8 +309,6 @@ private:
     NodeId GetNewNodeId();
 
     void DumpAddresses();
-
-    unsigned int GetReceiveFloodSize() const;
 
     // Network stats
     void RecordBytesRecv(uint64_t bytes);
