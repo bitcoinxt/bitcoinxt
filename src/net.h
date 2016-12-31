@@ -310,6 +310,7 @@ private:
 
     NodeId GetNewNodeId();
 
+    size_t SocketSendData(CNode *pnode);
     void DumpAddresses();
 
     // Network stats
@@ -380,7 +381,6 @@ void InitNetworkShapers();
 void MapPort(bool fUseUPnP);
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
-size_t SocketSendData(CNode *pnode);
 
 
 struct CombinerAll
@@ -587,6 +587,7 @@ public:
     const NodeId id;
 
     std::atomic_bool fPauseRecv;
+    std::atomic_bool fPauseSend;
 
 public:
     uint256 hashContinue;

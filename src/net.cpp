@@ -607,7 +607,7 @@ const uint256& CNetMessage::GetMessageHash() const
 
 
 // requires LOCK(cs_vSend)
-size_t SocketSendData(CNode *pnode)
+size_t CConnman::SocketSendData(CNode *pnode)
 {
     auto it = pnode->vSendMsg.begin();
     size_t nSentSize = 0;
@@ -639,6 +639,7 @@ size_t SocketSendData(CNode *pnode)
             if (pnode->nSendOffset == data.size()) {
                 pnode->nSendOffset = 0;
                 pnode->nSendSize -= data.size();
+                pnode->fPauseSend = pnode->nSendSize > nSendBufferMaxSize;
                 it++;
             } else {
                 // could not send full message; stop sending more
@@ -1035,7 +1036,9 @@ void CConnman::ThreadSocketHandler()
                 {
                     progress++;
                     size_t nBytes = SocketSendData(pnode);
-		    RecordBytesSent(nBytes);
+                    if (nBytes) {
+                        RecordBytesSent(nBytes);
+                    }
                 }
             }
 
@@ -1573,7 +1576,7 @@ void CConnman::ThreadMessageHandler()
                 if (lockRecv)
                 {
                     bool fMoreNodeWork = GetNodeSignals().ProcessMessages(pnode, this, flagInterruptMsgProc);
-                    fMoreWork |= (fMoreNodeWork && pnode->nSendSize < GetSendBufferSize());
+                    fMoreWork |= (fMoreNodeWork && !pnode->fPauseSend);
                 }
             }
             if (flagInterruptMsgProc)
@@ -2159,6 +2162,7 @@ CNode::CNode(NodeId idIn, uint64_t nLocalServicesIn, int nMyStartingHeightIn, SO
     CIPGroupData ipgroup = ipgroupSlot->Group();
     std::string strIpGroup = tfm::format("(group %s)", ipgroup.name);
     fPauseRecv = false;
+    fPauseSend = false;
     nProcessQueueSize = 0;
 
     if (fLogIPs)
@@ -2231,6 +2235,8 @@ void CConnman::PushMessage(CNode* pnode, CSerializedNetMsg&& msg)
 
         pnode->nSendSize += nTotalSize;
 
+        if (pnode->nSendSize > nSendBufferMaxSize)
+            pnode->fPauseSend = true;
         pnode->vSendMsg.push_back(std::move(serializedHeader));
         if (nMessageSize)
             pnode->vSendMsg.push_back(std::move(msg.data));

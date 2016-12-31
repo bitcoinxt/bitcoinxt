@@ -4327,14 +4327,13 @@ void static ProcessGetData(CNode* pfrom, CConnman* connman, std::atomic<bool>& i
         throw std::invalid_argument(std::string(__func__ )+ " requires connection manager");
 
     std::deque<CInv>::iterator it = pfrom->vRecvGetData.begin();
-    unsigned int nMaxSendBufferSize = connman->GetSendBufferSize();
     vector<CInv> vNotFound;
     CNetMsgMaker msgMaker(pfrom->GetSendVersion());
     LOCK(cs_main);
 
     while (it != pfrom->vRecvGetData.end()) {
         // Don't bother if send buffer is too full to respond anyway
-        if (pfrom->nSendSize >= nMaxSendBufferSize)
+        if (pfrom->fPauseSend)
             break;
 
         const CInv &inv = *it;
@@ -5553,8 +5552,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 // requires LOCK(cs_vRecvMsg)
 bool ProcessMessages(CNode* pfrom, CConnman* connman, std::atomic<bool>& interruptMsgProc)
 {
-    unsigned int nMaxSendBufferSize = connman->GetSendBufferSize();
-
     //
     // Message format
     //  (4) message start
@@ -5575,7 +5572,7 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman, std::atomic<bool>& interru
     if (!pfrom->vRecvGetData.empty()) return true;
 
         // Don't bother if send buffer is too full to respond anyway
-        if (pfrom->nSendSize >= nMaxSendBufferSize)
+        if (pfrom->fPauseSend)
             return false;
 
         std::list<CNetMessage> msgs;
