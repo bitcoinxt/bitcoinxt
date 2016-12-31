@@ -5549,7 +5549,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
     return true;
 }
 
-// requires LOCK(cs_vRecvMsg)
 bool ProcessMessages(CNode* pfrom, CConnman* connman, std::atomic<bool>& interruptMsgProc)
 {
     //

@@ -501,7 +501,6 @@ void CNode::copyStats(CNodeStats &stats)
 }
 #undef X
 
-// requires LOCK(cs_vRecvMsg)
 bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete)
 {
     complete = false;
@@ -808,13 +807,9 @@ void CConnman::ThreadSocketHandler()
                         TRY_LOCK(pnode->cs_vSend, lockSend);
                         if (lockSend)
                         {
-                            TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                            if (lockRecv)
-                            {
                                 TRY_LOCK(pnode->cs_inventory, lockInv);
                                 if (lockInv)
                                     fDelete = true;
-                            }
                         }
                     }
                     if (fDelete)
@@ -875,15 +870,10 @@ void CConnman::ThreadSocketHandler()
                 //   write buffer in this case before receiving more. This avoids
                 //   needlessly queueing received data, if the remote peer is not themselves
                 //   receiving data. This means properly utilizing TCP flow control signalling.
-                // * Otherwise, if there is no (complete) message in the receive buffer,
-                //   or there is space left in the buffer, select() for receiving data.
-                // * (if neither of the above applies, there is certainly one message
-                //   in the receiver buffer ready to be processed).
-                // Together, that means that at least one of the following is always possible,
-                // so we don't deadlock:
-                // * We send some data.
-                // * We wait for data to be received (and disconnect after timeout).
-                // * We process a message in the buffer (message handler thread).
+                // * Otherwise, if there is space left in the receive buffer, select() for
+                //   receiving data.
+                // * Hand off all complete messages to the processor, to be handled without
+                //   blocking here.
                 {
                     TRY_LOCK(pnode->cs_vSend, lockSend);
                     if (lockSend && !pnode->vSendMsg.empty()) {
@@ -892,8 +882,7 @@ void CConnman::ThreadSocketHandler()
                     }
                 }
                 {
-                    TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                    if (lockRecv && !pnode->fPauseRecv)
+                    if (!pnode->fPauseRecv)
                         FD_SET(pnode->hSocket, &fdsetRecv);
                 }
             }
@@ -961,9 +950,8 @@ void CConnman::ThreadSocketHandler()
             }
             if (recvSet || errorSet)
             {
-                TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
                 const int amt2Recv = receiveShaper.available(RECV_SHAPER_MIN_FRAG);
-                if (lockRecv && amt2Recv > 0)
+                if (amt2Recv > 0)
                 {
                     {
                         progress++;
@@ -1571,14 +1559,8 @@ void CConnman::ThreadMessageHandler()
                 continue;
 
             // Receive messages
-            {
-                TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
-                if (lockRecv)
-                {
-                    bool fMoreNodeWork = GetNodeSignals().ProcessMessages(pnode, this, flagInterruptMsgProc);
-                    fMoreWork |= (fMoreNodeWork && !pnode->fPauseSend);
-                }
-            }
+            bool fMoreNodeWork = GetNodeSignals().ProcessMessages(pnode, this, flagInterruptMsgProc);
+            fMoreWork |= (fMoreNodeWork && !pnode->fPauseSend);
             if (flagInterruptMsgProc)
                 return;
 

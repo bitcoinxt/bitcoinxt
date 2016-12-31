@@ -548,8 +548,6 @@ public:
     size_t nProcessQueueSize;
 
     std::deque<CInv> vRecvGetData;
-    std::list<CNetMessage> vRecvMsg;
-    CCriticalSection cs_vRecvMsg;
     uint64_t nRecvBytes;
     std::atomic<int> nRecvVersion;
 
@@ -635,6 +633,8 @@ private:
     const uint64_t nLocalServices;
     const int nMyStartingHeight;
     int nSendVersion;
+public: // for unittest only! consider this private
+    std::list<CNetMessage> vRecvMsg;  // Used only by SocketHandler thread
 public:
 
     NodeId GetId() const {
@@ -655,7 +655,6 @@ public:
         return nRefCount;
     }
 
-    // requires LOCK(cs_vRecvMsg)
     bool ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete);
 
     void SetRecvVersion(int nVersionIn)

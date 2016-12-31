@@ -44,8 +44,6 @@ BOOST_AUTO_TEST_CASE(FullMessages)
     s << (uint64_t)11; // ping nonce
     EndMessage(s);
 
-    LOCK(testNode.cs_vRecvMsg);
-
     // Receive a full 'ping' message
     {
         bool complete;
