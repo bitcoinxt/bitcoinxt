@@ -4530,7 +4530,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         throw std::invalid_argument(std::string(__func__ )+ " requires connection manager");
 
     RandAddSeedPerfmon();
-    unsigned int nMaxSendBufferSize = connman->GetSendBufferSize();
 
     LogPrint(Log::NET, "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
@@ -4832,11 +4831,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
             // Track requests for our stuff
             GetMainSignals().Inventory(inv.hash);
-
-            if (pfrom->nSendSize > (nMaxSendBufferSize * 2)) {
-                Misbehaving(pfrom->GetId(), 50, "send buffer size exceeded");
-                return error("send buffer size() = %u", pfrom->nSendSize);
-            }
         }
 
         if (!vToFetch.empty())
