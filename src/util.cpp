@@ -85,7 +85,6 @@
 #include <boost/program_options/parsers.hpp>
 #include <boost/thread.hpp>
 #include <openssl/crypto.h>
-#include <openssl/rand.h>
 #include <openssl/conf.h>
 
 // Work around clang compilation problem in Boost 1.46:
@@ -146,19 +145,9 @@ public:
         // or corrupt. Explicitly tell OpenSSL not to try to load the file. The result for our libs will be
         // that the config appears to have been loaded and there are no modules/engines available.
         OPENSSL_no_config();
-
-#ifdef WIN32
-        // Seed OpenSSL PRNG with current contents of the screen
-        RAND_screen();
-#endif
-
-        // Seed OpenSSL PRNG with performance counter
-        RandAddSeed();
     }
     ~CInit()
     {
-        // Securely erase the memory used by the PRNG
-        RAND_cleanup();
         // Shutdown OpenSSL library multithreading support
         CRYPTO_set_locking_callback(NULL);
         for (int i = 0; i < CRYPTO_num_locks(); i++)
