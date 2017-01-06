@@ -673,7 +673,7 @@ void BitcoinGUI::setNumBlocks(int count, const QDateTime& blockDate)
     statusBar()->clearMessage();
 
     // Acquire current block source
-    enum BlockSource blockSource = clientModel->getBlockSource();
+    enum FetchBlockSource blockSource = clientModel->getBlockSource();
     switch (blockSource) {
         case BLOCK_SOURCE_NETWORK:
             progressBarLabel->setText(tr("Synchronizing with network..."));

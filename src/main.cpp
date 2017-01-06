@@ -164,13 +164,6 @@ namespace {
     uint32_t nBlockSequenceId = 1;
 
     /**
-     * Sources of received blocks, saved to be able to send them reject
-     * messages or ban them when processing happens afterwards. Protected by
-     * cs_main.
-     */
-    map<uint256, NodeId> mapBlockSource;
-
-    /**
      * Filter for transactions that were recently rejected by
      * AcceptToMemoryPool. These are not rerequested until the chain tip
      * changes, at which point the entire filter is reset. Protected by
@@ -218,13 +211,16 @@ void InitRespendFilter() {
 
 class OnBlockFinished : public ThinBlockFinishedCallb {
     public:
-        OnBlockFinished();
-        OnBlockFinished(const std::string& strCommand);
+        OnBlockFinished(bool canMisbehave)
+            : canMisbehave(canMisbehave) { }
+
+        OnBlockFinished(bool canMisbehave, const std::string& strCommand)
+            : canMisbehave(canMisbehave), strCommand(strCommand) { }
 
         virtual void operator()(const CBlock& block, const std::vector<NodeId>& ids);
 
     private:
-
+        bool canMisbehave;
         const std::string strCommand;
 
         bool hasWhitelistedNode(const std::vector<NodeId>& ids) const;
@@ -237,7 +233,7 @@ struct InFlightEraserImpl : public InFlightEraser {
     virtual void operator()(NodeId, const uint256& block);
 };
 ThinBlockManager thinblockmg(
-        std::unique_ptr<ThinBlockFinishedCallb>(new OnBlockFinished()),
+        std::unique_ptr<ThinBlockFinishedCallb>(new OnBlockFinished(false)),
         std::unique_ptr<InFlightEraser>(new InFlightEraserImpl()));
 
 //////////////////////////////////////////////////////////////////////////////
@@ -472,15 +468,18 @@ void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash) {
     }
 }
 
-OnBlockFinished::OnBlockFinished() { }
-OnBlockFinished::OnBlockFinished(const std::string& strCommand) : strCommand(strCommand) { }
-
 void OnBlockFinished::operator()(const CBlock& block, const std::vector<NodeId>& ids) {
     AssertLockHeld(cs_main);
-    CBlock copy(block);
+
     CValidationState state;
-    ProcessNewBlock(state, pickBlockSource(ids), &copy,
-            hasWhitelistedNode(ids), NULL);
+    std::set<NodeId> nodes(begin(ids), end(ids));
+    BlockSource source(block.GetHash(), nodes, canMisbehave);
+
+    CBlock copy(block);
+    if (!ProcessNewBlock(state, source, &copy,
+            hasWhitelistedNode(ids), NULL)) {
+        LogPrintf("ProcessNewBlock failed in %s\n", __func__);
+    }
     rejectAndPunish(state, block.GetHash(), ids);
 }
 
@@ -1765,16 +1764,20 @@ void static InvalidChainFound(CBlockIndex* pindexNew)
     CheckForkWarningConditions();
 }
 
-void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state) {
+void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state,
+        const BlockSource& blockSource) {
     int nDoS = 0;
     if (state.IsInvalid(nDoS)) {
-        std::map<uint256, NodeId>::iterator it = mapBlockSource.find(pindex->GetBlockHash());
-        NodeStatePtr nodeState(it->second);
-        if (it != mapBlockSource.end() && !nodeState.IsNull()) {
+
+        for (NodeId id : blockSource.nodes) {
+            NodeStatePtr nodeState(id);
+            if (nodeState.IsNull())
+                continue;
+
             CBlockReject reject = {state.GetRejectCode(), state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), pindex->GetBlockHash()};
             nodeState->rejects.push_back(reject);
-            if (nDoS > 0)
-                Misbehaving(it->second, nDoS);
+            if (blockSource.canMisbehave && nDoS > 0)
+                Misbehaving(id, nDoS);
         }
     }
     if (!state.CorruptionPossible()) {
@@ -2722,7 +2725,8 @@ static int64_t nTimePostConnect = 0;
  * Connect a new block to chainActive. pblock is either NULL or a pointer to a CBlock
  * corresponding to pindexNew, to bypass loading it again from disk.
  */
-bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *pblock) {
+bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew,
+        CBlock *pblock, const BlockSource& blockSource) {
     assert(pindexNew->pprev == chainActive.Tip());
     // Read block from disk.
     int64_t nTime1 = GetTimeMicros();
@@ -2743,10 +2747,9 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         GetMainSignals().BlockChecked(*pblock, state);
         if (!rv) {
             if (state.IsInvalid())
-                InvalidBlockFound(pindexNew, state);
+                InvalidBlockFound(pindexNew, state, blockSource);
             return error("ConnectTip(): ConnectBlock %s failed", pindexNew->GetBlockHash().ToString());
         }
-        mapBlockSource.erase(inv.hash);
         nTime3 = GetTimeMicros(); nTimeConnectTotal += nTime3 - nTime2;
         LogPrint("bench", "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
         assert(view.Flush());
@@ -2853,7 +2856,7 @@ static void PruneBlockIndexCandidates() {
  * Try to make some progress towards making pindexMostWork the active block.
  * pblock is either NULL or a pointer to a CBlock corresponding to pindexMostWork.
  */
-static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock, bool& fInvalidFound) {
+static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock, const BlockSource& blockSource, bool& fInvalidFound) {
     AssertLockHeld(cs_main);
     const CBlockIndex *pindexOldTip = chainActive.Tip();
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
@@ -2885,7 +2888,8 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
 
         // Connect new blocks.
         BOOST_REVERSE_FOREACH(CBlockIndex *pindexConnect, vpindexToConnect) {
-            if (!ConnectTip(state, pindexConnect, pindexConnect == pindexMostWork ? pblock : NULL)) {
+            CBlock* mostWork = pindexConnect == pindexMostWork ? pblock : nullptr;
+            if (!ConnectTip(state, pindexConnect, mostWork, blockSource)) {
                 if (state.IsInvalid()) {
                     // The block violates a consensus rule.
                     if (!state.CorruptionPossible())
@@ -2929,7 +2933,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
  * or an activated best chain. pblock is either NULL or a pointer to a block
  * that is already loaded (to avoid loading it again from disk).
  */
-bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
+bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSource& blockSource) {
     CBlockIndex *pindexMostWork = NULL;
     const CChainParams& chainParams = Params();
     do {
@@ -2949,7 +2953,8 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
                 return true;
 
             bool fInvalidFound = false;
-            if (!ActivateBestChainStep(state, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL, fInvalidFound))
+            CBlock* mostWork = pblock && (pblock->GetHash() == pindexMostWork->GetBlockHash()) ? pblock : nullptr;
+            if (!ActivateBestChainStep(state, pindexMostWork, mostWork, blockSource, fInvalidFound))
                 return false;
 
             if (fInvalidFound) {
@@ -3508,7 +3513,8 @@ static bool IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned 
 }
 
 
-bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, bool fForceProcessing, const CDiskBlockPos *dbp)
+bool ProcessNewBlock(CValidationState &state, const BlockSource& from,
+        CBlock* pblock, bool fForceProcessing, const CDiskBlockPos *dbp)
 {
     // Preliminary checks
     bool checked = CheckBlock(*pblock, state);
@@ -3524,15 +3530,12 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, bool
         // Store to disk
         CBlockIndex *pindex = NULL;
         bool ret = AcceptBlock(*pblock, state, &pindex, fRequested, dbp);
-        if (pindex && pfrom) {
-            mapBlockSource[pindex->GetBlockHash()] = pfrom->GetId();
-        }
         CheckBlockIndex();
         if (!ret)
             return error("%s: AcceptBlock FAILED", __func__);
     }
 
-    if (!ActivateBestChain(state, pblock))
+    if (!ActivateBestChain(state, pblock, from))
         return error("%s: ActivateBestChain failed", __func__);
 
     return true;
@@ -3984,7 +3987,6 @@ void UnloadBlockIndex()
     vinfoBlockFile.clear();
     nLastBlockFile = 0;
     nBlockSequenceId = 1;
-    mapBlockSource.clear();
     blocksInFlight.clear();
     nQueuedValidatedHeaders = 0;
     nPreferredDownload = 0;
@@ -5421,7 +5423,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             return true;
         }
 
-        OnBlockFinished callb(strCommand);
+        OnBlockFinished callb(true, strCommand);
         callb(block, std::vector<NodeId>(1, pfrom->id));
     }
     else if (strCommand == "get_xthin") {
