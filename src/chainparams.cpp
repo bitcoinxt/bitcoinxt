@@ -91,6 +91,10 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1462060800; // May 1st, 2016
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800; // May 1st, 2017
 
+        // BIP100 defined start height and max block size change critical vote position
+        consensus.bip100ActivationHeight = 449568;
+        consensus.nMaxBlockSizeChangePosition = 1512;
+
         /**
          * The message start string is designed to be unlikely to occur in normal data.
          * The characters are rarely used upper ASCII, not valid as UTF-8, and produce
@@ -183,6 +187,10 @@ public:
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1456790400; // March 1st, 2016
         consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800; // May 1st, 2017
 
+        // BIP100 defined start height and max block size change critical vote position
+        consensus.bip100ActivationHeight = 798336;
+        consensus.nMaxBlockSizeChangePosition = 1512;
+
         pchMessageStart[0] = 0x0b;
         pchMessageStart[1] = 0x11;
         pchMessageStart[2] = 0x09;
@@ -254,6 +262,9 @@ public:
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
+
+        consensus.bip100ActivationHeight = 0;
+        consensus.nMaxBlockSizeChangePosition = 1512;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;

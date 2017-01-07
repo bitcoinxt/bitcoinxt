@@ -14,6 +14,7 @@ struct Opt {
     std::vector<std::string> UAComment(bool validate = false);
     int ScriptCheckThreads();
     int64_t CheckpointDays();
+    uint64_t MaxBlockSizeVote();
 
     // Thin block options
     bool UsingThinBlocks();
