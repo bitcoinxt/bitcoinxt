@@ -249,6 +249,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         next->pprev = prev;
         next->nHeight = prev->nHeight + 1;
         next->BuildSkip();
+        next->nMaxBlockSize = prev->nMaxBlockSize;
         chainActive.SetTip(next);
     }
     BOOST_CHECK(pblocktemplate = CreateNewBlock(scriptPubKey));
@@ -262,6 +263,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         next->pprev = prev;
         next->nHeight = prev->nHeight + 1;
         next->BuildSkip();
+        next->nMaxBlockSize = prev->nMaxBlockSize;
         chainActive.SetTip(next);
     }
     BOOST_CHECK(pblocktemplate = CreateNewBlock(scriptPubKey));

@@ -11,12 +11,14 @@
 #include "consensus/validation.h"
 #include "hash.h"
 #include "main.h"
+#include "maxblocksize.h"
 #include "net.h"
 #include "pow.h"
 #include "primitives/transaction.h"
 #include "timedata.h"
 #include "util.h"
 #include "utilmoneystr.h"
+#include "options.h"
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h"
 #endif
@@ -24,6 +26,8 @@
 #include <boost/thread.hpp>
 #include <boost/tuple/tuple.hpp>
 #include <stack>
+#include <iomanip>
+#include <cmath>
 
 using namespace std;
 
@@ -50,6 +54,23 @@ void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, 
         pblock->nBits = GetNextWorkRequired(pindexPrev, pblock, consensusParams);
 }
 
+// BIP100 string:
+// - Adds our block size vote (B) if configured.
+// - Adds Excessive Block (EB) string. This announces how big blocks we currently accept.
+static std::vector<unsigned char> BIP100Str(uint64_t hardLimit) {
+    uint64_t blockVote = Opt().MaxBlockSizeVote();
+
+    std::stringstream ss;
+    ss << "/BIP100/";
+    if (blockVote)
+        ss << "B" << blockVote << "/";
+    double dMaxBlockSize = double(hardLimit)/1000000;
+    ss << "EB" << std::setprecision(int(log10(dMaxBlockSize))+7) << dMaxBlockSize << "/";
+
+    const std::string s = ss.str();
+    return std::vector<unsigned char>(begin(s), end(s));
+}
+
 CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
 {
     const CChainParams& chainparams = Params();
@@ -72,9 +93,10 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
     pblocktemplate->vTxSigOps.push_back(-1); // updated at end
 
     // Largest block you're willing to create:
-    unsigned int nBlockMaxSize = GetArg("-blockmaxsize", DEFAULT_BLOCK_MAX_SIZE);
-    // Limit to between 1K and MAX_BLOCK_SIZE-1K for sanity:
-    nBlockMaxSize = std::max((unsigned int)1000, std::min((unsigned int)(MAX_BLOCK_SIZE-1000), nBlockMaxSize));
+    uint64_t hardLimit = GetNextMaxBlockSize(chainActive.Tip(), chainparams.GetConsensus());
+    uint64_t nBlockMaxSize = GetArg("-blockmaxsize", hardLimit);
+    // Limit to between 1K and (hard limit - 1K) for sanity:
+    nBlockMaxSize = std::max((uint64_t)1000, std::min((hardLimit - 1000),  nBlockMaxSize));
 
     // Skip free transactions if -relaypriority argument is true
     bool fSkipFree = GetBoolArg("-relaypriority", true);
@@ -177,8 +199,8 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
                 continue;
 
             unsigned int nTxSigOps = iter->GetSigOpCount();
-            if (nBlockSigOps + nTxSigOps >= MAX_BLOCK_SIGOPS) {
-                if (nBlockSigOps > MAX_BLOCK_SIGOPS - 2) {
+            if (nBlockSigOps + nTxSigOps >= MaxBlockSigops(hardLimit)) {
+                if (nBlockSigOps > MaxBlockSigops(hardLimit) - 2) {
                     break;
                 }
                 continue;
@@ -203,7 +225,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
 
         // Compute final coinbase transaction.
         txNew.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
-        txNew.vin[0].scriptSig = CScript() << nHeight << OP_0;
+        txNew.vin[0].scriptSig = CScript() << nHeight << BIP100Str(hardLimit) << OP_0;
         pblock->vtx[0] = txNew;
         pblocktemplate->vTxFees[0] = -nFees;
 
@@ -223,7 +245,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
     return pblocktemplate.release();
 }
 
-void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce)
+void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce, uint64_t nMaxBlockSize)
 {
     // Update nExtraNonce
     static uint256 hashPrevBlock;
@@ -235,7 +257,7 @@ void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& 
     ++nExtraNonce;
     unsigned int nHeight = pindexPrev->nHeight+1; // Height first in coinbase required for block.version=2
     CMutableTransaction txCoinbase(pblock->vtx[0]);
-    txCoinbase.vin[0].scriptSig = (CScript() << nHeight << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;
+    txCoinbase.vin[0].scriptSig = (CScript() << nHeight << BIP100Str(nMaxBlockSize) << CScriptNum(nExtraNonce)) + COINBASE_FLAGS;
     assert(txCoinbase.vin[0].scriptSig.size() <= 100);
 
     pblock->vtx[0] = txCoinbase;
@@ -361,7 +383,8 @@ void static BitcoinMiner(CWallet *pwallet)
                 return;
             }
             CBlock *pblock = &pblocktemplate->block;
-            IncrementExtraNonce(pblock, pindexPrev, nExtraNonce);
+            uint64_t hardLimit = GetNextMaxBlockSize(pindexPrev, chainparams.GetConsensus());
+            IncrementExtraNonce(pblock, pindexPrev, nExtraNonce, hardLimit);
 
             LogPrintf("Running BitcoinMiner with %u transactions in block (%u bytes)\n", pblock->vtx.size(),
                 ::GetSerializeSize(*pblock, SER_NETWORK, PROTOCOL_VERSION));
