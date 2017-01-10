@@ -43,14 +43,13 @@ BOOST_AUTO_TEST_CASE(scripthreads) {
     std::unique_ptr<ArgReset> argraii
         = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg.release()));
 
-    argPtr->par = 0; // auto
-    BOOST_CHECK(Opt().ScriptCheckThreads() > 0);
-
     argPtr->par = 1; // not threaded
     BOOST_CHECK_EQUAL(0, Opt().ScriptCheckThreads());
 
     argPtr->par = 3; // 3 threads
     BOOST_CHECK_EQUAL(3, Opt().ScriptCheckThreads());
+
+    // auto case not tested
 }
 
 BOOST_AUTO_TEST_CASE(checkpointdays) {
