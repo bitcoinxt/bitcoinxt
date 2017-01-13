@@ -1566,9 +1566,8 @@ void CConnman::ThreadMessageHandler()
 
             // Send messages
             {
-                TRY_LOCK(pnode->cs_sendProcessing, lockSend);
-                if (lockSend)
-                    GetNodeSignals().SendMessages(pnode, this, flagInterruptMsgProc);
+                LOCK(pnode->cs_sendProcessing);
+                GetNodeSignals().SendMessages(pnode, this, flagInterruptMsgProc);
             }
             if (flagInterruptMsgProc)
                 return;
