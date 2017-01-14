@@ -2664,7 +2664,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
                     for (auto h : hashesToAnnounce)
                         pnode->PushBlockHash(h);
                 });
-            // Notify external listeners about the new tip.
+            connman->WakeMessageHandler();
         }
         if (nStopAtHeight && pindexNewTip && pindexNewTip->nHeight >= nStopAtHeight) StartShutdown();
     } while(pindexNewTip != pindexMostWork);
