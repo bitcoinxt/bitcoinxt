@@ -279,6 +279,8 @@ public:
     CSipHasher GetDeterministicRandomizer(uint64_t id);
 
     unsigned int GetReceiveFloodSize() const;
+
+    void WakeMessageHandler();
 private:
     struct ListenSocket {
         SOCKET socket;
@@ -294,8 +296,6 @@ private:
     void AcceptConnection(const ListenSocket& hListenSocket);
     void ThreadSocketHandler();
     void ThreadDNSAddressSeed();
-
-    void WakeMessageHandler();
 
     CNode* FindNode(const CNetAddr& ip);
     CNode* FindNode(const CSubNet& subNet);
