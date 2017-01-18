@@ -4555,9 +4555,16 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         CAddress addrFrom;
         uint64_t nNonce = 1;
         uint64_t nServiceInt;
+        uint64_t nServices;
         int nVersion;
+        int nSendVersion;
+        std::string strSubVer;
+        int nStartingHeight = -1;
+        bool fRelay = true;
+
         vRecv >> nVersion >> nServiceInt >> nTime >> addrMe;
-        pfrom->nServices = nServiceInt;
+        nSendVersion = std::min(nVersion, PROTOCOL_VERSION);
+        nServices = nServiceInt;
         if (nVersion < MIN_PEER_PROTO_VERSION)
         {
             // disconnect from peers older than this proto version
@@ -4573,15 +4580,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         if (!vRecv.empty())
             vRecv >> addrFrom >> nNonce;
         if (!vRecv.empty()) {
-            vRecv >> LIMITED_STRING(pfrom->strSubVer, MAX_SUBVERSION_LENGTH);
-            pfrom->cleanSubVer = SanitizeString(pfrom->strSubVer);
+            vRecv >> LIMITED_STRING(strSubVer, MAX_SUBVERSION_LENGTH);
         }
         if (!vRecv.empty())
-            vRecv >> pfrom->nStartingHeight;
+            vRecv >> nStartingHeight;
         if (!vRecv.empty())
-            vRecv >> pfrom->fRelayTxes; // set to true after we get the first filter* message
-        else
-            pfrom->fRelayTxes = true;
+            vRecv >> fRelay;
 
         // Disconnect if we connected to ourself
         if (pfrom->fInbound && !connman->CheckIncomingNonce(nNonce))
@@ -4590,6 +4594,33 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             pfrom->fDisconnect = true;
             return true;
         }
+
+        if (pfrom->fInbound && addrMe.IsRoutable())
+        {
+            SeenLocal(addrMe);
+        }
+
+        // Be shy and don't send version until we hear
+        if (pfrom->fInbound)
+            PushNodeVersion(pfrom, *connman, GetAdjustedTime());
+
+        connman->PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::VERACK));
+
+        pfrom->nServices = nServices;
+        pfrom->addrLocal = addrMe;
+        pfrom->strSubVer = strSubVer;
+        pfrom->cleanSubVer = SanitizeString(strSubVer);
+        pfrom->nStartingHeight = nStartingHeight;
+        pfrom->fClient = !(nServices & NODE_NETWORK);
+        {
+            LOCK(pfrom->cs_filter);
+            pfrom->fRelayTxes = fRelay;
+        }
+
+        // Change version
+        pfrom->SetSendVersion(nSendVersion);
+        pfrom->nVersion = nVersion;
+        pfrom->fSuccessfullyConnected = true;
 
         {
             LOCK(cs_main);
@@ -4606,36 +4637,18 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             if (!pfrom->fInbound && !KeepOutgoingPeer(*pfrom)) {
                 LogPrintf("'%s' - peer=%d does not meet criteria for "
                         "outgoing connections, disconnecting.\n",
-                        pfrom->cleanSubVer, pfrom->id);
+                        SanitizeString(strSubVer), pfrom->id);
 
                 pfrom->fDisconnect = true;
                 return true;
             }
         }
 
-        pfrom->addrLocal = addrMe;
-        if (pfrom->fInbound && addrMe.IsRoutable())
-        {
-            SeenLocal(addrMe);
-        }
-
-        // Be shy and don't send version until we hear
-        if (pfrom->fInbound)
-            PushNodeVersion(pfrom, *connman, GetAdjustedTime());
-
-        pfrom->fClient = !(pfrom->nServices & NODE_NETWORK);
-
         // Potentially mark this peer as a preferred download peer.
         {
             NodeStatePtr nodeState(pfrom->GetId());
             UpdatePreferredDownload(pfrom, nodeState);
         }
-
-        // Change version
-        connman->PushMessage(pfrom, CNetMsgMaker(INIT_PROTO_VERSION).Make(NetMsgType::VERACK));
-        int nSendVersion = std::min(nVersion, PROTOCOL_VERSION);
-        pfrom->nVersion = nVersion;
-        pfrom->SetSendVersion(nSendVersion);
 
         if (!pfrom->fInbound)
         {
@@ -4661,8 +4674,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             }
             connman->MarkAddressGood(pfrom->addr);
         }
-
-        pfrom->fSuccessfullyConnected = true;
 
         string remoteAddr;
         if (fLogIPs)
@@ -4701,7 +4712,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
     if (strCommand == NetMsgType::VERACK)
     {
-        pfrom->SetRecvVersion(min(pfrom->nVersion, PROTOCOL_VERSION));
+        pfrom->SetRecvVersion(min(pfrom->nVersion.load(), PROTOCOL_VERSION));
 
         // Mark this node as currently connected, so we update its timestamp later.
         if (!pfrom->fInbound) {
