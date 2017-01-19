@@ -384,7 +384,7 @@ CNode* CConnman::ConnectNode(CAddress addrConnect, const char *pszDest, bool fCo
         NodeId id = GetNewNodeId();
         uint64_t nonce = GetDeterministicRandomizer(RANDOMIZER_ID_LOCALHOSTNONCE).Write(id).Finalize();
         CNode* pnode = new CNode(id, nLocalServices, GetBestHeight(), hSocket, addrConnect, nonce, pszDest ? pszDest : "", false);
-        pnode->nTimeConnected = GetTime();
+        pnode->nTimeConnected = GetSystemTimeInSeconds();
 
         pnode->AddRef();
 
@@ -623,7 +623,7 @@ size_t CConnman::SocketSendData(CNode *pnode)
             nBytes = send(pnode->hSocket, reinterpret_cast<const char*>(data.data()) + pnode->nSendOffset, amt2Send, MSG_NOSIGNAL | MSG_DONTWAIT);
         }
         if (nBytes > 0) {
-            pnode->nLastSend = GetTime();
+            pnode->nLastSend = GetSystemTimeInSeconds();
             pnode->nSendBytes += nBytes;
             pnode->nSendOffset += nBytes;
             bool empty = !sendShaper.consume(nBytes);
@@ -1029,7 +1029,7 @@ void CConnman::ThreadSocketHandler()
             //
             // Inactivity checking
             //
-            int64_t nTime = GetTime();
+            int64_t nTime = GetSystemTimeInSeconds();
             if (nTime - pnode->nTimeConnected > 60)
             {
                 if (pnode->nLastRecv == 0 || pnode->nLastSend == 0)
@@ -2112,7 +2112,7 @@ CNode::CNode(NodeId idIn, uint64_t nLocalServicesIn, int nMyStartingHeightIn, SO
     nLastRecv = 0;
     nSendBytes = 0;
     nRecvBytes = 0;
-    nTimeConnected = GetTime();
+    nTimeConnected = GetSystemTimeInSeconds();
     nTimeOffset = 0;
     addrName = addrNameIn == "" ? addr.ToStringIPPort() : addrNameIn;
     nVersion = 0;
