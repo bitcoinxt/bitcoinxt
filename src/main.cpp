@@ -5359,8 +5359,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             // new headers to connect.
             return true;
 
-        if (!p(headers, nCount == MAX_HEADERS_RESULTS, true))
-            return false;
+        try {
+            p(headers, nCount == MAX_HEADERS_RESULTS, true);
+        }
+        catch (const BlockHeaderError& e) {
+            return error(e.what());
+        }
     }
     else if (strCommand == "xthinblock" && !fImporting && !fReindex) // Ignore blocks received while importing
     {
