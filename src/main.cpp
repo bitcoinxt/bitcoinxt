@@ -5378,7 +5378,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             DefaultHeaderProcessor headerp(pfrom, blocksInFlight, thinblockmg,
                 inFlight, CheckBlockIndex);
             XThinBlockProcessor blockp(*pfrom, *(nodestate->thinblock), headerp);
-            blockp(vRecv, TxFinderImpl());
+            blockp(vRecv, TxFinderImpl(), chainActive.Height());
         }
         catch (const std::exception& e) {
             unexpectedThinError(strCommand, *pfrom, e.what());
@@ -5397,7 +5397,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             DefaultHeaderProcessor headerp(pfrom, blocksInFlight, thinblockmg,
                     inFlight, CheckBlockIndex);
             CompactBlockProcessor blockp(*pfrom, *(nodestate->thinblock), headerp);
-            blockp(vRecv, mempool, chainActive.Tip()->nMaxBlockSize);
+            blockp(vRecv, mempool, chainActive.Tip()->nMaxBlockSize, chainActive.Height());
         }
         catch (const std::exception& e) {
             unexpectedThinError(strCommand, *pfrom, e.what());

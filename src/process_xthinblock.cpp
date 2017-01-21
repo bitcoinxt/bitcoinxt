@@ -11,7 +11,7 @@
 
 
 void XThinBlockProcessor::operator()(
-        CDataStream& vRecv, const TxFinder& txfinder)
+        CDataStream& vRecv, const TxFinder& txfinder, int activeChainHeight)
 {
     XThinBlock block;
     vRecv >> block;
@@ -35,12 +35,7 @@ void XThinBlockProcessor::operator()(
         return;
     }
 
-    if (!processHeader(block.header)) {
-        worker.stopWork(hash);
-        return;
-    }
-
-    if (!setToWork(hash))
+    if (!setToWork(block.header, activeChainHeight))
         return;
 
     from.AddInventoryKnown(CInv(MSG_XTHINBLOCK, hash));

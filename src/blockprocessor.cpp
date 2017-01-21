@@ -22,21 +22,22 @@ void BlockProcessor::rejectBlock(
     worker.stopWork(block);
 }
 
-bool BlockProcessor::processHeader(const CBlockHeader& header) {
+CBlockIndex* BlockProcessor::processHeader(const CBlockHeader& header, bool maybeAnnouncement) {
 
         std::vector<CBlockHeader> h(1, header);
 
         try {
-            headerProcessor(h, false, false);
+            return headerProcessor(h, false, maybeAnnouncement);
         }
         catch (const BlockHeaderError& e) {
             rejectBlock(header.GetHash(), e.what(), 20);
-            return false;
+            return nullptr;
         }
-        return true;
 }
 
-bool BlockProcessor::setToWork(const uint256& hash) {
+bool BlockProcessor::setToWork(const CBlockHeader& header, int activeChainHeight) {
+
+    const uint256 hash = header.GetHash();
 
     if (HaveBlockData(hash)) {
         LogPrint("thin", "already had block %s, "
@@ -46,18 +47,35 @@ bool BlockProcessor::setToWork(const uint256& hash) {
 	    return false;
     }
 
-    if (!worker.isWorkingOn(hash)) {
-        // Happens if:
-        // * We did not request a block
-        // * We requested a different block.
-        // * We already received block (after requesting it) and
-        //   found it to be invalid.
+    bool isAnnouncement = !worker.isWorkingOn(hash);
 
-        LogPrint("thin", "ignoring %s %s that peer is not working "
-                "on peer=%d\n", netcmd, hash.ToString(), from.id);
+    // Don't treat block as announcement, will trigger
+    // direct block fetch.
+    bool treatAsAnnouncement = false;
+    CBlockIndex* index = processHeader(header, treatAsAnnouncement);
+    if (!index)
+        return false;
+
+    if (isAnnouncement && index->nHeight <= activeChainHeight + 2) {
+        // Accept block announcement.
+        LogPrint("thin", "received %s %s announcement peer=%d\n",
+                netcmd, hash.ToString(), from.id);
+        worker.addWork(hash);
+        return true;
+    }
+    else if (isAnnouncement) {
+        // Be conservative about block announcements to protect against DoS.
+        // We have processed the header, so the block will be re-downloaded
+        // later if we really want it.
+        LogPrint("thin", "ignoring block announcement %s, height %d is too far "
+                "away from active chain %d peer=%d\n", hash.ToString(),
+                index->nHeight, activeChainHeight, from.id);
         return false;
     }
-    return true;
+    else {
+        // this is a block we have requested.
+        return true;
+    }
 }
 
 bool BlockProcessor::requestConnectHeaders(const CBlockHeader& header) {

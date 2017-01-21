@@ -15,7 +15,7 @@ class CompactBlockProcessor : public BlockProcessor {
         }
 
         void operator()(CDataStream& vRecv, const CTxMemPool& mempool,
-                uint64_t currMaxBlockSize);
+                uint64_t currMaxBlockSize, int activeChainHeight);
 };
 
 #endif

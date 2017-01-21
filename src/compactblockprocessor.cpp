@@ -10,7 +10,7 @@
 #include "compacttxfinder.h"
 
 void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mempool,
-        uint64_t currMaxBlockSize)
+        uint64_t currMaxBlockSize, int activeChainHeight)
 {
     CompactBlock block;
     vRecv >> block;
@@ -34,13 +34,10 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
         return;
     }
 
-    if (!processHeader(block.header))
+    if (!setToWork(block.header, activeChainHeight))
         return;
 
     from.AddInventoryKnown(CInv(MSG_CMPCT_BLOCK, hash));
-
-    if (!setToWork(hash))
-        return;
 
     std::unique_ptr<CompactStub> stub;
     try {

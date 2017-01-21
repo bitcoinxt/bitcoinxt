@@ -11,13 +11,16 @@
 #include "compactthin.h"
 #include "chainparams.h"
 #include "consensus/consensus.h"
+#include "chain.h"
 
 struct CmpctDummyHeaderProcessor : public BlockHeaderProcessor {
 
     CmpctDummyHeaderProcessor() : reqConnHeadResp(false) { }
 
     CBlockIndex* operator()(const std::vector<CBlockHeader>&, bool, bool) override {
-        return nullptr;
+        static CBlockIndex index;
+        index.nHeight = 2;
+        return &index;
     }
     bool requestConnectHeaders(const CBlockHeader& h, CNode& from) override {
         return reqConnHeadResp;
@@ -74,7 +77,7 @@ BOOST_AUTO_TEST_CASE(accepts_parallel_compacts) {
 
     // cblock2 is announced, should start work on
     // that too.
-    p(blockstream, mpool, MAX_BLOCK_SIZE);
+    p(blockstream, mpool, MAX_BLOCK_SIZE, 1);
 
     BOOST_CHECK(w.isWorkingOn(block1));
     BOOST_CHECK(w.isWorkingOn(block2.GetHash()));
@@ -104,8 +107,8 @@ BOOST_AUTO_TEST_CASE(two_process_same) {
 
     CDataStream s1 = toStream(c1);
     CDataStream s2 = toStream(c2);
-    p1(s1, mpool, MAX_BLOCK_SIZE);
-    p2(s2, mpool, MAX_BLOCK_SIZE);
+    p1(s1, mpool, MAX_BLOCK_SIZE, 1);
+    p2(s2, mpool, MAX_BLOCK_SIZE, 1);
 
     // both should be working on the block still
     BOOST_CHECK(w1.isWorkingOn(block.GetHash()));
@@ -134,7 +137,7 @@ BOOST_AUTO_TEST_CASE(discard_if_missing_prev) {
     headerp.reqConnHeadResp = true; // we need to request prev header (we don't have it)
 
     CompactBlockProcessor p(node, w, headerp);
-    p(s, mpool, MAX_BLOCK_SIZE);
+    p(s, mpool, MAX_BLOCK_SIZE, 1);
 
     // should have discarded block.
     BOOST_CHECK(!w.isWorkingOn(block.GetHash()));

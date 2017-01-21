@@ -41,7 +41,10 @@ struct DummyHeaderProcessor : public BlockHeaderProcessor {
         called = true;
         if (!headerOK)
             throw BlockHeaderError("header not OK");
-        return nullptr;
+
+        static CBlockIndex index;
+        index.nHeight = 2;
+        return &index;
     }
     bool requestConnectHeaders(const CBlockHeader& h, CNode& from) override {
         return false;
@@ -95,7 +98,7 @@ BOOST_AUTO_TEST_CASE(xthinblock_ignore_invalid) {
     worker.addWork(xblock.header.GetHash());
     CDataStream s = stream(xblock);
     DummyXThinProcessor process(pfrom, worker, headerprocessor);
-    process(s, NullFinder());
+    process(s, NullFinder(), 1);
 
     // Should reset the worker.
     BOOST_CHECK(!worker.isWorking());
@@ -115,7 +118,7 @@ BOOST_AUTO_TEST_CASE(xthinblock_ignore_if_has_block_data) {
     worker.addWork(xblock.header.GetHash());
     CDataStream s = stream(xblock);
     DummyXThinProcessor process(pfrom, worker, headerprocessor);
-    process(s, NullFinder());
+    process(s, NullFinder(), 1);
 
     // peer should not be working on anything
     BOOST_CHECK(!worker.isWorking());
@@ -128,7 +131,7 @@ BOOST_AUTO_TEST_CASE(xthinblock_header_is_processed) {
     worker.addWork(xblock.header.GetHash());
     CDataStream s = stream(xblock);
     DummyXThinProcessor process(pfrom, worker, headerprocessor);
-    process(s, NullFinder());
+    process(s, NullFinder(), 1);
 
     BOOST_CHECK(headerprocessor.called);
     BOOST_CHECK(worker.isStubBuilt(xblock.header.GetHash()));
@@ -142,7 +145,7 @@ BOOST_AUTO_TEST_CASE(xthinblock_stop_if_header_fails) {
     headerprocessor.headerOK = false;
     CDataStream s = stream(xblock);
     DummyXThinProcessor process(pfrom, worker, headerprocessor);
-    process(s, NullFinder());
+    process(s, NullFinder(), 1);
 
     BOOST_CHECK(!worker.isWorkingOn(xblock.header.GetHash()));
     BOOST_CHECK(!worker.isStubBuilt(xblock.header.GetHash()));
@@ -158,7 +161,7 @@ BOOST_AUTO_TEST_CASE(xthinblock_rerequest_missing) {
     worker.addWork(xblock.header.GetHash());
     CDataStream s = stream(xblock);
     DummyXThinProcessor process(pfrom, worker, headerprocessor);
-    process(s, NullFinder());
+    process(s, NullFinder(), 1);
 
     BOOST_CHECK(headerprocessor.called);
     BOOST_CHECK(worker.isStubBuilt(xblock.header.GetHash()));
@@ -174,7 +177,7 @@ BOOST_AUTO_TEST_CASE(xthinblock_rerequest_missing) {
     pfrom.messages.clear();
     xblock = XThinBlock(TestBlock1(), f);
     s = stream(xblock);
-    process(s, NullFinder());
+    process(s, NullFinder(), 1);
     BOOST_CHECK(pfrom.messages.empty());
 }
 
@@ -187,7 +190,7 @@ BOOST_AUTO_TEST_CASE(rebuild_stub) {
     worker.isBuilt = true;
     CDataStream s = stream(xblock);
     DummyXThinProcessor process(pfrom, worker, headerprocessor);
-    process(s, NullFinder());
+    process(s, NullFinder(), 1);
 
     BOOST_CHECK(worker.buildStubCalled);
 }
@@ -216,7 +219,7 @@ BOOST_AUTO_TEST_CASE(compactblockprocessor_fetch_full) {
     CTxMemPool mpool(CFeeRate(0));
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
     stream << block;
-    p(stream, mpool, currMaxBlockSize);
+    p(stream, mpool, currMaxBlockSize, 1);
 
     // should have rejected the block
     BOOST_CHECK_EQUAL(1, node.messages.size());
