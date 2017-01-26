@@ -4620,7 +4620,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         // Change version
         pfrom->SetSendVersion(nSendVersion);
         pfrom->nVersion = nVersion;
-        pfrom->fSuccessfullyConnected = true;
 
         {
             LOCK(cs_main);
@@ -4731,6 +4730,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
                 && !(pfrom->SupportsXThinBlocks() && Opt().PreferXThinBlocks())) {
             enableCompactBlocks(*connman, *pfrom, false);
         }
+        pfrom->fSuccessfullyConnected = true;
     }
 
 
@@ -5742,7 +5742,7 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
     const Consensus::Params& consensusParams = Params().GetConsensus();
     {
         // Don't send anything until we get its version message
-        if (pto->nVersion == 0 || pto->fDisconnect)
+        if (!pto->fSuccessfullyConnected || pto->fDisconnect)
             return true;
 
         // If we get here, the outgoing message serialization version is set and can't change.
