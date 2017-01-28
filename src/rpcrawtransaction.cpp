@@ -771,7 +771,9 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp)
 
         // ... and merge in other signatures:
         BOOST_FOREACH(const CMutableTransaction& txv, txVariants) {
-            txin.scriptSig = CombineSignatures(prevPubKey, TransactionSignatureChecker(&txConst, i, amount), txin.scriptSig, txv.vin[i].scriptSig);
+            if (txv.vin.size() > i) {
+                txin.scriptSig = CombineSignatures(prevPubKey, TransactionSignatureChecker(&txConst, i, amount), txin.scriptSig, txv.vin[i].scriptSig);
+	    }
         }
 
         // Because we do not know if forkid is used or not, we just try both.
