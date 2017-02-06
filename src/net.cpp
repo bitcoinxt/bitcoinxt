@@ -987,9 +987,15 @@ void ThreadSocketHandler()
             //
             // Receive
             //
+            bool recvSet = false;
+            bool sendSet = false;
+            bool errorSet = false;
             if (pnode->hSocket == INVALID_SOCKET)
                 continue;
-            if (FD_ISSET(pnode->hSocket, &fdsetRecv) || FD_ISSET(pnode->hSocket, &fdsetError))
+            recvSet = FD_ISSET(pnode->hSocket, &fdsetRecv);
+            sendSet = FD_ISSET(pnode->hSocket, &fdsetSend);
+            errorSet = FD_ISSET(pnode->hSocket, &fdsetError);
+            if (recvSet || errorSet)
             {
                 TRY_LOCK(pnode->cs_vRecvMsg, lockRecv);
                 const int amt2Recv = receiveShaper.available(RECV_SHAPER_MIN_FRAG);
@@ -1037,9 +1043,7 @@ void ThreadSocketHandler()
             //
             // Send
             //
-            if (pnode->hSocket == INVALID_SOCKET)
-                continue;
-            if (FD_ISSET(pnode->hSocket, &fdsetSend))
+            if (sendSet)
             {
                 TRY_LOCK(pnode->cs_vSend, lockSend);
                 if (lockSend && sendShaper.try_consume(0))
