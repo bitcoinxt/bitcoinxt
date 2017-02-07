@@ -5676,8 +5676,10 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman, std::atomic<bool>& interru
             PrintExceptionContinue(NULL, "ProcessMessages()");
         }
 
-        if (!fRet)
+        if (!fRet) {
             LogPrint(Log::NET, "%s(%s, %u bytes) FAILED peer=%d\n", __func__, SanitizeString(strCommand), nMessageSize, pfrom->id);
+        }
+        ProcessRejectsAndBans(connman, pfrom);
 
     return fMoreWork;
 }
@@ -5700,44 +5702,6 @@ bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
     // We want to download thin blocks only.
     return pto->SupportsXThinBlocks()
         || NodeStatePtr(pto->id)->supportsCompactBlocks;
-}
-
-/**
- * Handle async rejects and ban flags.
- *
- * Helper function for SendMessages, returns true if parent function should return.
- */
-static bool ProcessRejectsAndBans(CConnman* connman, CNode* pto) {
-    NodeStatePtr statePtr(pto->GetId());
-    if (connman == nullptr || pto == nullptr || statePtr.IsNull()) {
-        LogPrint(Log::NET, "%s got invalid argments\n", __func__);
-        return true;
-    }
-
-    for (const CBlockReject& reject : statePtr->rejects) {
-        connman->PushMessage(pto, NetMsg(pto, NetMsgType::REJECT,
-                                         std::string(NetMsgType::BLOCK),
-                                         reject.chRejectCode,
-                                         reject.strRejectReason, reject.hashBlock));
-    }
-    statePtr->rejects.clear();
-
-    if (!statePtr->fShouldBan)
-        return false;
-
-    statePtr->fShouldBan = false;
-    if (pto->fWhitelisted) {
-        LogPrintf("Warning: not punishing whitelisted peer %s!\n", pto->addr.ToString());
-        return false;
-    }
-    pto->fDisconnect = true;
-    if (pto->addr.IsLocal()) {
-        LogPrintf("Warning: not banning local peer %s!\n", pto->addr.ToString());
-    }
-    else {
-        connman->Ban(pto->addr);
-    }
-    return true;
 }
 
 bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsgProc)
