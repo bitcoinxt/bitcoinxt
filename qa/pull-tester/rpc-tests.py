@@ -151,7 +151,8 @@ testScriptsExt = [
     'p2p-compactblocks.py',
     'mempool_packages.py',
     'p2p-compactblocks-limits.py',
-    'dbcrash.py'
+    'dbcrash.py',
+    'p2p-timeouts.py',
 ]
 
 
