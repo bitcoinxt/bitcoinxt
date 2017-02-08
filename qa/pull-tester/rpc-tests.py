@@ -122,7 +122,8 @@ testScripts = [
     'disablewallet.py',
     'rpcnamedargs.py',
     'abc-monolith-activation.py',
-    'bip64.py'
+    'bip64.py',
+    'p2p-leaktests.py',
 ]
 
 testScriptsExt = [
