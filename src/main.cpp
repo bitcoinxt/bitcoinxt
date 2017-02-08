@@ -4540,7 +4540,31 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
 
 
-    if (strCommand == "version")
+    if (strCommand == NetMsgType::REJECT)
+    {
+        if (LogAcceptCategory(Log::NET)) {
+            try {
+                string strMsg; unsigned char ccode; string strReason;
+                vRecv >> LIMITED_STRING(strMsg, CMessageHeader::COMMAND_SIZE) >> ccode >> LIMITED_STRING(strReason, MAX_REJECT_MESSAGE_LENGTH);
+
+                ostringstream ss;
+                ss << strMsg << " code " << itostr(ccode) << ": " << strReason;
+
+                if (strMsg == NetMsgType::BLOCK || strMsg == NetMsgType::TX)
+                {
+                    uint256 hash;
+                    vRecv >> hash;
+                    ss << ": hash " << hash.ToString();
+                }
+                LogPrint(Log::NET, "Reject %s\n", SanitizeString(ss.str()));
+            } catch (const std::ios_base::failure&) {
+                // Avoid feedback loops by preventing reject messages from triggering a new reject message.
+                LogPrint(Log::NET, "Unparseable reject message received\n");
+                return false;
+            }
+        }
+    }
+    else if (strCommand == NetMsgType::VERSION)
     {
         // Each connection can only send one version message
         if (pfrom->nVersion != 0)
@@ -5529,33 +5553,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         pfrom->pfilter = new CBloomFilter();
         pfrom->fRelayTxes = true;
     }
-
-
-    else if (strCommand == "reject")
-    {
-        if (LogAcceptCategory(Log::NET)) {
-            try {
-                string strMsg; unsigned char ccode; string strReason;
-                vRecv >> LIMITED_STRING(strMsg, CMessageHeader::COMMAND_SIZE) >> ccode >> LIMITED_STRING(strReason, MAX_REJECT_MESSAGE_LENGTH);
-
-                ostringstream ss;
-                ss << strMsg << " code " << itostr(ccode) << ": " << strReason;
-
-                if (strMsg == "block" || strMsg == "tx")
-                {
-                    uint256 hash;
-                    vRecv >> hash;
-                    ss << ": hash " << hash.ToString();
-                }
-                LogPrint(Log::NET, "Reject %s\n", SanitizeString(ss.str()));
-            } catch (const std::ios_base::failure&) {
-                // Avoid feedback loops by preventing reject messages from triggering a new reject message.
-                LogPrint(Log::NET, "Unparseable reject message received\n");
-                return false;
-            }
-        }
-    }
-
     else
     {
         // Ignore unknown commands for extensibility
