@@ -146,6 +146,7 @@ class TestManager(object):
 
     def clear_all_connections(self):
         self.connections    = []
+        self.test_nodes     = []        
 
     def wait_for_verack(self):
         sleep_time = 0.05

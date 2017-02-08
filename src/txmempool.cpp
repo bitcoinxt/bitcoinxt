@@ -21,10 +21,10 @@ using namespace std;
 CTxMemPoolEntry::CTxMemPoolEntry(const CTransaction& _tx, const CAmount& _nFee,
                                  int64_t _nTime, double _dPriority, unsigned int _nHeight,
                                  bool poolHasNoInputsOf, bool _spendsCoinbase,
-                                 LockPoints lp):
+                                 LockPoints lp, unsigned int _sigOps):
         tx(_tx), nFee(_nFee), nTime(_nTime), dPriority(_dPriority), nHeight(_nHeight),
         hadNoDependencies(poolHasNoInputsOf), spendsCoinbase(_spendsCoinbase),
-        lockPoints(lp)
+        lockPoints(lp), sigOpCount(_sigOps)
 {
     nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
     nModSize = tx.CalculateModifiedSize(nTxSize);
@@ -359,7 +359,7 @@ CTxMemPool::CTxMemPool(const CFeeRate& _minRelayFee) :
     // Sanity checks off by default for performance, because otherwise
     // accepting transactions becomes O(N^2) where N is the number
     // of transactions in the pool
-    fSanityCheck = false;
+    nCheckFrequency = 0;
 
     minerPolicyEstimator = new CBlockPolicyEstimator(_minRelayFee);
 }
@@ -544,7 +544,7 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
                 if (it2 != mapTx.end())
                     continue;
                 const CCoins *coins = pcoins->AccessCoins(txin.prevout.hash);
-                if (fSanityCheck) assert(coins);
+                if (nCheckFrequency != 0) assert(coins);
                 if (!coins || (coins->IsCoinBase() && ((signed long)nMemPoolHeight) - coins->nHeight < COINBASE_MATURITY)) {
                     transactionsToRemove.push_back(tx);
                     break;
@@ -626,7 +626,10 @@ void CTxMemPool::clear()
 
 void CTxMemPool::check(const CCoinsViewCache *pcoins) const
 {
-    if (!fSanityCheck)
+    if (nCheckFrequency == 0)
+        return;
+
+    if (insecure_rand() >= nCheckFrequency)
         return;
 
     LogPrint("mempool", "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(), (unsigned int)mapNextTx.size());
