@@ -21,7 +21,7 @@
 
 using namespace std;
 
-CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweakIn, unsigned char nFlagsIn) :
+CBloomFilter::CBloomFilter(const unsigned int nElements, const double nFPRate, const unsigned int nTweakIn, unsigned char nFlagsIn) :
     /**
      * The ideal size for a bloom filter with a given number of elements and false positive rate is:
      * - nElements * log(fp rate) / ln(2)^2
@@ -42,7 +42,7 @@ CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate, unsigned int 
 }
 
 // Private constructor used by CRollingBloomFilter
-CBloomFilter::CBloomFilter(unsigned int nElements, double nFPRate, unsigned int nTweakIn) :
+CBloomFilter::CBloomFilter(const unsigned int nElements, const double nFPRate, const unsigned int nTweakIn) :
     vData((unsigned int)(-1  / LN2SQUARED * nElements * log(nFPRate)) / 8),
     isFull(false),
     isEmpty(true),
@@ -122,7 +122,7 @@ void CBloomFilter::clear()
     isEmpty = true;
 }
 
-void CBloomFilter::reset(unsigned int nNewTweak)
+void CBloomFilter::reset(const unsigned int nNewTweak)
 {
     clear();
     nTweak = nNewTweak;
@@ -216,7 +216,7 @@ void CBloomFilter::UpdateEmptyFull()
     isEmpty = empty;
 }
 
-CRollingBloomFilter::CRollingBloomFilter(unsigned int nElements, double fpRate)
+CRollingBloomFilter::CRollingBloomFilter(const unsigned int nElements, const double fpRate)
 {
     double logFpRate = log(fpRate);
     /* The optimal number of hash functions is log(fpRate) / log(0.5), but
