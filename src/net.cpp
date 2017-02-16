@@ -440,10 +440,11 @@ void CNode::PushVersion()
             services = NODE_NETWORK;
 
         PushMessage("version", 70002, services, nTime, addrYou, addrMe,
-                nLocalHostNonce, XTSubVersion(), nBestHeight, true);
+                nLocalHostNonce, XTSubVersion(0), nBestHeight, true);
     } else {
+        int nMaxBlockSize = g_signals.GetMaxBlockSize().get_value_or(0);
         PushMessage("version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
-                nLocalHostNonce, XTSubVersion(), nBestHeight, true);
+                nLocalHostNonce, XTSubVersion(nMaxBlockSize), nBestHeight, true);
     }
 }
 

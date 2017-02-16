@@ -1001,11 +1001,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         return InitError(e.what());
     }
 
-    if (XTSubVersion().size() > MAX_SUBVERSION_LENGTH)
+    uint64_t hugeBlock = 1000 * MAX_BLOCK_SIZE;
+    if (XTSubVersion(hugeBlock).size() > MAX_SUBVERSION_LENGTH)
         return InitError(strprintf(
             "Total length of network version string %i exceeds maximum of %i characters. "
             "Reduce size of uacomment or hide platform details.",
-            XTSubVersion().size(), MAX_SUBVERSION_LENGTH));
+            XTSubVersion(hugeBlock).size(), MAX_SUBVERSION_LENGTH));
 
     if (mapArgs.count("-onlynet")) {
         std::set<enum Network> nets;
