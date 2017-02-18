@@ -20,6 +20,8 @@
 #include "boost/multi_index_container.hpp"
 #include "boost/multi_index/ordered_index.hpp"
 #include "boost/multi_index/hashed_index.hpp"
+#include <boost/thread/locks.hpp>
+#include <boost/thread/mutex.hpp>
 
 class CAutoFile;
 class CBlockIndex;
@@ -369,6 +371,7 @@ private:
     uint64_t totalTxSize; //! sum of all mempool tx' byte sizes
     uint64_t cachedInnerUsage; //! sum of dynamic memory usage of all the map elements (NOT the maps themselves)
 
+    boost::mutex cs_txPerSec;
     double nTxPerSec; //BU: tx's per second accepted into the mempool
 public:
     typedef boost::multi_index_container<
@@ -528,7 +531,7 @@ public:
     // BU: begin
     double TransactionsPerSecond()
     {
-        LOCK(cs);
+        boost::mutex::scoped_lock lock(cs_txPerSec);
         return nTxPerSec;
     }
     // BU: end
