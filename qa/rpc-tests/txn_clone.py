@@ -23,6 +23,11 @@ class TxnMallTest(BitcoinTestFramework):
         # Start with split network:
         return super(TxnMallTest, self).setup_network(True)
 
+    def setup_nodes(self):
+        #This test requires mocktime
+        enable_mocktime()
+        return start_nodes(4, self.options.tmpdir)
+
     def run_test(self):
         # All nodes should start with 1,250 BTC:
         starting_balance = 1250
