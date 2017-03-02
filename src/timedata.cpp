@@ -32,7 +32,11 @@ int64_t GetTimeOffset()
 
 int64_t GetAdjustedTime()
 {
-    return GetTime() + GetTimeOffset();
+    if (GetBoolArg("-trustsystemclock", true)) {
+        return GetTime();
+    } else {
+        return GetTime() + GetTimeOffset();
+    }
 }
 
 static int64_t abs64(int64_t n)
