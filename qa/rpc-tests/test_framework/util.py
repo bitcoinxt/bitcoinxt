@@ -285,26 +285,6 @@ def initialize_chain_clean(test_dir, num_nodes):
 def wait_for_node_exit(node_index, timeout):
     bitcoind_processes[node_index].wait(timeout)
 
-def _rpchost_to_args(rpchost):
-    '''Convert optional IP:port spec to rpcconnect/rpcport args'''
-    if rpchost is None:
-        return []
-
-    match = re.match('(\[[0-9a-fA-f:]+\]|[^:]+)(?::([0-9]+))?$', rpchost)
-    if not match:
-        raise ValueError('Invalid RPC host spec ' + rpchost)
-
-    rpcconnect = match.group(1)
-    rpcport = match.group(2)
-
-    if rpcconnect.startswith('['): # remove IPv6 [...] wrapping
-        rpcconnect = rpcconnect[1:-1]
-
-    rv = ['-rpcconnect=' + rpcconnect]
-    if rpcport:
-        rv += ['-rpcport=' + rpcport]
-    return rv
-
 def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=None):
     """
     Start a bitcoind and return RPC connection to it
