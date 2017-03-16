@@ -101,7 +101,7 @@ protected:
 const CChainParams &Params();
 
 /**
- * @returns CChainParams for the given BIP70 chain name.
+ * @returns CChainParams for the given chain name.
  */
 CChainParams& Params(const std::string& chain);
 
