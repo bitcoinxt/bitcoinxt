@@ -198,9 +198,11 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             if (!IsFinalTx(tx, nHeight, nLockTimeCutoff))
                 continue;
 
+            // TODO: with more complexity we could make the block bigger when
+            // sigop-constrained and sigop density in later megabytes is low
             unsigned int nTxSigOps = iter->GetSigOpCount();
-            if (nBlockSigOps + nTxSigOps >= MaxBlockSigops(hardLimit)) {
-                if (nBlockSigOps > MaxBlockSigops(hardLimit) - 2) {
+            if (nBlockSigOps + nTxSigOps >= MaxBlockSigops(nBlockSize)) {
+                if (nBlockSigOps > MaxBlockSigops(nBlockSize) - 2) {
                     break;
                 }
                 continue;
