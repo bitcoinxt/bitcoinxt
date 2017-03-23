@@ -202,6 +202,7 @@ void ThreadScriptCheck();
 /** Try to detect Partition (network isolation) attacks against us */
 int PartitionCheck(bool (*initialDownloadCheck)(), CCriticalSection& cs, const CBlockIndex *const &bestHeader, int64_t nPowTargetSpacing);
 /** Check whether we are doing an initial block download (synchronizing from disk or network) */
+extern bool fForceInitialBlockDownload;
 bool IsInitialBlockDownload();
 /** Format a string that describes several potential problems detected by the core */
 std::string GetWarnings(std::string strFor);

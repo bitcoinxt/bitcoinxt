@@ -553,12 +553,14 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         int index_in_template = i - 1;
         entry.push_back(Pair("fee", pblocktemplate->vTxFees[index_in_template]));
         entry.push_back(Pair("sigops", pblocktemplate->vTxSigOps[index_in_template]));
-
         transactions.push_back(entry);
     }
 
+    uint64_t nMaxBlockSize = GetNextMaxBlockSize(chainActive.Tip(), Params().GetConsensus());
+    CScript flags = CScript() << BIP100Str(nMaxBlockSize);
+    flags +=  COINBASE_FLAGS;
     UniValue aux(UniValue::VOBJ);
-    aux.push_back(Pair("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end())));
+    aux.push_back(Pair("flags", HexStr(flags.begin(), flags.end())));
 
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
 
@@ -570,7 +572,6 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         aMutable.push_back("prevblock");
     }
 
-    uint64_t nMaxBlockSize = GetNextMaxBlockSize(chainActive.Tip(), Params().GetConsensus());
     UniValue result(UniValue::VOBJ);
     result.push_back(Pair("capabilities", aCaps));
     result.push_back(Pair("version", pblock->nVersion));

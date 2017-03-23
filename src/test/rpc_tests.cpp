@@ -6,7 +6,11 @@
 #include "rpcclient.h"
 
 #include "base58.h"
+#include "main.h"
+#include "net.h"
 #include "netbase.h"
+#include "options.h"
+#include "utilstrencodings.h"
 
 #include "test/test_bitcoin.h"
 
@@ -172,6 +176,65 @@ BOOST_AUTO_TEST_CASE(rpc_boostasiotocnetaddr)
     BOOST_CHECK_EQUAL(BoostAsioToCNetAddr(boost::asio::ip::address::from_string("::0:127.0.0.1")).ToString(), "127.0.0.1");
     // v4 mapped must be interpreted as IPv4
     BOOST_CHECK_EQUAL(BoostAsioToCNetAddr(boost::asio::ip::address::from_string("::ffff:127.0.0.1")).ToString(), "127.0.0.1");
+}
+
+static std::string get_coinbaseaux_flags(UniValue blocktpl) {
+    UniValue aux = find_value(blocktpl.get_obj(), "coinbaseaux").get_obj();
+    std::string hexstr = find_value(aux.get_obj(), "flags").get_str();
+    std::vector<unsigned char> parsed = ParseHex(hexstr);
+    return std::string(parsed.begin(), parsed.end());
+}
+
+// Put us in a state where we accept rpc calls.
+class RpcMineState {
+public:
+    RpcMineState()
+    {
+        // Don't throw "Bitcoin is downloading blocks"
+        fForceInitialBlockDownload = true;
+
+        // Don't throw "Bitcoin is not connected"
+        LOCK(cs_vNodes);
+        assert(vNodes.empty());
+        vNodes.push_back(new CNode(INVALID_SOCKET, CAddress()));
+
+    }
+    ~RpcMineState() {
+        fForceInitialBlockDownload = false;
+
+        LOCK(cs_vNodes);
+        delete vNodes[0];
+        vNodes.clear();
+    }
+};
+
+BOOST_AUTO_TEST_CASE(rpc_getblocktemplate_vote)
+{
+    RpcMineState raii;
+
+    UniValue noVote = CallRPC("getblocktemplate");
+    std::string f = get_coinbaseaux_flags(noVote);
+    BOOST_CHECK(f.find("/BIP100/EB1/") != std::string::npos);
+    BOOST_CHECK(f.find("/B1/") == std::string::npos);
+
+    // Vote for 16MB blocks (using -maxblocksizevote)
+    struct Dummy : public ArgGetter {
+        int64_t GetArg(const std::string& arg, int64_t def) override {
+            return arg == "-maxblocksizevote" ? 16 : def;
+        }
+
+        bool GetBool(const std::string&, bool def) override
+        { return def; }
+
+        std::vector<std::string> GetMultiArgs(const std::string&) override
+        { return { }; }
+    };
+    auto reset = SetDummyArgGetter(std::unique_ptr<ArgGetter>(new Dummy));
+
+    UniValue hasVote = CallRPC("getblocktemplate");
+    f = get_coinbaseaux_flags(hasVote);
+    BOOST_CHECK(f.find("/BIP100/B16/EB1/") != std::string::npos);
+
 }
 
 BOOST_AUTO_TEST_SUITE_END()
