@@ -5435,7 +5435,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             DefaultHeaderProcessor headerp(pfrom, blocksInFlight, thinblockmg,
                     inFlight, CheckBlockIndex);
             CompactBlockProcessor blockp(*pfrom, *(nodestate->thinblock), headerp);
-            blockp(vRecv, mempool);
+            blockp(vRecv, mempool, chainActive.Tip()->nMaxBlockSize);
         }
         catch (...) {
             LogPrintf("Unexpected error receiving cmpctblock from %d\n", pfrom->id);

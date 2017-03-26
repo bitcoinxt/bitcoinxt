@@ -14,6 +14,7 @@
 #include <boost/test/unit_test.hpp>
 #include <stdexcept>
 #include <limits>
+#include <cmath>
 
 BOOST_AUTO_TEST_SUITE(blockencodings_tests);
 
@@ -43,34 +44,48 @@ BOOST_AUTO_TEST_CASE(TransactionsRequestSerializationTest) {
 BOOST_AUTO_TEST_CASE(validate_compact_block) {
     CBlock block = TestBlock1(); // valid block
     CompactBlock a(block, CoinbaseOnlyPrefiller{});
-    BOOST_CHECK_NO_THROW(validateCompactBlock(a));
+    uint64_t currMaxBlockSize = 1000000; // 1MB
+    BOOST_CHECK_NO_THROW(validateCompactBlock(a, currMaxBlockSize));
 
-    // Invalid header
+    // invalid header
     CompactBlock b = a;
     b.header.SetNull();
     BOOST_ASSERT(b.header.IsNull());
-    BOOST_CHECK_THROW(validateCompactBlock(b), std::invalid_argument);
+    BOOST_CHECK_THROW(validateCompactBlock(b, currMaxBlockSize), std::invalid_argument);
 
     // null tx in prefilled
     CompactBlock c = a;
     c.prefilledtxn.at(0).tx = CTransaction();
-    BOOST_CHECK_THROW(validateCompactBlock(c), std::invalid_argument);
+    BOOST_CHECK_THROW(validateCompactBlock(c, currMaxBlockSize), std::invalid_argument);
 
     // overflowing index
     CompactBlock d = a;
     d.prefilledtxn.at(0).index = std::numeric_limits<uint16_t>::max();
-    BOOST_CHECK_THROW(validateCompactBlock(d), std::invalid_argument);
+    BOOST_CHECK_THROW(validateCompactBlock(d, currMaxBlockSize), std::invalid_argument);
 
     // too high index
     CompactBlock e = a;
     e.prefilledtxn.at(0).index = std::numeric_limits<uint16_t>::max() / 2;
-    BOOST_CHECK_THROW(validateCompactBlock(e), std::invalid_argument);
+    BOOST_CHECK_THROW(validateCompactBlock(e, currMaxBlockSize), std::invalid_argument);
 
     // no transactions
     CompactBlock f = a;
     f.shorttxids.clear();
     f.prefilledtxn.clear();
-    BOOST_CHECK_THROW(validateCompactBlock(f), std::invalid_argument);
+    BOOST_CHECK_THROW(validateCompactBlock(f, currMaxBlockSize), std::invalid_argument);
+
+    // too big
+    CompactBlock g = a;
+    currMaxBlockSize = 1000 * 100; // 100kb (for faster unittest)
+    size_t tooManyTx = std::ceil(currMaxBlockSize * 1.05 / minTxSize()) + 1;
+    g.prefilledtxn.resize(tooManyTx, g.prefilledtxn.at(0));
+    BOOST_CHECK_THROW(validateCompactBlock(g, currMaxBlockSize), std::invalid_argument);
+
+    // not too big
+    uint64_t nextMaxBlockSize = currMaxBlockSize * 105 / 100;
+    uint64_t nextMaxPrefilled = (nextMaxBlockSize / minTxSize()) - g.shorttxids.size();
+    g.prefilledtxn.resize(nextMaxPrefilled);
+    BOOST_CHECK_NO_THROW(validateCompactBlock(g, currMaxBlockSize));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

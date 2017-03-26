@@ -9,7 +9,8 @@
 #include "consensus/validation.h"
 #include "compacttxfinder.h"
 
-void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mempool)
+void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mempool,
+        uint64_t currMaxBlockSize)
 {
     CompactBlock block;
     vRecv >> block;
@@ -20,7 +21,7 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
             hash.ToString(), worker.nodeID());
 
     try {
-        validateCompactBlock(block);
+        validateCompactBlock(block, currMaxBlockSize);
     }
     catch (const std::exception& e) {
         LogPrint("thin", "Invalid compact block %s\n", e.what());

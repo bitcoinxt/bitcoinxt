@@ -12,6 +12,8 @@
 #include "testutil.h"
 #include "util.h" // for fPrintToDebugLog
 #include "xthin.h"
+#include "compactthin.h"
+#include "compactblockprocessor.h"
 #include <boost/test/unit_test_suite.hpp>
 #include <boost/test/test_tools.hpp>
 
@@ -295,4 +297,34 @@ BOOST_AUTO_TEST_CASE(xthinblock_rerequest_missing) {
 }
 
 BOOST_AUTO_TEST_SUITE_END();
+BOOST_AUTO_TEST_SUITE(compactblockprocessor_tests);
 
+// TODO: Move to compactblockprocessor_tests.cpp after thin block
+// announcements are merged.
+BOOST_AUTO_TEST_CASE(compactblockprocessor_fetch_full) {
+    CBlock testblock = TestBlock1();
+
+    DummyNode node;
+    std::unique_ptr<ThinBlockManager> tmgr = GetDummyThinBlockMg();
+    CompactWorker worker(*tmgr, node.id);
+    DummyHeaderProcessor hprocessor;
+    CompactBlockProcessor p(node, worker, hprocessor);
+
+    // create a invalid compact block (obviously too big)
+    CompactBlock block(TestBlock1(), CoinbaseOnlyPrefiller{});
+
+    uint64_t currMaxBlockSize = 1000 * 100; // 100kb (for faster unittest)
+    size_t tooManyTx = std::ceil(currMaxBlockSize * 1.05 / minTxSize()) + 1;
+    block.prefilledtxn.resize(tooManyTx, block.prefilledtxn.at(0));
+
+    CTxMemPool mpool(CFeeRate(0));
+    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
+    stream << block;
+    p(stream, mpool, currMaxBlockSize);
+
+    // should have rejected the block
+    BOOST_CHECK_EQUAL(1, node.messages.size());
+    BOOST_CHECK_EQUAL("reject", node.messages.at(0));
+}
+
+BOOST_AUTO_TEST_SUITE_END();
