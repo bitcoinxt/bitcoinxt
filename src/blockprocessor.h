@@ -11,8 +11,8 @@ class uint256;
 class BlockProcessor {
 
     public:
-        BlockProcessor(CNode& f, ThinBlockWorker& w, 
-                const std::string& netcmd, BlockHeaderProcessor& h) : 
+        BlockProcessor(CNode& f, ThinBlockWorker& w,
+                const std::string& netcmd, BlockHeaderProcessor& h) :
             from(f), worker(w), netcmd(netcmd), headerProcessor(h)
         {
         }
@@ -26,10 +26,12 @@ class BlockProcessor {
         CNode& from;
         ThinBlockWorker& worker;
         virtual void misbehave(int howmuch);
-        
+        bool requestConnectHeaders(const CBlockHeader&);
+
     private:
         std::string netcmd;
         BlockHeaderProcessor& headerProcessor;
+
 };
 
 inline BlockProcessor::~BlockProcessor() { }

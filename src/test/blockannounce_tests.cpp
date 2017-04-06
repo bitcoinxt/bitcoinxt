@@ -14,18 +14,18 @@
 struct DummyBlockAnnounceReceiver : public BlockAnnounceReceiver {
 
     DummyBlockAnnounceReceiver(uint256 block,
-            CNode& from, ThinBlockManager& thinmg, InFlightIndex& inFlightIndex) : 
+            CNode& from, ThinBlockManager& thinmg, InFlightIndex& inFlightIndex) :
         BlockAnnounceReceiver(block, from, thinmg, inFlightIndex),
-        updateCalled(0), 
+        updateCalled(0),
         isAlmostSynced(true),
         overrideStrategy(BlockAnnounceReceiver::INVALID)
     {
     }
-    
+
     void updateBlockAvailability() override {
         ++updateCalled;
     }
-        
+
     bool almostSynced() override {
         return isAlmostSynced;
     }
@@ -35,11 +35,11 @@ struct DummyBlockAnnounceReceiver : public BlockAnnounceReceiver {
             ? overrideStrategy
             : BlockAnnounceReceiver::pickDownloadStrategy();
     }
-        
+
     bool blockHeaderIsKnown() const override {
         return BlockAnnounceReceiver::blockHeaderIsKnown();
     }
-        
+
     bool isInitialBlockDownload() const override {
         return false;
     }
@@ -68,7 +68,6 @@ struct BlockAnnounceRecvFixture {
         nodestate(node.id)
     {
         SelectParams(CBaseChainParams::MAIN);
-        nodestate->initialHeadersReceived = true;
     }
 
     uint256 block;
@@ -82,7 +81,7 @@ struct BlockAnnounceRecvFixture {
 BOOST_FIXTURE_TEST_SUITE(blockannouncerecv_tests, BlockAnnounceRecvFixture);
 
 BOOST_AUTO_TEST_CASE(header_is_known) {
-    
+
     // We have not seen the block before.
     BOOST_CHECK(!ann.blockHeaderIsKnown());
 
@@ -94,7 +93,7 @@ BOOST_AUTO_TEST_CASE(header_is_known) {
 BOOST_AUTO_TEST_CASE(announce_updates_availability) {
 
     std::vector<CInv> toFetch;
-    
+
     ann.onBlockAnnounced(toFetch, false);
     BOOST_CHECK_EQUAL(1, ann.updateCalled);
 
@@ -114,7 +113,7 @@ BOOST_AUTO_TEST_CASE(fetch_when_wanted) {
 
     {   // We have block (we don't want it)
         std::vector<CInv> toFetch;
-        DummyBlockIndexEntry entry(block); 
+        DummyBlockIndexEntry entry(block);
         BOOST_CHECK(!ann.onBlockAnnounced(toFetch, false));
         BOOST_CHECK_EQUAL(0, toFetch.size());
     }
@@ -149,7 +148,7 @@ struct DummyArgGetter : public ArgGetter {
 };
 
 BOOST_AUTO_TEST_CASE(dowl_strategy_full_now) {
-    
+
     // Peer does not support thin blocks and we are almost synced.
     node.nServices = 0;
 
@@ -170,25 +169,12 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_full_now) {
             ann.pickDownloadStrategy());
 }
 
-BOOST_AUTO_TEST_CASE(downl_strategy_thin_later) {
-
-    // Node supports thin blocks, but we have not
-    // received any headers from node yet. We may not have
-    // caught up on its longest chain. Download thin later.
-    node.nServices = NODE_THIN;
-    nodestate->initialHeadersReceived = false;
-    BOOST_CHECK_EQUAL(
-            BlockAnnounceReceiver::DOWNL_THIN_LATER,
-            ann.pickDownloadStrategy());
-}
-
-
 BOOST_AUTO_TEST_CASE(dowl_strategy_thin_later_2) {
 
     // Thin supports sending thin blocks but is busy. Request later.
     node.nServices = NODE_THIN;
 
-    // By default DummyNode uses DummyThinWorker. 
+    // By default DummyNode uses DummyThinWorker.
     // DummyThinWorker always returns false for isAvailable().
     BOOST_ASSERT(!nodestate->thinblock->isAvailable());
 
@@ -202,7 +188,7 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_dont_downl_1) {
 
     // If we have requested block from max number of nodes
     // then don't download.
-    
+
     // Set max parallel to 1
     auto arg(new DummyArgGetter);
     std::unique_ptr<ArgReset> argraii
@@ -213,7 +199,6 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_dont_downl_1) {
     // Put one node to work
     DummyNode node2(11, thinmg.get());
     NodeStatePtr state2(node2.id);
-    state2->initialHeadersReceived = true;
     state2->thinblock.reset(new XThinWorker(*thinmg, node2.id));
     state2->thinblock->setToWork(block);
     BOOST_CHECK_EQUAL(1, thinmg->numWorkers(block));
@@ -221,7 +206,7 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_dont_downl_1) {
     // Second one should not attempt to download on announcement.
     nodestate->thinblock.reset(new XThinWorker(*thinmg, node.id));
     node.nServices = NODE_THIN;
-    
+
     BOOST_CHECK_EQUAL(BlockAnnounceReceiver::DONT_DOWNL,
             ann.pickDownloadStrategy());
 }
@@ -229,14 +214,14 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_dont_downl_1) {
 BOOST_AUTO_TEST_CASE(dowl_strategy_dont_downl_2) {
     // Don't download announced block unless we are close to
     // catching up to the longest chain.
-    
+
     ann.isAlmostSynced = false;
     BOOST_CHECK_EQUAL(BlockAnnounceReceiver::DONT_DOWNL, ann.pickDownloadStrategy());
 }
 
 BOOST_AUTO_TEST_CASE(dowl_strategy_dont_dowl_3) {
     // Don't download a block that is already in flight.
-    
+
     node.nServices &= ~NODE_THIN;
 
     inFlightIndex.blockInFlight = true;
@@ -245,22 +230,22 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_dont_dowl_3) {
 }
 
 BOOST_AUTO_TEST_CASE(dowl_strategy_dont_dowl_4) {
-    
+
     // Don't download a block from a peer that has
     // many blocks queued up.
-    
+
     nodestate->nBlocksInFlight = MAX_BLOCKS_IN_TRANSIT_PER_PEER;
     BOOST_CHECK_EQUAL(BlockAnnounceReceiver::DONT_DOWNL,
             ann.pickDownloadStrategy());
 }
 
 BOOST_AUTO_TEST_CASE(dowl_strategy_dont_dowl_5) {
-    
+
     // Don't download a full block from a peer if we
     // are configured to avoid full block downloads.
-    
+
     node.nServices &= ~NODE_THIN;
-    
+
     auto arg = new DummyArgGetter;
     auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
     arg->usethin = 3; // xthin only, avoid full blocks
@@ -273,9 +258,9 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_dont_dowl_5) {
 struct RequestBlockWorker : public DummyThinWorker {
     RequestBlockWorker(ThinBlockManager& mg, NodeId id)
         : DummyThinWorker(mg, id), reqs(0) { }
-    
+
     void requestBlock(const uint256& block,
-        std::vector<CInv>& getDataReq, CNode& node) override { 
+        std::vector<CInv>& getDataReq, CNode& node) override {
         ++reqs;
     }
     int reqs;
@@ -290,7 +275,7 @@ BOOST_AUTO_TEST_CASE(onannounced_downl_thin) {
 
     auto worker = new RequestBlockWorker(*thinmg, node.id);
     nodestate->thinblock.reset(worker); //<- takes ownership of ptr
-    
+
     std::vector<CInv> r;
     BOOST_CHECK(ann.onBlockAnnounced(r, false));
     BOOST_CHECK_EQUAL(1, worker->reqs);
@@ -303,9 +288,9 @@ BOOST_AUTO_TEST_CASE(onannounced_downl_thin) {
 BOOST_AUTO_TEST_CASE(onannounced_downl_full) {
     // Test that onBlockAnnounced requests a full block
     // with DOWL_FULL_NOW strategy.
-    
+
     ann.overrideStrategy = BlockAnnounceReceiver::DOWNL_FULL_NOW;
-    
+
     std::vector<CInv> toFetch;
     BOOST_CHECK(ann.onBlockAnnounced(toFetch, false));
     BOOST_CHECK_EQUAL(1, toFetch.size());
@@ -316,14 +301,14 @@ BOOST_AUTO_TEST_CASE(onannounced_downl_full) {
 }
 
 BOOST_AUTO_TEST_CASE(onannounced_dont_downl) {
-    // Test that onBlockAnnounced does not request anything 
+    // Test that onBlockAnnounced does not request anything
     // with DONT_DOWNL strategy.
 
     ann.overrideStrategy = BlockAnnounceReceiver::DONT_DOWNL;
 
     auto worker = new RequestBlockWorker(*thinmg, node.id);
     nodestate->thinblock.reset(worker); //<- takes ownership of ptr
-    
+
     std::vector<CInv> toFetch;
     BOOST_CHECK(!ann.onBlockAnnounced(toFetch, false));
     BOOST_CHECK_EQUAL(0, worker->reqs);
@@ -335,14 +320,14 @@ BOOST_AUTO_TEST_CASE(onannounced_dont_downl) {
 }
 
 BOOST_AUTO_TEST_CASE(onannounced_dowl_thin_later) {
-    // Test that onBlockAnnounced does not request anything 
+    // Test that onBlockAnnounced does not request anything
     // with DOWL_THIN_LATER strategy.
 
     ann.overrideStrategy = BlockAnnounceReceiver::DOWNL_THIN_LATER;
 
     auto worker = new RequestBlockWorker(*thinmg, node.id);
     nodestate->thinblock.reset(worker); //<- takes ownership of ptr
-    
+
     std::vector<CInv> toFetch;
     BOOST_CHECK(!ann.onBlockAnnounced(toFetch, false));
     BOOST_CHECK_EQUAL(0, worker->reqs);
@@ -469,7 +454,7 @@ BOOST_AUTO_TEST_CASE(announce_with_inv) {
     DummyBlockIndexEntry entry1(uint256S("0xBAD"));
     DummyBlockIndexEntry entry2(uint256S("0xBEEF"));
     entry2.index.pprev = &entry1.index;
-    
+
     to.blocksToAnnounce = { entry1.hash, entry2.hash };
     NodeStatePtr(to.id)->bestHeaderSent = &entry1.index;
 

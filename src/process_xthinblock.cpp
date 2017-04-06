@@ -25,9 +25,18 @@ void XThinBlockProcessor::operator()(
         block.selfValidate();
     }
     catch (const std::invalid_argument& e) {
+        LogPrint("thin", "Invalid xthin block %s\n", e.what());
         rejectBlock(hash, e.what(), 20);
+        return;
     }
-    processHeader(block.header);
+
+    if (requestConnectHeaders(block.header)) {
+        worker.setAvailable();
+        return;
+    }
+
+    if (!processHeader(block.header))
+        return;
 
     from.AddInventoryKnown(CInv(MSG_XTHINBLOCK, hash));
 
