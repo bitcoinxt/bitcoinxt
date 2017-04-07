@@ -63,7 +63,7 @@ protected:
     bool fBad;
 
     /** helper function to efficiently calculate the number of nodes at given height in the merkle tree */
-    unsigned int CalcTreeWidth(int height) {
+    unsigned int CalcTreeWidth(int height) const {
         return (nTransactions+(1 << height)-1) >> height;
     }
 
@@ -121,6 +121,8 @@ public:
 /**
  * Used to relay blocks as header + vector<merkle branch>
  * to filtered nodes.
+ *
+ * NOTE: The class assumes that the given CBlock has *at least* 1 transaction. If the CBlock has 0 txs, it will hit an assertion.
  */
 class CMerkleBlock
 {
