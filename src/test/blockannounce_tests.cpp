@@ -1,10 +1,11 @@
-// Copyright (c) 2016- The Bitcoin XT developers
+// Copyright (c) 2016-2017 The Bitcoin XT developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include <boost/test/unit_test.hpp>
 #include "test/testutil.h"
 #include "blockannounce.h"
+#include "blocksender.h"
 #include "inflightindex.h"
 #include "test/thinblockutil.h"
 #include "options.h"
@@ -362,11 +363,17 @@ class DummyBlockAnnounceSender : BlockAnnounceSender {
         bool canAnnounceWithHeaders() const override {
             return BlockAnnounceSender::canAnnounceWithHeaders();
         }
+        bool canAnnounceWithBlock() const override {
+            return BlockAnnounceSender::canAnnounceWithBlock();
+        }
         bool announceWithHeaders() override {
             return BlockAnnounceSender::announceWithHeaders();
         }
         void announceWithInv() override {
             return BlockAnnounceSender::announceWithInv();
+        }
+        void announceWithBlock(BlockSender& s) override {
+            return BlockAnnounceSender::announceWithBlock(s);
         }
 };
 
@@ -397,10 +404,8 @@ BOOST_AUTO_TEST_CASE(canAnnounceWithHeaders) {
     DummyBlockIndexEntry entry(block);
     SetTipRAII activeTip(&entry.index);
 
-    NodeStatePtr(to.id)->prefersHeaders = false;
-    BOOST_CHECK(!ann.canAnnounceWithHeaders());
-
     NodeStatePtr(to.id)->prefersHeaders = true;
+    to.blocksToAnnounce = std::vector<uint256>(1, block);
     BOOST_CHECK(ann.canAnnounceWithHeaders());
 
     // To many header announcements
@@ -480,6 +485,61 @@ BOOST_AUTO_TEST_CASE(announce_with_inv) {
     BOOST_CHECK_EQUAL(
             entry2.hash.ToString(),
             to.vInventoryToSend.at(0).hash.ToString());
+}
+
+BOOST_AUTO_TEST_CASE(can_announce_with_block) {
+
+    /// These are same criterias as for announcing with headers.
+    /// All must be fulfilled, in addition to more.
+
+    uint256 block = uint256S("0xABBA");
+    // Add block to our active chain.
+    DummyBlockIndexEntry entry(block);
+    SetTipRAII activeTip(&entry.index);
+    to.blocksToAnnounce = std::vector<uint256>(1, block);
+    BOOST_CHECK(ann.canAnnounceWithBlock());
+
+    // Can only announce with a block
+    // if we have a single announcement
+    to.blocksToAnnounce = std::vector<uint256>(2, block);
+    BOOST_CHECK(!ann.canAnnounceWithBlock());
+
+    // We want to announce a block in our active chain. Thats fine.
+    to.blocksToAnnounce = std::vector<uint256>(1, block);
+    BOOST_CHECK(ann.canAnnounceWithBlock());
+
+    // A block not in our active chain,
+    // for example: we re-orged from it.
+    DummyBlockIndexEntry entry2(uint256S("0xFEED"));
+    to.blocksToAnnounce = std::vector<uint256>(1, entry2.hash);
+    BOOST_CHECK(!ann.canAnnounceWithBlock());
+}
+
+BOOST_AUTO_TEST_CASE(announce_with_block) {
+    DummyBlockIndexEntry entry1(uint256S("0xBAD"));
+    DummyBlockIndexEntry entry2(uint256S("0xBEEF"));
+    entry2.index.pprev = &entry1.index;
+
+    // Since it's only one block to announce, it
+    // can be announced with block.
+    to.blocksToAnnounce = { entry2.hash };
+    NodeStatePtr(to.id)->bestHeaderSent = &entry1.index;
+    NodeStatePtr(to.id)->supportsCompactBlocks = true;
+
+    struct DummyBlockSender : public BlockSender {
+
+        bool readBlockFromDisk(CBlock& block, const CBlockIndex*) override {
+            block = TestBlock1();
+            return true;
+        }
+    };
+    DummyBlockSender sender;
+    ann.announceWithBlock(sender);
+    BOOST_CHECK_EQUAL(1, to.messages.size());
+    BOOST_CHECK_EQUAL("cmpctblock", to.messages.at(0));
+
+    // bestHeaderSent should now be entry3
+    BOOST_CHECK(NodeStatePtr(to.id)->bestHeaderSent == &entry2.index);
 }
 
 BOOST_AUTO_TEST_CASE(find_headers_to_announce) {

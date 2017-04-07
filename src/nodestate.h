@@ -67,8 +67,10 @@ struct CNodeState {
     //! Whether we consider this a preferred download peer.
     bool fPreferredDownload;
 
-    //! Whether this peer wants invs or headers (when possible) for block announcements.
+    //! Whether this peer wants headers (when possible) for block announcements.
     bool prefersHeaders;
+    //! Whether this peer wants thin blocks (when possible) for block announcements.
+    bool prefersBlocks;
 
     // we need to receive headers leading to a block, before we can
     // request a block.

@@ -4938,9 +4938,10 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             return true; // Ignore as per BIP152
 
         LOCK(cs_main);
-        NodeStatePtr(pfrom->id)->supportsCompactBlocks = true;
-        NodeStatePtr(pfrom->id)->thinblock.reset(
-                new CompactWorker(thinblockmg, pfrom->id));
+        NodeStatePtr node(pfrom->id);
+        node->supportsCompactBlocks = true;
+        node->prefersBlocks = highBandwidth;
+        node->thinblock.reset(new CompactWorker(thinblockmg, pfrom->id));
     }
 
     else if (strCommand == "sendheaders")
@@ -5013,6 +5014,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         auto mi = mapBlockIndex.find(req.blockhash);
         bool haveBlock = mi != mapBlockIndex.end();
+        LOCK(cs_main);
         BlockSender bs;
         bool canSend = haveBlock && bs.canSend(
                 chainActive, *(mi->second), pindexBestHeader);
@@ -5432,6 +5434,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         BlockMap::iterator mi = mapBlockIndex.find(req.block);
         bool haveBlock = mi != mapBlockIndex.end();
+        LOCK(cs_main);
         BlockSender bs;
         bool canSend = haveBlock && bs.canSend(
                 chainActive, *(mi->second), pindexBestHeader);
