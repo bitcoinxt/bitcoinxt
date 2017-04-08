@@ -228,8 +228,16 @@ bool BlockAnnounceSender::canAnnounceWithHeaders() const {
 // We only announce with a thin block if there is one block to announce.
 // In addition, same limitations as announcing as header apply.
 bool BlockAnnounceSender::canAnnounceWithBlock() const {
-    return to.blocksToAnnounce.size() == 1
-        && canAnnounceWithHeaders();
+
+    if(to.blocksToAnnounce.size() != 1)
+        return false;
+
+    if (!canAnnounceWithHeaders())
+        return false;
+
+    uint256 hash = to.blocksToAnnounce[0];
+    CBlockIndex* block = mapBlockIndex.find(hash)->second;
+    return block->nStatus & BLOCK_HAVE_DATA;
 }
 
 bool BlockAnnounceSender::announceWithHeaders() {
