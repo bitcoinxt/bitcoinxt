@@ -4662,6 +4662,16 @@ struct MempoolHashProvider : public TxHashProvider {
     }
 };
 
+void unexpectedThinError(const std::string& cmd, CNode& from, const std::string& err) {
+    LogPrintf("Unexpected error handling cmd '%s': '%s' peer=%d\n", cmd, err, from.id);
+    {
+        LOCK(cs_main);
+        NodeStatePtr(from.id)->thinblock->setAvailable();
+        Misbehaving(from.id, 10);
+    }
+    from.PushMessage("reject", cmd, REJECT_MALFORMED, err);
+}
+
 bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t nTimeReceived)
 {
     RandAddSeedPerfmon();
@@ -5335,12 +5345,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                 inFlight, CheckBlockIndex);
             ProcessMerkleBlock(*pfrom, vRecv, *(nodestate->thinblock), TxFinderImpl(), p);
         }
-        catch (...) {
-            LogPrintf("Unexpected error receiving merkleblock from %d\n", pfrom->id);
-            LOCK(cs_main);
-            NodeStatePtr nodestate(pfrom->id);
-            nodestate->thinblock->setAvailable();
-            Misbehaving(pfrom->GetId(), 10); // FIXME: Is this DoS policy reasonable? May not be pfrom's fault.
+        catch (const std::exception& e) {
+            unexpectedThinError(strCommand, *pfrom, e.what());
             throw;
         }
 
@@ -5357,12 +5363,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             XThinBlockProcessor blockp(*pfrom, *(nodestate->thinblock), headerp);
             blockp(vRecv, TxFinderImpl());
         }
-        catch (...) {
-            LogPrintf("Unexpected error receiving xthinblock from %d\n", pfrom->id);
-            LOCK(cs_main);
-            NodeStatePtr nodestate(pfrom->id);
-            nodestate->thinblock->setAvailable();
-            Misbehaving(pfrom->GetId(), 10); // FIXME: Is this DoS policy reasonable? May not be pfrom's fault.
+        catch (const std::exception& e) {
+            unexpectedThinError(strCommand, *pfrom, e.what());
             throw;
         }
     }
@@ -5378,12 +5380,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             CompactBlockProcessor blockp(*pfrom, *(nodestate->thinblock), headerp);
             blockp(vRecv, mempool);
         }
-        catch (...) {
-            LogPrintf("Unexpected error receiving cmpctblock from %d\n", pfrom->id);
-            LOCK(cs_main);
-            NodeStatePtr nodestate(pfrom->id);
-            nodestate->thinblock->setAvailable();
-            Misbehaving(pfrom->GetId(), 10); // FIXME: Is this DoS policy reasonable? May not be pfrom's fault.
+        catch (const std::exception& e) {
+            unexpectedThinError(strCommand, *pfrom, e.what());
             throw;
         }
     }
