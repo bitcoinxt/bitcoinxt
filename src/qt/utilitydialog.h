@@ -21,7 +21,12 @@ class HelpMessageDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit HelpMessageDialog(QWidget *parent, bool about);
+    enum Type {
+        ShowAbout,
+        ShowCommandLineOptions
+    };
+
+    explicit HelpMessageDialog(Type type, QWidget *parent = 0);
     ~HelpMessageDialog();
 
     void printToConsole();

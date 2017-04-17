@@ -24,7 +24,7 @@
 #include <QVBoxLayout>
 
 /** "Help message" or "About" dialog box */
-HelpMessageDialog::HelpMessageDialog(QWidget *parent, bool about) :
+HelpMessageDialog::HelpMessageDialog(HelpMessageDialog::Type type, QWidget *parent) :
     QDialog(parent),
     ui(new Ui::HelpMessageDialog)
 {
@@ -40,7 +40,7 @@ HelpMessageDialog::HelpMessageDialog(QWidget *parent, bool about) :
     version += " " + tr("(%1-bit)").arg(32);
 #endif
 
-    if (about)
+    if (type == ShowAbout)
     {
         setWindowTitle(tr("About Bitcoin XT"));
 

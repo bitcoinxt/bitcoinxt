@@ -49,7 +49,7 @@ class BitcoinUnits: public QAbstractListModel
     Q_OBJECT
 
 public:
-    explicit BitcoinUnits(QObject *parent);
+    explicit BitcoinUnits(QObject *parent = 0);
 
     /** Bitcoin units.
       @note Source: https://en.bitcoin.it/wiki/Units . Please add only sensible ones

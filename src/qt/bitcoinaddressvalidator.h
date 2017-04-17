@@ -15,7 +15,7 @@ class BitcoinAddressEntryValidator : public QValidator
     Q_OBJECT
 
 public:
-    explicit BitcoinAddressEntryValidator(QObject *parent);
+    explicit BitcoinAddressEntryValidator(QObject *parent = 0);
 
     State validate(QString &input, int &pos) const;
 };
@@ -27,7 +27,7 @@ class BitcoinAddressCheckValidator : public QValidator
     Q_OBJECT
 
 public:
-    explicit BitcoinAddressCheckValidator(QObject *parent);
+    explicit BitcoinAddressCheckValidator(QObject *parent = 0);
 
     State validate(QString &input, int &pos) const;
 };

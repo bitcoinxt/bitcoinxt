@@ -24,7 +24,7 @@ class OptionsDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit OptionsDialog(QWidget *parent, bool enableWallet);
+    explicit OptionsDialog(bool enableWallet, QWidget *parent = 0);
     ~OptionsDialog();
 
     void setModel(OptionsModel *model);

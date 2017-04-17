@@ -32,7 +32,7 @@
 #include <QMessageBox>
 #include <QTimer>
 
-OptionsDialog::OptionsDialog(QWidget *parent, bool enableWallet) :
+OptionsDialog::OptionsDialog(bool enableWallet, QWidget *parent) :
     QDialog(parent),
     ui(new Ui::OptionsDialog),
     model(0),

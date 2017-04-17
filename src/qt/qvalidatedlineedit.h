@@ -15,7 +15,7 @@ class QValidatedLineEdit : public QLineEdit
     Q_OBJECT
 
 public:
-    explicit QValidatedLineEdit(QWidget *parent);
+    explicit QValidatedLineEdit(QWidget *parent = 0);
     void clear();
     void setCheckValidator(const QValidator *v);
 
