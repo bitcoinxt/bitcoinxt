@@ -3,19 +3,25 @@
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#
-# Test RPC calls related to blockchain state. Tests correspond to code in
-# rpc/blockchain.cpp.
-#
+"""
+Test the following RPCs:
+    - gettxoutsetinfo
+    - getdifficulty
+    - getbestblockhash
+    - getblockhash
+    - getblockheader
+    - verifychain
+
+Tests correspond to code in rpc/blockchain.cpp.
+"""
 
 from decimal import Decimal
 
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.authproxy import JSONRPCException
 from test_framework.util import (
-    initialize_chain,
     assert_equal,
-    assert_raises,
+    assert_raises_jsonrpc,
     assert_is_hex_string,
     assert_is_hash_string,
     start_nodes,
@@ -46,6 +52,7 @@ class BlockchainTest(BitcoinTestFramework):
     def run_test(self):
         self._test_gettxoutsetinfo()
         self._test_getblockheader()
+        self._test_getdifficulty()
         self.nodes[0].verifychain(4, 0)
 
     def _test_gettxoutsetinfo(self):
@@ -63,8 +70,8 @@ class BlockchainTest(BitcoinTestFramework):
     def _test_getblockheader(self):
         node = self.nodes[0]
 
-        assert_raises(
-            JSONRPCException, lambda: node.getblockheader('nonsense'))
+        assert_raises_jsonrpc(-5, "Block not found",
+                              node.getblockheader, "nonsense")
 
         besthash = node.getbestblockhash()
         secondbesthash = node.getblockhash(199)
@@ -85,6 +92,12 @@ class BlockchainTest(BitcoinTestFramework):
         assert isinstance(header['version'], int)
         assert isinstance(int(header['versionHex'], 16), int)
         assert isinstance(header['difficulty'], Decimal)
+
+    def _test_getdifficulty(self):
+        difficulty = self.nodes[0].getdifficulty()
+        # 1 hash in 2 should be valid, so difficulty should be 1/2**31
+        # binary => decimal => binary math is why we do this check
+        assert abs(difficulty * 2**31 - 1) < 0.0001
 
 if __name__ == '__main__':
     BlockchainTest().main()
