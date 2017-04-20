@@ -98,16 +98,26 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = false;
         consensus.fPowNoRetargeting = false;
-        consensus.nRuleChangeActivationThreshold = 1916; // 95% of 2016
-        consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 27;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
 
         // Deployment of BIP68, BIP112, and BIP113.
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1462060800; // May 1st, 2016
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800; // May 1st, 2017
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].name = "csv";
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].gbt_force = true;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1462060800LL; // May 1st, 2016
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800LL; // May 1st, 2017
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].windowsize = 2016;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].threshold = 1916; // 95% of 2016
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].minlockedblocks = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].minlockedtime = 0;
+
+        // testing bit
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].name = "testdummy";
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].gbt_force = false;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601LL; // January 1, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999LL; // December 31, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].windowsize = 2016;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].threshold = 1916; // 95% of 2016
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].minlockedblocks = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].minlockedtime = 0;
 
         // BIP100 defined start height and max block size change critical vote position
         consensus.bip100ActivationHeight = 449568;
@@ -202,16 +212,26 @@ public:
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
         consensus.fPowNoRetargeting = false;
-        consensus.nRuleChangeActivationThreshold = 1512; // 75% for testchains
-        consensus.nMinerConfirmationWindow = 2016; // nPowTargetTimespan / nPowTargetSpacing
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 27;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601; // January 1, 2008
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999; // December 31, 2008
 
         // Deployment of BIP68, BIP112, and BIP113.
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1456790400; // March 1st, 2016
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800; // May 1st, 2017
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].name = "csv";
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].gbt_force = true;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 1456790400LL; // May 1st, 2016
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 1493596800LL; // May 1st, 2017
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].windowsize = 2016;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].threshold = 1916; // 95% of 2016
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].minlockedblocks = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].minlockedtime = 0;
+
+        // testing bit
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].name = "testdummy";
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].gbt_force = false;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 1199145601LL; // January 1, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 1230767999LL; // December 31, 2008
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].windowsize = 2016;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].threshold = 1916; // 95% of 2016
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].minlockedblocks = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].minlockedtime = 0;
 
         // BIP100 defined start height and max block size change critical vote position
         consensus.bip100ActivationHeight = 798336;
@@ -312,20 +332,32 @@ public:
         consensus.BIP66Height = 1251; // BIP66 activated on regtest (Used in rpc activation tests)
         consensus.powLimit = uint256S("7fffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff");
         consensus.fPowNoRetargeting = true;
-        consensus.nRuleChangeActivationThreshold = 108; // 75% for testchains
-        consensus.nMinerConfirmationWindow = 144; // Faster than normal for regtest (144 instead of 2016)
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].bit = 27;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 999999999999ULL;
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].bit = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 0;
-        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 999999999999ULL;
         consensus.nPowTargetTimespan = 14 * 24 * 60 * 60; // two weeks
         consensus.nPowTargetSpacing = 10 * 60;
         consensus.fPowAllowMinDifficultyBlocks = true;
 
         consensus.bip100ActivationHeight = 0;
         consensus.nMaxBlockSizeChangePosition = 1512;
+
+        // Deployment of BIP68, BIP112, and BIP113.
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].name = "csv";
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].gbt_force = true;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nStartTime = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].nTimeout = 999999999999LL;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].windowsize = 144;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].threshold = 108; // 75% of 144
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].minlockedblocks = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_CSV].minlockedtime = 0;
+
+        // testing bit
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].name = "testdummy";
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].gbt_force = false;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nStartTime = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].nTimeout = 999999999999LL;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].windowsize = 144;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].threshold = 108; // 75% of 144
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].minlockedblocks = 0;
+        consensus.vDeployments[Consensus::DEPLOYMENT_TESTDUMMY].minlockedtime = 0;
 
         // Nov, 13 hard fork is always on on regtest.
         consensus.cashHardForkActivationTime = 0;

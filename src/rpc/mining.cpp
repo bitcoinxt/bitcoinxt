@@ -370,10 +370,15 @@ static UniValue BIP22ValidationResult(const CValidationState& state)
     return "valid?";
 }
 
-std::string gbt_vb_name(const Consensus::DeploymentPos pos) {
-    const struct BIP9DeploymentInfo& vbinfo = VersionBitsDeploymentInfo[pos];
-    std::string s = vbinfo.name;
-    if (!vbinfo.gbt_force) {
+static const Consensus::ForkDeployment& gbt_vb_fork(const Consensus::Params& consensusParams, const Consensus::DeploymentPos pos)
+{
+    return consensusParams.vDeployments.at(pos);
+}
+
+static const std::string gbt_vb_name(const Consensus::ForkDeployment& fork)
+{
+    std::string s = fork.name;
+    if (!fork.gbt_force) {
         s.insert(s.begin(), '!');
     }
     return s;
@@ -667,43 +672,56 @@ UniValue getblocktemplate(const JSONRPCRequest& request)
     UniValue aRules(UniValue::VARR);
     UniValue vbavailable(UniValue::VOBJ);
     for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++i) {
-        Consensus::DeploymentPos pos = Consensus::DeploymentPos(i);
-        ThresholdState state = VersionBitsState(pindexPrev, consensusParams, pos, versionbitscache);
-        switch (state) {
-            case THRESHOLD_DEFINED:
-            case THRESHOLD_FAILED:
-                // Not exposed to GBT at all
-                break;
-            case THRESHOLD_LOCKED_IN:
-                // Ensure bit is set in block version
-                pblock->nVersion |= VersionBitsMask(consensusParams, pos);
-                // FALL THROUGH to get vbavailable set...
-            case THRESHOLD_STARTED:
+        Consensus::DeploymentPos bit = static_cast<Consensus::DeploymentPos>(i);
+        if (!IsConfiguredDeployment(consensusParams, bit)) {
+            continue;
+        }
+        ThresholdState state = VersionBitsState(pindexPrev, consensusParams, bit, versionbitscache);
+        switch (state)
+        {
+        case THRESHOLD_DEFINED:
+        case THRESHOLD_FAILED:
+            // Not exposed to GBT at all
+            break;
+        case THRESHOLD_LOCKED_IN:
+            // Ensure bit is set in block version
+            pblock->nVersion |= VersionBitsMask(consensusParams, bit);
+        // FALLTHROUGH
+        // to get vbavailable set...
+        case THRESHOLD_STARTED:
+        {
+            const Consensus::ForkDeployment &fork = gbt_vb_fork(consensusParams, bit);
+            std::string forkName = gbt_vb_name(fork);
+            vbavailable.push_back(Pair(forkName, bit));
+            if (setClientRules.find(fork.name) == setClientRules.end())
             {
-                const struct BIP9DeploymentInfo& vbinfo = VersionBitsDeploymentInfo[pos];
-                vbavailable.push_back(Pair(gbt_vb_name(pos), consensusParams.vDeployments[pos].bit));
-                if (setClientRules.find(vbinfo.name) == setClientRules.end()) {
-                    if (!vbinfo.gbt_force) {
-                        // If the client doesn't support this, don't indicate it in the [default] version
-                        pblock->nVersion &= ~VersionBitsMask(consensusParams, pos);
-                    }
+                if (!fork.gbt_force)
+                {
+                    // If the client doesn't support this, don't indicate it in the [default] version
+                    pblock->nVersion &= ~VersionBitsMask(consensusParams, bit);
                 }
-                break;
             }
-            case THRESHOLD_ACTIVE:
+            break;
+        }
+        case THRESHOLD_ACTIVE:
+        {
+            // Add to rules only
+            const Consensus::ForkDeployment &fork = gbt_vb_fork(consensusParams, bit);
+            std::string forkName = gbt_vb_name(fork);
+            aRules.push_back(forkName);
+            if (setClientRules.find(fork.name) == setClientRules.end())
             {
-                // Add to rules only
-                const struct BIP9DeploymentInfo& vbinfo = VersionBitsDeploymentInfo[pos];
-                aRules.push_back(gbt_vb_name(pos));
-                if (setClientRules.find(vbinfo.name) == setClientRules.end()) {
-                    // Not supported by the client; make sure it's safe to proceed
-                    if (!vbinfo.gbt_force) {
-                        // If we do anything other than throw an exception here, be sure version/force isn't sent to old clients
-                        throw JSONRPCError(RPC_INVALID_PARAMETER, strprintf("Support for '%s' rule requires explicit client support", vbinfo.name));
-                    }
+                // Not supported by the client; make sure it's safe to proceed
+                if (!fork.gbt_force)
+                {
+                    // If we do anything other than throw an exception here, be sure version/force isn't sent to old
+                    // clients
+                    throw JSONRPCError(RPC_INVALID_PARAMETER,
+                        strprintf("Support for '%s' rule requires explicit client support", fork.name));
                 }
-                break;
             }
+            break;
+        }
         }
     }
     result.push_back(Pair("version", pblock->nVersion));
@@ -713,9 +731,12 @@ UniValue getblocktemplate(const JSONRPCRequest& request)
 
     if (nMaxVersionPreVB >= 2) {
         // If VB is supported by the client, nMaxVersionPreVB is -1, so we won't get here
-        // Because BIP 34 changed how the generation transaction is serialised, we can only use version/force back to v2 blocks
-        // This is safe to do [otherwise-]unconditionally only because we are throwing an exception above if a non-force deployment gets activated
-        // Note that this can probably also be removed entirely after the first BIP9 non-force deployment (ie, probably segwit) gets activated
+        // Because BIP 34 changed how the generation transaction is serialised, we can only use version/force back to v2
+        // blocks
+        // This is safe to do [otherwise-]unconditionally only because we are throwing an exception above if a non-force
+        // deployment gets activated
+        // Note that this can probably also be removed entirely after the first BIP9/BIP135 non-force deployment
+        // (ie, segwit) gets activated
         aMutable.push_back("version/force");
     }
 

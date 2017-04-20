@@ -11,6 +11,7 @@
 #include "sync.h"
 #include "util.h"
 #include "hash.h"
+#include "versionbits.h"
 
 #include <stdint.h>
 
@@ -674,7 +675,7 @@ UniValue SoftForkDesc(const std::string &name, int version, CBlockIndex* pindex,
     return rv;
 }
 
-static UniValue BIP9SoftForkDesc(const Consensus::Params& consensusParams, Consensus::DeploymentPos id)
+static std::pair<std::string,UniValue> BIP9SoftForkDesc(const Consensus::Params& consensusParams, Consensus::DeploymentPos id)
 {
     UniValue rv(UniValue::VOBJ);
     const ThresholdState thresholdState = VersionBitsTipState(consensusParams, id);
@@ -687,11 +688,43 @@ static UniValue BIP9SoftForkDesc(const Consensus::Params& consensusParams, Conse
     }
     if (THRESHOLD_STARTED == thresholdState)
     {
-        rv.push_back(Pair("bit", consensusParams.vDeployments[id].bit));
+        rv.push_back(Pair("bit", (int)id));
     }
-    rv.push_back(Pair("startTime", consensusParams.vDeployments[id].nStartTime));
-    rv.push_back(Pair("timeout", consensusParams.vDeployments[id].nTimeout));
-    return rv;
+    rv.push_back(Pair("startTime", consensusParams.vDeployments.at(id).nStartTime));
+    rv.push_back(Pair("timeout", consensusParams.vDeployments.at(id).nTimeout));
+    return std::make_pair(consensusParams.vDeployments.at(id).name,rv);
+}
+
+static std::pair<std::string,UniValue> BIP135ForkDesc(const Consensus::Params &consensusParams, Consensus::DeploymentPos id)
+{
+    UniValue rv(UniValue::VOBJ);
+    rv.push_back(Pair("bit", id));
+    const ThresholdState thresholdState = VersionBitsTipState(consensusParams, id);
+    switch (thresholdState)
+    {
+    case THRESHOLD_DEFINED:
+        rv.push_back(Pair("status", "defined"));
+        break;
+    case THRESHOLD_STARTED:
+        rv.push_back(Pair("status", "started"));
+        break;
+    case THRESHOLD_LOCKED_IN:
+        rv.push_back(Pair("status", "locked_in"));
+        break;
+    case THRESHOLD_ACTIVE:
+        rv.push_back(Pair("status", "active"));
+        break;
+    case THRESHOLD_FAILED:
+        rv.push_back(Pair("status", "failed"));
+        break;
+    }
+    rv.push_back(Pair("startTime", consensusParams.vDeployments.at(id).nStartTime));
+    rv.push_back(Pair("timeout", consensusParams.vDeployments.at(id).nTimeout));
+    rv.push_back(Pair("windowsize", consensusParams.vDeployments.at(id).windowsize));
+    rv.push_back(Pair("threshold", consensusParams.vDeployments.at(id).threshold));
+    rv.push_back(Pair("minlockedblocks", consensusParams.vDeployments.at(id).minlockedblocks));
+    rv.push_back(Pair("minlockedtime", consensusParams.vDeployments.at(id).minlockedtime));
+    return std::make_pair(consensusParams.vDeployments.at(id).name, rv);
 }
 
 UniValue getblockchaininfo(const JSONRPCRequest& request)
@@ -728,6 +761,23 @@ UniValue getblockchaininfo(const JSONRPCRequest& request)
             "        \"startTime\": xx,       (numeric) the minimum median time past of a block at which the bit gains its meaning\n"
             "        \"timeout\": xx          (numeric) the median time past of a block at which the deployment is considered failed if not yet locked in\n"
             "     }\n"
+            "  ]\n"
+            "  \"bip135_forks\": {            (object) status of BIP135 forks in progress\n"
+            "     \"xxxx\" : {                (string) name of the fork\n"
+            "        \"status\": \"xxxx\",      (string) one of \"defined\", \"started\", \"locked_in\", \"active\", "
+            "\"failed\"\n"
+            "        \"bit\": xx,             (numeric) the bit (0-28) in the block version field used to signal this "
+            "fork (only for \"started\" status)\n"
+            "        \"startTime\": xx,       (numeric) the minimum median time past of a block at which the bit gains "
+            "its meaning\n"
+            "        \"windowsize\": xx,      (numeric) the number of blocks over which the fork status is tallied\n"
+            "        \"threshold\": xx,       (numeric) the number of blocks in a window that must signal for fork to "
+            "lock in\n"
+            "        \"minlockedblocks\": xx, (numeric) the minimum number of blocks to elapse after lock-in and "
+            "before activation\n"
+            "        \"minlockedtime\": xx,   (numeric) the minimum number of seconds to elapse after median time past "
+            "of lock-in until activation\n"
+            "     }\n"
             "  }\n"
             "}\n"
             "\nExamples:\n"
@@ -753,12 +803,24 @@ UniValue getblockchaininfo(const JSONRPCRequest& request)
     CBlockIndex* tip = chainActive.Tip();
     UniValue softforks(UniValue::VARR);
     UniValue bip9_softforks(UniValue::VOBJ);
+    UniValue bip135_forks(UniValue::VOBJ);
     softforks.push_back(SoftForkDesc("bip34", 2, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip66", 3, tip, consensusParams));
     softforks.push_back(SoftForkDesc("bip65", 4, tip, consensusParams));
-    bip9_softforks.push_back(Pair("csv", BIP9SoftForkDesc(consensusParams, Consensus::DEPLOYMENT_CSV)));
-    obj.push_back(Pair("softforks",             softforks));
+    for (int i = 0; i < Consensus::MAX_VERSION_BITS_DEPLOYMENTS; i++)
+    {
+        Consensus::DeploymentPos bit = static_cast<Consensus::DeploymentPos>(i);
+        if (IsConfiguredDeployment(consensusParams, bit))
+        {
+            bip9_softforks.push_back(BIP9SoftForkDesc(consensusParams, bit));
+            bip135_forks.push_back(BIP135ForkDesc(consensusParams, bit));
+        }
+    }
+
+    obj.push_back(Pair("softforks", softforks));
     obj.push_back(Pair("bip9_softforks", bip9_softforks));
+    // to maintain backward compat initially, we introduce a new list for the full BIP135 data
+    obj.push_back(Pair("bip135_forks", bip135_forks));
 
     if (fPruneMode)
     {
