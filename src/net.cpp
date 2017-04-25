@@ -428,10 +428,7 @@ void CNode::PushVersion()
     CAddress addrYou = (addr.IsRoutable() && !IsProxy(addr) ? addr : CAddress(CService("0.0.0.0",0)));
     CAddress addrMe = GetLocalAddress(&addr);
     GetRandBytes((unsigned char*)&nLocalHostNonce, sizeof(nLocalHostNonce));
-    if (fLogIPs)
-        LogPrint("net", "send version message: version %d, blocks=%d, us=%s, them=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), addrYou.ToString(), id);
-    else
-        LogPrint("net", "send version message: version %d, blocks=%d, us=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), id);
+    LogPrint("net", "send version message: version %d, blocks=%d, us=%s, them=%s, peer=%d\n", PROTOCOL_VERSION, nBestHeight, addrMe.ToString(), addrYou.ToString(), id);
 
     // Stealth mode: pretend to be like Bitcoin Core to hide from DoS attackers.
     if (Opt().IsStealthMode()) {
@@ -2078,10 +2075,7 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     ipgroupSlot = AssignIPGroupSlot(CNetAddr(addr.ToStringIP()));
     CIPGroupData ipgroup = ipgroupSlot->Group();
     std::string strIpGroup = tfm::format("(group %s)", ipgroup.name);
-    if (fLogIPs)
-        LogPrint("net", "Added connection to %s peer=%d %s\n", addrName, id, strIpGroup);
-    else
-        LogPrint("net", "Added connection peer=%d %s\n", id, strIpGroup);
+    LogPrint("net", "Added connection to %s peer=%d %s\n", addrName, id, strIpGroup);
 
     // Be shy and don't send version until we hear
     if (hSocket != INVALID_SOCKET && !fInbound)

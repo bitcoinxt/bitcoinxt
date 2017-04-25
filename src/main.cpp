@@ -4810,17 +4810,11 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         pfrom->fSuccessfullyConnected = true;
 
-        string remoteAddr;
-        if (fLogIPs)
-            remoteAddr = ", peeraddr=" + pfrom->addr.ToString();
-
         CIPGroupData ipgroup = pfrom->ipgroupSlot->Group();
-        string group = ipgroup.name != "" ? tfm::format(", ipgroup=%s", ipgroup.name) : "";
-
-        LogPrintf("receive version message: %s: version %d, blocks=%d, us=%s, peerid=%d%s%s\n",
+        LogPrintf("receive version message: %s: version %d, blocks=%d, us=%s, peerid=%d peeraddr=%s ipgroup=%s\n",
                   pfrom->cleanSubVer, pfrom->nVersion,
                   pfrom->nStartingHeight, addrMe.ToString(), pfrom->id,
-                  group, remoteAddr);
+                  pfrom->addr.ToString(), ipgroup.name);
 
         int64_t nTimeOffset = nTime - GetTime();
         pfrom->nTimeOffset = nTimeOffset;
