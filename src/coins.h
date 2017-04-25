@@ -81,7 +81,7 @@ public:
     }
 };
 
-/** 
+/**
  * Pruned version of CTransaction: only retains metadata and unspent transaction outputs
  *
  * Serialized format:
@@ -402,10 +402,10 @@ public:
 
 class CCoinsViewCache;
 
-/** 
+/**
  * A reference to a mutable cache entry. Encapsulating it allows us to run
  *  cleanup code after the modification is finished, and keeping track of
- *  concurrent modifications. 
+ *  concurrent modifications.
  */
 class CCoinsModifier
 {
@@ -432,7 +432,7 @@ protected:
 
     /**
      * Make mutable so that we can "fill the cache" even from Get-methods
-     * declared as "const".  
+     * declared as "const".
      */
     mutable uint256 hashBlock;
     mutable CCoinsMap cacheCoins;
@@ -447,6 +447,7 @@ public:
     // Standard CCoinsView methods
     bool GetCoins(const uint256 &txid, CCoins &coins) const;
     bool HaveCoins(const uint256 &txid) const;
+    bool HaveCoins(const COutPoint &outpoint) const;
     uint256 GetBestBlock() const;
     void SetBestBlock(const uint256 &hashBlock);
     bool BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock);
@@ -459,11 +460,32 @@ public:
     const CCoins* AccessCoins(const uint256 &txid) const;
 
     /**
+     * Return a copy of a Coin in the cache, or a pruned one if not found. This is
+     * more efficient than GetCoins. Modifications to other cache entries are
+     * allowed while accessing the returned pointer.
+     * TODO: return a reference to a Coin after changing CCoinsViewCache storage.
+     */
+    const Coin AccessCoin(const COutPoint &output) const;
+
+    /**
      * Return a modifiable reference to a CCoins. If no entry with the given
      * txid exists, a new one is created. Simultaneous modifications are not
      * allowed.
      */
     CCoinsModifier ModifyCoins(const uint256 &txid);
+
+    /**
+     * Add a coin. Set potential_overwrite to true if a non-pruned version may
+     * already exist.
+     */
+    void AddCoin(const COutPoint& outpoint, Coin&& coin, bool potential_overwrite);
+
+    /**
+     * Spend a coin. Pass moveto in order to get the deleted data.
+     * If no unspent output exists for the passed outpoint, this call
+     * has no effect.
+     */
+    void SpendCoin(const COutPoint &outpoint, Coin* moveto = nullptr);
 
     /**
      * Push the modifications applied to this cache to its base.
@@ -478,7 +500,7 @@ public:
     //! Calculate the size of the cache (in bytes)
     size_t DynamicMemoryUsage() const;
 
-    /** 
+    /**
      * Amount of bitcoins coming in to a transaction
      * Note that lightweight clients may not know anything besides the hash of previous transactions,
      * so may not be able to calculate this.
@@ -499,12 +521,21 @@ public:
     friend class CCoinsModifier;
 
 private:
-    CCoinsMap::const_iterator FetchCoins(const uint256 &txid) const;
+    CCoinsMap::iterator FetchCoins(const uint256 &txid) const;
 
     /**
      * By making the copy constructor private, we prevent accidentally using it when one intends to create a cache on top of a base cache.
      */
     CCoinsViewCache(const CCoinsViewCache &);
 };
+
+//! Utility function to add all of a transaction's outputs to a cache.
+// It assumes that overwrites are only possible for coinbase transactions,
+// TODO: pass in a boolean to limit these possible overwrites to known
+// (pre-BIP34) cases.
+void AddCoins(CCoinsViewCache& cache, const CTransaction& tx, int nHeight);
+
+//! Utility function to find any unspent output with a given txid.
+const Coin AccessByTxid(const CCoinsViewCache& cache, const uint256& txid);
 
 #endif // BITCOIN_COINS_H
