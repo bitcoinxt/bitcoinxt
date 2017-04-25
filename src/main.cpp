@@ -4356,9 +4356,8 @@ bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, ve
             uint256 hash = vOutPoints[i].hash;
             if (view.GetCoins(hash, coins))
             {
-                if (fCheckMemPool)
-                    mempool.pruneSpent(hash, coins);   // TODO: this should be done by the CCoinsViewMemPool
-                if (coins.IsAvailable(vOutPoints[i].n))
+                bool isSpentMempool = fCheckMemPool && !mempool.isSpent(vOutPoints[i]);
+                if (coins.IsAvailable(vOutPoints[i].n) && !isSpentMempool)
                 {
                     hits[i] = true;
                     // Safe to index into vout here because IsAvailable checked if it's off the end of the array, or if
