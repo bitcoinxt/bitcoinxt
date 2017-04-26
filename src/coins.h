@@ -274,8 +274,6 @@ public:
     //! Return priority of tx at height nHeight
     double GetPriority(const CTransaction &tx, uint32_t nHeight) const;
 
-    const CTxOut &GetOutputFor(const CTxIn& input) const;
-
 private:
     CCoinsMap::iterator FetchCoins(const COutPoint &outpoint) const;
 
