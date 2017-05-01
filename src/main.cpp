@@ -2652,7 +2652,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
     }
 
     int nStopAtHeight = GetArg("-stopatheight", DEFAULT_STOPATHEIGHT);
-    if (nStopAtHeight && pindexNewTip->nHeight >= nStopAtHeight) StartShutdown();
+    if (nStopAtHeight && pindexNewTip && pindexNewTip->nHeight >= nStopAtHeight) StartShutdown();
 
     return true;
 }
