@@ -182,8 +182,14 @@ BOOST_AUTO_TEST_CASE(get_max_blocksize_vote_no_vote) {
 
     // missing BIP100 prefix
     BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << to_uchar("/B2/"), height));
-
     BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << to_uchar("/BIP100/B/B8/"), height));
+
+    //Explicit zeros and garbage
+    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << to_uchar("/BIP100/B0/BIP100/B2"), height));
+    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << to_uchar("/EB0/EB2/"), height));
+    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << to_uchar("/BIP100/Bgarbage/B2/"), height));
+    BOOST_CHECK_EQUAL(2000000, GetMaxBlockSizeVote(CScript() << to_uchar("/EBgarbage/EB2/"), height));
+
 
     // Test that height is not a part of the vote string.
     // Encoded height in this test ends with /.

@@ -61,7 +61,8 @@ uint64_t GetNextMaxBlockSize(const CBlockIndex* pindexLast, const Consensus::Par
 
 static uint32_t FindVote(const std::string& coinbase) {
 
-    uint32_t eb_vote = 0;
+    bool eb_vote = false;
+    uint32_t ebVoteMB = 0;
     std::vector<char> curr;
     bool bip100vote = false;
     bool started = false;
@@ -98,8 +99,9 @@ static uint32_t FindVote(const std::string& coinbase) {
             // Look for a EB vote. Keep it, but continue to look for a BIP100/B vote.
             if (!eb_vote && curr[0] == 'E' && curr[1] == 'B') {
                 try {
-                    eb_vote = boost::lexical_cast<uint32_t>(std::string(
+                    ebVoteMB = boost::lexical_cast<uint32_t>(std::string(
                                 begin(curr) + 2, end(curr)));
+                    eb_vote = true;
                 }
                 catch (const std::exception& e) {
                     LogPrintf("Invalid coinbase EB-vote: %s\n", e.what());
@@ -115,7 +117,7 @@ static uint32_t FindVote(const std::string& coinbase) {
         else
             curr.push_back(s);
     }
-    return eb_vote;
+    return ebVoteMB;
 }
 
 uint64_t GetMaxBlockSizeVote(const CScript &coinbase, int32_t nHeight)
