@@ -2,6 +2,7 @@
 #define BITCOIN_TESTUTIL_H
 
 #include "main.h"
+#include <boost/filesystem/path.hpp>
 
 struct DummyBlockIndexEntry {
 DummyBlockIndexEntry(const uint256& hash) : hash(hash) {
@@ -16,4 +17,6 @@ DummyBlockIndexEntry(const uint256& hash) : hash(hash) {
     uint256 hash;
 };
 
-#endif
+boost::filesystem::path GetTempPath();
+
+#endif // BITCOIN_TEST_TESTUTIL_H
