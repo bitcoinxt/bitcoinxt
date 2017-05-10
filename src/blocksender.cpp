@@ -1,4 +1,4 @@
-// Copyright (c) 2016 The Bitcoin XT developers
+// Copyright (c) 2016-2017 The Bitcoin XT developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "blockencodings.h"
@@ -8,6 +8,7 @@
 #include "chain.h"
 #include "chainparams.h"
 #include "util.h"
+#include "utilprocessmsg.h" //
 #include "net.h"
 #include "xthin.h"
 #include "merkleblock.h"
@@ -47,21 +48,11 @@ bool BlockSender::canSend(const CChain& activeChain, const CBlockIndex& block,
     return send;
 }
 
-void updateBestHeaderSent(CNode& node, CBlockIndex* blockIndex) {
-    // When we send a block, were also sending its header.
-    NodeStatePtr state(node.id);
-    if (!state->bestHeaderSent)
-        state->bestHeaderSent = blockIndex;
-
-    if (state->bestHeaderSent->nHeight <= blockIndex->nHeight)
-        state->bestHeaderSent = blockIndex;
-}
-
 void BlockSender::send(const CChain& activeChain, CNode& node,
         CBlockIndex& blockIndex, const CInv& inv)
 {
     sendBlock(node, blockIndex, inv.type, activeChain.Height());
-    updateBestHeaderSent(node, &blockIndex);
+    UpdateBestHeaderSent(node, &blockIndex);
     triggerNextRequest(activeChain, inv, node);
 }
 
