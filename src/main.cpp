@@ -4942,9 +4942,10 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             return true; // Ignore as per BIP152
 
         LOCK(cs_main);
-        NodeStatePtr(pfrom->id)->supportsCompactBlocks = true;
-        NodeStatePtr(pfrom->id)->thinblock.reset(
-                new CompactWorker(thinblockmg, pfrom->id));
+        NodeStatePtr node(pfrom->id);
+        node->supportsCompactBlocks = true;
+        node->prefersBlocks = highBandwidth;
+        node->thinblock.reset(new CompactWorker(thinblockmg, pfrom->id));
     }
 
     else if (strCommand == "sendheaders")
@@ -5017,6 +5018,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         auto mi = mapBlockIndex.find(req.blockhash);
         bool haveBlock = mi != mapBlockIndex.end();
+        LOCK(cs_main);
         BlockSender bs;
         bool canSend = haveBlock && bs.canSend(
                 chainActive, *(mi->second), pindexBestHeader);
@@ -5317,15 +5319,14 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             return true;
         }
 
-        NodeStatePtr(pfrom->id)->initialHeadersReceived = true;
-
-        auto sendGetHeaders = [pfrom](){
-            pfrom->PushMessage("getheaders",
-                    chainActive.GetLocator(pindexBestHeader), uint256());
-        };
         MarkBlockAsInFlight inFlight;
-        DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight,
-                CheckBlockIndex, sendGetHeaders);
+        DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight, CheckBlockIndex);
+
+        if (p.requestConnectHeaders(headers.at(0), *pfrom))
+            // headers don't connect to active chain, requested
+            // new headers to connect.
+            return true;
+
         if (!p(headers, nCount == MAX_HEADERS_RESULTS, true))
             return false;
     }
@@ -5389,6 +5390,18 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         pfrom->AddInventoryKnown(inv);
 
+        LOCK(cs_main);
+        MarkBlockAsInFlight inFlight;
+        DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight, CheckBlockIndex);
+
+        if (p.requestConnectHeaders(block.GetBlockHeader(), *pfrom)) {
+            LogPrintf("Received block %s from peer=%d, but headers do "
+                    "not connect. Discarding.\n");
+            InFlightEraserImpl erase;
+            erase(pfrom->id, inv.hash);
+            return true;
+        }
+
         OnBlockFinished callb(strCommand);
         callb(block, std::vector<NodeId>(1, pfrom->id));
     }
@@ -5424,6 +5437,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         BlockMap::iterator mi = mapBlockIndex.find(req.block);
         bool haveBlock = mi != mapBlockIndex.end();
+        LOCK(cs_main);
         BlockSender bs;
         bool canSend = haveBlock && bs.canSend(
                 chainActive, *(mi->second), pindexBestHeader);

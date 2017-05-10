@@ -1,13 +1,15 @@
-// Copyright (c) 2016 The Bitcoin XT developers
+// Copyright (c) 2016-2017 The Bitcoin XT developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "blockannounce.h"
+#include "blocksender.h"
 #include "main.h" // for mapBlockIndex, UpdateBlockAvailability, IsInitialBlockDownload
 #include "options.h"
 #include "timedata.h"
 #include "inflightindex.h"
 #include "nodestate.h"
 #include "util.h"
+#include "utilprocessmsg.h"
 #include "thinblockmanager.h"
 #include "thinblock.h"
 
@@ -80,9 +82,6 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
 
     NodeStatePtr state(from.id);
 
-    if (!state->initialHeadersReceived)
-        return DOWNL_THIN_LATER;
-
     if (thinmg.numWorkers(block) >= Opt().ThinBlocksMaxParallel()) {
         LogPrint("thin", "max parallel thin req reached, not req %s from peer %d\n",
                 block.ToString(), from.id);
@@ -117,17 +116,6 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch,
     DownloadStrategy s = pickDownloadStrategy();
 
     if (s == DOWNL_THIN_NOW) {
-
-        if (!announcedAsHeader && nodestate->prefersHeaders) {
-            // Node we're requesting from prefers headers announcement,
-            // but sent us an inv announcement.
-            //
-            // It is likely that we don't have previous blocks,
-            // this block may be part of an reorg. So we request headers to
-            // be sure that we have all headers leading up to this block.
-            requestHeaders(from, block);
-        }
-
         int numDownloading = thinmg.numWorkers(block);
         LogPrint("thin", "requesting %s from peer %d (%d of %d parallel)\n",
             block.ToString(), from.id, (numDownloading + 1), Opt().ThinBlocksMaxParallel());
@@ -137,18 +125,12 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch,
         return true;
     }
 
-    // First request the headers preceding the announced block. In the normal fully-synced
-    // case where a new block is announced that succeeds the current tip (no reorganization),
-    // there are no such headers.
-    // Secondly, and only when we are close to being synced, we request the announced block directly,
-    // to avoid an extra round-trip. Note that we must *first* ask for the headers, so by the
-    // time the block arrives, the header chain leading up to it is already validated. Not
-    // doing this will result in the received block being rejected as an orphan in case it is
-    // not a direct successor.
-
-    if (!blocksInFlight.isInFlight(block) || !nodestate->initialHeadersReceived) {
+    // Request headers preceding the announced block (if any), so by the time
+    // the full block arrives, the header chain leading up to it is already
+    // validated. Not doing this will result in block being discarded and
+    // re-downloaded later.
+    if (!hasBlockData() && !blocksInFlight.isInFlight(block))
         requestHeaders(from, block);
-    }
 
     if (s == DONT_DOWNL)
         return false;
@@ -205,9 +187,6 @@ bool BlockAnnounceSender::canAnnounceWithHeaders() const {
     if (to.blocksToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE)
         return false;
 
-    if (!NodeStatePtr(to.id)->prefersHeaders)
-        return false;
-
     // If we come across any
     // headers that aren't on chainActive, give up.
     for (auto h : to.blocksToAnnounce) {
@@ -224,6 +203,21 @@ bool BlockAnnounceSender::canAnnounceWithHeaders() const {
     }
 
     return blocksConnect(to.blocksToAnnounce);
+}
+
+// We only announce with a thin block if there is one block to announce.
+// In addition, same limitations as announcing as header apply.
+bool BlockAnnounceSender::canAnnounceWithBlock() const {
+
+    if(to.blocksToAnnounce.size() != 1)
+        return false;
+
+    if (!canAnnounceWithHeaders())
+        return false;
+
+    uint256 hash = to.blocksToAnnounce[0];
+    CBlockIndex* block = mapBlockIndex.find(hash)->second;
+    return block->nStatus & BLOCK_HAVE_DATA;
 }
 
 bool BlockAnnounceSender::announceWithHeaders() {
@@ -272,9 +266,26 @@ bool BlockAnnounceSender::announceWithHeaders() {
             headers.back().GetHash().ToString(), to.id);
 
     to.PushMessage("headers", headers);
-    NodeStatePtr(to.id)->bestHeaderSent = best;
+    UpdateBestHeaderSent(to, best);
 
     return true;
+}
+
+void BlockAnnounceSender::announceWithBlock(BlockSender& sender) {
+    assert(to.blocksToAnnounce.size() == 1);
+    uint256 hash = to.blocksToAnnounce[0];
+    CBlockIndex* block = mapBlockIndex.find(hash)->second;
+
+    if (peerHasHeader(block)) {
+        // peer may have announced this block to us.
+        return;
+    }
+
+    sender.sendBlock(to, *block, MSG_CMPCT_BLOCK, block->nHeight);
+    UpdateBestHeaderSent(to, block);
+
+    LogPrint("net", "%s: block %s to peer=%d\n",
+            __func__, hash.ToString(), to.id);
 }
 
 void BlockAnnounceSender::announce() {
@@ -283,11 +294,24 @@ void BlockAnnounceSender::announce() {
     if (to.blocksToAnnounce.empty())
         return;
 
-    LogPrint("ann", "Announce for peer=%d, %d blocks, prefersheaders: %d\n",
-            to.id, to.blocksToAnnounce.size(), NodeStatePtr(to.id)->prefersHeaders);
+    NodeStatePtr node(to.id);
+    LogPrint("ann", "Announce for peer=%d, %d blocks, prefersheaders: %d, prefersblocks: %d\n",
+            to.id, to.blocksToAnnounce.size(),
+            node->prefersHeaders, node->prefersBlocks);
 
     try {
-        if (!(canAnnounceWithHeaders() && announceWithHeaders()))
+        bool announced = false;
+
+        if (node->prefersBlocks && canAnnounceWithBlock()) {
+            BlockSender sender;
+            announceWithBlock(sender);
+            announced = true;
+        }
+
+        else if (node->prefersHeaders && canAnnounceWithHeaders())
+            announced = announceWithHeaders();
+
+        if (!announced)
             announceWithInv();
     }
     catch (const std::exception& e) {

@@ -25,10 +25,9 @@ DefaultHeaderProcessor::DefaultHeaderProcessor(CNode* pfrom,
         InFlightIndex& i,
         ThinBlockManager& mg,
         BlockInFlightMarker& inFlight,
-        std::function<void()> checkBlockIndex,
-        std::function<void()> sendGetHeaders) :
+        std::function<void()> checkBlockIndex) :
     pfrom(pfrom), blocksInFlight(i), thinmg(mg), markAsInFlight(inFlight),
-    checkBlockIndex(checkBlockIndex), sendGetHeaders(sendGetHeaders)
+    checkBlockIndex(checkBlockIndex)
 {
 }
 
@@ -37,20 +36,6 @@ bool DefaultHeaderProcessor::operator()(const std::vector<CBlockHeader>& headers
         bool peerSentMax,
         bool maybeAnnouncement)
 {
-    if (maybeAnnouncement && !headerConnects(headers.at(0)))
-    {
-        // Send a getheaders message in response to try to connect the chain.
-        // Once a headers message is received that is valid and does connect,
-        // nUnconnectingHeaders gets reset back to 0.
-        NodeStatePtr(pfrom->id)->unconnectingHeaders++;
-        sendGetHeaders();
-        UpdateBlockAvailability(pfrom->id, headers.back().GetHash());
-
-        if (NodeStatePtr(pfrom->id)->unconnectingHeaders % MAX_UNCONNECTING_HEADERS == 0)
-            Misbehaving(pfrom->id, 20);
-        return true;
-    }
-
     bool ok;
     CBlockIndex* pindexLast;
     std::tie(ok, pindexLast) = acceptHeaders(headers);
@@ -164,4 +149,29 @@ void DefaultHeaderProcessor::suggestDownload(const std::vector<CBlockIndex*>& to
                 last->GetBlockHash().ToString(), last->nHeight);
         pfrom->PushMessage("getdata", toGet);
     }
+}
+
+// If we have a header from a peer that does not connect
+// to our active chain, try to retrieve any missing to connect it.
+//
+// Return: If header request was needed. In this case,
+// the current header cannot be processed.
+bool DefaultHeaderProcessor::requestConnectHeaders(const CBlockHeader& h, CNode& from) {
+    if (headerConnects(h))
+        return false;
+
+    UpdateBlockAvailability(from.id, h.GetHash());
+
+    LogPrint("net", "Headers for %s do not connect. We don't have pprev %s peer=%d\n",
+            h.GetHash().ToString(), h.hashPrevBlock.ToString(), from.id);
+
+    NodeStatePtr(from.id)->unconnectingHeaders++;
+
+    from.PushMessage("getheaders",
+            chainActive.GetLocator(pindexBestHeader), uint256());
+
+    if (NodeStatePtr(from.id)->unconnectingHeaders % MAX_UNCONNECTING_HEADERS == 0)
+        Misbehaving(from.id, 20);
+
+    return true;
 }

@@ -19,7 +19,7 @@ CNodeState::CNodeState(NodeId id, ThinBlockManager& thinblockmg) {
     nBlocksInFlightValidHeaders = 0;
     fPreferredDownload = false;
     prefersHeaders = false;
-    initialHeadersReceived = false;
+    prefersBlocks = false;
     supportsCompactBlocks = false;
     thinblock.reset(new DummyThinWorker(thinblockmg, id));
 }

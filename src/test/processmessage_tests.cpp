@@ -40,6 +40,9 @@ struct DummyHeaderProcessor : public BlockHeaderProcessor {
         called = true;
         return headerOK;
     }
+    bool requestConnectHeaders(const CBlockHeader& h, CNode& from) override {
+        return false;
+    }
     bool headerOK;
     bool called;
 };

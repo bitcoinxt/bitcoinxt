@@ -7,6 +7,7 @@
 #include "uint256.h"
 #include <vector>
 
+class BlockSender;
 class CInv;
 class CNode;
 class ThinBlockManager;
@@ -17,13 +18,13 @@ class BlockAnnounceReceiver {
 
     public:
         BlockAnnounceReceiver(uint256 block,
-                CNode& from, ThinBlockManager& thinmg, InFlightIndex& inFlightIndex) : 
+                CNode& from, ThinBlockManager& thinmg, InFlightIndex& inFlightIndex) :
             block(block), from(from), thinmg(thinmg), blocksInFlight(inFlightIndex)
         {
         }
 
         bool onBlockAnnounced(std::vector<CInv>& toFetch, bool announcedAsHeader);
-        
+
         enum DownloadStrategy {
             DOWNL_THIN_NOW,
             DOWNL_FULL_NOW,
@@ -64,7 +65,10 @@ class BlockAnnounceSender {
 
     protected:
         virtual bool canAnnounceWithHeaders() const;
+        virtual bool canAnnounceWithBlock() const;
+
         virtual bool announceWithHeaders();
+        virtual void announceWithBlock(BlockSender&);
         virtual void announceWithInv();
 
     private:

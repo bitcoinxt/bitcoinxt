@@ -436,7 +436,7 @@ void GenerateBitcoins(bool fGenerate, CWallet* pwallet, int nThreads)
     static boost::thread_group* minerThreads = NULL;
 
     if (nThreads < 0)
-        nThreads = boost::thread::hardware_concurrency();
+        nThreads = GetNumCores();
 
     if (minerThreads != NULL)
     {
