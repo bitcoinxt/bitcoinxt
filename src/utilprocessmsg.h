@@ -24,4 +24,6 @@ inline BlockInFlightMarker::~BlockInFlightMarker() { }
 // If node matches our criteria for outgoing connections.
 bool KeepOutgoingPeer(const CNode&);
 
+void UpdateBestHeaderSent(CNode& node, CBlockIndex* blockIndex);
+
 #endif
