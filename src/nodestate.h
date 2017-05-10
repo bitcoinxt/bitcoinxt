@@ -72,10 +72,6 @@ struct CNodeState {
     //! Whether this peer wants thin blocks (when possible) for block announcements.
     bool prefersBlocks;
 
-    // we need to receive headers leading to a block, before we can
-    // request a block.
-    bool initialHeadersReceived;
-
     bool supportsCompactBlocks;
 
     //! the thin block the node is currently providing to us

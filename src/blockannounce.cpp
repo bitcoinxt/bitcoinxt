@@ -82,9 +82,6 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
 
     NodeStatePtr state(from.id);
 
-    if (!state->initialHeadersReceived)
-        return DOWNL_THIN_LATER;
-
     if (thinmg.numWorkers(block) >= Opt().ThinBlocksMaxParallel()) {
         LogPrint("thin", "max parallel thin req reached, not req %s from peer %d\n",
                 block.ToString(), from.id);
@@ -119,17 +116,6 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch,
     DownloadStrategy s = pickDownloadStrategy();
 
     if (s == DOWNL_THIN_NOW) {
-
-        if (!announcedAsHeader && nodestate->prefersHeaders) {
-            // Node we're requesting from prefers headers announcement,
-            // but sent us an inv announcement.
-            //
-            // It is likely that we don't have previous blocks,
-            // this block may be part of an reorg. So we request headers to
-            // be sure that we have all headers leading up to this block.
-            requestHeaders(from, block);
-        }
-
         int numDownloading = thinmg.numWorkers(block);
         LogPrint("thin", "requesting %s from peer %d (%d of %d parallel)\n",
             block.ToString(), from.id, (numDownloading + 1), Opt().ThinBlocksMaxParallel());
@@ -139,18 +125,12 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch,
         return true;
     }
 
-    // First request the headers preceding the announced block. In the normal fully-synced
-    // case where a new block is announced that succeeds the current tip (no reorganization),
-    // there are no such headers.
-    // Secondly, and only when we are close to being synced, we request the announced block directly,
-    // to avoid an extra round-trip. Note that we must *first* ask for the headers, so by the
-    // time the block arrives, the header chain leading up to it is already validated. Not
-    // doing this will result in the received block being rejected as an orphan in case it is
-    // not a direct successor.
-
-    if (!blocksInFlight.isInFlight(block) || !nodestate->initialHeadersReceived) {
+    // Request headers preceding the announced block (if any), so by the time
+    // the full block arrives, the header chain leading up to it is already
+    // validated. Not doing this will result in block being discarded and
+    // re-downloaded later.
+    if (!hasBlockData() && !blocksInFlight.isInFlight(block))
         requestHeaders(from, block);
-    }
 
     if (s == DONT_DOWNL)
         return false;

@@ -5325,15 +5325,14 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             return true;
         }
 
-        NodeStatePtr(pfrom->id)->initialHeadersReceived = true;
-
-        auto sendGetHeaders = [pfrom](){
-            pfrom->PushMessage("getheaders",
-                    chainActive.GetLocator(pindexBestHeader), uint256());
-        };
         MarkBlockAsInFlight inFlight;
-        DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight,
-                CheckBlockIndex, sendGetHeaders);
+        DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight, CheckBlockIndex);
+
+        if (p.requestConnectHeaders(headers.at(0), *pfrom))
+            // headers don't connect to active chain, requested
+            // new headers to connect.
+            return true;
+
         if (!p(headers, nCount == MAX_HEADERS_RESULTS, true))
             return false;
     }
@@ -5396,6 +5395,18 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         LogPrintf("received block %s peer=%d\n", inv.hash.ToString(), pfrom->id);
 
         pfrom->AddInventoryKnown(inv);
+
+        LOCK(cs_main);
+        MarkBlockAsInFlight inFlight;
+        DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight, CheckBlockIndex);
+
+        if (p.requestConnectHeaders(block.GetBlockHeader(), *pfrom)) {
+            LogPrintf("Received block %s from peer=%d, but headers do "
+                    "not connect. Discarding.\n");
+            InFlightEraserImpl erase;
+            erase(pfrom->id, inv.hash);
+            return true;
+        }
 
         OnBlockFinished callb(strCommand);
         callb(block, std::vector<NodeId>(1, pfrom->id));

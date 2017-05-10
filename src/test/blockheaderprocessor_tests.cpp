@@ -8,46 +8,12 @@
 
 BOOST_AUTO_TEST_SUITE(blockheaderprocessor_tests);
 
-class DefaultHeaderProcessorDummy : public DefaultHeaderProcessor {
-    public:
-
-        DefaultHeaderProcessorDummy(CNode* pfrom,
-                InFlightIndex& i, ThinBlockManager& tm, BlockInFlightMarker& m,
-                std::function<void()> checkBlockIndex,
-                std::function<void()> sendGetHeaders) :
-            DefaultHeaderProcessor(pfrom, i, tm, m, checkBlockIndex, sendGetHeaders)
-        {
-        }
-
-        std::tuple<bool, CBlockIndex*> acceptHeaders(
-                const std::vector<CBlockHeader>& headers) override
-        {
-            return std::make_tuple(true, nullptr);
-        }
-};
-
 BOOST_AUTO_TEST_CASE(test_connect_chain_req) {
 
     // Header does not connect, should
     // send a getheaders to connect and stop processing headers.
 
-    bool checkBlockCalled = false;
-    auto checkBlockFunc = [&checkBlockCalled]() {
-        checkBlockCalled = true;
-    };
-
-    bool sendGetHeadersCalled = false;
-    auto sendGetHeadersFunc = [&sendGetHeadersCalled]() {
-        sendGetHeadersCalled = true;
-    };
-
     DummyNode from;
-    auto thinmg = GetDummyThinBlockMg();
-    InFlightIndex inFlight;
-    DummyMarkAsInFlight markAsInFlight;
-
-    DefaultHeaderProcessorDummy processHeader(&from, inFlight, *thinmg,
-        markAsInFlight, checkBlockFunc, sendGetHeadersFunc);
 
     // Try to process a header that does not connect
     DummyBlockIndexEntry e1(uint256S("0xaaa"));
@@ -55,21 +21,27 @@ BOOST_AUTO_TEST_CASE(test_connect_chain_req) {
 
     CBlockHeader header;
     header.hashPrevBlock = uint256S("0xccc"); //< prev block not in mapBlockIndex
-    processHeader({ header }, false, true);
 
-    BOOST_CHECK(sendGetHeadersCalled);
-    BOOST_CHECK(!checkBlockCalled);
+    auto thinmg = GetDummyThinBlockMg();
+    InFlightIndex inFlight;
+    DummyMarkAsInFlight markAsInFlight;
+    auto checkBlockIndex = []() { };
+
+    DefaultHeaderProcessor p(&from, inFlight, *thinmg, markAsInFlight, checkBlockIndex);
+
+    BOOST_CHECK(p.requestConnectHeaders(header, from));
     BOOST_CHECK_EQUAL(1, NodeStatePtr(from.id)->unconnectingHeaders);
+    BOOST_CHECK_EQUAL(1, from.messages.size());
+    BOOST_CHECK_EQUAL("getheaders", from.messages.at(0));
 
     // Add entry so that header connects. Try again.
-    sendGetHeadersCalled = false;
-    checkBlockCalled = false;
 
     DummyBlockIndexEntry e3(header.hashPrevBlock);
-    processHeader({ header }, false, true);
-    BOOST_CHECK(!sendGetHeadersCalled);
-    BOOST_CHECK(checkBlockCalled);
-    BOOST_CHECK_EQUAL(0, NodeStatePtr(from.id)->unconnectingHeaders);
+
+    from.messages.clear();
+    BOOST_CHECK(!p.requestConnectHeaders(header, from));
+    BOOST_CHECK_EQUAL(0, from.messages.size());
+    BOOST_CHECK_EQUAL(1 /* no change */, NodeStatePtr(from.id)->unconnectingHeaders);
 }
 
 BOOST_AUTO_TEST_SUITE_END();

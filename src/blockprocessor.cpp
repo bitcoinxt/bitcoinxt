@@ -61,3 +61,17 @@ bool BlockProcessor::setToWork(const uint256& hash) {
     }
     return true;
 }
+
+bool BlockProcessor::requestConnectHeaders(const CBlockHeader& header) {
+    bool needPrevHeaders = headerProcessor.requestConnectHeaders(header, from);
+
+    if (needPrevHeaders) {
+        // We don't have previous block. We can't connect it to the chain.
+        // Ditch it. We will re-request it later if we see that we still want it.
+        LogPrint("thin", "Can't connect block %s. We don't have prev. Ignoring it peer=%d.\n",
+                header.GetHash().ToString(), from.id);
+
+        worker.setAvailable();
+    }
+    return needPrevHeaders;
+}

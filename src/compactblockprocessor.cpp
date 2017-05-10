@@ -28,10 +28,16 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
         return;
     }
 
+    if (requestConnectHeaders(block.header)) {
+        worker.setAvailable();
+        return;
+    }
+
     CompactTxFinder txfinder(mempool,
             block.shorttxidk0, block.shorttxidk1);
 
-    processHeader(block.header);
+    if (!processHeader(block.header))
+        return;
 
     from.AddInventoryKnown(CInv(MSG_CMPCT_BLOCK, hash));
 
