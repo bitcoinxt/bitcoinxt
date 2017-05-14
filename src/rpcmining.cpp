@@ -10,6 +10,7 @@
 #include "core_io.h"
 #include "init.h"
 #include "main.h"
+#include "maxblocksize.h"
 #include "miner.h"
 #include "net.h"
 #include "pow.h"
@@ -154,7 +155,8 @@ UniValue generate(const UniValue& params, bool fHelp)
         CBlock *pblock = &pblocktemplate->block;
         {
             LOCK(cs_main);
-            IncrementExtraNonce(pblock, chainActive.Tip(), nExtraNonce);
+            uint64_t nMaxBlockSize = GetNextMaxBlockSize(chainActive.Tip(), Params().GetConsensus());
+            IncrementExtraNonce(pblock, chainActive.Tip(), nExtraNonce, nMaxBlockSize);
         }
         while (!CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus())) {
             // Yes, there is a chance every nonce could fail to satisfy the -regtest
@@ -238,6 +240,7 @@ UniValue getmininginfo(const UniValue& params, bool fHelp)
             "  \"pooledtx\": n              (numeric) The size of the mem pool\n"
             "  \"testnet\": true|false      (boolean) If using testnet or not\n"
             "  \"chain\": \"xxxx\",         (string) current network name as defined in BIP70 (main, test, regtest)\n"
+            "  \"sizelimit\" : n,           (numeric) The block size limit as of the last block\n"
             "}\n"
             "\nExamples:\n"
             + HelpExampleCli("getmininginfo", "")
@@ -258,6 +261,7 @@ UniValue getmininginfo(const UniValue& params, bool fHelp)
     obj.push_back(Pair("pooledtx",         (uint64_t)mempool.size()));
     obj.push_back(Pair("testnet",          Params().TestnetToBeDeprecatedFieldRPC()));
     obj.push_back(Pair("chain",            Params().NetworkIDString()));
+    obj.push_back(Pair("sizelimit",        chainActive.Tip()->nMaxBlockSize));
 #ifdef ENABLE_WALLET
     obj.push_back(Pair("generate",         getgenerate(params, false)));
 #endif
@@ -549,12 +553,14 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
         int index_in_template = i - 1;
         entry.push_back(Pair("fee", pblocktemplate->vTxFees[index_in_template]));
         entry.push_back(Pair("sigops", pblocktemplate->vTxSigOps[index_in_template]));
-
         transactions.push_back(entry);
     }
 
+    uint64_t nMaxBlockSize = GetNextMaxBlockSize(chainActive.Tip(), Params().GetConsensus());
+    CScript flags = CScript() << BIP100Str(nMaxBlockSize);
+    flags +=  COINBASE_FLAGS;
     UniValue aux(UniValue::VOBJ);
-    aux.push_back(Pair("flags", HexStr(COINBASE_FLAGS.begin(), COINBASE_FLAGS.end())));
+    aux.push_back(Pair("flags", HexStr(flags.begin(), flags.end())));
 
     arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
 
@@ -578,8 +584,8 @@ UniValue getblocktemplate(const UniValue& params, bool fHelp)
     result.push_back(Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1));
     result.push_back(Pair("mutable", aMutable));
     result.push_back(Pair("noncerange", "00000000ffffffff"));
-    result.push_back(Pair("sigoplimit", (int64_t)MAX_BLOCK_SIGOPS));
-    result.push_back(Pair("sizelimit", (int64_t)MAX_BLOCK_SIZE));
+    result.push_back(Pair("sigoplimit", MaxBlockSigops(nMaxBlockSize)));
+    result.push_back(Pair("sizelimit", nMaxBlockSize));
     result.push_back(Pair("curtime", pblock->GetBlockTime()));
     result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
     result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight+1)));

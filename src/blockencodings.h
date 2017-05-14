@@ -163,6 +163,7 @@ public:
     }
 };
 
-void validateCompactBlock(const CompactBlock& cmpctblock);
+unsigned int minTxSize();
+void validateCompactBlock(const CompactBlock& cmpctblock, uint64_t currMaxBlockSize);
 
 #endif

@@ -420,7 +420,8 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-datacarriersize", strprintf(_("Maximum size of data in data carrier transactions we relay and mine (default: %u)"), MAX_OP_RETURN_RELAY));
 
     strUsage += HelpMessageGroup(_("Block creation options:"));
-    strUsage += HelpMessageOpt("-blockmaxsize=<n>", strprintf(_("Set maximum block size in bytes (default: %d)"), DEFAULT_BLOCK_MAX_SIZE));
+    strUsage += HelpMessageOpt("-blockmaxsize=<n>", _("Set maximum block size in bytes (default: network sizelimit)"));
+    strUsage += HelpMessageOpt("-maxblocksizevote=<n>", _("Set vote for maximum block size in megabytes (default: network sizelimit)"));
     if (showDebug)
         strUsage += HelpMessageOpt("-blockversion=<n>", "Override block version to test forking scenarios");
 
@@ -896,6 +897,9 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     fIsBareMultisigStd = GetBoolArg("-permitbaremultisig", true);
     nMaxDatacarrierBytes = GetArg("-datacarriersize", nMaxDatacarrierBytes);
 
+    if (Opt().MaxBlockSizeVote() > 999)
+        InitWarning(_("Warning: Max block size vote is very large. Units are megabytes.\n"));
+
     // Option to startup with mocktime set (used for regression testing):
     SetMockTime(GetArg("-mocktime", 0)); // SetMockTime(0) is a no-op
 
@@ -1002,11 +1006,12 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
         return InitError(e.what());
     }
 
-    if (XTSubVersion().size() > MAX_SUBVERSION_LENGTH)
+    uint64_t hugeBlock = 1000 * MAX_BLOCK_SIZE;
+    if (XTSubVersion(hugeBlock).size() > MAX_SUBVERSION_LENGTH)
         return InitError(strprintf(
             "Total length of network version string %i exceeds maximum of %i characters. "
             "Reduce size of uacomment or hide platform details.",
-            XTSubVersion().size(), MAX_SUBVERSION_LENGTH));
+            XTSubVersion(hugeBlock).size(), MAX_SUBVERSION_LENGTH));
 
     if (mapArgs.count("-onlynet")) {
         std::set<enum Network> nets;
@@ -1189,8 +1194,11 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
                    break;
                 }
 
-                if (!LoadBlockIndex()) {
+                bool fRebuildRequired = false;
+                if (!LoadBlockIndex(&fRebuildRequired)) {
                     strLoadError = _("Error loading block database");
+                    if (fRebuildRequired)
+                        strLoadError += _(". You need to rebuild the database using -reindex.");
                     break;
                 }
 

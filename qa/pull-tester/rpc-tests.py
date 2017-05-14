@@ -96,6 +96,7 @@ testScripts = [
     'sendheaders.py'
 ]
 testScriptsExt = [
+    'bip100-sizelimit.py',
     'bip9-softforks.py',
     'bipdersig-p2p.py',
     'bip65-cltv-p2p.py',

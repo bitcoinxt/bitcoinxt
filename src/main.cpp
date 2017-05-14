@@ -20,6 +20,7 @@
 #include "consensus/validation.h"
 #include "inflightindex.h"
 #include "init.h"
+#include "maxblocksize.h"
 #include "merkleblock.h"
 #include "net.h"
 #include "nodestate.h"
@@ -253,6 +254,12 @@ int GetHeight()
 {
     LOCK(cs_main);
     return chainActive.Height();
+}
+
+int GetMaxBlockSize()
+{
+    LOCK(cs_main);
+    return chainActive.Tip()->nMaxBlockSize;
 }
 
 void UpdatePreferredDownload(CNode* node, NodeStatePtr& state)
@@ -589,6 +596,7 @@ void RegisterNodeSignals(CNodeSignals& nodeSignals)
     nodeSignals.SendMessages.connect(&SendMessages);
     nodeSignals.InitializeNode.connect(&InitializeNode);
     nodeSignals.FinalizeNode.connect(&FinalizeNode);
+    nodeSignals.GetMaxBlockSize.connect(&GetMaxBlockSize);
 }
 
 void UnregisterNodeSignals(CNodeSignals& nodeSignals)
@@ -599,6 +607,7 @@ void UnregisterNodeSignals(CNodeSignals& nodeSignals)
     nodeSignals.SendMessages.disconnect(&SendMessages);
     nodeSignals.InitializeNode.disconnect(&InitializeNode);
     nodeSignals.FinalizeNode.disconnect(&FinalizeNode);
+    nodeSignals.GetMaxBlockSize.disconnect(&GetMaxBlockSize);
 }
 
 CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& locator)
@@ -1105,7 +1114,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
         return state.DoS(10, error("CheckTransaction(): vout empty"),
                          REJECT_INVALID, "bad-txns-vout-empty");
     // Size limits
-    if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
+    if (::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION) > MAX_TRANSACTION_SIZE)
         return state.DoS(100, error("CheckTransaction(): size limits failed"),
                          REJECT_INVALID, "bad-txns-oversize");
 
@@ -1344,7 +1353,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         // Check that the transaction doesn't have an excessive number of
         // sigops, making it impossible to mine. Since the coinbase transaction
         // itself can contain sigops MAX_STANDARD_TX_SIGOPS is less than
-        // MAX_BLOCK_SIGOPS; we still consider this an invalid rather than
+        // MaxBlockSigops(), we still consider this an invalid rather than
         // merely non-standard transaction.
         unsigned int nSigOps = GetLegacySigOpCount(tx);
         nSigOps += GetP2SHSigOpCount(tx, view);
@@ -1621,8 +1630,12 @@ CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams)
     return nSubsidy;
 }
 
+bool fForceInitialBlockDownload = false;
 bool IsInitialBlockDownload()
 {
+    if (fForceInitialBlockDownload)
+        return false;
+
     const CChainParams& chainParams = Params();
     LOCK(cs_main);
     if (fImporting || fReindex)
@@ -2289,6 +2302,13 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         return true;
     }
 
+    // Block size limit (BIP100)
+    if (block.vtx.size() > pindex->nMaxBlockSize)
+        return state.DoS(100, error("%s: size limits failed", __func__), REJECT_INVALID, "bad-vtx-length");
+    uint64_t nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+    if (nBlockSize > pindex->nMaxBlockSize)
+        return state.DoS(100, error("%s: size limits failed", __func__), REJECT_INVALID, "bad-blk-length");
+
     const int64_t timeBarrier = GetTime() - 24 * 3600 * Opt().CheckpointDays();
     // Blocks that have varius days of POW behind them makes them secure in
     // that actually online nodes checked the scripts, so during initial sync we
@@ -2376,7 +2396,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
         nInputs += tx.vin.size();
         nSigOps += GetLegacySigOpCount(tx);
-        if (nSigOps > MAX_BLOCK_SIGOPS)
+        if (nSigOps > MaxBlockSigops(nBlockSize))
             return state.DoS(100, error("ConnectBlock(): too many sigops"),
                              REJECT_INVALID, "bad-blk-sigops");
 
@@ -2405,7 +2425,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 // this is to prevent a "rogue miner" from creating
                 // an incredibly-expensive-to-validate block.
                 nSigOps += GetP2SHSigOpCount(tx, view);
-                if (nSigOps > MAX_BLOCK_SIGOPS)
+                if (nSigOps > MaxBlockSigops(nBlockSize))
                     return state.DoS(100, error("ConnectBlock(): too many sigops"),
                                      REJECT_INVALID, "bad-blk-sigops");
             }
@@ -3109,6 +3129,7 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBl
     pindexNew->nFile = pos.nFile;
     pindexNew->nDataPos = pos.nPos;
     pindexNew->nUndoPos = 0;
+    pindexNew->nMaxBlockSizeVote = GetMaxBlockSizeVote(block.vtx[0].vin[0].scriptSig, pindexNew->nHeight);
     pindexNew->nStatus |= BLOCK_HAVE_DATA;
     pindexNew->RaiseValidity(BLOCK_VALID_TRANSACTIONS);
     setDirtyBlockIndex.insert(pindexNew);
@@ -3127,6 +3148,7 @@ bool ReceivedBlockTransactions(const CBlock &block, CValidationState& state, CBl
                 LOCK(cs_nBlockSequenceId);
                 pindex->nSequenceId = nBlockSequenceId++;
             }
+            pindex->nMaxBlockSize = GetNextMaxBlockSize(pindex->pprev, Params().GetConsensus());
             if (chainActive.Tip() == NULL || !setBlockIndexCandidates.value_comp()(pindex, chainActive.Tip())) {
                 setBlockIndexCandidates.insert(pindex);
             }
@@ -3157,7 +3179,7 @@ bool FindBlockPos(CValidationState &state, CDiskBlockPos &pos, unsigned int nAdd
     }
 
     if (!fKnown) {
-        while (vinfoBlockFile[nFile].nSize + nAddSize >= MAX_BLOCKFILE_SIZE) {
+        while (vinfoBlockFile[nFile].nSize + nAddSize >= GetNextMaxBlockSize(chainActive.Tip(), Params().GetConsensus()) * MIN_BLOCKFILE_BLOCKS) {
             LogPrintf("Leaving block file %i: %s\n", nFile, vinfoBlockFile[nFile].ToString());
             FlushBlockFile(true);
             nFile++;
@@ -3275,9 +3297,8 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     // because we receive the wrong transactions for it.
 
     // Size limits
-    if (block.vtx.empty() || block.vtx.size() > MAX_BLOCK_SIZE || ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION) > MAX_BLOCK_SIZE)
-        return state.DoS(100, error("CheckBlock(): size limits failed"),
-                         REJECT_INVALID, "bad-blk-length");
+    if (block.vtx.empty())
+        return state.DoS(100, error("CheckBlock(): no transactions"), REJECT_INVALID, "bad-blk-length");
 
     // First transaction must be coinbase, the rest must not be
     if (block.vtx.empty() || !block.vtx[0].IsCoinBase())
@@ -3298,9 +3319,8 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     {
         nSigOps += GetLegacySigOpCount(tx);
     }
-    if (nSigOps > MAX_BLOCK_SIGOPS)
-        return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"),
-                         REJECT_INVALID, "bad-blk-sigops", true);
+    if (nSigOps > MaxBlockSigops(::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)))
+        return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"), REJECT_INVALID, "bad-blk-sigops", true);
 
     return true;
 }
@@ -3548,6 +3568,7 @@ bool TestBlockValidity(CValidationState &state, const CBlock& block, CBlockIndex
     CBlockIndex indexDummy(block);
     indexDummy.pprev = pindexPrev;
     indexDummy.nHeight = pindexPrev->nHeight + 1;
+    indexDummy.nMaxBlockSize = GetNextMaxBlockSize(pindexPrev, Params().GetConsensus());
 
     // NOTE: CheckBlockHeader is called by CheckBlock
     if (!ContextualCheckBlockHeader(block, state, pindexPrev))
@@ -3735,7 +3756,7 @@ CBlockIndex * InsertBlockIndex(uint256 hash)
     return pindexNew;
 }
 
-bool static LoadBlockIndexDB()
+bool static LoadBlockIndexDB(bool* fRebuildRequired)
 {
     const CChainParams& chainparams = Params();
     if (!pblocktree->LoadBlockIndexGuts())
@@ -3752,8 +3773,10 @@ bool static LoadBlockIndexDB()
         vSortedByHeight.push_back(make_pair(pindex->nHeight, pindex));
     }
     sort(vSortedByHeight.begin(), vSortedByHeight.end());
-    BOOST_FOREACH(const PAIRTYPE(int, CBlockIndex*)& item, vSortedByHeight)
+    vector<pair<int, CBlockIndex*>>::iterator firstBIP100Entry = vSortedByHeight.end();
+    for (vector<pair<int, CBlockIndex*>>::iterator iter = vSortedByHeight.begin(); iter != vSortedByHeight.end(); iter++)
     {
+        const PAIRTYPE(int, CBlockIndex*)& item = *iter;
         CBlockIndex* pindex = item.second;
         pindex->nChainWork = (pindex->pprev ? pindex->pprev->nChainWork : 0) + GetBlockProof(*pindex);
         // We can link the chain of blocks for which we've received transactions at some point.
@@ -3778,6 +3801,11 @@ bool static LoadBlockIndexDB()
             pindex->BuildSkip();
         if (pindex->IsValid(BLOCK_VALID_TREE) && (pindexBestHeader == NULL || CBlockIndexWorkComparator()(pindexBestHeader, pindex)))
             pindexBestHeader = pindex;
+        if (item.first < chainparams.GetConsensus().bip100ActivationHeight) {
+            pindex->nMaxBlockSize = MAX_BLOCK_SIZE;
+        } else if (firstBIP100Entry == vSortedByHeight.end()) {
+            firstBIP100Entry = iter;
+        }
     }
 
     // Load block file info
@@ -3824,6 +3852,35 @@ bool static LoadBlockIndexDB()
     bool fReindexing = false;
     pblocktree->ReadReindexing(fReindexing);
     fReindex |= fReindexing;
+
+    // Set max block size variables in any remaining pre-BIP100 index entries
+    bool fUpdatedEntries = false;
+    for (vector<pair<int, CBlockIndex*>>::iterator iter = firstBIP100Entry; iter != vSortedByHeight.end(); iter++) {
+        const PAIRTYPE(int, CBlockIndex*)& item = *iter;
+        CBlockIndex* pindex = item.second;
+        if (pindex->nSerialVersion < BIP100_DBI_VERSION) {
+            if (!fUpdatedEntries) {
+                uiInterface.InitMessage(_("Updating block index for BIP100..."));
+                fUpdatedEntries = true;
+            }
+            pindex->nSerialVersion = DISK_BLOCK_INDEX_VERSION;
+            if (pindex->nChainTx) {
+                CBlock block;
+                if (ReadBlockFromDisk(block, pindex)) {
+                    pindex->nMaxBlockSizeVote = GetMaxBlockSizeVote(block.vtx[0].vin[0].scriptSig, pindex->nHeight);
+                    pindex->nMaxBlockSize = GetNextMaxBlockSize(pindex->pprev, chainparams.GetConsensus());
+                } else {
+                    // Error: Can't reconstruct vote. Rebuild required.
+                    // This can happen if the blocks were pruned after BIP100
+                    // activation with pre-BIP100 software.
+                    *fRebuildRequired = true;
+                    return false;
+                }
+            }
+            LogPrint("reindex", "%s: Updating block index entry at height %d for BIP100\n", __func__, pindex->nHeight);
+            setDirtyBlockIndex.insert(pindex);
+        }
+    }
 
     // Check whether we have a transaction index
     pblocktree->ReadFlag("txindex", fTxIndex);
@@ -3968,10 +4025,11 @@ void UnloadBlockIndex()
     fHavePruned = false;
 }
 
-bool LoadBlockIndex()
+bool LoadBlockIndex(bool* fRebuildRequired)
 {
+    assert(fRebuildRequired != NULL);
     // Load block index from databases
-    if (!fReindex && !LoadBlockIndexDB())
+    if (!fReindex && !LoadBlockIndexDB(fRebuildRequired))
         return false;
     return true;
 }
@@ -4051,7 +4109,7 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
                     continue;
                 // read size
                 blkdat >> nSize;
-                if (nSize < 80 || nSize > MAX_BLOCK_SIZE)
+                if (nSize < 80)
                     continue;
             } catch (const std::exception&) {
                 // no valid block header found; don't complain
@@ -4374,12 +4432,13 @@ static std::map<std::string, size_t> maxMessageSizes = boost::assign::map_list_o
 bool static SanityCheckMessage(CNode* peer, const CNetMessage& msg)
 {
     const std::string& strCommand = msg.hdr.GetCommand();
-    if (msg.hdr.nMessageSize > MAX_PROTOCOL_MESSAGE_LENGTH ||
+    uint64_t nMaxMessageSize = GetMaxBlockSize() * 105 / 100;
+    if (msg.hdr.nMessageSize > nMaxMessageSize ||
         (maxMessageSizes.count(strCommand) && msg.hdr.nMessageSize > maxMessageSizes[strCommand])) {
         LogPrint("net", "Oversized %s message from peer=%i (%d bytes)\n",
                  SanitizeString(strCommand), peer->GetId(), msg.hdr.nMessageSize);
         Misbehaving(peer->GetId(), 20);
-        return msg.hdr.nMessageSize <= MAX_PROTOCOL_MESSAGE_LENGTH;
+        return msg.hdr.nMessageSize <= nMaxMessageSize;
     }
     // This would be a good place for more sophisticated DoS detection/prevention.
     // (e.g. disconnect a peer that is flooding us with excessive messages)
@@ -5379,7 +5438,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             DefaultHeaderProcessor headerp(pfrom, blocksInFlight, thinblockmg,
                     inFlight, CheckBlockIndex);
             CompactBlockProcessor blockp(*pfrom, *(nodestate->thinblock), headerp);
-            blockp(vRecv, mempool);
+            blockp(vRecv, mempool, chainActive.Tip()->nMaxBlockSize);
         }
         catch (const std::exception& e) {
             unexpectedThinError(strCommand, *pfrom, e.what());
