@@ -44,8 +44,13 @@ struct DummyArgGetter : public ArgGetter {
 };
 
 bool OsInStr(const std::string& version) {
-    // Assume OS is in string if string contains comments
-    return version.find("(") != std::string::npos;
+    std::vector<std::string> systems = {
+        "BSD", "Linux", "Mac OS", "Windows", "Unknown OS"
+    };
+    for (std::string os : systems)
+        if (version.find(os) != std::string::npos)
+            return true;
+    return false;
 }
 
 BOOST_AUTO_TEST_CASE(platform_in_xtsubversion)
@@ -57,16 +62,16 @@ BOOST_AUTO_TEST_CASE(platform_in_xtsubversion)
 
     argPtr->hideplatform = true;
     argPtr->stealthmode = false;
-    BOOST_CHECK(!OsInStr(XTSubVersion()));
+    BOOST_CHECK(!OsInStr(XTSubVersion(0)));
 
     argPtr->hideplatform = false;
     argPtr->stealthmode = true;
-    BOOST_CHECK(!OsInStr(XTSubVersion()));
+    BOOST_CHECK(!OsInStr(XTSubVersion(0)));
 
 #if BOOST_VERSION >= 105500
     argPtr->hideplatform = false;
     argPtr->stealthmode = false;
-    BOOST_CHECK(OsInStr(XTSubVersion()));
+    BOOST_CHECK(OsInStr(XTSubVersion(0)));
 #endif
 }
 
@@ -78,10 +83,10 @@ BOOST_AUTO_TEST_CASE(xtsubversion_stealthmode)
         = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg.release()));
 
     argPtr->stealthmode = true;
-    BOOST_CHECK(XTSubVersion().find("XT") == std::string::npos);
+    BOOST_CHECK(XTSubVersion(0).find("XT") == std::string::npos);
 
     argPtr->stealthmode = false;
-    BOOST_CHECK(XTSubVersion().find("XT") != std::string::npos);
+    BOOST_CHECK(XTSubVersion(0).find("XT") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(xtsubversion_uacomment)
@@ -93,22 +98,32 @@ BOOST_AUTO_TEST_CASE(xtsubversion_uacomment)
 
     argPtr->hideplatform = true;
 
-    // no comments
-    BOOST_CHECK(XTSubVersion().find("(") == std::string::npos);
+    // only EB comment
+    BOOST_CHECK(XTSubVersion(0).find("(EB0)") != std::string::npos);
 
-    // only uacomments
+    // uacomments + EB
     argPtr->uacomment = {"hello", "world" };
-    BOOST_CHECK(XTSubVersion().find("(hello; world)") != std::string::npos);
+    BOOST_CHECK(XTSubVersion(0).find("(hello; world; EB0)") != std::string::npos);
 
 #if BOOST_VERSION >= 105500
     // combines with platform
     argPtr->hideplatform = false;
-    BOOST_CHECK(XTSubVersion().find("(hello; world; ") != std::string::npos);
+    std::string withplatform = XTSubVersion(0);
+    BOOST_CHECK(withplatform.find("(hello; world; ") != std::string::npos);
+    BOOST_CHECK(OsInStr(withplatform.substr(withplatform.find("(hello; world; "))));
 #endif
 
     // allowed in stealth-mode
     argPtr->stealthmode = true;
-    BOOST_CHECK(XTSubVersion().find("(hello; world)") != std::string::npos);
+    BOOST_CHECK(XTSubVersion(0).find("(hello; world)") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(xtsubversion_eb)
+{
+    // 1MB blocks
+    BOOST_CHECK(XTSubVersion(1000000).find("EB1)") != std::string::npos);
+    // 1GB blocks
+    BOOST_CHECK(XTSubVersion(1000 * 1000000).find("EB1000)") != std::string::npos);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

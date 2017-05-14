@@ -49,8 +49,6 @@ class CValidationState;
 struct CNodeStateStats;
 struct LockPoints;
 
-/** Default for -blockmaxsize, which controls the range of sizes the mining code will create **/
-static const unsigned int DEFAULT_BLOCK_MAX_SIZE = 750000;
 /** Used only for relay rule that guesses at network miner policies **/
 static const unsigned int DEFAULT_BLOCK_PRIORITY_SIZE = 50000;
 /** The maximum size for transactions we're willing to relay/mine */
@@ -58,7 +56,7 @@ static const unsigned int MAX_STANDARD_TX_SIZE = 100000;
 /** Maximum number of signature check operations in an IsStandard() P2SH script */
 static const unsigned int MAX_P2SH_SIGOPS = 15;
 /** The maximum number of sigops we're willing to relay/mine in a single tx */
-static const unsigned int MAX_STANDARD_TX_SIGOPS = MAX_BLOCK_SIGOPS/5;
+static const unsigned int MAX_STANDARD_TX_SIGOPS = 4000;
 /** Default for -maxorphantx, maximum number of orphan transactions kept in memory */
 static const unsigned int DEFAULT_MAX_ORPHAN_TRANSACTIONS = 100;
 /** Default for -limitancestorcount, max number of in-mempool ancestors */
@@ -73,8 +71,8 @@ static const unsigned int DEFAULT_DESCENDANT_SIZE_LIMIT = 101;
 static const unsigned int DEFAULT_MAX_MEMPOOL_SIZE = 300;
 /** Default for -mempoolexpiry, expiration time for mempool transactions in hours */
 static const unsigned int DEFAULT_MEMPOOL_EXPIRY = 72;
-/** The maximum size of a blk?????.dat file (since 0.8) */
-static const unsigned int MAX_BLOCKFILE_SIZE = 0x8000000; // 128 MiB
+/** Minimum number of max-sized blocks in blk?????.dat files */
+static const unsigned int MIN_BLOCKFILE_BLOCKS = 128;
 /** The pre-allocation chunk size for blk?????.dat files (since 0.8) */
 static const unsigned int BLOCKFILE_CHUNK_SIZE = 0x1000000; // 16 MiB
 /** The pre-allocation chunk size for rev?????.dat files (since 0.8) */
@@ -97,8 +95,6 @@ static const unsigned int DATABASE_WRITE_INTERVAL = 60 * 60;
 static const unsigned int DATABASE_FLUSH_INTERVAL = 24 * 60 * 60;
 /** Maximum length of reject messages. */
 static const unsigned int MAX_REJECT_MESSAGE_LENGTH = 111;
-/** Maximum length of incoming protocol messages (no message over 2 MiB is currently acceptable). */
-static const unsigned int MAX_PROTOCOL_MESSAGE_LENGTH = 2 * 1024 * 1024;
 
 struct BlockHasher
 {
@@ -187,7 +183,7 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp = NULL);
 /** Initialize a new block tree database + block data on disk */
 bool InitBlockIndex();
 /** Load the block tree and coins database from disk */
-bool LoadBlockIndex();
+bool LoadBlockIndex(bool* fRebuildRequired);
 /** Unload database information */
 void UnloadBlockIndex();
 /** Process protocol messages received from a given node */

@@ -9,6 +9,8 @@
 
 #include <string>
 #include <boost/version.hpp>
+#include <iomanip>
+#include <cmath>
 
 #if BOOST_VERSION >= 105500 // Boost 1.55 or newer
 #include <boost/predef.h>
@@ -150,7 +152,7 @@ std::string FormatSubVersion(const std::string& name, int nClientVersion, const 
 /**
  * The default Bitcoin XT subversion field according to BIP 14 spec
  */
-std::string XTSubVersion()
+std::string XTSubVersion(uint64_t nMaxBlockSize)
 {
     std::vector<std::string> comments = Opt().UAComment();
 
@@ -161,6 +163,12 @@ std::string XTSubVersion()
         std::vector<std::string> p = GetPlatformDetails();
         comments.insert(comments.end(), p.begin(), p.end());
     }
+
+    // Announce our excessive block acceptence.
+    std::stringstream ss;
+    double dMaxBlockSize = double(nMaxBlockSize)/1000000;
+    ss << "EB" << std::setprecision(int(log10(dMaxBlockSize))+7) << dMaxBlockSize;
+    comments.insert(end(comments), ss.str());
 
     return FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, comments, CLIENT_VERSION_XT_SUBVER);
 }

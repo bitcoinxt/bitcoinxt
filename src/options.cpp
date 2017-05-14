@@ -69,6 +69,10 @@ int64_t Opt::CheckpointDays() {
     return std::max(int64_t(1), Args->GetArg("-checkpoint-days", def));
 }
 
+uint64_t Opt::MaxBlockSizeVote() {
+    return Args->GetArg("-maxblocksizevote", 0);
+}
+
 bool Opt::UsingThinBlocks() {
     if (IsStealthMode())
         return false;

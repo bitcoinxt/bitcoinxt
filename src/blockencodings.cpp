@@ -25,8 +25,6 @@ uint64_t GetShortID(
     return SipHashUint256(shorttxidk0, shorttxidk1, txhash) & 0xffffffffffffL;
 }
 
-#define MIN_TRANSACTION_SIZE (::GetSerializeSize(CTransaction(), SER_NETWORK, PROTOCOL_VERSION))
-
 CompactBlock::CompactBlock(const CBlock& block, const CompactPrefiller& prefiller) :
         nonce(GetRand(std::numeric_limits<uint64_t>::max())), header(block)
 {
@@ -68,12 +66,19 @@ uint64_t CompactBlock::GetShortID(const uint256& txhash) const {
     return ::GetShortID(shorttxidk0, shorttxidk1, txhash);
 }
 
-void validateCompactBlock(const CompactBlock& cmpctblock) {
+unsigned int minTxSize() {
+    return ::GetSerializeSize(CTransaction(), SER_NETWORK, PROTOCOL_VERSION);
+}
+
+void validateCompactBlock(const CompactBlock& cmpctblock, uint64_t currMaxBlockSize) {
     if (cmpctblock.header.IsNull() || (cmpctblock.shorttxids.empty() && cmpctblock.prefilledtxn.empty()))
         throw std::invalid_argument("empty data in compact block");
 
-    if (cmpctblock.shorttxids.size() + cmpctblock.prefilledtxn.size() > MAX_BLOCK_SIZE / MIN_TRANSACTION_SIZE)
-        throw std::invalid_argument("compact block exceeds max txs in a block");
+    // The max block size may have changed at the height
+    // this block is in. We guess it's at most 2x current.
+    size_t txsInBlock = cmpctblock.shorttxids.size() + cmpctblock.prefilledtxn.size();
+    if (txsInBlock > ((currMaxBlockSize * 2) / minTxSize()))
+        throw LikelyInvalidBlock("compact block possibly exceeds max txs in a block");
 
     int32_t lastprefilledindex = -1;
     for (size_t i = 0; i < cmpctblock.prefilledtxn.size(); i++) {

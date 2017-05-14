@@ -12,6 +12,7 @@
 
 const std::string CBaseChainParams::MAIN = "main";
 const std::string CBaseChainParams::TESTNET = "test";
+const std::string CBaseChainParams::BIP100NET = "bip100";
 const std::string CBaseChainParams::REGTEST = "regtest";
 
 void AppendParamsHelpMessages(std::string& strUsage, bool debugHelp)
@@ -50,6 +51,20 @@ public:
     }
 };
 static CBaseTestNetParams testNetParams;
+
+/**
+ * Testnet for BIP100
+ */
+class CBaseBIP100NetParams : public CBaseChainParams
+{
+public:
+    CBaseBIP100NetParams()
+    {
+        nRPCPort = 28332;
+        strDataDir = "testnet-bip100";
+    }
+};
+static CBaseBIP100NetParams bip100NetParams;
 
 /*
  * Regression test
@@ -92,6 +107,8 @@ CBaseChainParams& BaseParams(const std::string& chain)
         return mainParams;
     else if (chain == CBaseChainParams::TESTNET)
         return testNetParams;
+    else if (chain == CBaseChainParams::BIP100NET)
+        return bip100NetParams;
     else if (chain == CBaseChainParams::REGTEST)
         return regTestParams;
     else
@@ -107,6 +124,7 @@ std::string ChainNameFromCommandLine()
 {
     bool fRegTest = GetBoolArg("-regtest", false);
     bool fTestNet = GetBoolArg("-testnet", false);
+    bool fBIP100Net = GetBoolArg("-testnet-bip100", false);
 
     if (fTestNet && fRegTest)
         throw std::runtime_error("Invalid combination of -regtest and -testnet.");
@@ -114,6 +132,8 @@ std::string ChainNameFromCommandLine()
         return CBaseChainParams::REGTEST;
     if (fTestNet)
         return CBaseChainParams::TESTNET;
+    if (fBIP100Net)
+        return CBaseChainParams::BIP100NET;
     return CBaseChainParams::MAIN;
 }
 

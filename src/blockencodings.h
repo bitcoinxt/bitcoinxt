@@ -163,6 +163,15 @@ public:
     }
 };
 
-void validateCompactBlock(const CompactBlock& cmpctblock);
+// It's likely, but not certain, that this block is invalid.
+// To protect against DoS it cannot be processed as a compact block.
+class LikelyInvalidBlock : public std::runtime_error {
+public:
+    LikelyInvalidBlock(const std::string& err) : runtime_error(err) { }
+};
+
+unsigned int minTxSize();
+
+void validateCompactBlock(const CompactBlock& cmpctblock, uint64_t currMaxBlockSize);
 
 #endif
