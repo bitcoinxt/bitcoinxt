@@ -108,7 +108,6 @@ bool fDaemon = false;
 bool fServer = false;
 string strMiscWarning;
 bool fLogTimestamps = false;
-bool fLogIPs = false;
 std::atomic<bool> fReopenDebugLog(false);
 CTranslationInterface translationInterface;
 
