@@ -18,6 +18,11 @@ bool SupportsThinBlocks(const CNode& node) {
 bool KeepOutgoingPeer(const CNode& node) {
     assert(!node.fInbound);
 
+    // UASF nodes reject blocks that are valid, but do not vote for a
+    // consensus change the node operator is trying to force onto the network.
+    if (node.strSubVer.find("UASF") != std::string::npos)
+        return false;
+
     if (!Opt().UsingThinBlocks())
         return true;
 
