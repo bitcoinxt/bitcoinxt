@@ -99,7 +99,7 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
 void requestHeaders(CNode& from, const uint256& block) {
 
     from.PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), block);
-    LogPrint("net", "getheaders (%d) %s to peer=%d\n",
+    LogPrint("block", "getheaders (%d) %s to peer=%d\n",
             pindexBestHeader->nHeight, block.ToString(), from.id);
 }
 
@@ -260,7 +260,7 @@ bool BlockAnnounceSender::announceWithHeaders() {
     if (headers.empty())
         return true;
 
-    LogPrint("net", "%s: %u headers, range (%s, %s), to peer=%d\n", __func__,
+    LogPrint("block", "%s: %u headers, range (%s, %s), to peer=%d\n", __func__,
             headers.size(),
             headers.front().GetHash().ToString(),
             headers.back().GetHash().ToString(), to.id);
@@ -339,7 +339,7 @@ void BlockAnnounceSender::announceWithInv() {
     // setInventoryKnown to track this.)
     if (!peerHasHeader(pindex)) {
         to.PushInventory(CInv(MSG_BLOCK, hashToAnnounce));
-        LogPrint("net", "%s: sending inv peer=%d hash=%s\n", __func__,
+        LogPrint("block", "%s: sending inv peer=%d hash=%s\n", __func__,
                 to.id, hashToAnnounce.ToString());
     }
 }
