@@ -13,6 +13,7 @@
 #include <vector>
 
 class CBlock;
+class CNode;
 class TxFinder;
 struct ThinBloomStub;
 struct XThinStub;
@@ -46,10 +47,10 @@ class ThinBlockManager : boost::noncopyable {
                 std::unique_ptr<InFlightEraser> inFlightEraser);
 
         void addWorker(const uint256& block, ThinBlockWorker& w);
-        void delWorker(ThinBlockWorker& w, NodeId);
+        void delWorker(const uint256& block, ThinBlockWorker& w);
         int numWorkers(const uint256& block) const;
 
-        void buildStub(const StubData&, const TxFinder& txFinder);
+        void buildStub(const StubData&, const TxFinder&);
         bool isStubBuilt(const uint256& block);
 
         bool addTx(const uint256& block, const CTransaction& tx);

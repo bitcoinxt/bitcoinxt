@@ -30,12 +30,9 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
     }
 
     if (requestConnectHeaders(block.header)) {
-        worker.setAvailable();
+        worker.stopWork(hash);
         return;
     }
-
-    CompactTxFinder txfinder(mempool,
-            block.shorttxidk0, block.shorttxidk1);
 
     if (!processHeader(block.header))
         return;
@@ -47,6 +44,9 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
 
     std::unique_ptr<CompactStub> stub;
     try {
+        CompactTxFinder txfinder(mempool,
+                block.shorttxidk0, block.shorttxidk1);
+
         stub.reset(new CompactStub(block));
         worker.buildStub(*stub, txfinder);
     }
@@ -55,14 +55,14 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
         return;
     }
 
-    // If the stub was enough to finish the block then
-    // the worker will be available.
-    if (worker.isAvailable())
+    if (!worker.isWorkingOn(hash)) {
+        // Stub had enough data to finish
+        // the block.
         return;
+    }
 
     // Request missing
-    std::vector<ThinTx> missing = worker.getTxsMissing();
-    assert(!missing.empty());
+    std::vector<ThinTx> missing = worker.getTxsMissing(hash);
 
     CompactReRequest req;
     req.blockhash = hash;

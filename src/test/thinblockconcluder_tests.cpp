@@ -52,7 +52,7 @@ BOOST_AUTO_TEST_CASE(xthin_concluder) {
         DummyWorker(ThinBlockManager& mg, NodeId id) :
             XThinWorker(mg, id), addTxCalled(false) { }
 
-        bool addTx(const CTransaction& tx) override {
+        bool addTx(const uint256& block, const CTransaction& tx) override {
             addTxCalled = true;
             return true;
         }
@@ -64,18 +64,17 @@ BOOST_AUTO_TEST_CASE(xthin_concluder) {
     XThinBlockConcluder conclude;
     // Should ignore since worker is not working
     // on anything.
-    worker.setAvailable();
     conclude(resp, pfrom, worker, markInFlight);
     BOOST_CHECK(!worker.addTxCalled);
 
     // Should ignore since worker is assigned to a
     // different block.
-    worker.setToWork(uint256S("0xf00d"));
+    worker.addWork(uint256S("0xf00d"));
     conclude(resp, pfrom, worker, markInFlight);
     BOOST_CHECK(!worker.addTxCalled);
 
     // Should add tx.
-    worker.setToWork(resp.block);
+    worker.addWork(resp.block);
     conclude(resp, pfrom, worker, markInFlight);
     BOOST_CHECK(worker.addTxCalled);
 }
@@ -90,7 +89,7 @@ BOOST_AUTO_TEST_CASE(compact_concluder) {
         DummyWorker(ThinBlockManager& mg, NodeId id) :
             CompactWorker(mg, id), addTxCalled(false) { }
 
-        bool addTx(const CTransaction& tx) override {
+        bool addTx(const uint256& block, const CTransaction& tx) override {
             addTxCalled = true;
             return true;
         }
@@ -102,18 +101,17 @@ BOOST_AUTO_TEST_CASE(compact_concluder) {
     CompactBlockConcluder conclude;
     // Should ignore since worker is not working
     // on anything.
-    worker.setAvailable();
     conclude(resp, pfrom, worker, markInFlight);
     BOOST_CHECK(!worker.addTxCalled);
 
     // Should ignore since worker is assigned to a
     // different block.
-    worker.setToWork(uint256S("0xf00d"));
+    worker.addWork(uint256S("0xf00d"));
     conclude(resp, pfrom, worker, markInFlight);
     BOOST_CHECK(!worker.addTxCalled);
 
     // Should add tx.
-    worker.setToWork(resp.blockhash);
+    worker.addWork(resp.blockhash);
     conclude(resp, pfrom, worker, markInFlight);
     BOOST_CHECK(worker.addTxCalled);
 };

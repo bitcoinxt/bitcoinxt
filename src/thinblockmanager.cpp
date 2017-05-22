@@ -18,23 +18,19 @@ void ThinBlockManager::addWorker(const uint256& block, ThinBlockWorker& w) {
     builders[block].workers.insert(&w);
 }
 
-void ThinBlockManager::delWorker(ThinBlockWorker& w, NodeId nodeId) {
-    typedef std::map<uint256, ActiveBuilder>::iterator auto_;
-    for (auto_ a = builders.begin(); a != builders.end(); ++a) {
-        if (!a->second.workers.erase(&w))
-            continue; // not working on block.
+void ThinBlockManager::delWorker(const uint256& block, ThinBlockWorker& w) {
+    assert(builders.count(block));
 
-        if (a->second.workers.empty())
-            builders.erase(a);
+    bool ok = builders[block].workers.erase(&w);
+    assert(ok); // worker was working on block.
 
-        InFlightEraser& erase = *inFlightEraser;
-        erase(nodeId, a->first);
+    if (builders[block].workers.empty())
+        builders.erase(block);
 
-        // worker only works on one thin block at
-        // a time, so safe to return.
-        return;
-    }
+    InFlightEraser& erase = *inFlightEraser;
+    erase(w.nodeID(), block);
 }
+
 int ThinBlockManager::numWorkers(const uint256& block) const {
     return builders.count(block)
         ? builders.find(block)->second.workers.size()
@@ -61,7 +57,8 @@ struct WrappedFinder : public TxFinder {
     const TxFinder& wrapped;
 };
 
-void ThinBlockManager::buildStub(const StubData& s, const TxFinder& txFinder)
+void ThinBlockManager::buildStub(
+        const StubData& s, const TxFinder& txFinder)
 {
     uint256 h = s.header().GetHash();
     assert(builders.count(h));
@@ -144,13 +141,11 @@ void ThinBlockManager::removeIfExists(const uint256& h) {
     if (!builders.count(h))
         return;
 
-    typedef std::set<ThinBlockWorker*>::iterator auto_;
-
     // Take copy. Calling setAvailable causes workers to remove
     // themself from set (changing it during iteration)
     std::set<ThinBlockWorker*> workers = builders[h].workers;
-    for (auto_ w = workers.begin(); w != workers.end(); ++w)
-        (*w)->setAvailable();
+    for (ThinBlockWorker* w : workers)
+        w->stopWork(h);
     builders.erase(h);
 }
 

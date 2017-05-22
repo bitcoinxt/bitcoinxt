@@ -121,70 +121,64 @@ bool ThinTx::equals(const uint256& b) const {
 }
 
 ThinBlockWorker::ThinBlockWorker(ThinBlockManager& m, NodeId n) :
-    mg(m), rerequesting(false), node(n)
+    mg(m), node(n)
 {
 }
 
 ThinBlockWorker::~ThinBlockWorker() {
-    mg.delWorker(*this, node);
+    stopAllWork();
 }
 
 void ThinBlockWorker::buildStub(const StubData& d, const TxFinder& f) {
-    assert(d.header().GetHash() == block);
-    mg.buildStub(d, f);
+    assert(isWorkingOn(d.header().GetHash()));
+    return mg.buildStub(d, f);
 }
 
-bool ThinBlockWorker::isStubBuilt() const {
+bool ThinBlockWorker::isStubBuilt(const uint256& block) const {
     return mg.isStubBuilt(block);
 }
 
-bool ThinBlockWorker::addTx(const CTransaction& tx) {
+bool ThinBlockWorker::addTx(const uint256& block, const CTransaction& tx) {
     return mg.addTx(block, tx);
 }
 
-std::vector<ThinTx> ThinBlockWorker::getTxsMissing() const {
+std::vector<ThinTx> ThinBlockWorker::getTxsMissing(const uint256& block) const {
     return mg.getTxsMissing(block);
 }
 
-void ThinBlockWorker::setAvailable() {
-    if (isAvailable())
+void ThinBlockWorker::stopWork(const uint256& block) {
+    if (!isWorkingOn(block))
         return;
-    mg.delWorker(*this, node);
-    block.SetNull();
-    rerequesting = false;
+
+    mg.delWorker(block, *this);
+    blocks.erase(block);
+    rerequesting.erase(block);
 }
 
-bool ThinBlockWorker::isAvailable() const {
-    return block.IsNull();
+void ThinBlockWorker::stopAllWork() {
+    for (auto b : blocks)
+        stopWork(b);
 }
 
-void ThinBlockWorker::setToWork(const uint256& newblock) {
+void ThinBlockWorker::addWork(const uint256& newblock) {
     assert(!newblock.IsNull());
-    if (newblock == block)
+    if (isWorkingOn(newblock))
         return;
-
-    mg.delWorker(*this, node);
-    block = newblock;
-    rerequesting = false;
+    blocks.insert(newblock);
     mg.addWorker(newblock, *this);
 }
 
-bool ThinBlockWorker::isOnlyWorker() const {
+bool ThinBlockWorker::isOnlyWorker(const uint256& block) const {
     return mg.numWorkers(block) <= 1;
 }
 
-bool ThinBlockWorker::isReRequesting() const {
-    return rerequesting;
+bool ThinBlockWorker::isReRequesting(const uint256& block) const {
+    return rerequesting.count(block);
 }
 
-void ThinBlockWorker::setReRequesting(bool r) {
-    rerequesting = r;
-}
-
-uint256 ThinBlockWorker::blockHash() const {
-    return block;
-}
-
-std::string ThinBlockWorker::blockStr() const {
-    return block.ToString();
+void ThinBlockWorker::setReRequesting(const uint256& block, bool r) {
+    if (r)
+        rerequesting.insert(block);
+    else
+        rerequesting.erase(block);
 }

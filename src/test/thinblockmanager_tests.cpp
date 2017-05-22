@@ -25,13 +25,13 @@ BOOST_AUTO_TEST_CASE(add_and_del_worker) {
 
     // Assigning a worker to a block adds it to the manager.
     uint256 block = uint256S("0xFF");
-    worker->setToWork(block);
+    worker->addWork(block);
     BOOST_CHECK_EQUAL(1, mg->numWorkers(block));
 
-    worker->setAvailable();
+    worker->stopWork(block);
     BOOST_CHECK_EQUAL(0, mg->numWorkers(block));
 
-    worker->setToWork(block);
+    worker->addWork(block);
     worker.reset();
     BOOST_CHECK_EQUAL(0, mg->numWorkers(block));
 };

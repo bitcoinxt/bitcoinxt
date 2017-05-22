@@ -4701,7 +4701,7 @@ void unexpectedThinError(const std::string& cmd, CNode& from, const std::string&
     LogPrintf("Unexpected error handling cmd '%s': '%s' peer=%d\n", cmd, err, from.id);
     {
         LOCK(cs_main);
-        NodeStatePtr(from.id)->thinblock->setAvailable();
+        NodeStatePtr(from.id)->thinblock->stopAllWork();
         Misbehaving(from.id, 10);
     }
     from.PushMessage("reject", cmd, REJECT_MALFORMED, err);
@@ -5860,12 +5860,9 @@ bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
     if (!Opt().AvoidFullBlocks())
         return true;
 
-    // We want thin blocks only, but peer does not support it.
-    if (!(pto->SupportsXThinBlocks() || NodeStatePtr(pto->id)->supportsCompactBlocks))
-        return false;
-
-    // Is node busy serving a thin block already?
-    return worker.isAvailable();
+    // We want to download thin blocks only.
+    return pto->SupportsXThinBlocks()
+        || NodeStatePtr(pto->id)->supportsCompactBlocks;
 }
 
 
@@ -6091,9 +6088,10 @@ bool SendMessages(CNode* pto, bool fSendTrickle)
             std::set<NodeId> stallers;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - statePtr->nBlocksInFlight, vToDownload, stallers);
             BOOST_FOREACH(CBlockIndex *pindex, vToDownload) {
-                if (ThinBlocksActive(pto) && worker.isAvailable()) {
+
+                if (ThinBlocksActive(pto)) {
                     worker.requestBlock(pindex->GetBlockHash(), vGetData, *pto);
-                    worker.setToWork(pindex->GetBlockHash());
+                    worker.addWork(pindex->GetBlockHash());
                     LogPrint("net", "Requesting thin block %s (%d) peer=%d\n",
                             pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
                 }
