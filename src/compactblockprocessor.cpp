@@ -48,7 +48,7 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
                 block.shorttxidk0, block.shorttxidk1);
 
         stub.reset(new CompactStub(block));
-        worker.buildStub(*stub, txfinder);
+        worker.buildStub(*stub, txfinder, from);
     }
     catch (const thinblock_error& e) {
         rejectBlock(hash, e.what(), 10);

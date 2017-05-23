@@ -425,8 +425,10 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
             if (pindex->nStatus & BLOCK_HAVE_DATA || chainActive.Contains(pindex)) {
                 if (pindex->nChainTx)
                     state->pindexLastCommonBlock = pindex;
-            } else if (!blocksInFlight.isInFlight(pindex->GetBlockHash())) {
-                // The block is not already downloaded, and not yet in flight.
+            } else if (!(blocksInFlight.isInFlight(pindex->GetBlockHash())
+                    || state->thinblock->isWorkingOn(pindex->GetBlockHash()))) {
+                // The block is not already downloaded, not yet in flight and
+                // not being received as a thin block announcement.
                 if (pindex->nHeight > nWindowEnd) {
                     // We reached the end of the window.
                     if (vBlocks.size() == 0 && !waitingfor.count(nodeid)) {
@@ -4894,10 +4896,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             //
             // This also acts as announcement to tell the peer that we
             // support compact blocks.
-
-            bool highBandwidth = false;
-            uint64_t version = 1;
-            pfrom->PushMessage("sendcmpct", highBandwidth, version);
+            enableCompactBlocks(*pfrom, false);
         }
     }
 
@@ -5418,6 +5417,10 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         if (p.requestConnectHeaders(block.GetBlockHeader(), *pfrom)) {
             LogPrintf("Received block %s from peer=%d, but headers do "
                     "not connect. Discarding.\n");
+
+            // thinblock requests may respond with a full block
+            NodeStatePtr(pfrom->id)->thinblock->stopWork(block.GetHash());
+
             InFlightEraserImpl erase;
             erase(pfrom->id, inv.hash);
             return true;

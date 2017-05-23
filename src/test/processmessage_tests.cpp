@@ -22,9 +22,9 @@ struct DummyWorker : public WORKER_TYPE {
         WORKER_TYPE(m, i), isBuilt(false), buildStubCalled(false)
     { }
 
-    void buildStub(const StubData& s, const TxFinder& f) override {
+    void buildStub(const StubData& s, const TxFinder& f, CNode& n) override {
         buildStubCalled = true;
-        WORKER_TYPE::buildStub(s, f);
+        WORKER_TYPE::buildStub(s, f, n);
     }
     bool isStubBuilt(const uint256& block) const override {
         return isBuilt;

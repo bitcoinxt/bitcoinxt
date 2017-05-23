@@ -4,6 +4,8 @@
 
 #include "compactthin.h"
 #include "protocol.h"
+#include "net.h"
+#include "util.h"
 #include <sstream>
 
 CompactWorker::CompactWorker(ThinBlockManager& m, NodeId n) :
@@ -15,6 +17,52 @@ void CompactWorker::requestBlock(const uint256& block,
         std::vector<CInv>& getDataReq, CNode& node) {
 
     getDataReq.push_back(CInv(MSG_CMPCT_BLOCK, block));
+}
+
+class CompactAnn : public BlockAnnHandle {
+    public:
+        CompactAnn(CNode& n) : node(&n) {
+
+            LogPrint("ann", "requesting compact block announcements "
+                    "peer=%d\n", nodeID());
+
+            enableCompactBlocks(*node, true);
+
+            finalizeCallb = [=](NodeId id) {
+                if (id != nodeID())
+                    return;
+                node = nullptr;
+            };
+            finalizeCallbConn = GetNodeSignals().FinalizeNode.connect(finalizeCallb);
+        }
+        ~CompactAnn() {
+            finalizeCallbConn.disconnect();
+            if (!node)
+                return;
+
+            LogPrint("ann", "un-requesting compact block announcements "
+                    "peer=%d\n", nodeID());
+
+            enableCompactBlocks(*node, false);
+        }
+
+        void onNodeDestroyed(NodeId id) {
+            if (id != node->id)
+                return;
+            node = nullptr;
+        }
+
+        NodeId nodeID() const override {
+            return node ? node->id : -1;
+        }
+
+        CNode* node;
+        std::function<void(NodeId)> finalizeCallb;
+        boost::signals2::connection finalizeCallbConn;
+};
+
+std::unique_ptr<BlockAnnHandle> CompactWorker::requestBlockAnnouncements(CNode& n) {
+    return std::unique_ptr<BlockAnnHandle>(new CompactAnn(n));
 }
 
 std::vector<ThinTx> CompactStub::allTransactions() const {
@@ -48,4 +96,9 @@ std::vector<ThinTx> CompactStub::allTransactions() const {
         throw thinblock_error(err.str());
     }
     return all;
+}
+
+void enableCompactBlocks(CNode& node, bool highBandwidth) {
+    uint64_t version = 1;
+    node.PushMessage("sendcmpct", highBandwidth, version);
 }

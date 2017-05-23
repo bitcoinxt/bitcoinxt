@@ -47,7 +47,7 @@ void XThinBlockProcessor::operator()(
 
     try {
         XThinStub stub(block);
-        worker.buildStub(stub, txfinder);
+        worker.buildStub(stub, txfinder, from);
     }
     catch (const thinblock_error& e) {
         rejectBlock(hash, e.what(), 10);

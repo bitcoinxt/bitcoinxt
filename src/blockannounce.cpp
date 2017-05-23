@@ -50,6 +50,7 @@ bool BlockAnnounceReceiver::almostSynced() {
 
 BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrategy() {
 
+
     if (!almostSynced())
         return DONT_DOWNL;
 

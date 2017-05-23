@@ -20,6 +20,7 @@ class CompactWorker : public ThinBlockWorker {
 
         void requestBlock(const uint256& block,
                 std::vector<CInv>& getDataReq, CNode& node) override;
+        std::unique_ptr<BlockAnnHandle> requestBlockAnnouncements(CNode& n) override;
 };
 
 
@@ -49,5 +50,7 @@ struct CompactStub : public StubData {
     private:
         CompactBlock block;
 };
+
+void enableCompactBlocks(CNode& node, bool highBandwidth);
 
 #endif

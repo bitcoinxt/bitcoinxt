@@ -15,7 +15,7 @@ class DummyThinWorker : public ThinBlockWorker {
 
         bool addTx(const uint256&, const CTransaction& tx) override { return false; }
 
-        void buildStub(const StubData&, const TxFinder&) override { }
+        void buildStub(const StubData&, const TxFinder&, CNode& from) override { }
         void addWork(const uint256& block) override { }
         void stopWork(const uint256& block) override { }
         void stopAllWork() override { }

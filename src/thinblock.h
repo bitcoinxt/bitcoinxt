@@ -8,6 +8,7 @@
 #include "uint256.h"
 #include <stdexcept>
 #include <set>
+#include <memory>
 
 class CNode;
 class CInv;
@@ -83,6 +84,13 @@ struct thinblock_error : public std::runtime_error {
     virtual ~thinblock_error() throw() { }
 };
 
+class BlockAnnHandle {
+    public:
+        virtual NodeId nodeID() const = 0;
+        virtual ~BlockAnnHandle() = 0;
+};
+inline BlockAnnHandle::~BlockAnnHandle() { }
+
 // Each peer we're connected to can work on one thin block
 // at a time. This keeps track of the thin block a peer is working on.
 class ThinBlockWorker : boost::noncopyable {
@@ -95,7 +103,7 @@ class ThinBlockWorker : boost::noncopyable {
 
         virtual std::vector<std::pair<int, ThinTx> > getTxsMissing(const uint256&) const;
 
-        virtual void buildStub(const StubData&, const TxFinder&);
+        virtual void buildStub(const StubData&, const TxFinder&, CNode& from);
         virtual bool isStubBuilt(const uint256& block) const;
         virtual void addWork(const uint256& block);
         virtual void stopWork(const uint256& block);
@@ -119,6 +127,14 @@ class ThinBlockWorker : boost::noncopyable {
 
         virtual bool isWorkingOn(const uint256& h) const {
             return blocks.count(h);
+        }
+
+        // Enables block announcements with thin blocks.
+        // Returns a RAII object that disables them on destruct.
+        // Returns nullptr if peer does ont support this.
+        virtual std::unique_ptr<BlockAnnHandle> requestBlockAnnouncements(CNode&)
+        {
+            return nullptr;
         }
 
     private:
