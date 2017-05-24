@@ -5063,7 +5063,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         try {
             if (canSend)
-                bs.sendReReqReponse(*pfrom, *(mi->second), req);
+                bs.sendReReqReponse(*pfrom, *(mi->second), req,
+                        chainActive.Height());
         }
         catch (const std::exception& e) {
             LogPrintf("error in re-request from peer=%d: %s\n",
@@ -5466,7 +5467,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         try {
             if (canSend)
-                bs.sendReReqReponse(*pfrom, *(mi->second), req);
+                bs.sendReReqReponse(*pfrom, *(mi->second), req,
+                        chainActive.Height());
         }
         catch (const std::exception& e) {
             LogPrintf("error in xthin re-request from peer=%d: %s\n",
