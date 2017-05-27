@@ -137,7 +137,7 @@ void DefaultHeaderProcessor::suggestDownload(const std::vector<CBlockIndex*>& to
 
         // Stop if we don't want to download this block now.
         // Won't want next.
-        if (!ann.onBlockAnnounced(toGet, true))
+        if (!ann.onBlockAnnounced(toGet))
             break;
 
         // This block has been requested from peer.

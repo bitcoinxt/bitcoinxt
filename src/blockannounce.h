@@ -23,7 +23,7 @@ class BlockAnnounceReceiver {
         {
         }
 
-        bool onBlockAnnounced(std::vector<CInv>& toFetch, bool announcedAsHeader);
+        bool onBlockAnnounced(std::vector<CInv>& toFetch);
 
         enum DownloadStrategy {
             DOWNL_THIN_NOW,
