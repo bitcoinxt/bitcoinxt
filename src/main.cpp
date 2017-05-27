@@ -5046,7 +5046,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
             if (inv.type == MSG_BLOCK) {
                 BlockAnnounceReceiver ann(inv.hash, *pfrom, thinblockmg, blocksInFlight);
-                if (ann.onBlockAnnounced(vToFetch, false)) {
+                if (ann.onBlockAnnounced(vToFetch)) {
                     // This block has been requested from peer.
                     MarkBlockAsInFlight()(pfrom->id, inv.hash, Params().GetConsensus());
                 }

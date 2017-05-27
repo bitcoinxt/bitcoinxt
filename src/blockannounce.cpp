@@ -106,8 +106,7 @@ void requestHeaders(CNode& from, const uint256& block) {
 // React to a block announcement.
 //
 // Returns true if we requested the block now from the peer that requested it.
-bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch,
-        bool announcedAsHeader) {
+bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch) {
     AssertLockHeld(cs_main);
 
     updateBlockAvailability();

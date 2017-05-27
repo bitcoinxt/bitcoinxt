@@ -95,12 +95,12 @@ BOOST_AUTO_TEST_CASE(announce_updates_availability) {
 
     std::vector<CInv> toFetch;
 
-    ann.onBlockAnnounced(toFetch, false);
+    ann.onBlockAnnounced(toFetch);
     BOOST_CHECK_EQUAL(1, ann.updateCalled);
 
     // Availability should also be called when we don't want block.
     DummyBlockIndexEntry entry(block); //< we have block (we don't want it)
-    ann.onBlockAnnounced(toFetch, false);
+    ann.onBlockAnnounced(toFetch);
     BOOST_CHECK_EQUAL(2, ann.updateCalled);
 }
 
@@ -108,14 +108,14 @@ BOOST_AUTO_TEST_CASE(fetch_when_wanted) {
 
     {   // We want block.
         std::vector<CInv> toFetch;
-        BOOST_CHECK(ann.onBlockAnnounced(toFetch, false));
+        BOOST_CHECK(ann.onBlockAnnounced(toFetch));
         BOOST_CHECK(!toFetch.empty());
     }
 
     {   // We have block (we don't want it)
         std::vector<CInv> toFetch;
         DummyBlockIndexEntry entry(block);
-        BOOST_CHECK(!ann.onBlockAnnounced(toFetch, false));
+        BOOST_CHECK(!ann.onBlockAnnounced(toFetch));
         BOOST_CHECK_EQUAL(0, toFetch.size());
     }
 }
@@ -278,7 +278,7 @@ BOOST_AUTO_TEST_CASE(onannounced_downl_thin) {
     nodestate->thinblock.reset(worker); //<- takes ownership of ptr
 
     std::vector<CInv> r;
-    BOOST_CHECK(ann.onBlockAnnounced(r, false));
+    BOOST_CHECK(ann.onBlockAnnounced(r));
     BOOST_CHECK_EQUAL(1, worker->reqs);
 
     // thin blocks come with a header, we should not
@@ -293,7 +293,7 @@ BOOST_AUTO_TEST_CASE(onannounced_downl_full) {
     ann.overrideStrategy = BlockAnnounceReceiver::DOWNL_FULL_NOW;
 
     std::vector<CInv> toFetch;
-    BOOST_CHECK(ann.onBlockAnnounced(toFetch, false));
+    BOOST_CHECK(ann.onBlockAnnounced(toFetch));
     BOOST_CHECK_EQUAL(1, toFetch.size());
     BOOST_CHECK_EQUAL(block.ToString(), toFetch.at(0).hash.ToString());
 
@@ -311,7 +311,7 @@ BOOST_AUTO_TEST_CASE(onannounced_dont_downl) {
     nodestate->thinblock.reset(worker); //<- takes ownership of ptr
 
     std::vector<CInv> toFetch;
-    BOOST_CHECK(!ann.onBlockAnnounced(toFetch, false));
+    BOOST_CHECK(!ann.onBlockAnnounced(toFetch));
     BOOST_CHECK_EQUAL(0, worker->reqs);
     BOOST_CHECK_EQUAL(0, toFetch.size());
 
@@ -330,7 +330,7 @@ BOOST_AUTO_TEST_CASE(onannounced_dowl_thin_later) {
     nodestate->thinblock.reset(worker); //<- takes ownership of ptr
 
     std::vector<CInv> toFetch;
-    BOOST_CHECK(!ann.onBlockAnnounced(toFetch, false));
+    BOOST_CHECK(!ann.onBlockAnnounced(toFetch));
     BOOST_CHECK_EQUAL(0, worker->reqs);
     BOOST_CHECK_EQUAL(0, toFetch.size());
 
