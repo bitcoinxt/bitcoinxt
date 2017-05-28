@@ -93,7 +93,7 @@ class ThinBlockWorker : boost::noncopyable {
 
         virtual bool addTx(const uint256& block, const CTransaction& tx);
 
-        virtual std::vector<ThinTx> getTxsMissing(const uint256&) const;
+        virtual std::vector<std::pair<int, ThinTx> > getTxsMissing(const uint256&) const;
 
         virtual void buildStub(const StubData&, const TxFinder&);
         virtual bool isStubBuilt(const uint256& block) const;

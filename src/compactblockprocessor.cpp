@@ -62,30 +62,13 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
     }
 
     // Request missing
-    std::vector<ThinTx> missing = worker.getTxsMissing(hash);
+    std::vector<std::pair<int, ThinTx> > missing = worker.getTxsMissing(hash);
 
     CompactReRequest req;
     req.blockhash = hash;
 
-    std::vector<ThinTx> all = stub->allTransactions();
-
-    for (auto& tx : missing) {
-
-        auto res = std::find_if(begin(all), end(all), [&tx](const ThinTx& b) {
-            return tx.equals(b);
-        });
-        if (res == end(all)) {
-            std::stringstream ss;
-            ss << "Error: Did not find " << tx.obfuscated() << " missing, has: ";
-            for (auto& a : all)
-                ss << a.obfuscated() << "; ";
-            throw std::runtime_error(ss.str());
-        }
-
-        size_t index = std::distance(begin(all), res);
-
-        req.indexes.push_back(index);
-    }
+    for (auto& t : missing)
+        req.indexes.push_back(t.first /* index in block */);
 
     LogPrint("thin", "re-requesting %d compact txs for %s peer=%d\n",
             req.indexes.size(), hash.ToString(), from.id);

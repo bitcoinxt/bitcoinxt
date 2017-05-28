@@ -24,7 +24,7 @@ class ThinBlockBuilder {
         TXAddRes addTransaction(const CTransaction& tx);
 
         int numTxsMissing() const;
-        std::vector<ThinTx> getTxsMissing() const;
+        std::vector<std::pair<int, ThinTx> > getTxsMissing() const;
 
         // If builder has uint256 hashes in wantedTxs list,
         // this will do nothing.

@@ -61,14 +61,13 @@ void XThinBlockProcessor::operator()(
     }
 
     // Request missing
-    std::vector<ThinTx> missing = worker.getTxsMissing(hash);
-    assert(!missing.empty());
+    std::vector<std::pair<int, ThinTx> > missing = worker.getTxsMissing(hash);
 
     XThinReRequest req;
     req.block = hash;
 
     for (auto& t : missing)
-        req.txRequesting.insert(t.cheap());
+        req.txRequesting.insert(t.second.cheap());
 
     LogPrintf("re-requesting xthin %d missing transactions for %s from peer=%d\n",
             missing.size(), hash.ToString(), from.id);

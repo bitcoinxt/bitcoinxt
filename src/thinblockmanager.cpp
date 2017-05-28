@@ -149,7 +149,7 @@ void ThinBlockManager::removeIfExists(const uint256& h) {
     builders.erase(h);
 }
 
-std::vector<ThinTx> ThinBlockManager::getTxsMissing(const uint256& hash) const {
+std::vector<std::pair<int, ThinTx> > ThinBlockManager::getTxsMissing(const uint256& hash) const {
     assert(builders.count(hash));
     ThinBlockBuilder* b = builders.find(hash)->second.builder.get();
     assert(b);

@@ -142,7 +142,7 @@ bool ThinBlockWorker::addTx(const uint256& block, const CTransaction& tx) {
     return mg.addTx(block, tx);
 }
 
-std::vector<ThinTx> ThinBlockWorker::getTxsMissing(const uint256& block) const {
+std::vector<std::pair<int, ThinTx> > ThinBlockWorker::getTxsMissing(const uint256& block) const {
     return mg.getTxsMissing(block);
 }
 
