@@ -512,6 +512,40 @@ BOOST_AUTO_TEST_CASE(announce_with_block) {
     BOOST_CHECK(NodeStatePtr(to.id)->bestHeaderSent == &entry2.index);
 }
 
+BOOST_AUTO_TEST_CASE(dont_announce_if_peer_knows) {
+    // don't announce block to peer if it
+    // already knows about it.
+
+    DummyBlockIndexEntry entry1(uint256S("0xBAD"));
+    DummyBlockIndexEntry entry2(uint256S("0xBEEF"));
+    entry2.index.pprev = &entry1.index;
+
+    to.blocksToAnnounce = { entry2.hash };
+    NodeStatePtr(to.id)->bestHeaderSent = &entry1.index;
+    NodeStatePtr(to.id)->supportsCompactBlocks = true;
+
+    // Let it be known that this peer
+    // already knows about this block.
+    NodeStatePtr(to.id)->pindexBestKnownBlock = &entry2.index;
+
+    struct DummyBlockSender : public BlockSender {
+
+        DummyBlockSender() : BlockSender(), sendBlockCalls(0) {
+        }
+
+        void sendBlock(CNode& node, const CBlockIndex& blockIndex,
+                int invType, int activeChainHeight) override {
+            sendBlockCalls++;
+        }
+        int sendBlockCalls;
+    };
+    DummyBlockSender sender;
+    ann.announceWithBlock(sender);
+
+    // peer knows about block, should not have sent.
+    BOOST_CHECK_EQUAL(0, sender.sendBlockCalls);
+}
+
 BOOST_AUTO_TEST_CASE(find_headers_to_announce) {
     DummyBlockIndexEntry entry1(uint256S("0xBAD"));
     DummyBlockIndexEntry entry2(uint256S("0xBEEF"));

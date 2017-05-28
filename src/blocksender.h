@@ -27,7 +27,7 @@ class BlockSender {
         void send(const CChain& activeChain, CNode& node,
             CBlockIndex& blockIndex, const CInv& inv);
 
-        void sendBlock(CNode& node,
+        virtual void sendBlock(CNode& node,
             const CBlockIndex& blockIndex, int invType, int activeChainHeight);
 
         // Creates a response for a re-request for transactions missing
