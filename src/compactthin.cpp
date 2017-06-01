@@ -19,7 +19,7 @@ void CompactWorker::requestBlock(const uint256& block,
 
 std::vector<ThinTx> CompactStub::allTransactions() const {
 
-    std::vector<ThinTx> all(block.BlockTxCount(), ThinTx(uint256()));
+    std::vector<ThinTx> all(block.BlockTxCount(), ThinTx::Null());
 
     int lastIndex = -1;
     for (size_t i = 0; i < block.prefilledtxn.size(); ++i) {

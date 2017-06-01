@@ -19,7 +19,6 @@ struct Opt {
     // Thin block options
     bool UsingThinBlocks();
     bool AvoidFullBlocks();
-    bool OptimalThinBlocksOnly();
     int ThinBlocksMaxParallel();
     bool PreferCompactBlocks() const; // Added for rpc test
 };

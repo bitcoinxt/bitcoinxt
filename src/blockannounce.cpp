@@ -24,10 +24,7 @@ bool BlockAnnounceReceiver::fetchAsThin() const {
     if (!Opt().UsingThinBlocks())
         return false;
 
-    if (from.SupportsBloomThinBlocks() || from.SupportsXThinBlocks())
-        return true;
-
-    if (NodeStatePtr(from.id)->supportsCompactBlocks)
+    if (from.SupportsXThinBlocks() || NodeStatePtr(from.id)->supportsCompactBlocks)
         return true;
 
     return false;

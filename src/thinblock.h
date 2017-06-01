@@ -44,7 +44,7 @@ public:
 
 private:
 
-    uint256 full_; //< Used by bloom thin
+    uint256 full_; //< Bundled/prefilled transactions have known full hash.
     uint64_t cheap_; //< Used by xthin
     struct {
         uint64_t id;

@@ -298,10 +298,6 @@ public:
     int nRefCount;
     NodeId id;
 
-    // the nonce we expect to find in a pong message marking end of thin block tx data.
-    uint64_t thinBlockNonce;
-    uint256 thinBlockNonceBlock; //< In what context was the nonce created
-
 protected:
 
     // Denial-of-service detection/prevention
@@ -658,10 +654,6 @@ public:
     static uint64_t GetTotalBytesRecv();
     static uint64_t GetTotalBytesSent();
 
-    // Node (probably) supports filter_* commands
-    bool SupportsBloom() const;
-
-    bool SupportsBloomThinBlocks() const;
     bool SupportsXThinBlocks() const;
     bool SupportsCompactBlocks() const;
 };

@@ -11,7 +11,6 @@
 #include "blockheaderprocessor.h"
 #include "blockencodings.h"
 #include "blocksender.h"
-#include "bloomthin.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "checkqueue.h"
@@ -26,7 +25,6 @@
 #include "nodestate.h"
 #include "options.h"
 #include "pow.h"
-#include "process_merkleblock.h"
 #include "process_xthinblock.h"
 #include "thinblockbuilder.h"
 #include "thinblockconcluder.h"
@@ -4480,7 +4478,7 @@ bool static AlreadyHave(const CInv& inv)
 // catching up with the block chain).
 bool ThinBlocksActive(CNode* n) {
     return !IsInitialBlockDownload() && Opt().UsingThinBlocks()
-        && (n->SupportsBloomThinBlocks() || n->SupportsXThinBlocks());
+        && (n->SupportsXThinBlocks() || NodeStatePtr(n->id)->supportsCompactBlocks);
 }
 
 void static ProcessGetData(CNode* pfrom)
@@ -4797,12 +4795,11 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             NodeStatePtr ns(pfrom->id);
 
             if (Opt().UsingThinBlocks() && pfrom->SupportsXThinBlocks())
+            {
                 ns->thinblock.reset(new XThinWorker(
                     thinblockmg, pfrom->id,
                     std::unique_ptr<TxHashProvider>(new MempoolHashProvider)));
-
-            else if (Opt().UsingThinBlocks() && pfrom->SupportsBloomThinBlocks())
-                ns->thinblock.reset(new BloomThinWorker(thinblockmg, pfrom->id));
+            }
             else { /* keep DummyThinWorker */ }
 
             if (!pfrom->fInbound && !KeepOutgoingPeer(*pfrom)) {
@@ -4878,10 +4875,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         int64_t nTimeOffset = nTime - GetTime();
         pfrom->nTimeOffset = nTimeOffset;
         AddTimeData(pfrom->addr, nTimeOffset);
-
-        // Enable bloom thin blocks on peer
-        if (Opt().UsingThinBlocks() && pfrom->SupportsBloomThinBlocks() && !pfrom->SupportsXThinBlocks())
-            pfrom->PushMessage("filterload", CBloomFilter());
     }
 
 
@@ -4993,6 +4986,9 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
     }
 
     else if (strCommand == "sendcmpct") {
+        if (!Opt().UsingThinBlocks())
+            return true;
+
         bool highBandwidth = false;
         uint64_t version = 1;
         vRecv >> highBandwidth >> version;
@@ -5067,6 +5063,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
     else if (strCommand == "getblocktxn")
     {
+        if (!Opt().UsingThinBlocks())
+            return true;
         // Remote peer is requesting more transactions as part of compact block
         // transfer.
         CompactReRequest req;
@@ -5389,24 +5387,10 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         if (!p(headers, nCount == MAX_HEADERS_RESULTS, true))
             return false;
     }
-    else if (strCommand == "merkleblock" && !fImporting && !fReindex) // Ignore blocks received while importing
-    {
-        try {
-            LOCK(cs_main);
-            NodeStatePtr nodestate(pfrom->id);
-            MarkBlockAsInFlight inFlight;
-            DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg,
-                inFlight, CheckBlockIndex);
-            ProcessMerkleBlock(*pfrom, vRecv, *(nodestate->thinblock), TxFinderImpl(), p);
-        }
-        catch (const std::exception& e) {
-            unexpectedThinError(strCommand, *pfrom, e.what());
-            throw;
-        }
-
-    }
     else if (strCommand == "xthinblock" && !fImporting && !fReindex) // Ignore blocks received while importing
     {
+        if (!Opt().UsingThinBlocks())
+            return true;
         // We are receiving a xthin block.
         try {
             LOCK(cs_main);
@@ -5424,6 +5408,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
     }
     else if (strCommand == "cmpctblock" && !fImporting && !fReindex) // Ignore blocks received while importing
     {
+        if (!Opt().UsingThinBlocks())
+            return true;
         // We are receiving a compact block.
         try {
             LOCK(cs_main);
@@ -5465,6 +5451,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         callb(block, std::vector<NodeId>(1, pfrom->id));
     }
     else if (strCommand == "get_xthin") {
+        if (!Opt().UsingThinBlocks())
+            return true;
         CBloomFilter dontWant;
         CInv inv;
 
@@ -5486,6 +5474,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
     }
     else if (strCommand == "get_xblocktx") {
+        if (!Opt().UsingThinBlocks())
+            return true;
         // This is a request for transactions that remote peer wanted
         // as part of a xthinblock, but were not provided.
 
@@ -5511,6 +5501,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         }
     }
     else if (strCommand == "xblocktx") {
+        if (!Opt().UsingThinBlocks())
+            return true;
         // This is a response for us requesting missing transactions from
         // xthinblocks.
 
@@ -5525,6 +5517,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
     }
 
     else if (strCommand == "blocktxn") {
+        if (!Opt().UsingThinBlocks())
+            return true;
         // This is a response for us requesting missing transactions from
         // xthinblocks.
 
@@ -5641,13 +5635,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                     // This should never happen
                     sProblem = "Timing mishap";
                 }
-            } else if (nonce && pfrom->thinBlockNonce == nonce) {
-                LOCK(cs_main);
-                NodeStatePtr nodestate(pfrom->id);
-                ThinBlockWorker& thinblock = *(nodestate->thinblock);
-                MarkBlockAsInFlight m;
-                BloomBlockConcluder concludeDownload(m);
-                concludeDownload(pfrom, nonce, thinblock);
             }
             else if (pfrom->nPingNonceSent) {
                 // Nonce mismatches are normal when pings are overlapping
@@ -5902,13 +5889,7 @@ bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
         return true;
 
     // We want thin blocks only, but peer does not support it.
-    if (!(pto->SupportsBloomThinBlocks() || pto->SupportsXThinBlocks()
-                || NodeStatePtr(pto->id)->supportsCompactBlocks))
-        return false;
-
-    // We want optimal thin blocks only, but peer does not support it.
-    if (Opt().OptimalThinBlocksOnly() && !(pto->SupportsXThinBlocks()
-            || NodeStatePtr(pto->id)->supportsCompactBlocks))
+    if (!(pto->SupportsXThinBlocks() || NodeStatePtr(pto->id)->supportsCompactBlocks))
         return false;
 
     // Is node busy serving a thin block already?
