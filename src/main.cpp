@@ -229,7 +229,6 @@ class OnBlockFinished : public ThinBlockFinishedCallb {
 
         bool hasWhitelistedNode(const std::vector<NodeId>& ids) const;
         CNode* pickBlockSource(const std::vector<NodeId>& ids);
-        void updateRecentTxs(const CBlock& block, const std::vector<NodeId>& ids);
         void rejectAndPunish(const CValidationState& state, const uint256& hash,
                 const std::vector<NodeId>& ids);
 };
@@ -482,7 +481,6 @@ void OnBlockFinished::operator()(const CBlock& block, const std::vector<NodeId>&
     CValidationState state;
     ProcessNewBlock(state, pickBlockSource(ids), &copy,
             hasWhitelistedNode(ids), NULL);
-    updateRecentTxs(block, ids);
     rejectAndPunish(state, block.GetHash(), ids);
 }
 
@@ -508,21 +506,6 @@ CNode* OnBlockFinished::pickBlockSource(const std::vector<NodeId>& ids) {
         return pnode;
     }
     return NULL;
-}
-
-void OnBlockFinished::updateRecentTxs(const CBlock& block, const std::vector<NodeId>& ids) {
-    // Store hases of block with node, so we can ignore late tx messages
-    std::set<uint256> txs;
-    typedef std::vector<CTransaction>::const_iterator auto__;
-    for (auto__ t = block.vtx.begin(); t != block.vtx.end(); ++t)
-        txs.insert(t->GetHash());
-
-    typedef std::vector<NodeId>::const_iterator auto_;
-    for (auto_ n = ids.begin(); n != ids.end(); ++n) {
-        NodeStatePtr ns(*n);
-        if (ns.IsNull()) continue;
-        ns->recentThinBlockTx = txs;
-    }
 }
 
 void OnBlockFinished::rejectAndPunish(const CValidationState& state,
@@ -1244,12 +1227,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx.IsCoinBase()) {
-        // FIXME: In some cases we request a merkleblock, but the node provides another
-        // merkleblock first, followed by the one we expect. Only that we don't expect
-        // the one we requested first anymore (because it provided another).
-        // Don't ban it for sending us the coinbase of the block we requested.
-        int dos = Opt().UsingThinBlocks() ? 10 : 100;
-        return state.DoS(dos, error("AcceptToMemoryPool: coinbase as individual tx"),
+        return state.DoS(100, error("AcceptToMemoryPool: coinbase as individual tx"),
                          REJECT_INVALID, "coinbase");
     }
 
@@ -5234,123 +5212,115 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         NodeStatePtr nodestate(pfrom->GetId());
 
-        bool tryMempool = nodestate->thinblock->isAvailable() || !nodestate->thinblock->addTx(tx);
+        bool fMissingInputs = false;
+        CValidationState state;
 
-        // tx may belong to recently finished thin block. In that case
-        // we don't want to try mempool, node may get banned for sending is coinbase tx.
-        tryMempool = tryMempool && !nodestate->recentThinBlockTx.count(tx.GetHash());
+        mapAlreadyAskedFor.erase(inv);
 
-        if (tryMempool) {
-            bool fMissingInputs = false;
-            CValidationState state;
+        if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
+        {
+            mempool.check(pcoinsTip);
+            std::vector<uint256> vAncestors;
+            mempool.queryAncestors(tx.GetHash(), vAncestors);
+            RelayTransaction(tx, vAncestors);
+            vWorkQueue.push_back(inv.hash);
 
-            mapAlreadyAskedFor.erase(inv);
+            LogPrint("mempool", "AcceptToMemoryPool: peer=%d %s: accepted %s (poolsz %u)\n",
+                pfrom->id, pfrom->cleanSubVer,
+                tx.GetHash().ToString(),
+                mempool.size());
 
-            if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
+            // Recursively process any orphan transactions that depended on this one
+            set<NodeId> setMisbehaving;
+            for (unsigned int i = 0; i < vWorkQueue.size(); i++)
             {
-                mempool.check(pcoinsTip);
+                map<uint256, set<uint256> >::iterator itByPrev = mapOrphanTransactionsByPrev.find(vWorkQueue[i]);
+                if (itByPrev == mapOrphanTransactionsByPrev.end())
+                    continue;
+                for (set<uint256>::iterator mi = itByPrev->second.begin();
+                     mi != itByPrev->second.end();
+                     ++mi)
+                {
+                    const uint256& orphanHash = *mi;
+                    const CTransaction& orphanTx = mapOrphanTransactions[orphanHash].tx;
+                    NodeId fromPeer = mapOrphanTransactions[orphanHash].fromPeer;
+                    bool fMissingInputs2 = false;
+                    // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
+                    // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
+                    // anyone relaying LegitTxX banned)
+                    CValidationState stateDummy;
+
+
+                    if (setMisbehaving.count(fromPeer))
+                        continue;
+                    if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
+                    {
+                        LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
+                        std::vector<uint256> vAncestors;
+                        mempool.queryAncestors(orphanTx.GetHash(), vAncestors);
+                        RelayTransaction(orphanTx, vAncestors);
+                        vWorkQueue.push_back(orphanHash);
+                        vEraseQueue.push_back(orphanHash);
+                    }
+                    else if (!fMissingInputs2)
+                    {
+                        int nDos = 0;
+                        if (stateDummy.IsInvalid(nDos) && nDos > 0)
+                        {
+                            // Punish peer that gave us an invalid orphan tx
+                            Misbehaving(fromPeer, nDos);
+                            setMisbehaving.insert(fromPeer);
+                            LogPrint("mempool", "   invalid orphan tx %s\n", orphanHash.ToString());
+                        }
+                        // Has inputs but not accepted to mempool
+                        // Probably non-standard or insufficient fee/priority
+                        LogPrint("mempool", "   removed orphan tx %s\n", orphanHash.ToString());
+                        vEraseQueue.push_back(orphanHash);
+                        assert(recentRejects);
+                        recentRejects->insert(orphanHash);
+                    }
+                    mempool.check(pcoinsTip);
+                }
+            }
+            BOOST_FOREACH(uint256 hash, vEraseQueue)
+                EraseOrphanTx(hash);
+        }
+        else if (fMissingInputs)
+        {
+            AddOrphanTx(tx, pfrom->GetId());
+
+            // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
+            unsigned int nMaxOrphanTx = (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
+            unsigned int nEvicted = LimitOrphanTxSize(nMaxOrphanTx);
+            if (nEvicted > 0)
+                LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
+        } else {
+            assert(recentRejects);
+            recentRejects->insert(tx.GetHash());
+
+            if (pfrom->fWhitelisted) {
+                // Always relay transactions received from whitelisted peers, even
+                // if they were rejected from the mempool, allowing the node to
+                // function as a gateway for nodes hidden behind it.
+                //
+                // FIXME: This includes invalid transactions, which means a
+                // whitelisted peer could get us banned! We may want to change
+                // that.
                 std::vector<uint256> vAncestors;
                 mempool.queryAncestors(tx.GetHash(), vAncestors);
                 RelayTransaction(tx, vAncestors);
-                vWorkQueue.push_back(inv.hash);
-
-                LogPrint("mempool", "AcceptToMemoryPool: peer=%d %s: accepted %s (poolsz %u)\n",
-                    pfrom->id, pfrom->cleanSubVer,
-                    tx.GetHash().ToString(),
-                    mempool.size());
-
-                // Recursively process any orphan transactions that depended on this one
-                set<NodeId> setMisbehaving;
-                for (unsigned int i = 0; i < vWorkQueue.size(); i++)
-                {
-                    map<uint256, set<uint256> >::iterator itByPrev = mapOrphanTransactionsByPrev.find(vWorkQueue[i]);
-                    if (itByPrev == mapOrphanTransactionsByPrev.end())
-                        continue;
-                    for (set<uint256>::iterator mi = itByPrev->second.begin();
-                         mi != itByPrev->second.end();
-                         ++mi)
-                    {
-                        const uint256& orphanHash = *mi;
-                        const CTransaction& orphanTx = mapOrphanTransactions[orphanHash].tx;
-                        NodeId fromPeer = mapOrphanTransactions[orphanHash].fromPeer;
-                        bool fMissingInputs2 = false;
-                        // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
-                        // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
-                        // anyone relaying LegitTxX banned)
-                        CValidationState stateDummy;
-
-
-                        if (setMisbehaving.count(fromPeer))
-                            continue;
-                        if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
-                        {
-                            LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
-                            std::vector<uint256> vAncestors;
-                            mempool.queryAncestors(orphanTx.GetHash(), vAncestors);
-                            RelayTransaction(orphanTx, vAncestors);
-                            vWorkQueue.push_back(orphanHash);
-                            vEraseQueue.push_back(orphanHash);
-                        }
-                        else if (!fMissingInputs2)
-                        {
-                            int nDos = 0;
-                            if (stateDummy.IsInvalid(nDos) && nDos > 0)
-                            {
-                                // Punish peer that gave us an invalid orphan tx
-                                Misbehaving(fromPeer, nDos);
-                                setMisbehaving.insert(fromPeer);
-                                LogPrint("mempool", "   invalid orphan tx %s\n", orphanHash.ToString());
-                            }
-                            // Has inputs but not accepted to mempool
-                            // Probably non-standard or insufficient fee/priority
-                            LogPrint("mempool", "   removed orphan tx %s\n", orphanHash.ToString());
-                            vEraseQueue.push_back(orphanHash);
-                            assert(recentRejects);
-                            recentRejects->insert(orphanHash);
-                        }
-                        mempool.check(pcoinsTip);
-                    }
-                }
-                BOOST_FOREACH(uint256 hash, vEraseQueue)
-                    EraseOrphanTx(hash);
             }
-            else if (fMissingInputs)
-            {
-                AddOrphanTx(tx, pfrom->GetId());
-
-                // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
-                unsigned int nMaxOrphanTx = (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
-                unsigned int nEvicted = LimitOrphanTxSize(nMaxOrphanTx);
-                if (nEvicted > 0)
-                    LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
-            } else {
-                assert(recentRejects);
-                recentRejects->insert(tx.GetHash());
-
-                if (pfrom->fWhitelisted) {
-                    // Always relay transactions received from whitelisted peers, even
-                    // if they were rejected from the mempool, allowing the node to
-                    // function as a gateway for nodes hidden behind it.
-                    //
-                    // FIXME: This includes invalid transactions, which means a
-                    // whitelisted peer could get us banned! We may want to change
-                    // that.
-                    std::vector<uint256> vAncestors;
-                    mempool.queryAncestors(tx.GetHash(), vAncestors);
-                    RelayTransaction(tx, vAncestors);
-                }
-            }
-            int nDoS = 0;
-            if (state.IsInvalid(nDoS))
-            {
-                LogPrint("mempool", "%s from peer=%d %s was not accepted into the memory pool: %s\n", tx.GetHash().ToString(),
-                    pfrom->id, pfrom->cleanSubVer,
-                    state.GetRejectReason());
-                pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
-                                   state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
-                if (nDoS > 0)
-                    Misbehaving(pfrom->GetId(), nDoS);
-            }
+        }
+        int nDoS = 0;
+        if (state.IsInvalid(nDoS))
+        {
+            LogPrint("mempool", "%s from peer=%d %s was not accepted into the memory pool: %s\n", tx.GetHash().ToString(),
+                pfrom->id, pfrom->cleanSubVer,
+                state.GetRejectReason());
+            pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
+                               state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
+            if (nDoS > 0)
+                Misbehaving(pfrom->GetId(), nDoS);
         }
     }
     else if (strCommand == "headers" && !fImporting && !fReindex) // Ignore headers received while importing
