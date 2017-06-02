@@ -11,8 +11,38 @@
 #include <vector>
 #include "compactthin.h"
 
+static void fallbackDownload(CNode& from,
+        const uint256& block, BlockInFlightMarker& markInFlight) {
+
+    LogPrint("thin", "Falling back on full block download for %s peer=%d\n",
+            block.ToString(), from.id);
+
+    CInv req(MSG_BLOCK, block);
+    from.PushMessage("getdata", std::vector<CInv>(1, req));
+    markInFlight(from.id, block, Params().GetConsensus(), NULL);
+}
+
+static void handleReRequestFailed(ThinBlockWorker& worker, CNode& from,
+        BlockInFlightMarker& markInFlight) {
+
+    LogPrint("thin", "Did not provide all missing transactions in a"
+            "thin block re-request for %s peer=%d\n",
+            worker.blockStr(), worker.nodeID());
+
+    bool wasLastWorker = worker.isOnlyWorker();
+    uint256 wasWorkingOn = worker.blockHash();
+    worker.setAvailable();
+    if (wasLastWorker) {
+        // Node deserves misbehave, but we'll give it a chance
+        // to send us the full block.
+        fallbackDownload(from, wasWorkingOn, markInFlight);
+    }
+    else
+        Misbehaving(worker.nodeID(), 10);
+}
+
 void XThinBlockConcluder::operator()(const XThinReReqResponse& resp,
-        CNode& pfrom, ThinBlockWorker& worker) {
+        CNode& pfrom, ThinBlockWorker& worker, BlockInFlightMarker& markInFlight) {
 
     if (worker.isAvailable())
     {
@@ -30,22 +60,13 @@ void XThinBlockConcluder::operator()(const XThinReReqResponse& resp,
     for (auto_ t = resp.txRequested.begin(); t != resp.txRequested.end(); ++t)
         worker.addTx(*t);
 
-    // Block finished?
-    if (worker.isAvailable())
-        return;
-
-    // There is no reason for remote peer not to have provided all
-    // transactions at this point.
-    LogPrint("thin", "peer=%d responded to re-request for block %s, "
-        "but still did not provide all transctions missing\n",
-        pfrom.id, resp.block.ToString());
-
-    worker.setAvailable();
-    Misbehaving(pfrom.id, 10);
+    // Block fully constructed?
+    if (!worker.isAvailable())
+        handleReRequestFailed(worker, pfrom, markInFlight);
 }
 
 void CompactBlockConcluder::operator()(const CompactReReqResponse& resp,
-        CNode& pfrom, ThinBlockWorker& worker) {
+        CNode& pfrom, ThinBlockWorker& worker, BlockInFlightMarker& markInFlight) {
 
     if (worker.isAvailable())
     {
@@ -62,16 +83,7 @@ void CompactBlockConcluder::operator()(const CompactReReqResponse& resp,
     for (auto& t : resp.txn)
         worker.addTx(t);
 
-    // Block finished?
-    if (worker.isAvailable())
-        return;
-
-    // There is no reason for remote peer not to have provided all
-    // transactions at this point.
-    LogPrint("thin", "peer=%d responded to compact re-request for block %s, "
-        "but still did not provide all transctions missing\n",
-        pfrom.id, resp.blockhash.ToString());
-
-    worker.setAvailable();
-    Misbehaving(pfrom.id, 10);
+    // Block fully constructed?
+    if (!worker.isAvailable())
+        handleReRequestFailed(worker, pfrom, markInFlight);
 }

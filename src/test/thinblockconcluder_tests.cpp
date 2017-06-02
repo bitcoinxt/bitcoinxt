@@ -36,6 +36,7 @@ struct ConcluderSetup {
     DummyNode pfrom;
     ThinBlockManager tmgr;
     uint64_t nonce;
+    DummyMarkAsInFlight markInFlight;
 };
 
 
@@ -64,18 +65,18 @@ BOOST_AUTO_TEST_CASE(xthin_concluder) {
     // Should ignore since worker is not working
     // on anything.
     worker.setAvailable();
-    conclude(resp, pfrom, worker);
+    conclude(resp, pfrom, worker, markInFlight);
     BOOST_CHECK(!worker.addTxCalled);
 
     // Should ignore since worker is assigned to a
     // different block.
     worker.setToWork(uint256S("0xf00d"));
-    conclude(resp, pfrom, worker);
+    conclude(resp, pfrom, worker, markInFlight);
     BOOST_CHECK(!worker.addTxCalled);
 
     // Should add tx.
     worker.setToWork(resp.block);
-    conclude(resp, pfrom, worker);
+    conclude(resp, pfrom, worker, markInFlight);
     BOOST_CHECK(worker.addTxCalled);
 }
 
@@ -102,18 +103,18 @@ BOOST_AUTO_TEST_CASE(compact_concluder) {
     // Should ignore since worker is not working
     // on anything.
     worker.setAvailable();
-    conclude(resp, pfrom, worker);
+    conclude(resp, pfrom, worker, markInFlight);
     BOOST_CHECK(!worker.addTxCalled);
 
     // Should ignore since worker is assigned to a
     // different block.
     worker.setToWork(uint256S("0xf00d"));
-    conclude(resp, pfrom, worker);
+    conclude(resp, pfrom, worker, markInFlight);
     BOOST_CHECK(!worker.addTxCalled);
 
     // Should add tx.
     worker.setToWork(resp.blockhash);
-    conclude(resp, pfrom, worker);
+    conclude(resp, pfrom, worker, markInFlight);
     BOOST_CHECK(worker.addTxCalled);
 };
 
