@@ -101,6 +101,7 @@ static ScriptErrorDesc script_errors[]={
     {SCRIPT_ERR_MUST_USE_FORKID, "MISSING_FORKID"},
     {SCRIPT_ERR_DIV_BY_ZERO, "DIV_BY_ZERO"},
     {SCRIPT_ERR_MOD_BY_ZERO, "MOD_BY_ZERO"},
+    {SCRIPT_ERR_NONCOMPRESSED_PUBKEY, "NONCOMPRESSED_PUBKEY"},
 };
 
 const char *FormatScriptError(ScriptError_t err)

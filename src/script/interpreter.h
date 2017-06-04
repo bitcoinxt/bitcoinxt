@@ -88,13 +88,21 @@ enum
     // See BIP112 for details
     SCRIPT_VERIFY_CHECKSEQUENCEVERIFY = (1U << 10),
 
+    // Signature(s) must be empty vector if an CHECK(MULTI)SIG operation failed
+    SCRIPT_VERIFY_NULLFAIL = (1U << 14),
+
+
     // Do we accept signature using SIGHASH_FORKID
     //
     SCRIPT_ENABLE_SIGHASH_FORKID = (1U << 16),
 
-    // Signature(s) must be empty vector if an CHECK(MULTI)SIG operation failed
+    // Public keys in scripts must be compressed
     //
-    SCRIPT_VERIFY_NULLFAIL = (1U << 14),
+    SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE = (1U << 15),
+
+    // Placeholder. This flag is used by Bitcoin ABC only.
+    //
+    SCRIPT_ENABLE_REPLAY_PROTECTION = (1U << 17),
 
     // Enable new opcodes.
     //
