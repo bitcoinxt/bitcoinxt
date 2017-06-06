@@ -43,7 +43,8 @@ static std::map<string, unsigned int> mapFlagNames = boost::assign::map_list_of
     (string("DISCOURAGE_UPGRADABLE_NOPS"), (unsigned int)SCRIPT_VERIFY_DISCOURAGE_UPGRADABLE_NOPS)
     (string("CLEANSTACK"), (unsigned int)SCRIPT_VERIFY_CLEANSTACK)
     (string("CHECKLOCKTIMEVERIFY"), (unsigned int)SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY)
-    (string("CHECKSEQUENCEVERIFY"), (unsigned int)SCRIPT_VERIFY_CHECKSEQUENCEVERIFY);
+    (string("CHECKSEQUENCEVERIFY"), (unsigned int)SCRIPT_VERIFY_CHECKSEQUENCEVERIFY)
+    (std::string("SIGHASH_FORKID"), (unsigned int)SCRIPT_ENABLE_SIGHASH_FORKID);
 
 unsigned int ParseScriptFlags(string strFlags)
 {
@@ -106,6 +107,7 @@ BOOST_AUTO_TEST_CASE(tx_valid)
             }
 
             map<COutPoint, CScript> mapprevOutScriptPubKeys;
+            std::map<COutPoint, int64_t> mapprevOutValues;
             UniValue inputs = test[0].get_array();
             bool fValid = true;
 	    for (unsigned int inpIdx = 0; inpIdx < inputs.size(); inpIdx++) {
@@ -122,7 +124,12 @@ BOOST_AUTO_TEST_CASE(tx_valid)
                     break;
                 }
 
-                mapprevOutScriptPubKeys[COutPoint(uint256S(vinput[0].get_str()), vinput[1].get_int())] = ParseScript(vinput[2].get_str());
+                COutPoint outpoint(uint256S(vinput[0].get_str()), vinput[1].get_int());
+                mapprevOutScriptPubKeys[outpoint] = ParseScript(vinput[2].get_str());
+                if (vinput.size() >= 4)
+                {
+                    mapprevOutValues[outpoint] = vinput[3].get_int64();
+                }
             }
             if (!fValid)
             {
@@ -147,9 +154,15 @@ BOOST_AUTO_TEST_CASE(tx_valid)
                     break;
                 }
 
+                CAmount amount = 0;
+                if (mapprevOutValues.count(tx.vin[i].prevout))
+                {
+                    amount = mapprevOutValues[tx.vin[i].prevout];
+                }
+
                 unsigned int verify_flags = ParseScriptFlags(test[2].get_str());
                 BOOST_CHECK_MESSAGE(VerifyScript(tx.vin[i].scriptSig, mapprevOutScriptPubKeys[tx.vin[i].prevout],
-                                                 verify_flags, TransactionSignatureChecker(&tx, i), &err),
+                                                 verify_flags, TransactionSignatureChecker(&tx, i, amount), &err),
                                     strTest);
                 BOOST_CHECK_MESSAGE(err == SCRIPT_ERR_OK, ScriptErrorString(err));
             }
@@ -181,6 +194,7 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
             }
 
             map<COutPoint, CScript> mapprevOutScriptPubKeys;
+            std::map<COutPoint, int64_t> mapprevOutValues;
             UniValue inputs = test[0].get_array();
             bool fValid = true;
 	    for (unsigned int inpIdx = 0; inpIdx < inputs.size(); inpIdx++) {
@@ -197,7 +211,12 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
                     break;
                 }
 
-                mapprevOutScriptPubKeys[COutPoint(uint256S(vinput[0].get_str()), vinput[1].get_int())] = ParseScript(vinput[2].get_str());
+                COutPoint outpoint(uint256S(vinput[0].get_str()), vinput[1].get_int());
+                mapprevOutScriptPubKeys[outpoint] = ParseScript(vinput[2].get_str());
+                if (vinput.size() >= 4)
+                {
+                    mapprevOutValues[outpoint] = vinput[3].get_int64();
+                }
             }
             if (!fValid)
             {
@@ -221,9 +240,15 @@ BOOST_AUTO_TEST_CASE(tx_invalid)
                     break;
                 }
 
+                CAmount amount = 0;
+                if (mapprevOutValues.count(tx.vin[i].prevout))
+                {
+                    amount = mapprevOutValues[tx.vin[i].prevout];
+                }
+
                 unsigned int verify_flags = ParseScriptFlags(test[2].get_str());
                 fValid = VerifyScript(tx.vin[i].scriptSig, mapprevOutScriptPubKeys[tx.vin[i].prevout],
-                                      verify_flags, TransactionSignatureChecker(&tx, i), &err);
+                                      verify_flags, TransactionSignatureChecker(&tx, i, amount), &err);
             }
             BOOST_CHECK_MESSAGE(!fValid, strTest);
             BOOST_CHECK_MESSAGE(err != SCRIPT_ERR_OK, ScriptErrorString(err));

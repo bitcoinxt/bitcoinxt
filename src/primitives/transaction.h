@@ -11,6 +11,8 @@
 #include "serialize.h"
 #include "uint256.h"
 
+#include <memory>
+
 /** An outpoint - a combination of a transaction hash and an index n into its vout */
 class COutPoint
 {
@@ -310,5 +312,16 @@ struct CMutableTransaction
      */
     uint256 GetHash() const;
 };
+
+typedef std::shared_ptr<const CTransaction> CTransactionRef;
+static inline CTransactionRef MakeTransactionRef()
+{
+    return std::make_shared<const CTransaction>();
+}
+template <typename Tx>
+static inline CTransactionRef MakeTransactionRef(Tx &&txIn)
+{
+    return std::make_shared<const CTransaction>(std::forward<Tx>(txIn));
+}
 
 #endif // BITCOIN_PRIMITIVES_TRANSACTION_H
