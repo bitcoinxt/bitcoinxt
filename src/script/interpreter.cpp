@@ -171,11 +171,19 @@ bool static IsLowDERSignature(const valtype &vchSig, ScriptError* serror) {
     return true;
 }
 
-bool static IsDefinedHashtypeSignature(const valtype &vchSig) {
+static uint32_t GetHashType(const valtype &vchSig) {
+    if (vchSig.size() == 0) {
+        return 0;
+    }
+
+    return vchSig[vchSig.size() - 1];
+}
+
+static bool IsDefinedHashtypeSignature(const valtype &vchSig) {
     if (vchSig.size() == 0) {
         return false;
     }
-    unsigned char nHashType = vchSig[vchSig.size() - 1] & (~(SIGHASH_ANYONECANPAY));
+    uint32_t nHashType = GetHashType(vchSig) & ~(SIGHASH_ANYONECANPAY | SIGHASH_FORKID);
     if (nHashType < SIGHASH_ALL || nHashType > SIGHASH_SINGLE)
         return false;
 
@@ -868,8 +876,19 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                     // Subset of script starting at the most recent codeseparator
                     CScript scriptCode(pbegincodehash, pend);
 
-                    // Drop the signature, since there's no way for a signature to sign itself
-                    scriptCode.FindAndDelete(CScript(vchSig));
+                    // Drop the signature in scripts when SIGHASH_FORKID is
+                    // not used.
+                    uint32_t nHashType = GetHashType(vchSig);
+                    if (nHashType & SIGHASH_FORKID)
+                    {
+                        if (!(flags & SCRIPT_ENABLE_SIGHASH_FORKID))
+                            return set_error(serror,
+                                             SCRIPT_ERR_ILLEGAL_FORKID);
+                    }
+                    else
+                    {
+                        scriptCode.FindAndDelete(CScript(vchSig));
+                    }
 
                     if (!CheckSignatureEncoding(vchSig, flags, serror) || !CheckPubKeyEncoding(vchPubKey, flags, serror)) {
                         //serror is set
@@ -925,7 +944,20 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                     for (int k = 0; k < nSigsCount; k++)
                     {
                         valtype& vchSig = stacktop(-isig-k);
-                        scriptCode.FindAndDelete(CScript(vchSig));
+
+                        // Drop the signature in scripts when SIGHASH_FORKID
+                        // is not used.
+                        uint32_t nHashType = GetHashType(vchSig);
+                        if (nHashType & SIGHASH_FORKID)
+                        {
+                            if (!(flags & SCRIPT_ENABLE_SIGHASH_FORKID))
+                                return set_error(serror,
+                                                 SCRIPT_ERR_ILLEGAL_FORKID);
+                        }
+                        else
+                        {
+                            scriptCode.FindAndDelete(CScript(vchSig));
+                        }
                     }
 
                     bool fSuccess = true;
@@ -1104,10 +1136,82 @@ public:
     }
 };
 
+uint256 GetPrevoutHash(const CTransaction &txTo) {
+    CHashWriter ss(SER_GETHASH, 0);
+    for (unsigned int n = 0; n < txTo.vin.size(); n++) {
+        ss << txTo.vin[n].prevout;
+    }
+    return ss.GetHash();
+}
+
+uint256 GetSequenceHash(const CTransaction &txTo) {
+    CHashWriter ss(SER_GETHASH, 0);
+    for (unsigned int n = 0; n < txTo.vin.size(); n++) {
+        ss << txTo.vin[n].nSequence;
+    }
+    return ss.GetHash();
+}
+
+uint256 GetOutputsHash(const CTransaction &txTo) {
+    CHashWriter ss(SER_GETHASH, 0);
+    for (unsigned int n = 0; n < txTo.vout.size(); n++) {
+        ss << txTo.vout[n];
+    }
+    return ss.GetHash();
+}
+
 } // anon namespace
 
-uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType)
+uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsigned int nIn, uint32_t nHashType, const CAmount &amount)
 {
+    if (nHashType & SIGHASH_FORKID) {
+        uint256 hashPrevouts;
+        uint256 hashSequence;
+        uint256 hashOutputs;
+
+        if (!(nHashType & SIGHASH_ANYONECANPAY)) {
+            hashPrevouts = GetPrevoutHash(txTo);
+        }
+
+        if (!(nHashType & SIGHASH_ANYONECANPAY) &&
+            (nHashType & 0x1f) != SIGHASH_SINGLE &&
+            (nHashType & 0x1f) != SIGHASH_NONE) {
+            hashSequence = GetSequenceHash(txTo);
+        }
+
+        if ((nHashType & 0x1f) != SIGHASH_SINGLE &&
+            (nHashType & 0x1f) != SIGHASH_NONE) {
+            hashOutputs = GetOutputsHash(txTo);
+        } else if ((nHashType & 0x1f) == SIGHASH_SINGLE &&
+                   nIn < txTo.vout.size()) {
+            CHashWriter ss(SER_GETHASH, 0);
+            ss << txTo.vout[nIn];
+            hashOutputs = ss.GetHash();
+        }
+
+        CHashWriter ss(SER_GETHASH, 0);
+        // Version
+        ss << txTo.nVersion;
+        // Input prevouts/nSequence (none/all, depending on flags)
+        ss << hashPrevouts;
+        ss << hashSequence;
+        // The input being signed (replacing the scriptSig with scriptCode +
+        // amount). The prevout may already be contained in hashPrevout, and the
+        // nSequence may already be contain in hashSequence.
+        ss << txTo.vin[nIn].prevout;
+        ss << scriptCode;
+        ss << amount;
+        ss << txTo.vin[nIn].nSequence;
+        // Outputs (none/one/all, depending on flags)
+        ss << hashOutputs;
+        // Locktime
+        ss << txTo.nLockTime;
+        // Sighash type
+        ss << nHashType;
+
+        return ss.GetHash();
+    }
+
     static const uint256 one(uint256S("0000000000000000000000000000000000000000000000000000000000000001"));
     if (nIn >= txTo.vin.size()) {
         //  nIn out of range
@@ -1149,7 +1253,7 @@ bool TransactionSignatureChecker::CheckSig(const vector<unsigned char>& vchSigIn
     int nHashType = vchSig.back();
     vchSig.pop_back();
 
-    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType);
+    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount);
 
     if (!VerifySignature(vchSig, pubkey, sighash))
         return false;

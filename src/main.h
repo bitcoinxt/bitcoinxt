@@ -430,12 +430,16 @@ private:
     unsigned int nFlags;
     bool cacheStore;
     ScriptError error;
+    CAmount amount;
 
 public:
-    CScriptCheck(): ptxTo(0), nIn(0), nFlags(0), cacheStore(false), error(SCRIPT_ERR_UNKNOWN_ERROR) {}
+    CScriptCheck(): ptxTo(0), nIn(0), nFlags(0), cacheStore(false), error(SCRIPT_ERR_UNKNOWN_ERROR), amount(0) {}
     CScriptCheck(const CCoins& txFromIn, const CTransaction& txToIn, unsigned int nInIn, unsigned int nFlagsIn, bool cacheIn) :
         scriptPubKey(txFromIn.vout[txToIn.vin[nInIn].prevout.n].scriptPubKey),
-        ptxTo(&txToIn), nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn), error(SCRIPT_ERR_UNKNOWN_ERROR) { }
+        ptxTo(&txToIn), nIn(nInIn), nFlags(nFlagsIn), cacheStore(cacheIn), error(SCRIPT_ERR_UNKNOWN_ERROR)
+    {
+        amount = txFromIn.vout[txToIn.vin[nInIn].prevout.n].nValue;
+    }
 
     bool operator()();
 
@@ -446,6 +450,7 @@ public:
         std::swap(nFlags, check.nFlags);
         std::swap(cacheStore, check.cacheStore);
         std::swap(error, check.error);
+        std::swap(amount, check.amount);
     }
 
     ScriptError GetScriptError() const { return error; }
