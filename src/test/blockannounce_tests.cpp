@@ -106,10 +106,18 @@ BOOST_AUTO_TEST_CASE(announce_updates_availability) {
 
 BOOST_AUTO_TEST_CASE(fetch_when_wanted) {
 
-    {   // We want block.
+    {   // We have header, but not data. We want the block.
         std::vector<CInv> toFetch;
+        DummyBlockIndexEntry entry(block);
+        entry.index.nStatus &= ~BLOCK_HAVE_DATA;
         BOOST_CHECK(ann.onBlockAnnounced(toFetch));
         BOOST_CHECK(!toFetch.empty());
+    }
+
+    {   // We don't have header. We don't want block.
+        std::vector<CInv> toFetch;
+        BOOST_CHECK(!ann.onBlockAnnounced(toFetch));
+        BOOST_CHECK(toFetch.empty());
     }
 
     {   // We have block (we don't want it)
@@ -152,6 +160,9 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_full_now) {
 
     // Peer does not support thin blocks and we are almost synced.
     node.nServices = 0;
+
+    DummyBlockIndexEntry entry(block);
+    entry.index.nStatus &= ~BLOCK_HAVE_DATA;
 
     BOOST_CHECK_EQUAL(
             BlockAnnounceReceiver::DOWNL_FULL_NOW,

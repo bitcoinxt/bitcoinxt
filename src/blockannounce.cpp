@@ -73,7 +73,7 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
             return DONT_DOWNL;
         }
 
-        return DOWNL_FULL_NOW;
+        return blockHeaderIsKnown() ? DOWNL_FULL_NOW : DONT_DOWNL;
     }
 
     // At this point we know we want a thin block.
@@ -121,7 +121,7 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch) {
     // the full block arrives, the header chain leading up to it is already
     // validated. Not doing this will result in block being discarded and
     // re-downloaded later.
-    if (!hasBlockData() && !blocksInFlight.isInFlight(block))
+    if (!hasBlockData() && !blockHeaderIsKnown() && !blocksInFlight.isInFlight(block))
         requestHeaders(from, block);
 
     if (s == DONT_DOWNL)
