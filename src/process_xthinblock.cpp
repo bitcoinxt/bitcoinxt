@@ -11,7 +11,8 @@
 
 
 void XThinBlockProcessor::operator()(
-        CDataStream& vRecv, const TxFinder& txfinder, int activeChainHeight)
+        CDataStream& vRecv, const TxFinder& txfinder,
+        uint64_t currMaxBlockSize, int activeChainHeight)
 {
     XThinBlock block;
     vRecv >> block;
@@ -22,7 +23,7 @@ void XThinBlockProcessor::operator()(
             hash.ToString(), worker.nodeID());
 
     try {
-        block.selfValidate();
+        block.selfValidate(currMaxBlockSize);
     }
     catch (const std::invalid_argument& e) {
         LogPrint("thin", "Invalid xthin block %s\n", e.what());

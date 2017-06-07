@@ -164,6 +164,7 @@ public:
 };
 
 unsigned int minTxSize();
+void validateNumTxs(size_t transactions, uint64_t currMaxBlockSize);
 void validateCompactBlock(const CompactBlock& cmpctblock, uint64_t currMaxBlockSize);
 
 #endif

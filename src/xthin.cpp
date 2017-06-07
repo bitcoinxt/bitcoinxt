@@ -8,6 +8,7 @@
 #include "net.h"
 #include "pow.h"
 #include "protocol.h"
+#include "blockencodings.h"
 #include <algorithm>
 
 bool isCollision(const std::vector<uint64_t>& txHashes, const uint64_t& hash) {
@@ -42,7 +43,7 @@ XThinBlock::XThinBlock(const CBlock& block, const CBloomFilter& bloom, bool chec
     }
 }
 
-void XThinBlock::selfValidate() const {
+void XThinBlock::selfValidate(uint64_t currMaxBlockSize) const {
 
     if (header.GetHash().IsNull())
         throw std::invalid_argument("xthinblock is Null");
@@ -53,6 +54,8 @@ void XThinBlock::selfValidate() const {
     if (missing.size() > txHashes.size())
         throw std::invalid_argument("xthinblock cannot provide more transactions"
                 " than it claims are in block");
+
+    validateNumTxs(txHashes.size(), currMaxBlockSize);
 
     typedef std::vector<uint64_t>::const_iterator auto_;
     std::vector<uint64_t> copy;
