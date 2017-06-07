@@ -11,8 +11,7 @@ bool HaveBlockData(const uint256& hash) {
 }
 
 bool SupportsThinBlocks(const CNode& node) {
-    return node.SupportsBloomThinBlocks() || node.SupportsXThinBlocks()
-        || node.SupportsCompactBlocks();
+    return node.SupportsXThinBlocks() || node.SupportsCompactBlocks();
 }
 
 bool KeepOutgoingPeer(const CNode& node) {
@@ -20,9 +19,6 @@ bool KeepOutgoingPeer(const CNode& node) {
 
     if (!Opt().UsingThinBlocks())
         return true;
-
-    if (Opt().OptimalThinBlocksOnly())
-        return node.SupportsXThinBlocks() || node.SupportsCompactBlocks();
 
     return SupportsThinBlocks(node);
 }

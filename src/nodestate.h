@@ -76,7 +76,6 @@ struct CNodeState {
 
     //! the thin block the node is currently providing to us
     std::shared_ptr<ThinBlockWorker> thinblock;
-    std::set<uint256> recentThinBlockTx;
 
     CNodeState(NodeId id, ThinBlockManager&);
     ~CNodeState();

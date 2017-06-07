@@ -85,14 +85,6 @@ bool Opt::AvoidFullBlocks() {
         || Args->GetArg("-use-thin-blocks", 1) == 3;
 }
 
-// Makes only outbound connection to nodes that support very effective
-// versions of thin blocks. This includes xthin and compact thin blocks.
-// Disables bloom thin blocks.
-// Implicitly enables "avoid full blocks".
-bool Opt::OptimalThinBlocksOnly() {
-    return Args->GetArg("-use-thin-blocks", 1) == 3;
-}
-
 int Opt::ThinBlocksMaxParallel() {
     return Args->GetArg("-thin-blocks-max-parallel", 3);
 }

@@ -11,95 +11,38 @@
 #include <vector>
 #include "compactthin.h"
 
+static void fallbackDownload(CNode& from,
+        const uint256& block, BlockInFlightMarker& markInFlight) {
 
-void BloomBlockConcluder::operator()(CNode* pfrom,
-    uint64_t nonce, ThinBlockWorker& worker) {
-
-    // If it the thin block is finished, it the worker will be available.
-    if (worker.isAvailable()) {
-        pfrom->thinBlockNonce = 0;
-        pfrom->thinBlockNonceBlock.SetNull();
-        return;
-    }
-
-    if (pfrom->thinBlockNonceBlock != worker.blockHash()) {
-        LogPrint("thin", "thinblockconcluder: pong response for a different download (%s, currently waiting for %s). Ignoring.\n",
-            pfrom->thinBlockNonceBlock.ToString(), worker.blockStr());
-        return;
-    }
-
-    pfrom->thinBlockNonce = 0;
-    pfrom->thinBlockNonceBlock.SetNull();
-
-    // If node sends us headers, does not send us a merkleblock, but sends us a pong,
-    // then the worker will be without a stub.
-    if (!worker.isAvailable() && !worker.isStubBuilt()) {
-        LogPrintf("Peer %d did not provide us a merkleblock for %s\n",
-                pfrom->id, worker.blockStr());
-        misbehaving(pfrom->id, 20);
-        worker.setAvailable();
-        return;
-    }
-
-    if (worker.isReRequesting())
-        return giveUp(pfrom, worker);
-
-    reRequest(pfrom, worker, nonce);
-}
-
-void BloomBlockConcluder::reRequest(
-    CNode* pfrom,
-    ThinBlockWorker& worker,
-    uint64_t nonce)
-{
-    std::vector<ThinTx> txsMissing = worker.getTxsMissing();
-    assert(txsMissing.size()); // worker should have been available, not "missing 0 transactions".
-    LogPrint("thin", "Missing %d transactions for thin block %s, re-requesting (consider adjusting relay policies)\n",
-            txsMissing.size(), worker.blockStr());
-
-    std::vector<CInv> hashesToReRequest;
-    typedef std::vector<ThinTx>::const_iterator auto_;
-
-    for (auto_ m = txsMissing.begin(); m != txsMissing.end(); ++m) {
-        hashesToReRequest.push_back(CInv(MSG_TX, m->full()));
-        LogPrint("thin", "Re-requesting tx %s\n", m->full().ToString());
-    }
-    assert(hashesToReRequest.size() > 0);
-    worker.setReRequesting(true);
-    pfrom->thinBlockNonce = nonce;
-    pfrom->thinBlockNonceBlock = worker.blockHash();
-    pfrom->PushMessage("getdata", hashesToReRequest);
-    pfrom->PushMessage("ping", nonce);
-}
-
-void BloomBlockConcluder::fallbackDownload(CNode *pfrom, const uint256& block) {
-    LogPrint("thin", "Last worker working on %s could not provide missing transactions"
-            ", falling back on full block download\n", block.ToString());
+    LogPrint("thin", "Falling back on full block download for %s peer=%d\n",
+            block.ToString(), from.id);
 
     CInv req(MSG_BLOCK, block);
-    pfrom->PushMessage("getdata", std::vector<CInv>(1, req));
-    markInFlight(pfrom->id, block, Params().GetConsensus(), NULL);
+    from.PushMessage("getdata", std::vector<CInv>(1, req));
+    markInFlight(from.id, block, Params().GetConsensus(), NULL);
 }
 
-void BloomBlockConcluder::giveUp(CNode* pfrom, ThinBlockWorker& worker) {
-    LogPrintf("Re-requested transactions for thin block %s from %d, peer did not follow up.\n",
-            worker.blockStr(), pfrom->id);
-    uint256 block = worker.blockHash();
+static void handleReRequestFailed(ThinBlockWorker& worker, CNode& from,
+        BlockInFlightMarker& markInFlight) {
+
+    LogPrint("thin", "Did not provide all missing transactions in a"
+            "thin block re-request for %s peer=%d\n",
+            worker.blockStr(), worker.nodeID());
+
     bool wasLastWorker = worker.isOnlyWorker();
+    uint256 wasWorkingOn = worker.blockHash();
     worker.setAvailable();
-
-    // Was this the last peer working on thin block? Fallback to full block download.
-    if (wasLastWorker)
-        fallbackDownload(pfrom, block);
-}
-
-
-void BloomBlockConcluder::misbehaving(NodeId id, int howmuch) {
-    ::Misbehaving(id, howmuch);
+    if (wasLastWorker) {
+        // Node deserves misbehave, but we'll give it a chance
+        // to send us the full block.
+        fallbackDownload(from, wasWorkingOn, markInFlight);
+    }
+    else
+        Misbehaving(worker.nodeID(), 10);
 }
 
 void XThinBlockConcluder::operator()(const XThinReReqResponse& resp,
-        CNode& pfrom, ThinBlockWorker& worker) {
+        CNode& pfrom, ThinBlockWorker& worker, BlockInFlightMarker& markInFlight) {
 
     if (worker.isAvailable())
     {
@@ -117,22 +60,13 @@ void XThinBlockConcluder::operator()(const XThinReReqResponse& resp,
     for (auto_ t = resp.txRequested.begin(); t != resp.txRequested.end(); ++t)
         worker.addTx(*t);
 
-    // Block finished?
-    if (worker.isAvailable())
-        return;
-
-    // There is no reason for remote peer not to have provided all
-    // transactions at this point.
-    LogPrint("thin", "peer=%d responded to re-request for block %s, "
-        "but still did not provide all transctions missing\n",
-        pfrom.id, resp.block.ToString());
-
-    worker.setAvailable();
-    Misbehaving(pfrom.id, 10);
+    // Block fully constructed?
+    if (!worker.isAvailable())
+        handleReRequestFailed(worker, pfrom, markInFlight);
 }
 
 void CompactBlockConcluder::operator()(const CompactReReqResponse& resp,
-        CNode& pfrom, ThinBlockWorker& worker) {
+        CNode& pfrom, ThinBlockWorker& worker, BlockInFlightMarker& markInFlight) {
 
     if (worker.isAvailable())
     {
@@ -149,16 +83,7 @@ void CompactBlockConcluder::operator()(const CompactReReqResponse& resp,
     for (auto& t : resp.txn)
         worker.addTx(t);
 
-    // Block finished?
-    if (worker.isAvailable())
-        return;
-
-    // There is no reason for remote peer not to have provided all
-    // transactions at this point.
-    LogPrint("thin", "peer=%d responded to compact re-request for block %s, "
-        "but still did not provide all transctions missing\n",
-        pfrom.id, resp.blockhash.ToString());
-
-    worker.setAvailable();
-    Misbehaving(pfrom.id, 10);
+    // Block fully constructed?
+    if (!worker.isAvailable())
+        handleReRequestFailed(worker, pfrom, markInFlight);
 }

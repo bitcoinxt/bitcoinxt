@@ -2050,7 +2050,6 @@ CNode::CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn, bool fIn
     fWhitelisted = false;
     fOneShot = false;
     fClient = false; // set by version message
-    thinBlockNonce = 0;
     fInbound = fInboundIn;
     fNetworkNode = false;
     fSuccessfullyConnected = false;
@@ -2180,23 +2179,6 @@ void CNode::EndMessage() UNLOCK_FUNCTION(cs_vSend)
         SocketSendData(this);
 
     LEAVE_CRITICAL_SECTION(cs_vSend);
-}
-
-bool CNode::SupportsBloom() const {
-    return nVersion < NO_BLOOM_VERSION || nServices & NODE_BLOOM;
-}
-
-bool CNode::SupportsBloomThinBlocks() const {
-
-    if (!SupportsBloom())
-        return false;
-
-    // Bitcoin Core removed filterInventoryKnown filtering in 0.12,
-    // causing those nodes to send us all transactions in a block.
-    //
-    // Use SENDHEADERS_VERSION as a (temporary) means of
-    // detecting Bitcoin Core 0.12
-    return nVersion < SENDHEADERS_VERSION || nServices & NODE_GETUTXO;
 }
 
 bool CNode::SupportsXThinBlocks() const {

@@ -82,7 +82,6 @@ BITCOIN_CORE_H = \
   blockprocessor.h \
   blocksender.h \
   bloom.h \
-  bloomthin.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
@@ -131,7 +130,6 @@ BITCOIN_CORE_H = \
   pow.h \
   primitives/block.h \
   primitives/transaction.h \
-  process_merkleblock.h \
   process_xthinblock.h \
   protocol.h \
   pubkey.h \
@@ -198,7 +196,6 @@ libbitcoin_server_a_SOURCES = \
   blockprocessor.cpp \
   blocksender.cpp \
   bloom.cpp \
-  bloomthin.cpp \
   chain.cpp \
   checkpoints.cpp \
   compactblockprocessor.cpp \
@@ -220,7 +217,6 @@ libbitcoin_server_a_SOURCES = \
   options.cpp \
   policy/fees.cpp \
   pow.cpp \
-  process_merkleblock.cpp \
   process_xthinblock.cpp \
   rest.cpp \
   rpcblockchain.cpp \

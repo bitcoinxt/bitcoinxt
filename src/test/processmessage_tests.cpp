@@ -1,13 +1,11 @@
 #include "test/thinblockutil.h"
 #include "blockheaderprocessor.h"
 #include "bloom.h"
-#include "bloomthin.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "inflightindex.h"
 #include "merkleblock.h"
 #include "net.h"
-#include "process_merkleblock.h"
 #include "process_xthinblock.h"
 #include "testutil.h"
 #include "util.h" // for fPrintToDebugLog
@@ -24,8 +22,9 @@ struct DummyWorker : public WORKER_TYPE {
         WORKER_TYPE(m, i), isBuilt(false), buildStubCalled(false)
     { }
 
-    virtual void buildStub(const StubData&, const TxFinder&) {
+    virtual void buildStub(const StubData& s, const TxFinder& f) {
         buildStubCalled = true;
+        WORKER_TYPE::buildStub(s, f);
     }
     virtual bool isStubBuilt() const {
         return isBuilt;
@@ -48,116 +47,6 @@ struct DummyHeaderProcessor : public BlockHeaderProcessor {
     bool headerOK;
     bool called;
 };
-
-struct MerkleblockSetup {
-
-    MerkleblockSetup() :
-        mstream(SER_NETWORK, PROTOCOL_VERSION),
-        tmgr(std::unique_ptr<ThinBlockFinishedCallb>(new DummyFinishedCallb),
-             std::unique_ptr<InFlightEraser>(new DummyInFlightEraser))
-    {
-        CBloomFilter emptyFilter;
-        mblock = CMerkleBlock(TestBlock2(), emptyFilter);
-        mstream << mblock;
-
-        // test assert when pushing ping to pfrom if consensus params
-        // are not set.
-        SelectParams(CBaseChainParams::MAIN);
-
-        // asserts if fPrintToDebugLog is true
-        fPrintToDebugLog = false;
-    }
-    CMerkleBlock mblock;
-    CDataStream mstream;
-    DummyNode pfrom;
-    ThinBlockManager tmgr;
-    DummyHeaderProcessor headerprocessor;
-};
-
-BOOST_FIXTURE_TEST_SUITE(process_merkleblock_tests, MerkleblockSetup);
-
-BOOST_AUTO_TEST_CASE(ignore_if_has_block_data) {
-    // Add block to mapBlockIndex (so we already have it)
-    DummyBlockIndexEntry dummyEntry(mblock.header.GetHash());
-
-    BloomThinWorker worker(tmgr, 42);
-    worker.setToWork(mblock.header.GetHash());
-    ProcessMerkleBlock(pfrom, mstream, worker, NullFinder(), headerprocessor);
-
-    // peer should not be working on anything
-    BOOST_CHECK(worker.isAvailable());
-    BOOST_CHECK_EQUAL(0, pfrom.thinBlockNonce);
-}
-
-BOOST_AUTO_TEST_CASE(ditches_old_block) {
-    // if we thought the peer was working on a block, but then
-    // provided a new one, we should switch it over to the new one.
-    uint256 dummyhash;
-    dummyhash.SetHex("0xBADF00D");
-    BloomThinWorker worker(tmgr, 42);
-    worker.setToWork(dummyhash);
-    ProcessMerkleBlock(pfrom, mstream, worker, NullFinder(), headerprocessor);
-
-    BOOST_CHECK_EQUAL(mblock.header.GetHash().ToString(),
-            worker.blockStr());
-    BOOST_CHECK(pfrom.thinBlockNonce != 0);
-    BOOST_CHECK(worker.isStubBuilt());
-}
-
-// We want to call build stub even if we have one.
-// MerkleBlock's have full uint256 hash list, so they
-// should replace xthin uint64_t hash list (NYI).
-BOOST_AUTO_TEST_CASE(rebuild_stub) {
-    DummyWorker<BloomThinWorker> worker(tmgr, 42);
-    worker.setToWork(mblock.header.GetHash());
-    worker.isBuilt = true;
-    ProcessMerkleBlock(pfrom, mstream, worker, NullFinder(), headerprocessor);
-
-    BOOST_CHECK(worker.buildStubCalled);
-    BOOST_CHECK(pfrom.thinBlockNonce != 0);
-}
-
-BOOST_AUTO_TEST_CASE(build_stub) {
-    DummyWorker<BloomThinWorker> worker(tmgr, 42);
-    worker.setToWork(mblock.header.GetHash());
-    worker.isBuilt = false;
-    ProcessMerkleBlock(pfrom, mstream, worker, NullFinder(), headerprocessor);
-
-    BOOST_CHECK(worker.buildStubCalled);
-    BOOST_CHECK(pfrom.thinBlockNonce != 0);
-}
-
-BOOST_AUTO_TEST_CASE(merkleblock_ignore_if_supports_xthin) {
-    pfrom.nServices = NODE_THIN;
-
-    DummyWorker<BloomThinWorker> worker(tmgr, 42);
-    worker.setToWork(mblock.header.GetHash());
-    worker.isBuilt = false;
-    ProcessMerkleBlock(pfrom, mstream, worker, NullFinder(), headerprocessor);
-
-    BOOST_CHECK(!worker.buildStubCalled);
-    BOOST_CHECK_EQUAL(0, pfrom.thinBlockNonce);
-}
-
-BOOST_AUTO_TEST_CASE(merkleblock_header_is_processed) {
-    DummyWorker<BloomThinWorker> worker(tmgr, 42);
-    worker.setToWork(mblock.header.GetHash());
-    ProcessMerkleBlock(pfrom, mstream, worker, NullFinder(), headerprocessor);
-    BOOST_CHECK(headerprocessor.called);
-    BOOST_CHECK(worker.buildStubCalled);
-    BOOST_CHECK(!worker.isAvailable());
-}
-
-BOOST_AUTO_TEST_CASE(merkleblock_stop_if_header_fails) {
-    DummyWorker<BloomThinWorker> worker(tmgr, 42);
-    worker.setToWork(mblock.header.GetHash());
-    headerprocessor.headerOK = false;
-    ProcessMerkleBlock(pfrom, mstream, worker, NullFinder(), headerprocessor);
-    BOOST_CHECK(worker.isAvailable());
-    BOOST_CHECK(!worker.buildStubCalled);
-}
-
-BOOST_AUTO_TEST_SUITE_END();
 
 struct XThinBlockSetup {
 
@@ -297,6 +186,20 @@ BOOST_AUTO_TEST_CASE(xthinblock_rerequest_missing) {
     s = stream(xblock);
     process(s, NullFinder());
     BOOST_CHECK(pfrom.messages.empty());
+}
+
+// We want to call build stub even if we have one.
+// This thinblock may contain transactions we're missing.
+BOOST_AUTO_TEST_CASE(rebuild_stub) {
+    DummyWorker<XThinWorker> worker(tmgr, 42);
+    XThinBlock xblock(TestBlock1(), CBloomFilter());
+    worker.setToWork(xblock.header.GetHash());
+    worker.isBuilt = true;
+    CDataStream s = stream(xblock);
+    DummyXThinProcessor process(pfrom, worker, headerprocessor);
+    process(s, NullFinder());
+
+    BOOST_CHECK(worker.buildStubCalled);
 }
 
 BOOST_AUTO_TEST_SUITE_END();

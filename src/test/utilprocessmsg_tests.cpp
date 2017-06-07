@@ -61,18 +61,9 @@ BOOST_AUTO_TEST_CASE(keep_outgoing_peer) {
     arg->usethin = 1;
     BOOST_CHECK(!KeepOutgoingPeer(node));
 
-    // Node supports bloom thin blocks, keep.
-    node.nServices = NODE_BLOOM | NODE_GETUTXO;
-    BOOST_CHECK(KeepOutgoingPeer(node));
-
-    // Node supports xthin, but not bloom, keep.
+    // Node supports xthin, keep.
     node.nServices = NODE_THIN;
     BOOST_CHECK(KeepOutgoingPeer(node));
-
-    // We want optimal thin blocks only, disconnect.
-    arg->usethin = 3;
-    node.nServices = NODE_BLOOM | NODE_GETUTXO;
-    BOOST_CHECK(!KeepOutgoingPeer(node));
 
     // Node supports xthin, keep.
     node.nServices = NODE_THIN;

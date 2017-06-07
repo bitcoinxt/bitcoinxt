@@ -11,7 +11,6 @@
 #include "blockheaderprocessor.h"
 #include "blockencodings.h"
 #include "blocksender.h"
-#include "bloomthin.h"
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "checkqueue.h"
@@ -26,7 +25,6 @@
 #include "nodestate.h"
 #include "options.h"
 #include "pow.h"
-#include "process_merkleblock.h"
 #include "process_xthinblock.h"
 #include "thinblockbuilder.h"
 #include "thinblockconcluder.h"
@@ -231,7 +229,6 @@ class OnBlockFinished : public ThinBlockFinishedCallb {
 
         bool hasWhitelistedNode(const std::vector<NodeId>& ids) const;
         CNode* pickBlockSource(const std::vector<NodeId>& ids);
-        void updateRecentTxs(const CBlock& block, const std::vector<NodeId>& ids);
         void rejectAndPunish(const CValidationState& state, const uint256& hash,
                 const std::vector<NodeId>& ids);
 };
@@ -484,7 +481,6 @@ void OnBlockFinished::operator()(const CBlock& block, const std::vector<NodeId>&
     CValidationState state;
     ProcessNewBlock(state, pickBlockSource(ids), &copy,
             hasWhitelistedNode(ids), NULL);
-    updateRecentTxs(block, ids);
     rejectAndPunish(state, block.GetHash(), ids);
 }
 
@@ -510,21 +506,6 @@ CNode* OnBlockFinished::pickBlockSource(const std::vector<NodeId>& ids) {
         return pnode;
     }
     return NULL;
-}
-
-void OnBlockFinished::updateRecentTxs(const CBlock& block, const std::vector<NodeId>& ids) {
-    // Store hases of block with node, so we can ignore late tx messages
-    std::set<uint256> txs;
-    typedef std::vector<CTransaction>::const_iterator auto__;
-    for (auto__ t = block.vtx.begin(); t != block.vtx.end(); ++t)
-        txs.insert(t->GetHash());
-
-    typedef std::vector<NodeId>::const_iterator auto_;
-    for (auto_ n = ids.begin(); n != ids.end(); ++n) {
-        NodeStatePtr ns(*n);
-        if (ns.IsNull()) continue;
-        ns->recentThinBlockTx = txs;
-    }
 }
 
 void OnBlockFinished::rejectAndPunish(const CValidationState& state,
@@ -1246,12 +1227,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
     // Coinbase is only valid in a block, not as a loose transaction
     if (tx.IsCoinBase()) {
-        // FIXME: In some cases we request a merkleblock, but the node provides another
-        // merkleblock first, followed by the one we expect. Only that we don't expect
-        // the one we requested first anymore (because it provided another).
-        // Don't ban it for sending us the coinbase of the block we requested.
-        int dos = Opt().UsingThinBlocks() ? 10 : 100;
-        return state.DoS(dos, error("AcceptToMemoryPool: coinbase as individual tx"),
+        return state.DoS(100, error("AcceptToMemoryPool: coinbase as individual tx"),
                          REJECT_INVALID, "coinbase");
     }
 
@@ -4480,7 +4456,7 @@ bool static AlreadyHave(const CInv& inv)
 // catching up with the block chain).
 bool ThinBlocksActive(CNode* n) {
     return !IsInitialBlockDownload() && Opt().UsingThinBlocks()
-        && (n->SupportsBloomThinBlocks() || n->SupportsXThinBlocks());
+        && (n->SupportsXThinBlocks() || NodeStatePtr(n->id)->supportsCompactBlocks);
 }
 
 void static ProcessGetData(CNode* pfrom)
@@ -4797,12 +4773,11 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             NodeStatePtr ns(pfrom->id);
 
             if (Opt().UsingThinBlocks() && pfrom->SupportsXThinBlocks())
+            {
                 ns->thinblock.reset(new XThinWorker(
                     thinblockmg, pfrom->id,
                     std::unique_ptr<TxHashProvider>(new MempoolHashProvider)));
-
-            else if (Opt().UsingThinBlocks() && pfrom->SupportsBloomThinBlocks())
-                ns->thinblock.reset(new BloomThinWorker(thinblockmg, pfrom->id));
+            }
             else { /* keep DummyThinWorker */ }
 
             if (!pfrom->fInbound && !KeepOutgoingPeer(*pfrom)) {
@@ -4878,10 +4853,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         int64_t nTimeOffset = nTime - GetTime();
         pfrom->nTimeOffset = nTimeOffset;
         AddTimeData(pfrom->addr, nTimeOffset);
-
-        // Enable bloom thin blocks on peer
-        if (Opt().UsingThinBlocks() && pfrom->SupportsBloomThinBlocks() && !pfrom->SupportsXThinBlocks())
-            pfrom->PushMessage("filterload", CBloomFilter());
     }
 
 
@@ -4993,6 +4964,9 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
     }
 
     else if (strCommand == "sendcmpct") {
+        if (!Opt().UsingThinBlocks())
+            return true;
+
         bool highBandwidth = false;
         uint64_t version = 1;
         vRecv >> highBandwidth >> version;
@@ -5067,6 +5041,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
     else if (strCommand == "getblocktxn")
     {
+        if (!Opt().UsingThinBlocks())
+            return true;
         // Remote peer is requesting more transactions as part of compact block
         // transfer.
         CompactReRequest req;
@@ -5236,123 +5212,115 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         NodeStatePtr nodestate(pfrom->GetId());
 
-        bool tryMempool = nodestate->thinblock->isAvailable() || !nodestate->thinblock->addTx(tx);
+        bool fMissingInputs = false;
+        CValidationState state;
 
-        // tx may belong to recently finished thin block. In that case
-        // we don't want to try mempool, node may get banned for sending is coinbase tx.
-        tryMempool = tryMempool && !nodestate->recentThinBlockTx.count(tx.GetHash());
+        mapAlreadyAskedFor.erase(inv);
 
-        if (tryMempool) {
-            bool fMissingInputs = false;
-            CValidationState state;
+        if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
+        {
+            mempool.check(pcoinsTip);
+            std::vector<uint256> vAncestors;
+            mempool.queryAncestors(tx.GetHash(), vAncestors);
+            RelayTransaction(tx, vAncestors);
+            vWorkQueue.push_back(inv.hash);
 
-            mapAlreadyAskedFor.erase(inv);
+            LogPrint("mempool", "AcceptToMemoryPool: peer=%d %s: accepted %s (poolsz %u)\n",
+                pfrom->id, pfrom->cleanSubVer,
+                tx.GetHash().ToString(),
+                mempool.size());
 
-            if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs))
+            // Recursively process any orphan transactions that depended on this one
+            set<NodeId> setMisbehaving;
+            for (unsigned int i = 0; i < vWorkQueue.size(); i++)
             {
-                mempool.check(pcoinsTip);
+                map<uint256, set<uint256> >::iterator itByPrev = mapOrphanTransactionsByPrev.find(vWorkQueue[i]);
+                if (itByPrev == mapOrphanTransactionsByPrev.end())
+                    continue;
+                for (set<uint256>::iterator mi = itByPrev->second.begin();
+                     mi != itByPrev->second.end();
+                     ++mi)
+                {
+                    const uint256& orphanHash = *mi;
+                    const CTransaction& orphanTx = mapOrphanTransactions[orphanHash].tx;
+                    NodeId fromPeer = mapOrphanTransactions[orphanHash].fromPeer;
+                    bool fMissingInputs2 = false;
+                    // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
+                    // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
+                    // anyone relaying LegitTxX banned)
+                    CValidationState stateDummy;
+
+
+                    if (setMisbehaving.count(fromPeer))
+                        continue;
+                    if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
+                    {
+                        LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
+                        std::vector<uint256> vAncestors;
+                        mempool.queryAncestors(orphanTx.GetHash(), vAncestors);
+                        RelayTransaction(orphanTx, vAncestors);
+                        vWorkQueue.push_back(orphanHash);
+                        vEraseQueue.push_back(orphanHash);
+                    }
+                    else if (!fMissingInputs2)
+                    {
+                        int nDos = 0;
+                        if (stateDummy.IsInvalid(nDos) && nDos > 0)
+                        {
+                            // Punish peer that gave us an invalid orphan tx
+                            Misbehaving(fromPeer, nDos);
+                            setMisbehaving.insert(fromPeer);
+                            LogPrint("mempool", "   invalid orphan tx %s\n", orphanHash.ToString());
+                        }
+                        // Has inputs but not accepted to mempool
+                        // Probably non-standard or insufficient fee/priority
+                        LogPrint("mempool", "   removed orphan tx %s\n", orphanHash.ToString());
+                        vEraseQueue.push_back(orphanHash);
+                        assert(recentRejects);
+                        recentRejects->insert(orphanHash);
+                    }
+                    mempool.check(pcoinsTip);
+                }
+            }
+            BOOST_FOREACH(uint256 hash, vEraseQueue)
+                EraseOrphanTx(hash);
+        }
+        else if (fMissingInputs)
+        {
+            AddOrphanTx(tx, pfrom->GetId());
+
+            // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
+            unsigned int nMaxOrphanTx = (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
+            unsigned int nEvicted = LimitOrphanTxSize(nMaxOrphanTx);
+            if (nEvicted > 0)
+                LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
+        } else {
+            assert(recentRejects);
+            recentRejects->insert(tx.GetHash());
+
+            if (pfrom->fWhitelisted) {
+                // Always relay transactions received from whitelisted peers, even
+                // if they were rejected from the mempool, allowing the node to
+                // function as a gateway for nodes hidden behind it.
+                //
+                // FIXME: This includes invalid transactions, which means a
+                // whitelisted peer could get us banned! We may want to change
+                // that.
                 std::vector<uint256> vAncestors;
                 mempool.queryAncestors(tx.GetHash(), vAncestors);
                 RelayTransaction(tx, vAncestors);
-                vWorkQueue.push_back(inv.hash);
-
-                LogPrint("mempool", "AcceptToMemoryPool: peer=%d %s: accepted %s (poolsz %u)\n",
-                    pfrom->id, pfrom->cleanSubVer,
-                    tx.GetHash().ToString(),
-                    mempool.size());
-
-                // Recursively process any orphan transactions that depended on this one
-                set<NodeId> setMisbehaving;
-                for (unsigned int i = 0; i < vWorkQueue.size(); i++)
-                {
-                    map<uint256, set<uint256> >::iterator itByPrev = mapOrphanTransactionsByPrev.find(vWorkQueue[i]);
-                    if (itByPrev == mapOrphanTransactionsByPrev.end())
-                        continue;
-                    for (set<uint256>::iterator mi = itByPrev->second.begin();
-                         mi != itByPrev->second.end();
-                         ++mi)
-                    {
-                        const uint256& orphanHash = *mi;
-                        const CTransaction& orphanTx = mapOrphanTransactions[orphanHash].tx;
-                        NodeId fromPeer = mapOrphanTransactions[orphanHash].fromPeer;
-                        bool fMissingInputs2 = false;
-                        // Use a dummy CValidationState so someone can't setup nodes to counter-DoS based on orphan
-                        // resolution (that is, feeding people an invalid transaction based on LegitTxX in order to get
-                        // anyone relaying LegitTxX banned)
-                        CValidationState stateDummy;
-
-
-                        if (setMisbehaving.count(fromPeer))
-                            continue;
-                        if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2))
-                        {
-                            LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
-                            std::vector<uint256> vAncestors;
-                            mempool.queryAncestors(orphanTx.GetHash(), vAncestors);
-                            RelayTransaction(orphanTx, vAncestors);
-                            vWorkQueue.push_back(orphanHash);
-                            vEraseQueue.push_back(orphanHash);
-                        }
-                        else if (!fMissingInputs2)
-                        {
-                            int nDos = 0;
-                            if (stateDummy.IsInvalid(nDos) && nDos > 0)
-                            {
-                                // Punish peer that gave us an invalid orphan tx
-                                Misbehaving(fromPeer, nDos);
-                                setMisbehaving.insert(fromPeer);
-                                LogPrint("mempool", "   invalid orphan tx %s\n", orphanHash.ToString());
-                            }
-                            // Has inputs but not accepted to mempool
-                            // Probably non-standard or insufficient fee/priority
-                            LogPrint("mempool", "   removed orphan tx %s\n", orphanHash.ToString());
-                            vEraseQueue.push_back(orphanHash);
-                            assert(recentRejects);
-                            recentRejects->insert(orphanHash);
-                        }
-                        mempool.check(pcoinsTip);
-                    }
-                }
-                BOOST_FOREACH(uint256 hash, vEraseQueue)
-                    EraseOrphanTx(hash);
             }
-            else if (fMissingInputs)
-            {
-                AddOrphanTx(tx, pfrom->GetId());
-
-                // DoS prevention: do not allow mapOrphanTransactions to grow unbounded
-                unsigned int nMaxOrphanTx = (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
-                unsigned int nEvicted = LimitOrphanTxSize(nMaxOrphanTx);
-                if (nEvicted > 0)
-                    LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
-            } else {
-                assert(recentRejects);
-                recentRejects->insert(tx.GetHash());
-
-                if (pfrom->fWhitelisted) {
-                    // Always relay transactions received from whitelisted peers, even
-                    // if they were rejected from the mempool, allowing the node to
-                    // function as a gateway for nodes hidden behind it.
-                    //
-                    // FIXME: This includes invalid transactions, which means a
-                    // whitelisted peer could get us banned! We may want to change
-                    // that.
-                    std::vector<uint256> vAncestors;
-                    mempool.queryAncestors(tx.GetHash(), vAncestors);
-                    RelayTransaction(tx, vAncestors);
-                }
-            }
-            int nDoS = 0;
-            if (state.IsInvalid(nDoS))
-            {
-                LogPrint("mempool", "%s from peer=%d %s was not accepted into the memory pool: %s\n", tx.GetHash().ToString(),
-                    pfrom->id, pfrom->cleanSubVer,
-                    state.GetRejectReason());
-                pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
-                                   state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
-                if (nDoS > 0)
-                    Misbehaving(pfrom->GetId(), nDoS);
-            }
+        }
+        int nDoS = 0;
+        if (state.IsInvalid(nDoS))
+        {
+            LogPrint("mempool", "%s from peer=%d %s was not accepted into the memory pool: %s\n", tx.GetHash().ToString(),
+                pfrom->id, pfrom->cleanSubVer,
+                state.GetRejectReason());
+            pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
+                               state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
+            if (nDoS > 0)
+                Misbehaving(pfrom->GetId(), nDoS);
         }
     }
     else if (strCommand == "headers" && !fImporting && !fReindex) // Ignore headers received while importing
@@ -5389,24 +5357,10 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         if (!p(headers, nCount == MAX_HEADERS_RESULTS, true))
             return false;
     }
-    else if (strCommand == "merkleblock" && !fImporting && !fReindex) // Ignore blocks received while importing
-    {
-        try {
-            LOCK(cs_main);
-            NodeStatePtr nodestate(pfrom->id);
-            MarkBlockAsInFlight inFlight;
-            DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg,
-                inFlight, CheckBlockIndex);
-            ProcessMerkleBlock(*pfrom, vRecv, *(nodestate->thinblock), TxFinderImpl(), p);
-        }
-        catch (const std::exception& e) {
-            unexpectedThinError(strCommand, *pfrom, e.what());
-            throw;
-        }
-
-    }
     else if (strCommand == "xthinblock" && !fImporting && !fReindex) // Ignore blocks received while importing
     {
+        if (!Opt().UsingThinBlocks())
+            return true;
         // We are receiving a xthin block.
         try {
             LOCK(cs_main);
@@ -5424,6 +5378,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
     }
     else if (strCommand == "cmpctblock" && !fImporting && !fReindex) // Ignore blocks received while importing
     {
+        if (!Opt().UsingThinBlocks())
+            return true;
         // We are receiving a compact block.
         try {
             LOCK(cs_main);
@@ -5465,6 +5421,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         callb(block, std::vector<NodeId>(1, pfrom->id));
     }
     else if (strCommand == "get_xthin") {
+        if (!Opt().UsingThinBlocks())
+            return true;
         CBloomFilter dontWant;
         CInv inv;
 
@@ -5486,6 +5444,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
     }
     else if (strCommand == "get_xblocktx") {
+        if (!Opt().UsingThinBlocks())
+            return true;
         // This is a request for transactions that remote peer wanted
         // as part of a xthinblock, but were not provided.
 
@@ -5511,6 +5471,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         }
     }
     else if (strCommand == "xblocktx") {
+        if (!Opt().UsingThinBlocks())
+            return true;
         // This is a response for us requesting missing transactions from
         // xthinblocks.
 
@@ -5521,10 +5483,13 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         LOCK(cs_main);
         NodeStatePtr statePtr(pfrom->id);
-        XThinBlockConcluder()(resp, *pfrom, *(statePtr->thinblock));
+        MarkBlockAsInFlight m;
+        XThinBlockConcluder()(resp, *pfrom, *(statePtr->thinblock), m);
     }
 
     else if (strCommand == "blocktxn") {
+        if (!Opt().UsingThinBlocks())
+            return true;
         // This is a response for us requesting missing transactions from
         // xthinblocks.
 
@@ -5535,7 +5500,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         LOCK(cs_main);
         NodeStatePtr statePtr(pfrom->id);
-        CompactBlockConcluder()(resp, *pfrom, *(statePtr->thinblock));
+        MarkBlockAsInFlight m;
+        CompactBlockConcluder()(resp, *pfrom, *(statePtr->thinblock), m);
     }
 
     // This asymmetric behavior for inbound and outbound connections was introduced
@@ -5641,13 +5607,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
                     // This should never happen
                     sProblem = "Timing mishap";
                 }
-            } else if (nonce && pfrom->thinBlockNonce == nonce) {
-                LOCK(cs_main);
-                NodeStatePtr nodestate(pfrom->id);
-                ThinBlockWorker& thinblock = *(nodestate->thinblock);
-                MarkBlockAsInFlight m;
-                BloomBlockConcluder concludeDownload(m);
-                concludeDownload(pfrom, nonce, thinblock);
             }
             else if (pfrom->nPingNonceSent) {
                 // Nonce mismatches are normal when pings are overlapping
@@ -5902,13 +5861,7 @@ bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
         return true;
 
     // We want thin blocks only, but peer does not support it.
-    if (!(pto->SupportsBloomThinBlocks() || pto->SupportsXThinBlocks()
-                || NodeStatePtr(pto->id)->supportsCompactBlocks))
-        return false;
-
-    // We want optimal thin blocks only, but peer does not support it.
-    if (Opt().OptimalThinBlocksOnly() && !(pto->SupportsXThinBlocks()
-            || NodeStatePtr(pto->id)->supportsCompactBlocks))
+    if (!(pto->SupportsXThinBlocks() || NodeStatePtr(pto->id)->supportsCompactBlocks))
         return false;
 
     // Is node busy serving a thin block already?
