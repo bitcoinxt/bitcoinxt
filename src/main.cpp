@@ -2579,6 +2579,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
 bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSource& blockSource, CConnman* connman) {
     CBlockIndex *pindexMostWork = NULL;
     CBlockIndex *pindexNewTip = nullptr;
+    int nStopAtHeight = GetArg("-stopatheight", DEFAULT_STOPATHEIGHT);
     const CChainParams& chainParams = Params();
     do {
         boost::this_thread::interruption_point();
@@ -2643,6 +2644,7 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
             if (!hashesToAnnounce.empty())
                 uiInterface.NotifyBlockTip(hashesToAnnounce.front());
         }
+        if (nStopAtHeight && pindexNewTip && pindexNewTip->nHeight >= nStopAtHeight) StartShutdown();
     } while(pindexNewTip != pindexMostWork);
     CheckBlockIndex();
 
@@ -2650,9 +2652,6 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
     if (!FlushStateToDisk(state, FLUSH_STATE_PERIODIC)) {
         return false;
     }
-
-    int nStopAtHeight = GetArg("-stopatheight", DEFAULT_STOPATHEIGHT);
-    if (nStopAtHeight && pindexNewTip && pindexNewTip->nHeight >= nStopAtHeight) StartShutdown();
 
     return true;
 }
