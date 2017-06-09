@@ -16,6 +16,7 @@
 #include "timedata.h"
 #include "util.h"
 #include "wallet/db.h"
+#include "wallet/finaltx.h"
 #include "wallet/wallet.h"
 
 #include <stdint.h>

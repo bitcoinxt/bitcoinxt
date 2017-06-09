@@ -21,6 +21,7 @@
 #include "timedata.h"
 #include "util.h"
 #include "utilmoneystr.h"
+#include "wallet/finaltx.h"
 
 #include <assert.h>
 

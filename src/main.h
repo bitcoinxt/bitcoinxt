@@ -317,13 +317,15 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, int nHeight);
 /** Transaction validation functions */
 
 /**
- * Check if transaction will be final in the next block to be created.
+ * This is a variant of ContextualCheckTransaction which computes the contextual
+ * check for a transaction based on the chain tip.
  *
- * Calls IsFinalTx() with current block height and appropriate block time.
+ * This checks if transaction can be part of the *next* block.
  *
  * See consensus/consensus.h for flag definitions.
  */
-bool CheckFinalTx(const CTransaction &tx, int flags = -1);
+bool ContextualCheckTransactionForNextBlock(const CTransaction &tx,
+                                            CValidationState& state, int flags);
 
 /**
  * Test whether the LockPoints height and time are still valid on the current chain

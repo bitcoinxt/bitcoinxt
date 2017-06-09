@@ -300,7 +300,11 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.nLockTime = 0;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(100000000L).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
-    BOOST_CHECK(CheckFinalTx(tx, flags)); // Locktime passes
+    {
+        // Locktime passes
+        CValidationState state;
+        BOOST_CHECK(ContextualCheckTransactionForNextBlock(tx, state, flags));
+    }
     BOOST_CHECK(!TestSequenceLocks(tx, flags)); // Sequence locks fail
     BOOST_CHECK(SequenceLocks(tx, flags, &prevheights, CreateBlockIndex(chainActive.Tip()->nHeight + 2))); // Sequence locks pass on 2nd block
 
@@ -310,7 +314,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     prevheights[0] = baseheight + 2;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Time(GetTime()).FromTx(tx));
-    BOOST_CHECK(CheckFinalTx(tx, flags)); // Locktime passes
+    {
+        // Locktime passes
+        CValidationState state;
+        BOOST_CHECK(ContextualCheckTransactionForNextBlock(tx, state, flags));
+    }
+
     BOOST_CHECK(!TestSequenceLocks(tx, flags)); // Sequence locks fail
 
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++)
@@ -326,7 +335,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.nLockTime = chainActive.Tip()->nHeight + 1;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Time(GetTime()).FromTx(tx));
-    BOOST_CHECK(!CheckFinalTx(tx, flags)); // Locktime fails
+    {
+        // Locktime fails
+        CValidationState state;
+        BOOST_CHECK(!ContextualCheckTransactionForNextBlock(tx, state, flags));
+        BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txns-nonfinal");
+    }
     BOOST_CHECK(TestSequenceLocks(tx, flags)); // Sequence locks pass
     BOOST_CHECK(IsFinalTx(tx, chainActive.Tip()->nHeight + 2, chainActive.Tip()->GetMedianTimePast())); // Locktime passes on 2nd block
 
@@ -337,16 +351,32 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     prevheights[0] = baseheight + 4;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Time(GetTime()).FromTx(tx));
-    BOOST_CHECK(!CheckFinalTx(tx, flags)); // Locktime fails
+    {
+        // Locktime fails
+        CValidationState state;
+        BOOST_CHECK(!ContextualCheckTransactionForNextBlock(tx, state, flags));
+        BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txns-nonfinal");
+    }
     BOOST_CHECK(TestSequenceLocks(tx, flags)); // Sequence locks pass
-    BOOST_CHECK(IsFinalTx(tx, chainActive.Tip()->nHeight + 2, chainActive.Tip()->GetMedianTimePast() + 1)); // Locktime passes 1 second later
+    {
+        // Locktime passes 1 second later
+        CValidationState state;
+        BOOST_CHECK(ContextualCheckTransaction(tx, state,
+                                               chainActive.Tip()->nHeight + 2,
+                                               chainActive.Tip()->GetMedianTimePast() + 1,
+                                               chainActive.Tip()->GetMedianTimePast()));
+    }
 
     // mempool-dependent transactions (not added)
     tx.vin[0].prevout.hash = hash;
     prevheights[0] = chainActive.Tip()->nHeight + 1;
     tx.nLockTime = 0;
     tx.vin[0].nSequence = 0;
-    BOOST_CHECK(CheckFinalTx(tx, flags)); // Locktime passes
+    {
+        // Locktime passes
+        CValidationState state;
+        BOOST_CHECK(ContextualCheckTransactionForNextBlock(tx, state, flags));
+    }
     BOOST_CHECK(TestSequenceLocks(tx, flags)); // Sequence locks pass
     tx.vin[0].nSequence = 1;
     BOOST_CHECK(!TestSequenceLocks(tx, flags)); // Sequence locks fail
