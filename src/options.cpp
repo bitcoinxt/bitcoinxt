@@ -77,6 +77,10 @@ int64_t Opt::UAHFTime() {
     return Args->GetArg("-uahftime", UAHF_DEFAULT_ACTIVATION_TIME);
 }
 
+int Opt::UAHFProtectSunset() {
+    return Args->GetArg("-uahfprotectsunset", UAHF_DEFAULT_PROTECT_THIS_SUNSET);
+}
+
 bool Opt::UsingThinBlocks() {
     if (IsStealthMode())
         return false;

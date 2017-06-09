@@ -208,6 +208,13 @@ void InitRespendFilter() {
     seed_insecure_rand();
     doubleSpendFilter = CBloomFilter(MAX_DOUBLESPEND_BLOOM, 0.01, insecure_rand(), BLOOM_UPDATE_NONE);
 }
+// UAHF chain considers an OP_RETURN that commits to this string invalid
+static const std::string ANTI_REPLAY_COMMITMENT = "Bitcoin: A Peer-to-Peer Electronic Cash System";
+std::vector<unsigned char>& GetAntiReplayCommitment() {
+    static std::vector<unsigned char> vchARC = std::vector<unsigned char>(std::begin(ANTI_REPLAY_COMMITMENT),
+                                                                          std::end(ANTI_REPLAY_COMMITMENT));
+    return vchARC;
+}
 
 class OnBlockFinished : public ThinBlockFinishedCallb {
     public:
@@ -3364,9 +3371,27 @@ bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& sta
     return true;
 }
 
+bool ContextualCheckTransaction(const CTransaction &tx, CValidationState &state, int nHeight,
+                                int64_t nLockTimeCutoff, int64_t nMedianTimePastPrev) {
+    if (!IsFinalTx(tx, nHeight, nLockTimeCutoff)) {
+        return state.DoS(10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
+    }
+    if ((Opt().UAHFTime() != 0) &&
+        (nMedianTimePastPrev >= Opt().UAHFTime()) &&
+        (nHeight <= Opt().UAHFProtectSunset())) {
+        for (const CTxOut &o : tx.vout) {
+            if (o.scriptPubKey.IsCommitment(GetAntiReplayCommitment())) {
+                return state.DoS(10, error("%s: chain protected from tx", __func__), REJECT_INVALID, "bad-txn-replay");
+            }
+        }
+    }
+    return true;
+}
+
 bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIndex * const pindexPrev)
 {
     const int nHeight = pindexPrev == NULL ? 0 : pindexPrev->nHeight + 1;
+    const int64_t nMedianTimePastPrev = (pindexPrev == NULL ? 0 : pindexPrev->GetMedianTimePast());
     const Consensus::Params& consensusParams = Params().GetConsensus();
 
     // Start enforcing BIP113 (Median Time Past) using versionbits logic.
@@ -3376,13 +3401,14 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
     }
 
     int64_t nLockTimeCutoff = (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST)
-                              ? pindexPrev->GetMedianTimePast()
+                              ? nMedianTimePastPrev
                               : block.GetBlockTime();
 
     // Check that all transactions are finalized
     BOOST_FOREACH(const CTransaction& tx, block.vtx) {
-        if (!IsFinalTx(tx, nHeight, nLockTimeCutoff)) {
-            return state.DoS(10, error("%s: contains a non-final transaction", __func__), REJECT_INVALID, "bad-txns-nonfinal");
+        if (!ContextualCheckTransaction(tx, state, nHeight, nLockTimeCutoff, nMedianTimePastPrev)) {
+            // state set by ContextualCheckTransaction.
+            return false;
         }
     }
 
