@@ -48,6 +48,9 @@ MAX_INV_SZ = 50000
 MAX_BLOCK_SIZE = 8000000
 
 COIN = 100000000
+# Keep this around in case some tests specifically want to test legacy size
+ONE_MEGABYTE = 1000000
+LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE
 
 # Keep our own socket map for asyncore, so that we can track disconnects
 # ourselves (to workaround an issue with closing an asyncore socket when
