@@ -282,6 +282,8 @@ def initialize_chain_clean(test_dir, num_nodes):
     for i in range(num_nodes):
         datadir=initialize_datadir(test_dir, i)
 
+def wait_for_node_exit(node_index, timeout):
+    bitcoind_processes[node_index].wait(timeout)
 
 def _rpchost_to_args(rpchost):
     '''Convert optional IP:port spec to rpcconnect/rpcport args'''
