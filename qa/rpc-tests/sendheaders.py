@@ -82,6 +82,11 @@ e. Announce one more that doesn't connect.
    Expect: disconnect.
 '''
 
+'''
+Tweaks for differences between XT and Core
+'''
+XT_TWEAKS = True
+
 class BaseNode(NodeConnCB):
     def __init__(self):
         NodeConnCB.__init__(self)
@@ -97,6 +102,9 @@ class BaseNode(NodeConnCB):
         self.block_announced = False
         self.last_getheaders = None
         self.disconnected = False
+
+        # XT tweaks
+        self.requested_blocks = set()
 
     def clear_last_announcement(self):
         with mininode_lock:
@@ -143,6 +151,10 @@ class BaseNode(NodeConnCB):
 
     def on_getdata(self, conn, message):
         self.last_getdata = message
+
+        for inv in message.inv:
+            if inv.type == 2:
+                self.requested_blocks.add(inv.hash)
 
     def on_pong(self, conn, message):
         self.last_pong = message
@@ -368,10 +380,27 @@ class SendHeadersTest(BitcoinTestFramework):
                     test_node.wait_for_getheaders(timeout=5)
                     # Should have received a getheaders now
                     test_node.send_header_for_blocks(blocks)
+                    if XT_TWEAKS:
+                        # sync to avoid race,
+                        # inv_node may end up announcing tip first
+                        test_node.sync_with_ping()
                     # Test that duplicate inv's won't result in duplicate
                     # getdata requests, or duplicate headers announcements
                     [ inv_node.send_block_inv(x.sha256) for x in blocks ]
-                    test_node.wait_for_getdata([x.sha256 for x in blocks], timeout=5)
+                    if XT_TWEAKS:
+                        # XT does not batch getdata calls in the same way.
+                        # Check that all blocks are requested.
+                        success = False
+                        attempts = 0
+                        while not success and attempts < 10:
+                            attempts += 1
+                            success = set([x.sha256 for x in blocks])\
+                                    .issubset(test_node.requested_blocks)
+                            if not success:
+                                time.sleep(1)
+                        assert_equal(success, True)
+                    else:
+                        test_node.wait_for_getdata([x.sha256 for x in blocks], timeout=5)
                     inv_node.sync_with_ping()
                 else:
                     # Announce via headers

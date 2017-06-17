@@ -114,10 +114,10 @@ BOOST_AUTO_TEST_CASE(fetch_when_wanted) {
         BOOST_CHECK(!toFetch.empty());
     }
 
-    {   // We don't have header. We don't want block.
+    {   // We don't have header. We still want block.
         std::vector<CInv> toFetch;
-        BOOST_CHECK(!ann.onBlockAnnounced(toFetch));
-        BOOST_CHECK(toFetch.empty());
+        BOOST_CHECK(ann.onBlockAnnounced(toFetch));
+        BOOST_CHECK(!toFetch.empty());
     }
 
     {   // We have block (we don't want it)

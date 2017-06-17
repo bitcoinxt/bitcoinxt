@@ -73,7 +73,7 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
             return DONT_DOWNL;
         }
 
-        return blockHeaderIsKnown() ? DOWNL_FULL_NOW : DONT_DOWNL;
+        return DOWNL_FULL_NOW;
     }
 
     // At this point we know we want a thin block.
