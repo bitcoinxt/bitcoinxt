@@ -22,9 +22,14 @@
  */
 class CAddrInfo : public CAddress
 {
+
+
 public:
     //! last try whatsoever by us (memory only)
     int64_t nLastTry;
+
+    //! last counted attempt (memory only)
+    int64_t nLastCountAttempt;
 
 private:
     //! where knowledge about this address first came from
@@ -63,6 +68,7 @@ public:
     {
         nLastSuccess = 0;
         nLastTry = 0;
+        nLastCountAttempt = 0;
         nAttempts = 0;
         nRefCount = 0;
         fInTried = false;
@@ -173,9 +179,6 @@ private:
     //! critical section to protect the inner data structures
     mutable CCriticalSection cs;
 
-    //! secret key to randomize bucket select with
-    uint256 nKey;
-
     //! last used nId
     int nIdCount;
 
@@ -200,7 +203,12 @@ private:
     //! list of "new" buckets
     int vvNew[ADDRMAN_NEW_BUCKET_COUNT][ADDRMAN_BUCKET_SIZE];
 
+    //! last time Good was called (memory only)
+    int64_t nLastGood;
+
 protected:
+    //! secret key to randomize bucket select with
+    uint256 nKey;
 
     //! Find an entry.
     CAddrInfo* Find(const CNetAddr& addr, int *pnId = NULL);
@@ -228,10 +236,13 @@ protected:
     bool Add_(const CAddress &addr, const CNetAddr& source, int64_t nTimePenalty);
 
     //! Mark an entry as attempted to connect.
-    void Attempt_(const CService &addr, int64_t nTime);
+    void Attempt_(const CService &addr, bool fCountFailure, int64_t nTime);
 
-    //! Select an address to connect to.
-    CAddrInfo Select_();
+    //! Select an address to connect to, if newOnly is set to true, only the new table is selected from.
+    CAddrInfo Select_(bool newOnly);
+
+    //! Wraps GetRandInt to allow tests to override RandomInt and make it determinismistic.
+    virtual int RandomInt(int nMax);
 
 #ifdef DEBUG_ADDRMAN
     //! Perform consistency check. Returns an error code or zero.
@@ -345,6 +356,14 @@ public:
             nUBuckets ^= (1 << 30);
         }
 
+        if (nNew > ADDRMAN_NEW_BUCKET_COUNT * ADDRMAN_BUCKET_SIZE) {
+            throw std::ios_base::failure("Corrupt CAddrMan serialization, nNew exceeds limit.");
+        }
+
+        if (nTried > ADDRMAN_TRIED_BUCKET_COUNT * ADDRMAN_BUCKET_SIZE) {
+            throw std::ios_base::failure("Corrupt CAddrMan serialization, nTried exceeds limit.");
+        }
+
         // Deserialize entries from the new table.
         for (int n = 0; n < nNew; n++) {
             CAddrInfo &info = mapInfo[n];
@@ -445,6 +464,7 @@ public:
         nIdCount = 0;
         nTried = 0;
         nNew = 0;
+        nLastGood = 1; //Initially at 1 so that "never" is strictly worse.
     }
 
     CAddrMan()
@@ -519,12 +539,12 @@ public:
     }
 
     //! Mark an entry as connection attempted to.
-    void Attempt(const CService &addr, int64_t nTime = GetAdjustedTime())
+    void Attempt(const CService &addr, bool fCountFailure, int64_t nTime = GetAdjustedTime())
     {
         {
             LOCK(cs);
             Check();
-            Attempt_(addr, nTime);
+            Attempt_(addr, fCountFailure, nTime);
             Check();
         }
     }
@@ -532,13 +552,13 @@ public:
     /**
      * Choose an address to connect to.
      */
-    CAddrInfo Select()
+    CAddrInfo Select(bool newOnly = false)
     {
         CAddrInfo addrRet;
         {
             LOCK(cs);
             Check();
-            addrRet = Select_();
+            addrRet = Select_(newOnly);
             Check();
         }
         return addrRet;
@@ -567,6 +587,7 @@ public:
             Check();
         }
     }
+
 };
 
 #endif // BITCOIN_ADDRMAN_H
