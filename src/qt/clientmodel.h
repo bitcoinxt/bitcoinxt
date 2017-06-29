@@ -19,7 +19,7 @@ QT_BEGIN_NAMESPACE
 class QTimer;
 QT_END_NAMESPACE
 
-enum BlockSource {
+enum FetchBlockSource {
     BLOCK_SOURCE_NONE,
     BLOCK_SOURCE_REINDEX,
     BLOCK_SOURCE_DISK,
@@ -58,7 +58,7 @@ public:
     //! Return true if core is doing initial block download
     bool inInitialBlockDownload() const;
     //! Return true if core is importing blocks
-    enum BlockSource getBlockSource() const;
+    enum FetchBlockSource getBlockSource() const;
     //! Return warnings to be displayed in status bar
     QString getStatusBarWarnings() const;
 

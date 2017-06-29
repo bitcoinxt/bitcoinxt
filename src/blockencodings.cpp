@@ -70,13 +70,17 @@ unsigned int minTxSize() {
     return ::GetSerializeSize(CTransaction(), SER_NETWORK, PROTOCOL_VERSION);
 }
 
+void validateNumTxs(size_t transactions, uint64_t currMaxBlockSize) {
+    uint64_t maxBlockSize =  currMaxBlockSize * 105 / 100; // max size after next block adjustmnet
+    if (transactions > maxBlockSize / minTxSize())
+        throw std::invalid_argument("compact block exceeds max txs in a block");
+}
+
 void validateCompactBlock(const CompactBlock& cmpctblock, uint64_t currMaxBlockSize) {
     if (cmpctblock.header.IsNull() || (cmpctblock.shorttxids.empty() && cmpctblock.prefilledtxn.empty()))
         throw std::invalid_argument("empty data in compact block");
 
-    uint64_t maxBlockSize =  currMaxBlockSize * 105 / 100; // max size after next block adjustmnet
-    if (cmpctblock.shorttxids.size() + cmpctblock.prefilledtxn.size() > maxBlockSize / minTxSize())
-        throw std::invalid_argument("compact block exceeds max txs in a block");
+    validateNumTxs(cmpctblock.shorttxids.size() + cmpctblock.prefilledtxn.size(), currMaxBlockSize);
 
     int32_t lastprefilledindex = -1;
     for (size_t i = 0; i < cmpctblock.prefilledtxn.size(); i++) {

@@ -106,7 +106,15 @@ BOOST_AUTO_TEST_CASE(announce_updates_availability) {
 
 BOOST_AUTO_TEST_CASE(fetch_when_wanted) {
 
-    {   // We want block.
+    {   // We have header, but not data. We want the block.
+        std::vector<CInv> toFetch;
+        DummyBlockIndexEntry entry(block);
+        entry.index.nStatus &= ~BLOCK_HAVE_DATA;
+        BOOST_CHECK(ann.onBlockAnnounced(toFetch));
+        BOOST_CHECK(!toFetch.empty());
+    }
+
+    {   // We don't have header. We still want block.
         std::vector<CInv> toFetch;
         BOOST_CHECK(ann.onBlockAnnounced(toFetch));
         BOOST_CHECK(!toFetch.empty());
@@ -153,6 +161,9 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_full_now) {
     // Peer does not support thin blocks and we are almost synced.
     node.nServices = 0;
 
+    DummyBlockIndexEntry entry(block);
+    entry.index.nStatus &= ~BLOCK_HAVE_DATA;
+
     BOOST_CHECK_EQUAL(
             BlockAnnounceReceiver::DOWNL_FULL_NOW,
             ann.pickDownloadStrategy());
@@ -167,21 +178,6 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_full_now) {
     argPtr->usethin = 0;
     BOOST_CHECK_EQUAL(
             BlockAnnounceReceiver::DOWNL_FULL_NOW,
-            ann.pickDownloadStrategy());
-}
-
-BOOST_AUTO_TEST_CASE(dowl_strategy_thin_later_2) {
-
-    // Thin supports sending thin blocks but is busy. Request later.
-    node.nServices = NODE_THIN;
-
-    // By default DummyNode uses DummyThinWorker.
-    // DummyThinWorker always returns false for isAvailable().
-    BOOST_ASSERT(!nodestate->thinblock->isAvailable());
-
-
-    BOOST_CHECK_EQUAL(
-            BlockAnnounceReceiver::DOWNL_THIN_LATER,
             ann.pickDownloadStrategy());
 }
 
@@ -201,7 +197,7 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_dont_downl_1) {
     DummyNode node2(11, thinmg.get());
     NodeStatePtr state2(node2.id);
     state2->thinblock.reset(new XThinWorker(*thinmg, node2.id));
-    state2->thinblock->setToWork(block);
+    state2->thinblock->addWork(block);
     BOOST_CHECK_EQUAL(1, thinmg->numWorkers(block));
 
     // Second one should not attempt to download on announcement.
@@ -525,6 +521,40 @@ BOOST_AUTO_TEST_CASE(announce_with_block) {
 
     // bestHeaderSent should now be entry3
     BOOST_CHECK(NodeStatePtr(to.id)->bestHeaderSent == &entry2.index);
+}
+
+BOOST_AUTO_TEST_CASE(dont_announce_if_peer_knows) {
+    // don't announce block to peer if it
+    // already knows about it.
+
+    DummyBlockIndexEntry entry1(uint256S("0xBAD"));
+    DummyBlockIndexEntry entry2(uint256S("0xBEEF"));
+    entry2.index.pprev = &entry1.index;
+
+    to.blocksToAnnounce = { entry2.hash };
+    NodeStatePtr(to.id)->bestHeaderSent = &entry1.index;
+    NodeStatePtr(to.id)->supportsCompactBlocks = true;
+
+    // Let it be known that this peer
+    // already knows about this block.
+    NodeStatePtr(to.id)->pindexBestKnownBlock = &entry2.index;
+
+    struct DummyBlockSender : public BlockSender {
+
+        DummyBlockSender() : BlockSender(), sendBlockCalls(0) {
+        }
+
+        void sendBlock(CNode& node, const CBlockIndex& blockIndex,
+                int invType, int activeChainHeight) override {
+            sendBlockCalls++;
+        }
+        int sendBlockCalls;
+    };
+    DummyBlockSender sender;
+    ann.announceWithBlock(sender);
+
+    // peer knows about block, should not have sent.
+    BOOST_CHECK_EQUAL(0, sender.sendBlockCalls);
 }
 
 BOOST_AUTO_TEST_CASE(find_headers_to_announce) {

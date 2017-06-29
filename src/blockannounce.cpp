@@ -50,6 +50,7 @@ bool BlockAnnounceReceiver::almostSynced() {
 
 BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrategy() {
 
+
     if (!almostSynced())
         return DONT_DOWNL;
 
@@ -85,11 +86,6 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
         return DONT_DOWNL;
     }
 
-    if (!state->thinblock->isAvailable()) {
-        LogPrint("thin", "peer %d is busy with %s, won't req %s\n",
-                from.id, state->thinblock->blockStr(), block.ToString());
-        return DOWNL_THIN_LATER;
-    }
     return DOWNL_THIN_NOW;
 }
 
@@ -117,7 +113,7 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch) {
             block.ToString(), from.id, (numDownloading + 1), Opt().ThinBlocksMaxParallel());
 
         nodestate->thinblock->requestBlock(block, toFetch, from);
-        nodestate->thinblock->setToWork(block);
+        nodestate->thinblock->addWork(block);
         return true;
     }
 
@@ -125,7 +121,7 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch) {
     // the full block arrives, the header chain leading up to it is already
     // validated. Not doing this will result in block being discarded and
     // re-downloaded later.
-    if (!hasBlockData() && !blocksInFlight.isInFlight(block))
+    if (!hasBlockData() && !blockHeaderIsKnown() && !blocksInFlight.isInFlight(block))
         requestHeaders(from, block);
 
     if (s == DONT_DOWNL)

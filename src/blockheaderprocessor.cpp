@@ -32,15 +32,11 @@ DefaultHeaderProcessor::DefaultHeaderProcessor(CNode* pfrom,
 }
 
 // maybeAnnouncement: Header *might* have been received as a block announcement.
-bool DefaultHeaderProcessor::operator()(const std::vector<CBlockHeader>& headers,
+CBlockIndex* DefaultHeaderProcessor::operator()(const std::vector<CBlockHeader>& headers,
         bool peerSentMax,
         bool maybeAnnouncement)
 {
-    bool ok;
-    CBlockIndex* pindexLast;
-    std::tie(ok, pindexLast) = acceptHeaders(headers);
-    if (!ok)
-        return false;
+    CBlockIndex* pindexLast = acceptHeaders(headers);
 
     NodeStatePtr(pfrom->id)->unconnectingHeaders = 0;
 
@@ -64,10 +60,10 @@ bool DefaultHeaderProcessor::operator()(const std::vector<CBlockHeader>& headers
     }
 
     checkBlockIndex();
-    return true;
+    return pindexLast;
 }
 
-std::tuple<bool, CBlockIndex*> DefaultHeaderProcessor::acceptHeaders(
+CBlockIndex* DefaultHeaderProcessor::acceptHeaders(
         const std::vector<CBlockHeader>& headers) {
 
     CBlockIndex *pindexLast = nullptr;
@@ -75,20 +71,18 @@ std::tuple<bool, CBlockIndex*> DefaultHeaderProcessor::acceptHeaders(
         CValidationState state;
         if (pindexLast != nullptr && header.hashPrevBlock != pindexLast->GetBlockHash()) {
             Misbehaving(pfrom->GetId(), 20);
-            return std::make_tuple(
-                    error("non-continuous headers sequence"), pindexLast);
+            throw BlockHeaderError("non-continuous headers sequence");
         }
         if (!AcceptBlockHeader(header, state, &pindexLast)) {
             int nDoS;
             if (state.IsInvalid(nDoS)) {
                 if (nDoS > 0)
                     Misbehaving(pfrom->GetId(), nDoS);
-                return std::make_tuple(
-                        error("invalid header received"), pindexLast);
+                throw BlockHeaderError("invalid header received");
             }
         }
     }
-    return std::make_tuple(true, pindexLast);
+    return pindexLast;
 }
 
 std::vector<CBlockIndex*> DefaultHeaderProcessor::findMissingBlocks(CBlockIndex* last) {

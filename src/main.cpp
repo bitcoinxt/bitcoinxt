@@ -164,13 +164,6 @@ namespace {
     uint32_t nBlockSequenceId = 1;
 
     /**
-     * Sources of received blocks, saved to be able to send them reject
-     * messages or ban them when processing happens afterwards. Protected by
-     * cs_main.
-     */
-    map<uint256, NodeId> mapBlockSource;
-
-    /**
      * Filter for transactions that were recently rejected by
      * AcceptToMemoryPool. These are not rerequested until the chain tip
      * changes, at which point the entire filter is reset. Protected by
@@ -218,13 +211,16 @@ void InitRespendFilter() {
 
 class OnBlockFinished : public ThinBlockFinishedCallb {
     public:
-        OnBlockFinished();
-        OnBlockFinished(const std::string& strCommand);
+        OnBlockFinished(bool canMisbehave)
+            : canMisbehave(canMisbehave) { }
+
+        OnBlockFinished(bool canMisbehave, const std::string& strCommand)
+            : canMisbehave(canMisbehave), strCommand(strCommand) { }
 
         virtual void operator()(const CBlock& block, const std::vector<NodeId>& ids);
 
     private:
-
+        bool canMisbehave;
         const std::string strCommand;
 
         bool hasWhitelistedNode(const std::vector<NodeId>& ids) const;
@@ -237,7 +233,7 @@ struct InFlightEraserImpl : public InFlightEraser {
     virtual void operator()(NodeId, const uint256& block);
 };
 ThinBlockManager thinblockmg(
-        std::unique_ptr<ThinBlockFinishedCallb>(new OnBlockFinished()),
+        std::unique_ptr<ThinBlockFinishedCallb>(new OnBlockFinished(false)),
         std::unique_ptr<InFlightEraser>(new InFlightEraserImpl()));
 
 //////////////////////////////////////////////////////////////////////////////
@@ -429,8 +425,10 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
             if (pindex->nStatus & BLOCK_HAVE_DATA || chainActive.Contains(pindex)) {
                 if (pindex->nChainTx)
                     state->pindexLastCommonBlock = pindex;
-            } else if (!blocksInFlight.isInFlight(pindex->GetBlockHash())) {
-                // The block is not already downloaded, and not yet in flight.
+            } else if (!(blocksInFlight.isInFlight(pindex->GetBlockHash())
+                    || state->thinblock->isWorkingOn(pindex->GetBlockHash()))) {
+                // The block is not already downloaded, not yet in flight and
+                // not being received as a thin block announcement.
                 if (pindex->nHeight > nWindowEnd) {
                     // We reached the end of the window.
                     if (vBlocks.size() == 0 && !waitingfor.count(nodeid)) {
@@ -472,15 +470,18 @@ void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash) {
     }
 }
 
-OnBlockFinished::OnBlockFinished() { }
-OnBlockFinished::OnBlockFinished(const std::string& strCommand) : strCommand(strCommand) { }
-
 void OnBlockFinished::operator()(const CBlock& block, const std::vector<NodeId>& ids) {
     AssertLockHeld(cs_main);
-    CBlock copy(block);
+
     CValidationState state;
-    ProcessNewBlock(state, pickBlockSource(ids), &copy,
-            hasWhitelistedNode(ids), NULL);
+    std::set<NodeId> nodes(begin(ids), end(ids));
+    BlockSource source(block.GetHash(), nodes, canMisbehave);
+
+    CBlock copy(block);
+    if (!ProcessNewBlock(state, source, &copy,
+            hasWhitelistedNode(ids), NULL)) {
+        LogPrintf("ProcessNewBlock failed in %s\n", __func__);
+    }
     rejectAndPunish(state, block.GetHash(), ids);
 }
 
@@ -540,13 +541,16 @@ void InFlightEraserImpl::operator()(NodeId node, const uint256& hash) {
     if (q == QueuedBlockPtr())
         return;
 
-    NodeStatePtr state(q->node);
-    assert(!state.IsNull());
     nQueuedValidatedHeaders -= q->fValidatedHeaders;
-    state->nBlocksInFlightValidHeaders -= q->fValidatedHeaders;
-    state->vBlocksInFlight.erase(q);
-    state->nBlocksInFlight--;
-    state->nStallingSince = 0;
+    NodeStatePtr state(q->node);
+    if (!state.IsNull()) {
+        // state can be null if a node that has a block
+        // in flight is being destructed.
+        state->nBlocksInFlightValidHeaders -= q->fValidatedHeaders;
+        state->vBlocksInFlight.erase(q);
+        state->nBlocksInFlight--;
+        state->nStallingSince = 0;
+    }
     blocksInFlight.erase(q);
 
     int64_t getdataTime = q->nTime;
@@ -1762,16 +1766,20 @@ void static InvalidChainFound(CBlockIndex* pindexNew)
     CheckForkWarningConditions();
 }
 
-void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state) {
+void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state,
+        const BlockSource& blockSource) {
     int nDoS = 0;
     if (state.IsInvalid(nDoS)) {
-        std::map<uint256, NodeId>::iterator it = mapBlockSource.find(pindex->GetBlockHash());
-        NodeStatePtr nodeState(it->second);
-        if (it != mapBlockSource.end() && !nodeState.IsNull()) {
+
+        for (NodeId id : blockSource.nodes) {
+            NodeStatePtr nodeState(id);
+            if (nodeState.IsNull())
+                continue;
+
             CBlockReject reject = {state.GetRejectCode(), state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), pindex->GetBlockHash()};
             nodeState->rejects.push_back(reject);
-            if (nDoS > 0)
-                Misbehaving(it->second, nDoS);
+            if (blockSource.canMisbehave && nDoS > 0)
+                Misbehaving(id, nDoS);
         }
     }
     if (!state.CorruptionPossible()) {
@@ -2719,7 +2727,8 @@ static int64_t nTimePostConnect = 0;
  * Connect a new block to chainActive. pblock is either NULL or a pointer to a CBlock
  * corresponding to pindexNew, to bypass loading it again from disk.
  */
-bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *pblock) {
+bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew,
+        CBlock *pblock, const BlockSource& blockSource) {
     assert(pindexNew->pprev == chainActive.Tip());
     // Read block from disk.
     int64_t nTime1 = GetTimeMicros();
@@ -2740,10 +2749,9 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew, CBlock *
         GetMainSignals().BlockChecked(*pblock, state);
         if (!rv) {
             if (state.IsInvalid())
-                InvalidBlockFound(pindexNew, state);
+                InvalidBlockFound(pindexNew, state, blockSource);
             return error("ConnectTip(): ConnectBlock %s failed", pindexNew->GetBlockHash().ToString());
         }
-        mapBlockSource.erase(inv.hash);
         nTime3 = GetTimeMicros(); nTimeConnectTotal += nTime3 - nTime2;
         LogPrint("bench", "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
         assert(view.Flush());
@@ -2850,7 +2858,7 @@ static void PruneBlockIndexCandidates() {
  * Try to make some progress towards making pindexMostWork the active block.
  * pblock is either NULL or a pointer to a CBlock corresponding to pindexMostWork.
  */
-static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock, bool& fInvalidFound) {
+static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMostWork, CBlock *pblock, const BlockSource& blockSource, bool& fInvalidFound) {
     AssertLockHeld(cs_main);
     const CBlockIndex *pindexOldTip = chainActive.Tip();
     const CBlockIndex *pindexFork = chainActive.FindFork(pindexMostWork);
@@ -2882,7 +2890,8 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
 
         // Connect new blocks.
         BOOST_REVERSE_FOREACH(CBlockIndex *pindexConnect, vpindexToConnect) {
-            if (!ConnectTip(state, pindexConnect, pindexConnect == pindexMostWork ? pblock : NULL)) {
+            CBlock* mostWork = pindexConnect == pindexMostWork ? pblock : nullptr;
+            if (!ConnectTip(state, pindexConnect, mostWork, blockSource)) {
                 if (state.IsInvalid()) {
                     // The block violates a consensus rule.
                     if (!state.CorruptionPossible())
@@ -2926,7 +2935,7 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
  * or an activated best chain. pblock is either NULL or a pointer to a block
  * that is already loaded (to avoid loading it again from disk).
  */
-bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
+bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSource& blockSource) {
     CBlockIndex *pindexMostWork = NULL;
     const CChainParams& chainParams = Params();
     do {
@@ -2946,7 +2955,8 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock) {
                 return true;
 
             bool fInvalidFound = false;
-            if (!ActivateBestChainStep(state, pindexMostWork, pblock && pblock->GetHash() == pindexMostWork->GetBlockHash() ? pblock : NULL, fInvalidFound))
+            CBlock* mostWork = pblock && (pblock->GetHash() == pindexMostWork->GetBlockHash()) ? pblock : nullptr;
+            if (!ActivateBestChainStep(state, pindexMostWork, mostWork, blockSource, fInvalidFound))
                 return false;
 
             if (fInvalidFound) {
@@ -3505,7 +3515,8 @@ static bool IsSuperMajority(int minVersion, const CBlockIndex* pstart, unsigned 
 }
 
 
-bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, bool fForceProcessing, const CDiskBlockPos *dbp)
+bool ProcessNewBlock(CValidationState &state, const BlockSource& from,
+        CBlock* pblock, bool fForceProcessing, const CDiskBlockPos *dbp)
 {
     // Preliminary checks
     bool checked = CheckBlock(*pblock, state);
@@ -3521,15 +3532,12 @@ bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, bool
         // Store to disk
         CBlockIndex *pindex = NULL;
         bool ret = AcceptBlock(*pblock, state, &pindex, fRequested, dbp);
-        if (pindex && pfrom) {
-            mapBlockSource[pindex->GetBlockHash()] = pfrom->GetId();
-        }
         CheckBlockIndex();
         if (!ret)
             return error("%s: AcceptBlock FAILED", __func__);
     }
 
-    if (!ActivateBestChain(state, pblock))
+    if (!ActivateBestChain(state, pblock, from))
         return error("%s: ActivateBestChain failed", __func__);
 
     return true;
@@ -3981,7 +3989,6 @@ void UnloadBlockIndex()
     vinfoBlockFile.clear();
     nLastBlockFile = 0;
     nBlockSequenceId = 1;
-    mapBlockSource.clear();
     blocksInFlight.clear();
     nQueuedValidatedHeaders = 0;
     nPreferredDownload = 0;
@@ -4701,7 +4708,7 @@ void unexpectedThinError(const std::string& cmd, CNode& from, const std::string&
     LogPrintf("Unexpected error handling cmd '%s': '%s' peer=%d\n", cmd, err, from.id);
     {
         LOCK(cs_main);
-        NodeStatePtr(from.id)->thinblock->setAvailable();
+        NodeStatePtr(from.id)->thinblock->stopAllWork();
         Misbehaving(from.id, 10);
     }
     from.PushMessage("reject", cmd, REJECT_MALFORMED, err);
@@ -4888,17 +4895,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         }
 
         if (pfrom->nVersion >= SHORT_IDS_BLOCKS_VERSION
-                && (!(pfrom->nServices & NODE_THIN) || Opt().PreferCompactBlocks())) {
-
-            // We prefer xthin, however if node does not support it,
-            // we ask it for thin block variant compact blocks.
-            //
-            // This also acts as announcement to tell the peer that we
-            // support compact blocks.
-
-            bool highBandwidth = false;
-            uint64_t version = 1;
-            pfrom->PushMessage("sendcmpct", highBandwidth, version);
+                && !(pfrom->SupportsXThinBlocks() && Opt().PreferXThinBlocks())) {
+            enableCompactBlocks(*pfrom, false);
         }
     }
 
@@ -5066,7 +5064,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         try {
             if (canSend)
-                bs.sendReReqReponse(*pfrom, *(mi->second), req);
+                bs.sendReReqReponse(*pfrom, *(mi->second), req,
+                        chainActive.Height());
         }
         catch (const std::exception& e) {
             LogPrintf("error in re-request from peer=%d: %s\n",
@@ -5360,8 +5359,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             // new headers to connect.
             return true;
 
-        if (!p(headers, nCount == MAX_HEADERS_RESULTS, true))
-            return false;
+        try {
+            p(headers, nCount == MAX_HEADERS_RESULTS, true);
+        }
+        catch (const BlockHeaderError& e) {
+            return error(e.what());
+        }
     }
     else if (strCommand == "xthinblock" && !fImporting && !fReindex) // Ignore blocks received while importing
     {
@@ -5375,7 +5378,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             DefaultHeaderProcessor headerp(pfrom, blocksInFlight, thinblockmg,
                 inFlight, CheckBlockIndex);
             XThinBlockProcessor blockp(*pfrom, *(nodestate->thinblock), headerp);
-            blockp(vRecv, TxFinderImpl());
+            blockp(vRecv, TxFinderImpl(),
+                    chainActive.Tip()->nMaxBlockSize, chainActive.Height());
         }
         catch (const std::exception& e) {
             unexpectedThinError(strCommand, *pfrom, e.what());
@@ -5394,7 +5398,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             DefaultHeaderProcessor headerp(pfrom, blocksInFlight, thinblockmg,
                     inFlight, CheckBlockIndex);
             CompactBlockProcessor blockp(*pfrom, *(nodestate->thinblock), headerp);
-            blockp(vRecv, mempool, chainActive.Tip()->nMaxBlockSize);
+            blockp(vRecv, mempool, chainActive.Tip()->nMaxBlockSize, chainActive.Height());
         }
         catch (const std::exception& e) {
             unexpectedThinError(strCommand, *pfrom, e.what());
@@ -5418,12 +5422,16 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
         if (p.requestConnectHeaders(block.GetBlockHeader(), *pfrom)) {
             LogPrintf("Received block %s from peer=%d, but headers do "
                     "not connect. Discarding.\n");
+
+            // thinblock requests may respond with a full block
+            NodeStatePtr(pfrom->id)->thinblock->stopWork(block.GetHash());
+
             InFlightEraserImpl erase;
             erase(pfrom->id, inv.hash);
             return true;
         }
 
-        OnBlockFinished callb(strCommand);
+        OnBlockFinished callb(true, strCommand);
         callb(block, std::vector<NodeId>(1, pfrom->id));
     }
     else if (strCommand == "get_xthin") {
@@ -5469,7 +5477,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         try {
             if (canSend)
-                bs.sendReReqReponse(*pfrom, *(mi->second), req);
+                bs.sendReReqReponse(*pfrom, *(mi->second), req,
+                        chainActive.Height());
         }
         catch (const std::exception& e) {
             LogPrintf("error in xthin re-request from peer=%d: %s\n",
@@ -5866,12 +5875,9 @@ bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
     if (!Opt().AvoidFullBlocks())
         return true;
 
-    // We want thin blocks only, but peer does not support it.
-    if (!(pto->SupportsXThinBlocks() || NodeStatePtr(pto->id)->supportsCompactBlocks))
-        return false;
-
-    // Is node busy serving a thin block already?
-    return worker.isAvailable();
+    // We want to download thin blocks only.
+    return pto->SupportsXThinBlocks()
+        || NodeStatePtr(pto->id)->supportsCompactBlocks;
 }
 
 
@@ -6091,9 +6097,10 @@ bool SendMessages(CNode* pto)
             std::set<NodeId> stallers;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - statePtr->nBlocksInFlight, vToDownload, stallers);
             BOOST_FOREACH(CBlockIndex *pindex, vToDownload) {
-                if (ThinBlocksActive(pto) && worker.isAvailable()) {
+
+                if (ThinBlocksActive(pto)) {
                     worker.requestBlock(pindex->GetBlockHash(), vGetData, *pto);
-                    worker.setToWork(pindex->GetBlockHash());
+                    worker.addWork(pindex->GetBlockHash());
                     LogPrint("net", "Requesting thin block %s (%d) peer=%d\n",
                             pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
                 }

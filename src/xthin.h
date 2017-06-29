@@ -38,7 +38,7 @@ class XThinBlock {
 
         // primitive check to see if block is valid
         // throws on error
-        void selfValidate() const;
+        void selfValidate(uint64_t currMaxBlockSize) const;
 
         template <typename Stream, typename Operation>
         inline void SerializationOp(Stream& s,
@@ -77,13 +77,6 @@ inline TxHashProvider::~TxHashProvider() { }
 
 struct XThinStub : public StubData {
     XThinStub(const XThinBlock& b) : xblock(b) {
-        try {
-            xblock.selfValidate();
-        }
-        catch (const std::exception& e) {
-            throw thinblock_error(e.what());
-        }
-
         LogPrint("thin", "Created xthin stub for %s, %d transactions.\n",
                 header().GetHash().ToString(), allTransactions().size());
     }

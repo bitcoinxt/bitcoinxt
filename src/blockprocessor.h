@@ -7,6 +7,7 @@ class ThinBlockWorker;
 class BlockHeaderProcessor;
 class CBlockHeader;
 class uint256;
+class CBlockIndex;
 
 class BlockProcessor {
 
@@ -19,14 +20,14 @@ class BlockProcessor {
 
         virtual ~BlockProcessor() = 0;
         void rejectBlock(const uint256& block, const std::string& reason, int misbehave);
-        bool processHeader(const CBlockHeader& header);
-        bool setToWork(const uint256& hash);
+        bool setToWork(const CBlockHeader& hash, int activeChainHeight);
 
     protected:
         CNode& from;
         ThinBlockWorker& worker;
         virtual void misbehave(int howmuch);
         bool requestConnectHeaders(const CBlockHeader&);
+        CBlockIndex* processHeader(const CBlockHeader& header, bool maybeAnnouncement);
 
     private:
         std::string netcmd;

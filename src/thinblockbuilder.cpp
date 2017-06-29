@@ -57,14 +57,14 @@ int ThinBlockBuilder::numTxsMissing() const {
     return missing;
 }
 
-std::vector<ThinTx> ThinBlockBuilder::getTxsMissing() const {
+std::vector<std::pair<int, ThinTx> > ThinBlockBuilder::getTxsMissing() const {
     assert(wantedTxs.size() == thinBlock.vtx.size());
 
-    std::vector<ThinTx> missing;
+    std::vector<std::pair<int, ThinTx> > missing;
 
     for (size_t i = 0; i < wantedTxs.size(); ++i)
         if (thinBlock.vtx[i].IsNull())
-            missing.push_back(wantedTxs[i]);
+            missing.push_back(std::make_pair(i, wantedTxs[i]));
 
     assert(missing.size() == this->missing);
     return missing;

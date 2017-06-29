@@ -11,7 +11,8 @@
 
 
 void XThinBlockProcessor::operator()(
-        CDataStream& vRecv, const TxFinder& txfinder)
+        CDataStream& vRecv, const TxFinder& txfinder,
+        uint64_t currMaxBlockSize, int activeChainHeight)
 {
     XThinBlock block;
     vRecv >> block;
@@ -22,7 +23,7 @@ void XThinBlockProcessor::operator()(
             hash.ToString(), worker.nodeID());
 
     try {
-        block.selfValidate();
+        block.selfValidate(currMaxBlockSize);
     }
     catch (const std::invalid_argument& e) {
         LogPrint("thin", "Invalid xthin block %s\n", e.what());
@@ -31,41 +32,38 @@ void XThinBlockProcessor::operator()(
     }
 
     if (requestConnectHeaders(block.header)) {
-        worker.setAvailable();
+        worker.stopWork(hash);
         return;
     }
 
-    if (!processHeader(block.header))
+    if (!setToWork(block.header, activeChainHeight))
         return;
 
     from.AddInventoryKnown(CInv(MSG_XTHINBLOCK, hash));
 
-    if (!setToWork(hash))
-        return;
-
     try {
         XThinStub stub(block);
-        worker.buildStub(stub, txfinder);
+        worker.buildStub(stub, txfinder, from);
     }
     catch (const thinblock_error& e) {
         rejectBlock(hash, e.what(), 10);
         return;
     }
 
-    // If the stub was enough to finish the block then
-    // the worker will be available.
-    if (worker.isAvailable())
+    if (!worker.isWorkingOn(hash)) {
+        // Stub had enough data to finish
+        // the block.
         return;
+    }
 
     // Request missing
-    std::vector<ThinTx> missing = worker.getTxsMissing();
-    assert(!missing.empty());
+    std::vector<std::pair<int, ThinTx> > missing = worker.getTxsMissing(hash);
 
     XThinReRequest req;
     req.block = hash;
 
     for (auto& t : missing)
-        req.txRequesting.insert(t.cheap());
+        req.txRequesting.insert(t.second.cheap());
 
     LogPrintf("re-requesting xthin %d missing transactions for %s from peer=%d\n",
             missing.size(), hash.ToString(), from.id);

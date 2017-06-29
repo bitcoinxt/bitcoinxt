@@ -13,7 +13,8 @@ class XThinBlockProcessor : private BlockProcessor {
         {
         }
 
-        void operator()(CDataStream& vRecv, const TxFinder& txfinder);
+        void operator()(CDataStream& vRecv, const TxFinder& txfinder,
+                uint64_t currMaxBlockSize, int activeChainHeight);
 };
 
 #endif

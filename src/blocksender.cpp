@@ -16,6 +16,13 @@
 #include "nodestate.h"
 #include <vector>
 
+/** Maximum depth of blocks we're willing to serve as compact blocks to peers
+ *  when requested. For older blocks, a regular BLOCK response will be sent. */
+static const int MAX_CMPCTBLOCK_DEPTH = 5;
+/** Maximum depth of blocks we're willing to respond to GETBLOCKTXN requests for. */
+static const int MAX_BLOCKTXN_DEPTH = 10;
+
+
 BlockSender::BlockSender() {
 }
 
@@ -71,9 +78,13 @@ void BlockSender::triggerNextRequest(const CChain& activeChain, const CInv& inv,
     node.hashContinue.SetNull();
 }
 
-bool thinIsSmaller(const CBlock& b, const XThinBlock& x) {
+static bool thinIsSmaller(const CBlock& b, const XThinBlock& x) {
     return GetSerializeSize(x, SER_NETWORK, PROTOCOL_VERSION)
         < GetSerializeSize(b, SER_NETWORK, PROTOCOL_VERSION);
+}
+
+static bool withinDepthLimits(int depth, int blockHeight, int activeChainHeight) {
+    return blockHeight >= activeChainHeight - depth;
 }
 
 void BlockSender::sendBlock(CNode& node,
@@ -82,10 +93,8 @@ void BlockSender::sendBlock(CNode& node,
 
     // Send block from disk
     CBlock block;
-    if (!readBlockFromDisk(block, &blockIndex))
-        assert(!"cannot load block from disk");
-
-    assert(!block.IsNull());
+    if (!readBlockFromDisk(block, &blockIndex) || block.IsNull())
+        throw std::runtime_error("cannot read block from disk");
 
     // We only support MSG_XTHINBLOCK, if peer wants MSG_THINBLOCK,
     // fallback to full one.
@@ -112,10 +121,15 @@ void BlockSender::sendBlock(CNode& node,
         }
 
         try {
-            XThinBlock thinb(block, filter);
-            if (thinIsSmaller(block, thinb))
-                node.PushMessage("xthinblock", thinb);
-            else
+            bool sent = false;
+            if (withinDepthLimits(MAX_CMPCTBLOCK_DEPTH, blockIndex.nHeight, activeChainHeight)) {
+                XThinBlock thinb(block, filter);
+                if (thinIsSmaller(block, thinb)) {
+                    node.PushMessage("xthinblock", thinb);
+                    sent = true;
+                }
+            }
+            if (!sent)
                 node.PushMessage("block", block);
         }
         catch (const xthin_collision_error& e) {
@@ -129,12 +143,15 @@ void BlockSender::sendBlock(CNode& node,
     }
 
     if (invType == MSG_CMPCT_BLOCK && NodeStatePtr(node.id)->supportsCompactBlocks) {
-        if (blockIndex.nHeight >= activeChainHeight - 10) {
+        if (withinDepthLimits(MAX_CMPCTBLOCK_DEPTH, blockIndex.nHeight, activeChainHeight)) {
             CompactBlock cmpct(block, *choosePrefiller(node));
             node.PushMessage("cmpctblock", cmpct);
         }
-        else
+        else {
+            LogPrint("net", "cmpctblock outside depth %d, %d peer=%d\n",
+                    blockIndex.nHeight, activeChainHeight, node.id);
             node.PushMessage("block", block);
+        }
         return;
     }
 
@@ -160,25 +177,35 @@ void BlockSender::sendBlock(CNode& node,
 }
 
 void BlockSender::sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
-        const XThinReRequest& req)
+        const XThinReRequest& req, int activeChainHeight)
 {
     CBlock block;
     if (!readBlockFromDisk(block, &blockIndex))
-        assert(!"cannot load block from disk");
+        throw std::runtime_error("cannot load block from disk");
 
-    XThinReReqResponse resp(block, req.txRequesting);
-    node.PushMessage("xblocktx", resp);
+    if (withinDepthLimits(MAX_BLOCKTXN_DEPTH, blockIndex.nHeight, activeChainHeight)) {
+        XThinReReqResponse resp(block, req.txRequesting);
+        node.PushMessage("xblocktx", resp);
+    }
+    else {
+        node.PushMessage("block", block);
+    }
 }
 
 void BlockSender::sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
-        const CompactReRequest& req)
+        const CompactReRequest& req, int activeChainHeight)
 {
     CBlock block;
     if (!readBlockFromDisk(block, &blockIndex))
-        assert(!"cannot load block from disk");
+        throw std::runtime_error("cannot load block from disk");
 
-    CompactReReqResponse resp(block, req.indexes);
-    node.PushMessage("blocktxn", resp);
+    if (withinDepthLimits(MAX_BLOCKTXN_DEPTH, blockIndex.nHeight, activeChainHeight)) {
+        CompactReReqResponse resp(block, req.indexes);
+        node.PushMessage("blocktxn", resp);
+    }
+    else {
+        node.PushMessage("block", block);
+    }
 }
 
 bool BlockSender::readBlockFromDisk(CBlock& block, const CBlockIndex* pindex) {

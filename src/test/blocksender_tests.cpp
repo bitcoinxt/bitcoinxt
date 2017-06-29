@@ -166,7 +166,7 @@ BOOST_AUTO_TEST_CASE(send_msg_xblocktx) {
     requesting.insert(block.vtx[2].GetHash().GetCheapHash());
     XThinReRequest req;
     req.txRequesting = requesting;
-    bs.sendReReqReponse(node, index, req);
+    bs.sendReReqReponse(node, index, req, 1);
     BOOST_CHECK_EQUAL("xblocktx", node.messages.at(0));
 }
 
@@ -181,7 +181,7 @@ BOOST_AUTO_TEST_CASE(send_msg_cmpct_block) {
     BOOST_CHECK_EQUAL("cmpctblock", node.messages.at(0));
 };
 
-BOOST_AUTO_TEST_CASE(send_old_cmpct_block) {
+BOOST_AUTO_TEST_CASE(send_cmpctblock_depth) {
     // If someone requests an old compact block,
     // send them an full block instead.
     CBlockIndex index;
@@ -190,10 +190,30 @@ BOOST_AUTO_TEST_CASE(send_old_cmpct_block) {
     DummyNode node;
     NodeStatePtr(node.id)->supportsCompactBlocks = true;
     bs.readBlock = TestBlock2();
-    index.nHeight = 89;
-    bs.sendBlock(node, index, MSG_CMPCT_BLOCK, index.nHeight + 11);
-    BOOST_CHECK_EQUAL("block", node.messages.at(0));
+    index.nHeight = 100;
 
+    // within depth
+    bs.sendBlock(node, index, MSG_CMPCT_BLOCK, index.nHeight + 5);
+    BOOST_CHECK_EQUAL("cmpctblock", node.messages.at(0));
+
+    // outside depth
+    bs.sendBlock(node, index, MSG_CMPCT_BLOCK, index.nHeight + 6);
+    BOOST_CHECK_EQUAL("block", node.messages.at(1));
+}
+
+BOOST_AUTO_TEST_CASE(send_xthinblock_depth) {
+    BlockSenderDummy bs;
+    DummyNode node;
+    CBlockIndex index;
+    index.nHeight = 100;
+
+    // within depth
+    bs.sendBlock(node, index, MSG_XTHINBLOCK, index.nHeight + 5);
+    BOOST_CHECK_EQUAL("xthinblock", node.messages.at(0));
+
+    // outside depth
+    bs.sendBlock(node, index, MSG_XTHINBLOCK, index.nHeight + 6);
+    BOOST_CHECK_EQUAL("block", node.messages.at(1));
 }
 
 BOOST_AUTO_TEST_CASE(send_msg_blocktxn) {
@@ -206,9 +226,40 @@ BOOST_AUTO_TEST_CASE(send_msg_blocktxn) {
     req.indexes.push_back(1);
     req.indexes.push_back(4);
     req.blockhash = block.GetHash();
-    bs.sendReReqReponse(node, index, req);
+    bs.sendReReqReponse(node, index, req, 1);
     BOOST_CHECK_EQUAL("blocktxn", node.messages.at(0));
 }
 
+template <class T>
+static void checkReReq(T req, const std::string& thinResponse) {
+    BlockSenderDummy bs;
+    DummyNode node;
+
+    CBlockIndex index;
+    index.nHeight = 90;
+
+    // within depth limit, should respond with thin block reply
+    bs.sendReReqReponse(node, index, req, 100);
+    BOOST_CHECK_EQUAL(thinResponse, node.messages.at(0));
+
+    // outside depth limit, respond with full block
+    bs.sendReReqReponse(node, index, req, 101);
+    BOOST_CHECK_EQUAL("block", node.messages.at(1));
+}
+
+BOOST_AUTO_TEST_CASE(msg_blocktxn_depth) {
+    CompactReRequest req;
+    req.indexes.push_back(4);
+    req.blockhash.SetHex("0xF00D");
+
+    checkReReq(req, "blocktxn");
+}
+
+BOOST_AUTO_TEST_CASE(msg_xblocktx_depth) {
+    XThinReRequest req;
+    req.txRequesting = { TestBlock1().vtx[1].GetHash().GetCheapHash() };
+
+    checkReReq(req, "xblocktx");
+}
 
 BOOST_AUTO_TEST_SUITE_END();

@@ -3,6 +3,7 @@
 #include <vector>
 #include <functional>
 #include <tuple>
+#include <stdexcept>
 
 class CNode;
 class CBlockHeader;
@@ -11,9 +12,14 @@ class InFlightIndex;
 class ThinBlockManager;
 class BlockInFlightMarker;
 
+class BlockHeaderError : public std::runtime_error {
+    public:
+        BlockHeaderError(const std::string& what) : std::runtime_error(what) { }
+};
+
 class BlockHeaderProcessor {
     public:
-        virtual bool operator()(const std::vector<CBlockHeader>& headers,
+        virtual CBlockIndex* operator()(const std::vector<CBlockHeader>& headers,
                 bool peerSentMax,
                 bool maybeAnnouncement) = 0;
         virtual ~BlockHeaderProcessor() = 0;
@@ -21,6 +27,7 @@ class BlockHeaderProcessor {
 };
 inline BlockHeaderProcessor::~BlockHeaderProcessor() { }
 
+/// Process a block header received from another peer on the network.
 class DefaultHeaderProcessor : public BlockHeaderProcessor {
     public:
 
@@ -28,14 +35,14 @@ class DefaultHeaderProcessor : public BlockHeaderProcessor {
                 InFlightIndex&, ThinBlockManager&, BlockInFlightMarker&,
                 std::function<void()> checkBlockIndex);
 
-        bool operator()(const std::vector<CBlockHeader>& headers,
+        CBlockIndex* operator()(const std::vector<CBlockHeader>& headers,
                 bool peerSentMax,
                 bool maybeAnnouncement) override;
 
         bool requestConnectHeaders(const CBlockHeader& h, CNode& from) override;
 
     protected:
-        virtual std::tuple<bool, CBlockIndex*> acceptHeaders(
+         CBlockIndex* acceptHeaders(
                 const std::vector<CBlockHeader>& headers);
 
     private:

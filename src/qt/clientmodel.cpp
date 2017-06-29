@@ -137,7 +137,7 @@ bool ClientModel::inInitialBlockDownload() const
     return IsInitialBlockDownload();
 }
 
-enum BlockSource ClientModel::getBlockSource() const
+enum FetchBlockSource ClientModel::getBlockSource() const
 {
     if (fReindex)
         return BLOCK_SOURCE_REINDEX;

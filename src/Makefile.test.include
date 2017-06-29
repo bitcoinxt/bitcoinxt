@@ -50,6 +50,7 @@ BITCOIN_TESTS =\
   test/Checkpoints_tests.cpp \
   test/clientversion_tests.cpp \
   test/coins_tests.cpp \
+  test/compactblockprocessor_tests.cpp \
   test/compactprefiller_tests.cpp \
   test/compactthin_tests.cpp \
   test/compacttxfinder_tests.cpp \

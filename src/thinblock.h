@@ -7,6 +7,8 @@
 #include <boost/noncopyable.hpp>
 #include "uint256.h"
 #include <stdexcept>
+#include <set>
+#include <memory>
 
 class CNode;
 class CInv;
@@ -82,6 +84,13 @@ struct thinblock_error : public std::runtime_error {
     virtual ~thinblock_error() throw() { }
 };
 
+class BlockAnnHandle {
+    public:
+        virtual NodeId nodeID() const = 0;
+        virtual ~BlockAnnHandle() = 0;
+};
+inline BlockAnnHandle::~BlockAnnHandle() { }
+
 // Each peer we're connected to can work on one thin block
 // at a time. This keeps track of the thin block a peer is working on.
 class ThinBlockWorker : boost::noncopyable {
@@ -90,16 +99,16 @@ class ThinBlockWorker : boost::noncopyable {
 
         virtual ~ThinBlockWorker();
 
-        virtual bool addTx(const CTransaction& tx);
-        virtual std::vector<ThinTx> getTxsMissing() const;
+        virtual bool addTx(const uint256& block, const CTransaction& tx);
 
-        virtual void setAvailable();
-        virtual bool isAvailable() const;
+        virtual std::vector<std::pair<int, ThinTx> > getTxsMissing(const uint256&) const;
 
-        virtual void buildStub(const StubData&, const TxFinder&);
-        virtual bool isStubBuilt() const;
-        virtual void setToWork(const uint256& block);
-        virtual bool isOnlyWorker() const;
+        virtual void buildStub(const StubData&, const TxFinder&, CNode& from);
+        virtual bool isStubBuilt(const uint256& block) const;
+        virtual void addWork(const uint256& block);
+        virtual void stopWork(const uint256& block);
+        virtual void stopAllWork();
+        virtual bool isOnlyWorker(const uint256& block) const;
 
         // Request block. Implementation may append their request to
         // getDataReq or implement a more specialized behavour.
@@ -107,21 +116,34 @@ class ThinBlockWorker : boost::noncopyable {
         virtual void requestBlock(const uint256& block,
                 std::vector<CInv>& getDataReq, CNode& node) = 0;
 
-        bool isReRequesting() const;
-        void setReRequesting(bool);
-
-        uint256 blockHash() const;
-        std::string blockStr() const;
+        bool isReRequesting(const uint256& block) const;
+        void setReRequesting(const uint256& block, bool);
 
         NodeId nodeID() const { return node; }
 
+        bool isWorking() const {
+            return !blocks.empty();
+        }
+
+        virtual bool isWorkingOn(const uint256& h) const {
+            return blocks.count(h);
+        }
+
+        // Enables block announcements with thin blocks.
+        // Returns a RAII object that disables them on destruct.
+        // Returns nullptr if peer does ont support this.
+        virtual std::unique_ptr<BlockAnnHandle> requestBlockAnnouncements(CNode&)
+        {
+            return nullptr;
+        }
+
     private:
         ThinBlockManager& mg;
-        // if we're re-requesting txs for the block worker
-        // provided us.
-        bool rerequesting;
         NodeId node;
-        uint256 block;
+        // blocks this worker is downloading
+        std::set<uint256> blocks;
+        // block we're downloading and re-requesting transcations for
+        std::set<uint256> rerequesting;
 };
 
 #endif

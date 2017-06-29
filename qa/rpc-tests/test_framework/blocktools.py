@@ -5,7 +5,7 @@
 #
 
 from mininode import *
-from script import CScript, CScriptOp, OP_TRUE
+from script import CScript, CScriptOp, OP_TRUE, OP_CHECKSIG
 
 # Create a block (with regtest difficulty)
 def create_block(hashprev, coinbase, nTime=None):
@@ -38,8 +38,10 @@ def serialize_script_num(value):
     return r
 
 counter=1
-# Create an anyone-can-spend coinbase transaction, assuming no miner fees
-def create_coinbase(heightAdjust = 0, absoluteHeight = None):
+# Create a coinbase transaction, assuming no miner fees.
+# If pubkey is passed in, the coinbase output will be a P2PK output;
+# otherwise an anyone-can-spend output.
+def create_coinbase(heightAdjust = 0, absoluteHeight = None, pubkey = None):
     global counter
     height = absoluteHeight if absoluteHeight is not None else counter+heightAdjust
     coinbase = CTransaction()
@@ -50,7 +52,10 @@ def create_coinbase(heightAdjust = 0, absoluteHeight = None):
     coinbaseoutput.nValue = 50*100000000
     halvings = int((height)/150) # regtest
     coinbaseoutput.nValue >>= halvings
-    coinbaseoutput.scriptPubKey = CScript([OP_TRUE])
+    if (pubkey != None):
+        coinbaseoutput.scriptPubKey = CScript([pubkey, OP_CHECKSIG])
+    else:
+        coinbaseoutput.scriptPubKey = CScript([OP_TRUE])
     coinbase.vout = [ coinbaseoutput ]
     coinbase.calc_sha256()
     return coinbase

@@ -8,7 +8,9 @@
 #include "uint256.h"
 #include "xthin.h"
 #include "chainparams.h"
-
+#include "blockencodings.h"
+#include "consensus/consensus.h" // MAX_BLOCK_SIZE
+#include <iostream>
 
 // Workaround for segfaulting
 struct Workaround {
@@ -116,14 +118,14 @@ BOOST_AUTO_TEST_CASE(xthin_stub_self_validate) {
     // ok
     {
         XThinBlock xblock(TestBlock1(), CBloomFilter());
-        BOOST_CHECK_NO_THROW(xblock.selfValidate());
+        BOOST_CHECK_NO_THROW(xblock.selfValidate(MAX_BLOCK_SIZE));
     }
 
     // missing coinbase
     {
         XThinBlock xblock(TestBlock1(), CBloomFilter());
         xblock.missing.clear();
-        BOOST_CHECK_THROW(xblock.selfValidate(), std::invalid_argument);
+        BOOST_CHECK_THROW(xblock.selfValidate(MAX_BLOCK_SIZE), std::invalid_argument);
     }
 
     // more transactions bundled than are in block
@@ -132,14 +134,37 @@ BOOST_AUTO_TEST_CASE(xthin_stub_self_validate) {
         matchNone.clear();
         XThinBlock xblock(TestBlock1(), matchNone);
         xblock.missing.push_back(CTransaction());
-        BOOST_CHECK_THROW(xblock.selfValidate(), std::invalid_argument);
+        BOOST_CHECK_THROW(xblock.selfValidate(MAX_BLOCK_SIZE), std::invalid_argument);
     }
 
     // hash collision
     {
         XThinBlock xblock(TestBlock1(), CBloomFilter(), false);
         xblock.txHashes[1] = xblock.txHashes[2];
-        BOOST_CHECK_THROW(xblock.selfValidate(), std::invalid_argument);
+        BOOST_CHECK_THROW(xblock.selfValidate(MAX_BLOCK_SIZE), std::invalid_argument);
+    }
+
+    uint64_t currMaxBlockSize = 1000 * 100; // 100kb (for faster unittest)
+    // too big
+    {
+        XThinBlock xblock(TestBlock1(), CBloomFilter(), false);
+        size_t tooManyTx = std::ceil(currMaxBlockSize * 1.05 / minTxSize()) + 1;
+        xblock.txHashes.resize(tooManyTx);
+        for (size_t i = 1 /* skip coinbase */; i < tooManyTx; ++i)
+            xblock.txHashes[i] = GetRand(std::numeric_limits<unsigned int>::max());
+        BOOST_CHECK_THROW(xblock.selfValidate(currMaxBlockSize), std::invalid_argument);
+    }
+
+    // not too big
+    {
+        XThinBlock xblock(TestBlock1(), CBloomFilter(), false);
+        uint64_t nextMaxBlockSize = currMaxBlockSize * 105 / 100;
+        uint64_t notTooMany = nextMaxBlockSize / minTxSize();
+        xblock.txHashes.resize(notTooMany);
+        for (size_t i = 1 /* skip coinbase */; i < notTooMany; ++i)
+            xblock.txHashes[i] = GetRand(std::numeric_limits<unsigned int>::max());
+
+        BOOST_CHECK_NO_THROW(xblock.selfValidate(currMaxBlockSize));
     }
 }
 

@@ -164,7 +164,32 @@ void RegisterNodeSignals(CNodeSignals& nodeSignals);
 /** Unregister a network node */
 void UnregisterNodeSignals(CNodeSignals& nodeSignals);
 
-/** 
+/**
+ * Sources of received blocks, saved to be able to send them reject
+ * messages or ban them when processing happens afterwards.
+ */
+struct BlockSource {
+    BlockSource() : canMisbehave(true) { }
+    BlockSource(const uint256& block, const std::set<NodeId> n, bool canMisbehave)
+        : block(block), nodes(n), canMisbehave(canMisbehave) {
+    }
+
+    uint256 block;
+
+    // Block can be provided from multiple peers
+    // with thin blocks.
+    std::set<NodeId> nodes;
+
+    // If it's ok to misbehave the node
+    // when the block is invalid.
+    //
+    // Blocks received as block announcements
+    // should not be misbehaved. They are allowed to
+    // be sent before being fully validated.
+    bool canMisbehave;
+};
+
+/**
  * Process an incoming block. This only returns after the best known valid
  * block is made active. Note that it does not, however, guarantee that the
  * specific block passed to it has been checked for validity!
@@ -176,7 +201,7 @@ void UnregisterNodeSignals(CNodeSignals& nodeSignals);
  * @param[out]  dbp     The already known disk position of pblock, or NULL if not yet stored.
  * @return True if state.IsValid()
  */
-bool ProcessNewBlock(CValidationState &state, CNode* pfrom, CBlock* pblock, bool fForceProcessing, const CDiskBlockPos *dbp);
+bool ProcessNewBlock(CValidationState &state, const BlockSource& from, CBlock* pblock, bool fForceProcessing, const CDiskBlockPos *dbp);
 /** Check whether enough disk space is available for an incoming block */
 bool CheckDiskSpace(uint64_t nAdditionalBytes = 0);
 /** Open a block file (blk?????.dat) */
@@ -215,7 +240,7 @@ std::string GetWarnings(std::string strFor);
 /** Retrieve a transaction (from memory pool, or from disk, if possible) */
 bool GetTransaction(const uint256 &hash, CTransaction &tx, uint256 &hashBlock, bool fAllowSlow = false);
 /** Find the best known block, and make it the tip of the block chain */
-bool ActivateBestChain(CValidationState &state, CBlock *pblock = NULL);
+bool ActivateBestChain(CValidationState &state, CBlock *pblock = NULL, const BlockSource& = BlockSource());
 CAmount GetBlockSubsidy(int nHeight, const Consensus::Params& consensusParams);
 
 /**

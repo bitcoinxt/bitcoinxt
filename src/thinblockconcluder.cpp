@@ -22,20 +22,19 @@ static void fallbackDownload(CNode& from,
     markInFlight(from.id, block, Params().GetConsensus(), NULL);
 }
 
-static void handleReRequestFailed(ThinBlockWorker& worker, CNode& from,
+static void handleReRequestFailed(ThinBlockWorker& worker, CNode& from, uint256 block,
         BlockInFlightMarker& markInFlight) {
 
     LogPrint("thin", "Did not provide all missing transactions in a"
             "thin block re-request for %s peer=%d\n",
-            worker.blockStr(), worker.nodeID());
+            block.ToString(), worker.nodeID());
 
-    bool wasLastWorker = worker.isOnlyWorker();
-    uint256 wasWorkingOn = worker.blockHash();
-    worker.setAvailable();
+    bool wasLastWorker = worker.isOnlyWorker(block);
+    worker.stopWork(block);
     if (wasLastWorker) {
         // Node deserves misbehave, but we'll give it a chance
         // to send us the full block.
-        fallbackDownload(from, wasWorkingOn, markInFlight);
+        fallbackDownload(from, block, markInFlight);
     }
     else
         Misbehaving(worker.nodeID(), 10);
@@ -44,46 +43,35 @@ static void handleReRequestFailed(ThinBlockWorker& worker, CNode& from,
 void XThinBlockConcluder::operator()(const XThinReReqResponse& resp,
         CNode& pfrom, ThinBlockWorker& worker, BlockInFlightMarker& markInFlight) {
 
-    if (worker.isAvailable())
+    if (!worker.isWorkingOn(resp.block))
     {
-        LogPrint("thin", "worker peer=%d should not be working on a xthin block,"
-                "ignoring re-req response\n", pfrom.id);
-        return;
-    }
-    if (worker.blockHash() != resp.block) {
-        LogPrint("thin", "working on block %s, got xthin re-req response from peer=%d for %s\n",
-                worker.blockStr(), pfrom.id, resp.block.ToString());
+        LogPrint("thin", "got xthin re-req response for %s, but not "
+                "working on block peer=%d\n", resp.block.ToString(), pfrom.id);
         return;
     }
 
-    typedef std::vector<CTransaction>::const_iterator auto_;
-    for (auto_ t = resp.txRequested.begin(); t != resp.txRequested.end(); ++t)
-        worker.addTx(*t);
+    for (auto& t : resp.txRequested)
+        worker.addTx(resp.block, t);
 
     // Block fully constructed?
-    if (!worker.isAvailable())
-        handleReRequestFailed(worker, pfrom, markInFlight);
+    if (worker.isWorkingOn(resp.block))
+        handleReRequestFailed(worker, pfrom, resp.block, markInFlight);
 }
 
 void CompactBlockConcluder::operator()(const CompactReReqResponse& resp,
         CNode& pfrom, ThinBlockWorker& worker, BlockInFlightMarker& markInFlight) {
 
-    if (worker.isAvailable())
+    if (!worker.isWorkingOn(resp.blockhash))
     {
-        LogPrint("thin", "worker peer=%d should not be working on a compact thin block,"
-                "ignoring re-req response\n", pfrom.id);
-        return;
-    }
-    if (worker.blockHash() != resp.blockhash) {
-        LogPrint("thin", "working on block %s, got compact re-req response from peer=%d for %s\n",
-                worker.blockStr(), pfrom.id, resp.blockhash.ToString());
+        LogPrint("thin", "got compact re-req response for %s, but not "
+                "working on block peer=%d\n", resp.blockhash.ToString(), pfrom.id);
         return;
     }
 
     for (auto& t : resp.txn)
-        worker.addTx(t);
+        worker.addTx(resp.blockhash, t);
 
     // Block fully constructed?
-    if (!worker.isAvailable())
-        handleReRequestFailed(worker, pfrom, markInFlight);
+    if (worker.isWorkingOn(resp.blockhash))
+        handleReRequestFailed(worker, pfrom, resp.blockhash, markInFlight);
 }

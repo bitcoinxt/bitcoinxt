@@ -4,8 +4,6 @@
 #include <boost/test/unit_test.hpp>
 
 #include "test/thinblockutil.h"
-//#include "bloom.h"
-//#include "uint256.h"
 #include "compactthin.h"
 #include "chainparams.h"
 #include "blockencodings.h"
@@ -81,6 +79,24 @@ BOOST_AUTO_TEST_CASE(ids_are_correct) {
 
         BOOST_CHECK_EQUAL(shortID, all[i].obfuscated());
     }
+}
+
+BOOST_AUTO_TEST_CASE(request_block_announcements) {
+    auto mg = GetDummyThinBlockMg();
+
+    DummyNode node(42, mg.get());
+    CompactWorker w(*mg, node.id);
+    {
+        auto h = w.requestBlockAnnouncements(node);
+
+        // Should send a request for header announcements
+        BOOST_CHECK_EQUAL(1, node.messages.size());
+        BOOST_CHECK_EQUAL("sendcmpct", node.messages.at(0));
+    }
+    // hande goes out of scope,
+    // should send a request to disable header announcements
+    BOOST_CHECK_EQUAL(2, node.messages.size());
+    BOOST_CHECK_EQUAL("sendcmpct", node.messages.at(1));
 }
 
 BOOST_AUTO_TEST_SUITE_END();

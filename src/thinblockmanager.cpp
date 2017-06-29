@@ -5,6 +5,7 @@
 #include "thinblock.h"
 #include "thinblockbuilder.h"
 #include "util.h"
+#include <algorithm>
 
 ThinBlockManager::ThinBlockManager(
         std::unique_ptr<ThinBlockFinishedCallb> callb,
@@ -18,23 +19,19 @@ void ThinBlockManager::addWorker(const uint256& block, ThinBlockWorker& w) {
     builders[block].workers.insert(&w);
 }
 
-void ThinBlockManager::delWorker(ThinBlockWorker& w, NodeId nodeId) {
-    typedef std::map<uint256, ActiveBuilder>::iterator auto_;
-    for (auto_ a = builders.begin(); a != builders.end(); ++a) {
-        if (!a->second.workers.erase(&w))
-            continue; // not working on block.
+void ThinBlockManager::delWorker(const uint256& block, ThinBlockWorker& w) {
+    assert(builders.count(block));
 
-        if (a->second.workers.empty())
-            builders.erase(a);
+    bool ok = builders[block].workers.erase(&w);
+    assert(ok); // worker was working on block.
 
-        InFlightEraser& erase = *inFlightEraser;
-        erase(nodeId, a->first);
+    if (builders[block].workers.empty())
+        builders.erase(block);
 
-        // worker only works on one thin block at
-        // a time, so safe to return.
-        return;
-    }
+    InFlightEraser& erase = *inFlightEraser;
+    erase(w.nodeID(), block);
 }
+
 int ThinBlockManager::numWorkers(const uint256& block) const {
     return builders.count(block)
         ? builders.find(block)->second.workers.size()
@@ -61,7 +58,8 @@ struct WrappedFinder : public TxFinder {
     const TxFinder& wrapped;
 };
 
-void ThinBlockManager::buildStub(const StubData& s, const TxFinder& txFinder)
+void ThinBlockManager::buildStub(const StubData& s, const TxFinder& txFinder,
+        ThinBlockWorker& worker, CNode& from)
 {
     uint256 h = s.header().GetHash();
     assert(builders.count(h));
@@ -91,6 +89,10 @@ void ThinBlockManager::buildStub(const StubData& s, const TxFinder& txFinder)
         WrappedFinder wfinder(s.missingProvided(), txFinder);
         builders[h].builder.reset(new ThinBlockBuilder(
             s.header(), s.allTransactions(), wfinder));
+
+        // Node was first to provide us
+        // a thin block. Select for block announcements with thin blocks.
+        requestBlockAnnouncements(worker, from);
     }
 
     if (builders[h].builder->numTxsMissing() == 0)
@@ -144,17 +146,15 @@ void ThinBlockManager::removeIfExists(const uint256& h) {
     if (!builders.count(h))
         return;
 
-    typedef std::set<ThinBlockWorker*>::iterator auto_;
-
     // Take copy. Calling setAvailable causes workers to remove
     // themself from set (changing it during iteration)
     std::set<ThinBlockWorker*> workers = builders[h].workers;
-    for (auto_ w = workers.begin(); w != workers.end(); ++w)
-        (*w)->setAvailable();
+    for (ThinBlockWorker* w : workers)
+        w->stopWork(h);
     builders.erase(h);
 }
 
-std::vector<ThinTx> ThinBlockManager::getTxsMissing(const uint256& hash) const {
+std::vector<std::pair<int, ThinTx> > ThinBlockManager::getTxsMissing(const uint256& hash) const {
     assert(builders.count(hash));
     ThinBlockBuilder* b = builders.find(hash)->second.builder.get();
     assert(b);
@@ -186,3 +186,34 @@ void ThinBlockManager::finishBlock(const uint256& h, ThinBlockBuilder& builder) 
     removeIfExists(h);
 }
 
+// We ask for announcements with blocks from the
+// last 3 peers to provide a thin block first.
+void ThinBlockManager::requestBlockAnnouncements(ThinBlockWorker& w, CNode& node) {
+
+    typedef std::unique_ptr<BlockAnnHandle> annh;
+    auto it = std::find_if(
+            begin(announcers), end(announcers), [&w](const annh& h) {
+        return w.nodeID() == h->nodeID();
+    });
+
+    if (it != end(announcers)) {
+        // Already receiving announcements from peer.
+        // Move to the front.
+        std::rotate(it, it + 1, end(announcers));
+        return;
+    }
+
+    auto handle = w.requestBlockAnnouncements(node);
+    if (!bool(handle)) {
+        // Peer cannot provide block announcements
+        // with thin blocks.
+        return;
+    }
+
+    announcers.push_back(std::move(handle));
+
+    // Only request thin block announcements from 3 peers at a time.
+    if (announcers.size() > 3)
+        announcers.erase(begin(announcers));
+    LogPrint("ann", "Thin block announcers: %d\n", announcers.size());
+}
