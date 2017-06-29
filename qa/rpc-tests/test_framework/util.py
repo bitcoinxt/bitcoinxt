@@ -609,8 +609,13 @@ def get_bip9_status(node, key):
             return row
     raise IndexError ('key:"%s" not found' % key)
 
+# Helper to create at least "count" utxos
+# Pass in a fee that is sufficient for relay and mining new transactions.
 def create_confirmed_utxos(fee, node, count, age=101):
-    node.generate(int(0.5*count) + age)
+    to_generate = int(0.5*count) + age
+    while to_generate > 0:
+        node.generate(min(25, to_generate))
+        to_generate -= 25
     utxos = node.listunspent()
     iterations = count - len(utxos)
     addr1 = node.getnewaddress()
