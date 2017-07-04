@@ -118,7 +118,7 @@ BOOST_AUTO_TEST_CASE(sign)
             const CTxOut& output = txFrom.vout[txTo[i].vin[0].prevout.n];
             bool sigOK = CScriptCheck(output.scriptPubKey, output.nValue, txTo[i], 0,
                     SCRIPT_VERIFY_P2SH | SCRIPT_ENABLE_SIGHASH_FORKID | SCRIPT_VERIFY_STRICTENC,
-                    false, &txdata)();
+                    false, PrecomputedTransactionData(txTo[i]))();
             if (i == j)
                 BOOST_CHECK_MESSAGE(sigOK, strprintf("VerifySignature %d %d", i, j));
             else

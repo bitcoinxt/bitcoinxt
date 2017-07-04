@@ -26,6 +26,11 @@ struct PrecomputedTransactionData
 {
     uint256 hashPrevouts, hashSequence, hashOutputs;
 
+    PrecomputedTransactionData()
+        : hashPrevouts(), hashSequence(), hashOutputs()
+    {
+    }
+
     PrecomputedTransactionData(const CTransaction& tx);
 };
 uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,

@@ -418,7 +418,7 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
         std::vector<CScriptCheck> vChecks;
         const CTxOut& output = coins[tx.vin[i].prevout.n].out;
         CScriptCheck check(output.scriptPubKey, output.nValue,
-                tx, i, SCRIPT_VERIFY_P2SH, false, &txdata);
+                tx, i, SCRIPT_VERIFY_P2SH, false, txdata);
         vChecks.push_back(CScriptCheck());
         check.swap(vChecks.back());
         control.Add(vChecks);
