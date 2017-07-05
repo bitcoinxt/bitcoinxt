@@ -26,7 +26,7 @@ class TxnMallTest(BitcoinTestFramework):
     def setup_nodes(self):
         #This test requires mocktime
         enable_mocktime()
-        return start_nodes(4, self.options.tmpdir)
+        return start_nodes(4, self.options.tmpdir, [["-whitelist=127.0.0.1"],]*4)
 
     def run_test(self):
         # All nodes should start with 1,250 BTC:
