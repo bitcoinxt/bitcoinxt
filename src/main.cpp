@@ -5421,7 +5421,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
 
         if (p.requestConnectHeaders(block.GetBlockHeader(), *pfrom)) {
             LogPrintf("Received block %s from peer=%d, but headers do "
-                    "not connect. Discarding.\n");
+                    "not connect. Discarding.\n",
+                    inv.hash.ToString(), pfrom->id);
 
             // thinblock requests may respond with a full block
             NodeStatePtr(pfrom->id)->thinblock->stopWork(block.GetHash());
