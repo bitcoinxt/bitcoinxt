@@ -66,14 +66,25 @@ bool LogAcceptCategory(const char* category);
 /** Send a string to the log output */
 int LogPrintStr(const std::string &str);
 
-#define LogPrintf(...) LogPrint(NULL, __VA_ARGS__)
+/** Get format string from VA_ARGS for error reporting */
+template<typename... Args> std::string FormatStringFromLogArgs(const char *fmt, const Args&... args) { return fmt; }
 
-template<typename... Args>
-static inline int LogPrint(const char* category, const char* fmt, const Args&... args)
-{
-    if(!LogAcceptCategory(category)) return 0;                            \
-    return LogPrintStr(tfm::format(fmt, args...));
-}
+#define LogPrintf(...) do { \
+    std::string _log_msg_; /* Unlikely name to avoid shadowing variables */ \
+    try { \
+        _log_msg_ = tfm::format(__VA_ARGS__); \
+    } catch (tinyformat::format_error &_log_e_) { \
+        /* Original format string will have newline so don't add one here */ \
+        _log_msg_ = "Error \"" + std::string(_log_e_.what()) + "\" while formatting log message: " + FormatStringFromLogArgs(__VA_ARGS__); \
+    } \
+    LogPrintStr(_log_msg_); \
+} while(0)
+
+#define LogPrint(category, ...) do { \
+    if (LogAcceptCategory((category))) { \
+        LogPrintf(__VA_ARGS__); \
+    } \
+} while(0)
 
 template<typename... Args>
 bool error(const char* fmt, const Args&... args)
