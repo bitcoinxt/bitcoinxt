@@ -154,7 +154,7 @@ class SPVTest(BitcoinTestFramework):
         tx2parent_output[self.nodes[1].getnewaddress()] = 12.5
         tx2parent_output[self.nodes[1].getnewaddress()] = 12.48
         tx2parent = self.nodes[1].createrawtransaction([tx2parent_input], tx2parent_output)
-        tx2parentsignresult = self.nodes[1].signrawtransaction(tx2parent)
+        tx2parentsignresult = self.nodes[1].signrawtransaction(tx2parent, None, None, "ALL")
         assert_equal(tx2parentsignresult["complete"], True)
         tx2parent_id = self.nodes[1].sendrawtransaction(tx2parentsignresult["hex"])
 
@@ -169,7 +169,7 @@ class SPVTest(BitcoinTestFramework):
         tx2_output[self.nodes[0].getnewaddress()] = 2
         tx2_output[self.nodes[1].getnewaddress()] = 10.48
         tx2 = self.nodes[1].createrawtransaction([tx2_input], tx2_output)
-        tx2signresult = self.nodes[1].signrawtransaction(tx2)
+        tx2signresult = self.nodes[1].signrawtransaction(tx2, None, None, "ALL")
         assert_equal(tx2signresult["complete"], True)
         tx2_id = self.nodes[1].sendrawtransaction(tx2signresult["hex"])
 

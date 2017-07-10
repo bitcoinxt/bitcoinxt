@@ -60,7 +60,7 @@ class BIP9SoftForksTest(ComparisonTestFramework):
         return tx
 
     def sign_transaction(self, node, tx):
-        signresult = node.signrawtransaction(hexlify(tx.serialize()))
+        signresult = node.signrawtransaction(hexlify(tx.serialize()), None, None, "ALL")
         tx = CTransaction()
         f = cStringIO.StringIO(unhexlify(signresult['hex']))
         tx.deserialize(f)

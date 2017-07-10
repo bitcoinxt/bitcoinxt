@@ -125,7 +125,7 @@ class BIP68_112_113Test(ComparisonTestFramework):
 
     def sign_transaction(self, node, unsignedtx):
         rawtx = ToHex(unsignedtx)
-        signresult = node.signrawtransaction(rawtx)
+        signresult = node.signrawtransaction(rawtx, None, None, "ALL")
         tx = CTransaction()
         f = cStringIO.StringIO(unhexlify(signresult['hex']))
         tx.deserialize(f)

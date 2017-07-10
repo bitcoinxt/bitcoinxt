@@ -548,7 +548,12 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp)
             "       \"ALL|ANYONECANPAY\"\n"
             "       \"NONE|ANYONECANPAY\"\n"
             "       \"SINGLE|ANYONECANPAY\"\n"
-
+            "       \"ALL|FORKID\"\n"
+            "       \"NONE|FORKID\"\n"
+            "       \"SINGLE|FORKID\"\n"
+            "       \"ALL|FORKID|ANYONECANPAY\"\n"
+            "       \"NONE|FORKID|ANYONECANPAY\"\n"
+            "       \"SINGLE|FORKID|ANYONECANPAY\"\n"
             "\nResult:\n"
             "{\n"
             "  \"hex\" : \"value\",           (string) The hex-encoded raw transaction with signature(s)\n"
@@ -693,17 +698,22 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp)
     const CKeyStore& keystore = tempKeystore;
 #endif
 
-    int nHashType = SIGHASH_ALL;
+    int nHashType = SIGHASH_ALL | SIGHASH_FORKID;
     if (params.size() > 3 && !params[3].isNull()) {
         static map<string, int> mapSigHashValues =
             boost::assign::map_list_of
-            (string("ALL"), int(SIGHASH_ALL))
-            (string("ALL|ANYONECANPAY"), int(SIGHASH_ALL|SIGHASH_ANYONECANPAY))
-            (string("NONE"), int(SIGHASH_NONE))
-            (string("NONE|ANYONECANPAY"), int(SIGHASH_NONE|SIGHASH_ANYONECANPAY))
-            (string("SINGLE"), int(SIGHASH_SINGLE))
-            (string("SINGLE|ANYONECANPAY"), int(SIGHASH_SINGLE|SIGHASH_ANYONECANPAY))
-            ;
+            (std::string("ALL"), int(SIGHASH_ALL))
+            (std::string("ALL|ANYONECANPAY"), int(SIGHASH_ALL | SIGHASH_ANYONECANPAY))
+            (std::string("ALL|FORKID"), int(SIGHASH_ALL | SIGHASH_FORKID))
+            (std::string("ALL|FORKID|ANYONECANPAY"), int(SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_ANYONECANPAY))
+            (std::string("NONE"), int(SIGHASH_NONE))
+            (std::string("NONE|ANYONECANPAY"), int(SIGHASH_NONE | SIGHASH_ANYONECANPAY))
+            (std::string("NONE|FORKID"), int(SIGHASH_NONE | SIGHASH_FORKID))
+            (std::string("NONE|FORKID|ANYONECANPAY"), int(SIGHASH_NONE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY))
+            (std::string("SINGLE"), int(SIGHASH_SINGLE))
+            (std::string("SINGLE|ANYONECANPAY"), int(SIGHASH_SINGLE | SIGHASH_ANYONECANPAY))
+            (std::string("SINGLE|FORKID"), int(SIGHASH_SINGLE | SIGHASH_FORKID))
+            (std::string("SINGLE|FORKID|ANYONECANPAY"), int(SIGHASH_SINGLE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY));
         string strHashType = params[3].get_str();
         if (mapSigHashValues.count(strHashType))
             nHashType = mapSigHashValues[strHashType];
@@ -711,7 +721,7 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp)
             throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid sighash param");
     }
 
-    bool fHashSingle = ((nHashType & ~SIGHASH_ANYONECANPAY) == SIGHASH_SINGLE);
+    bool fHashSingle = ((nHashType & ~(SIGHASH_ANYONECANPAY | SIGHASH_FORKID)) == SIGHASH_SINGLE);
 
     // Script verification errors
     UniValue vErrors(UniValue::VARR);
@@ -739,9 +749,23 @@ UniValue signrawtransaction(const UniValue& params, bool fHelp)
         BOOST_FOREACH(const CMutableTransaction& txv, txVariants) {
             txin.scriptSig = CombineSignatures(prevPubKey, TransactionSignatureChecker(&txConst, i, amount), txin.scriptSig, txv.vin[i].scriptSig);
         }
-        ScriptError serror = SCRIPT_ERR_OK;
-        if (!VerifyScript(txin.scriptSig, prevPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, MutableTransactionSignatureChecker(&mergedTx, i, amount), &serror)) {
-            TxInErrorToJSON(txin, vErrors, ScriptErrorString(serror));
+
+        // Because we do not know if forkid is used or not, we just try both.
+        // TODO: Remove after the Hard Fork.
+        ScriptError serror0 = SCRIPT_ERR_OK;
+        ScriptError serror1 = SCRIPT_ERR_OK;
+        TransactionSignatureChecker checker(&txConst, i, amount);
+        if (!VerifyScript(txin.scriptSig, prevPubKey,
+                          STANDARD_SCRIPT_VERIFY_FLAGS |
+                              SCRIPT_ENABLE_SIGHASH_FORKID,
+                          checker, &serror0) &&
+            !VerifyScript(txin.scriptSig, prevPubKey,
+                          STANDARD_SCRIPT_VERIFY_FLAGS, checker, &serror1)) {
+            std::string error;
+            error += ScriptErrorString(serror0);
+            error += " ";
+            error += ScriptErrorString(serror1);
+            TxInErrorToJSON(txin, vErrors, error);
         }
     }
     bool fComplete = vErrors.empty();
