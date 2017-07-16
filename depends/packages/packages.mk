@@ -1,4 +1,4 @@
-packages:=boost openssl curl
+packages:=boost openssl curl libevent
 native_packages := native_ccache native_comparisontool
 
 qt_native_packages = native_protobuf
