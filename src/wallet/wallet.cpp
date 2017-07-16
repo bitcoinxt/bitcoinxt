@@ -725,6 +725,10 @@ bool CWallet::AddToWallet(const CWalletTx& wtxIn, bool fFromLoadWallet, CWalletD
         {
             BOOST_FOREACH(const uint256& conflictHash, wtxIn.GetConflicts(false))
             {
+                LogPrintf("%s %s conflicts with %s\n",
+                        __func__,
+                        wtxIn.GetHash().GetHex(),
+                        conflictHash.GetHex());
                 CWalletTx& txConflict = mapWallet[conflictHash];
                 NotifyTransactionChanged(this, conflictHash, CT_UPDATED); //Updates UI table
                 if (IsFromMe(txConflict) || IsMine(txConflict))

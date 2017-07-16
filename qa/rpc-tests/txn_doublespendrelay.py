@@ -8,6 +8,21 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 from decimal import Decimal
 
+def wait_for(criteria):
+    import sys
+    sys.stdout.write("Waiting for tx to get relayed")
+    sys.stdout.flush()
+    for i in range(1, 14):
+        if criteria():
+            print("")
+            return
+
+        sys.stdout.write(".")
+        sys.stdout.flush()
+        time.sleep(0.1 * i**2) # geometric back-off
+
+    raise Exception("Timeout")
+
 class DoubleSpendRelay(BitcoinTestFramework):
 
     #
@@ -26,7 +41,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         self.is_network_split = False
         self.nodes = []
         for i in range(0,4):
-            self.nodes.append(start_node(i, self.options.tmpdir, ["-whitelist=127.0.0.1"]))
+            self.nodes.append(start_node(i, self.options.tmpdir, ["-debug", "-whitelist=127.0.0.1"]))
         connect_nodes(self.nodes[0], 2)
         connect_nodes(self.nodes[1], 2)
         connect_nodes(self.nodes[3], 2)
@@ -49,7 +64,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(tx1_inputs, outputs))
         txid1 = nodes[0].sendrawtransaction(signed["hex"], True)
         sync_mempools([nodes[0], nodes[3]])
-        
+
         txid1_info = nodes[3].gettransaction(txid1)
         assert_equal(txid1_info["respendsobserved"], [])
 
@@ -69,11 +84,10 @@ class DoubleSpendRelay(BitcoinTestFramework):
         # Wait until txid2 is relayed to nodes[3] (but don't wait forever):
         # Note we can't use sync_mempools, because the respend isn't added to
         # the mempool.
-        for i in range(1,7):
-            txid1_info = nodes[3].gettransaction(txid1)
-            if txid1_info["respendsobserved"] != []:
-                break
-            time.sleep(0.1 * i**2) # geometric back-off
+        def txid2_relay():
+            return nodes[3].gettransaction(txid1)["respendsobserved"] != []
+        wait_for(txid2_relay)
+        txid1_info = nodes[3].gettransaction(txid1)
         assert_equal(txid1_info["respendsobserved"], [txid2])
 
         # Test 3: Is triple-spend of tx1_inputs[0] not relayed?
@@ -106,11 +120,10 @@ class DoubleSpendRelay(BitcoinTestFramework):
         signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(inputs4, outputs))
         txid4 = nodes[1].sendrawtransaction(signed["hex"], True)
         # Wait until txid4 is relayed to nodes[3] (but don't wait forever):
-        for i in range(1,7):
-            txid1_info = nodes[3].gettransaction(txid1)
-            if txid1_info["respendsobserved"] != [txid2]:
-                break
-            time.sleep(0.1 * i**2) # geometric back-off
+        def txid4_relay():
+            return nodes[3].gettransaction(txid1)["respendsobserved"] != [txid2]
+        wait_for(txid4_relay)
+        txid1_info = nodes[3].gettransaction(txid1)
         assert_equal(sorted(txid1_info["respendsobserved"]), sorted([txid2,txid4]))
 
         # Test 5: Is double-spend of tx1_inputs[2] relayed when triple-spend of tx1_inputs[0] follows it?
@@ -128,11 +141,11 @@ class DoubleSpendRelay(BitcoinTestFramework):
         signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(inputs5, outputs))
         txid5 = nodes[1].sendrawtransaction(signed["hex"], True)
         # Wait until txid5 is relayed to nodes[3] (but don't wait forever):
-        for i in range(1,7):
-            txid1_info = nodes[3].gettransaction(txid1)
-            if sorted(txid1_info["respendsobserved"]) != sorted([txid2,txid4]):
-                break
-            time.sleep(0.1 * i**2) # geometric back-off
+        def txid5_relay():
+            return sorted(nodes[3].gettransaction(txid1)["respendsobserved"]) \
+                != sorted([txid2,txid4])
+        wait_for(txid5_relay)
+        txid1_info = nodes[3].gettransaction(txid1)
         assert_equal(sorted(txid1_info["respendsobserved"]), sorted([txid2,txid4,txid5]))
 
 if __name__ == '__main__':
