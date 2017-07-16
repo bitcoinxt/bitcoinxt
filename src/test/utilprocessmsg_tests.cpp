@@ -43,7 +43,7 @@ struct UtilDummyArgGetter : public ArgGetter {
 
 BOOST_AUTO_TEST_SUITE(utilprocessmsg_tests);
 
-BOOST_AUTO_TEST_CASE(keep_outgoing_peer) {
+BOOST_AUTO_TEST_CASE(keep_outgoing_peer_thin) {
 
     auto arg = new UtilDummyArgGetter;
     auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
@@ -74,5 +74,19 @@ BOOST_AUTO_TEST_CASE(keep_outgoing_peer) {
     node.nServices = SHORT_IDS_BLOCKS_VERSION;
     BOOST_CHECK(KeepOutgoingPeer(node));
 }
+
+BOOST_AUTO_TEST_CASE(keep_outgoing_peer_uasf) {
+    DummyNode node;
+    node.nServices = 0;
+    auto arg = new UtilDummyArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+    arg->usethin = 0;
+
+    node.strSubVer = "Nice node";
+    BOOST_CHECK(KeepOutgoingPeer(node));
+
+    node.strSubVer = "Bad UASF node";
+    BOOST_CHECK(!KeepOutgoingPeer(node));
+};
 
 BOOST_AUTO_TEST_SUITE_END()
