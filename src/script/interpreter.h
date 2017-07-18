@@ -95,12 +95,14 @@ enum
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError* serror);
 
-uint256 SignatureHash(const CScript &scriptCode, const CTransaction& txTo, unsigned int nIn, uint32_t nHashType, const CAmount &amount);
+uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo, unsigned int nIn, uint32_t nHashType, const CAmount &amount,
+                      unsigned int flags = SCRIPT_ENABLE_SIGHASH_FORKID);
 
 class BaseSignatureChecker
 {
 public:
-    virtual bool CheckSig(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode) const
+    virtual bool CheckSig(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey,
+                          const CScript& scriptCode, unsigned int flags) const
     {
         return false;
     }
@@ -130,7 +132,7 @@ protected:
 
 public:
     TransactionSignatureChecker(const CTransaction* txToIn, unsigned int nInIn, const CAmount &amountIn) : txTo(txToIn), nIn(nInIn), amount(amountIn) {}
-    bool CheckSig(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode) const;
+    bool CheckSig(const std::vector<unsigned char>& scriptSig, const std::vector<unsigned char>& vchPubKey, const CScript& scriptCode, unsigned int flags) const;
     bool CheckLockTime(const CScriptNum& nLockTime) const;
     bool CheckSequence(const CScriptNum& nSequence) const;
 };

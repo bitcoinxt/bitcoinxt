@@ -97,12 +97,15 @@ string ScriptToAsmStr(const CScript& script, const bool fAttemptSighashDecode)
             } else {
                 // the IsUnspendable check makes sure not to try to decode OP_RETURN data that may match the format of a signature
                 if (fAttemptSighashDecode && !script.IsUnspendable()) {
-                    string strSigHashDecode;
-                    // goal: only attempt to decode a defined sighash type from data that looks like a signature within a scriptSig.
-                    // this won't decode correctly formatted public keys in Pubkey or Multisig scripts due to
-                    // the restrictions on the pubkey formats (see IsCompressedOrUncompressedPubKey) being incongruous with the
-                    // checks in CheckSignatureEncoding.
-                    if (CheckSignatureEncoding(vch, SCRIPT_VERIFY_STRICTENC, NULL)) {
+                    std::string strSigHashDecode;
+                    // goal: only attempt to decode a defined sighash type from
+                    // data that looks like a signature within a scriptSig. This
+                    // won't decode correctly formatted public keys in Pubkey or
+                    // Multisig scripts due to the restrictions on the pubkey
+                    // formats (see IsCompressedOrUncompressedPubKey) being
+                    // incongruous with the checks in CheckSignatureEncoding.
+                    if (CheckSignatureEncoding(vch, SCRIPT_VERIFY_STRICTENC |
+                                                    SCRIPT_ENABLE_SIGHASH_FORKID, NULL)) {
                         const unsigned char chSigHashType = vch.back();
                         if (mapSigHashTypes.count(chSigHashType)) {
                             strSigHashDecode = "[" + mapSigHashTypes.find(chSigHashType)->second + "]";

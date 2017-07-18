@@ -184,7 +184,7 @@ static CScript CombineMultisig(const CScript& scriptPubKey, const BaseSignatureC
             if (sigs.count(pubkey))
                 continue; // Already got a sig for this pubkey
 
-            if (checker.CheckSig(sig, pubkey, scriptPubKey))
+            if (checker.CheckSig(sig, pubkey, scriptPubKey, SCRIPT_ENABLE_SIGHASH_FORKID))
             {
                 sigs[pubkey] = sig;
                 break;

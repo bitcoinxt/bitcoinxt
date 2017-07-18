@@ -683,7 +683,7 @@ BOOST_AUTO_TEST_CASE(script_build)
                                 "P2PK INVALID AMOUNT", SCRIPT_ENABLE_SIGHASH_FORKID, false, TEST_AMOUNT
                                ).PushSig(keys.key0, SIGHASH_ALL | SIGHASH_FORKID, 32, 32, TEST_AMOUNT + 1).ScriptError(SCRIPT_ERR_EVAL_FALSE));
     tests.push_back(TestBuilder(CScript() << ToByteVector(keys.pubkey0) << OP_CHECKSIG,
-                                "P2PK INVALID FORKID", 0, false, TEST_AMOUNT
+                                "P2PK INVALID FORKID", SCRIPT_VERIFY_STRICTENC, false, TEST_AMOUNT
                                ).PushSig(keys.key0, SIGHASH_ALL | SIGHASH_FORKID, 32, 32, TEST_AMOUNT).ScriptError(SCRIPT_ERR_ILLEGAL_FORKID));
 
     std::set<std::string> tests_set;
