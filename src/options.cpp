@@ -73,6 +73,10 @@ uint64_t Opt::MaxBlockSizeVote() {
     return Args->GetArg("-maxblocksizevote", 0);
 }
 
+int64_t Opt::UAHFTime() {
+    return Args->GetArg("-uahftime", UAHF_DEFAULT_ACTIVATION_TIME);
+}
+
 bool Opt::UsingThinBlocks() {
     if (IsStealthMode())
         return false;

@@ -439,6 +439,7 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-maxblocksizevote=<n>", _("Set vote for maximum block size in megabytes (default: network sizelimit)"));
     if (showDebug)
         strUsage += HelpMessageOpt("-blockversion=<n>", "Override block version to test forking scenarios");
+    strUsage += HelpMessageOpt("-uahftime=<n>", strprintf(_("Set user-activated hard fork activation time (default: %d) (0=disable)"), UAHF_DEFAULT_ACTIVATION_TIME));
 
     strUsage += HelpMessageGroup(_("RPC server options:"));
     strUsage += HelpMessageOpt("-server", _("Accept command line and JSON-RPC commands"));
