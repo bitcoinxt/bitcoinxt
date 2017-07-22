@@ -218,9 +218,13 @@ bool CheckSignatureEncoding(const vector<unsigned char> &vchSig, unsigned int fl
         if (!IsDefinedHashtypeSignature(vchSig)) {
             return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
         }
-        if (!(flags & SCRIPT_ENABLE_SIGHASH_FORKID) &&
-            (GetHashType(vchSig) & SIGHASH_FORKID)) {
+        bool usesForkId = GetHashType(vchSig) & SIGHASH_FORKID;
+        bool forkIdEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
+        if (!forkIdEnabled && usesForkId) {
             return set_error(serror, SCRIPT_ERR_ILLEGAL_FORKID);
+        }
+        if (forkIdEnabled && !usesForkId) {
+            return set_error(serror, SCRIPT_ERR_MUST_USE_FORKID);
         }
     }
     return true;

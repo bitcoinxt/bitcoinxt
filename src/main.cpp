@@ -2376,6 +2376,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     // Allow UAHF replay-protected signatures if parent is at or after activation time
     if ((Opt().UAHFTime() != 0) && (pindex->pprev != NULL) && (pindex->pprev->GetMedianTimePast() >= Opt().UAHFTime())) {
+        flags |= SCRIPT_VERIFY_STRICTENC;
         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
     }
 
@@ -2788,6 +2789,12 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew,
         return false;
     int64_t nTime5 = GetTimeMicros(); nTimeChainState += nTime5 - nTime4;
     LogPrint("bench", "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
+    // If we just activated the UAHF, clear the pool to be sure it doesn't contain tx invalid after the fork
+    if ((Opt().UAHFTime() != 0) &&
+        (pindexNew->GetMedianTimePast() >= Opt().UAHFTime()) &&
+        (pindexNew->pprev->GetMedianTimePast() < Opt().UAHFTime())) {
+        mempool.clear();
+    }
     // Remove conflicting transactions from the mempool.
     list<CTransaction> txConflicted;
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload());

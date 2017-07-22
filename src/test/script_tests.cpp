@@ -91,6 +91,7 @@ static ScriptErrorDesc script_errors[]={
     {SCRIPT_ERR_CLEANSTACK, "CLEANSTACK"},
     {SCRIPT_ERR_DISCOURAGE_UPGRADABLE_NOPS, "DISCOURAGE_UPGRADABLE_NOPS"},
     {SCRIPT_ERR_ILLEGAL_FORKID, "ILLEGAL_FORKID"},
+    {SCRIPT_ERR_MUST_USE_FORKID, "MISSING_FORKID"},
 };
 
 const char *FormatScriptError(ScriptError_t err)

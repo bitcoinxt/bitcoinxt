@@ -69,6 +69,8 @@ const char* ScriptErrorString(const ScriptError serror)
             return "Public key is neither compressed or uncompressed";
         case SCRIPT_ERR_ILLEGAL_FORKID:
             return "Illegal use of SIGHASH_FORKID";
+        case SCRIPT_ERR_MUST_USE_FORKID:
+            return "Signature must use SIGHASH_FORKID";
         case SCRIPT_ERR_UNKNOWN_ERROR:
         case SCRIPT_ERR_ERROR_COUNT:
         default: break;
