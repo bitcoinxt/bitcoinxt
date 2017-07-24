@@ -7,6 +7,7 @@
 
 #include "arith_uint256.h"
 #include "chain.h"
+#include "options.h"
 #include "primitives/block.h"
 #include "uint256.h"
 #include "util.h"
@@ -57,6 +58,10 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     if (nBits == nProofOfWorkLimit) {
         return nProofOfWorkLimit;
     }
+
+    // Done, unless checking UAHF fast difficulty drop
+    if ((Opt().UAHFTime() == 0) || (pindexLast->GetMedianTimePast() < Opt().UAHFTime()))
+        return nBits;
 
     // If producing the last 6 block took less than 12h, we keep the same difficulty.
     const CBlockIndex *pindex6 = pindexLast->GetAncestor(nHeight - 7);

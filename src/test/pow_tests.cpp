@@ -105,6 +105,7 @@ static CBlockIndex GetBlockIndex(CBlockIndex *pindexPrev, int64_t nTimeInterval,
 }
 
 BOOST_AUTO_TEST_CASE(retargeting_test) {
+    mapArgs["-uahftime"] = "1";
     SelectParams(CBaseChainParams::MAIN);
     const Consensus::Params &params = Params().GetConsensus();
 
@@ -180,6 +181,8 @@ BOOST_AUTO_TEST_CASE(retargeting_test) {
     BOOST_CHECK_EQUAL(
         GetNextWorkRequired(&blocks[114], &blkHeaderDummy, params),
         powLimit.GetCompact());
+
+    mapArgs.erase("-uahftime");
 }
 
 BOOST_AUTO_TEST_SUITE_END()
