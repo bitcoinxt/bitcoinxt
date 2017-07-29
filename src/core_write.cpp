@@ -55,15 +55,20 @@ string FormatScript(const CScript& script)
     return ret.substr(0, ret.size() - 1);
 }
 
-const map<unsigned char, string> mapSigHashTypes =
+const std::map<unsigned char, std::string> mapSigHashTypes =
     boost::assign::map_list_of
-    (static_cast<unsigned char>(SIGHASH_ALL), string("ALL"))
-    (static_cast<unsigned char>(SIGHASH_ALL|SIGHASH_ANYONECANPAY), string("ALL|ANYONECANPAY"))
-    (static_cast<unsigned char>(SIGHASH_NONE), string("NONE"))
-    (static_cast<unsigned char>(SIGHASH_NONE|SIGHASH_ANYONECANPAY), string("NONE|ANYONECANPAY"))
-    (static_cast<unsigned char>(SIGHASH_SINGLE), string("SINGLE"))
-    (static_cast<unsigned char>(SIGHASH_SINGLE|SIGHASH_ANYONECANPAY), string("SINGLE|ANYONECANPAY"))
-    ;
+    (static_cast<unsigned char>(SIGHASH_ALL), std::string("ALL"))
+    (static_cast<unsigned char>(SIGHASH_ALL | SIGHASH_ANYONECANPAY), std::string("ALL|ANYONECANPAY"))
+    (static_cast<unsigned char>(SIGHASH_ALL | SIGHASH_FORKID), std::string("ALL|FORKID"))
+    (static_cast<unsigned char>(SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_ANYONECANPAY), std::string("ALL|FORKID|ANYONECANPAY"))
+    (static_cast<unsigned char>(SIGHASH_NONE), std::string("NONE"))
+    (static_cast<unsigned char>(SIGHASH_NONE | SIGHASH_ANYONECANPAY), std::string("NONE|ANYONECANPAY"))
+    (static_cast<unsigned char>(SIGHASH_NONE | SIGHASH_FORKID), std::string("NONE|FORKID"))
+    (static_cast<unsigned char>(SIGHASH_NONE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY), std::string("NONE|FORKID|ANYONECANPAY"))
+    (static_cast<unsigned char>(SIGHASH_SINGLE), std::string("SINGLE"))
+    (static_cast<unsigned char>(SIGHASH_SINGLE | SIGHASH_ANYONECANPAY), std::string("SINGLE|ANYONECANPAY"))
+    (static_cast<unsigned char>(SIGHASH_SINGLE | SIGHASH_FORKID), std::string("SINGLE|FORKID"))
+    (static_cast<unsigned char>(SIGHASH_SINGLE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY), std::string("SINGLE|FORKID|ANYONECANPAY"));
 
 /**
  * Create the assembly string representation of a CScript object.
@@ -92,12 +97,21 @@ string ScriptToAsmStr(const CScript& script, const bool fAttemptSighashDecode)
             } else {
                 // the IsUnspendable check makes sure not to try to decode OP_RETURN data that may match the format of a signature
                 if (fAttemptSighashDecode && !script.IsUnspendable()) {
-                    string strSigHashDecode;
-                    // goal: only attempt to decode a defined sighash type from data that looks like a signature within a scriptSig.
-                    // this won't decode correctly formatted public keys in Pubkey or Multisig scripts due to
-                    // the restrictions on the pubkey formats (see IsCompressedOrUncompressedPubKey) being incongruous with the
-                    // checks in CheckSignatureEncoding.
-                    if (CheckSignatureEncoding(vch, SCRIPT_VERIFY_STRICTENC, NULL)) {
+                    std::string strSigHashDecode;
+                    // goal: only attempt to decode a defined sighash type from
+                    // data that looks like a signature within a scriptSig. This
+                    // won't decode correctly formatted public keys in Pubkey or
+                    // Multisig scripts due to the restrictions on the pubkey
+                    // formats (see IsCompressedOrUncompressedPubKey) being
+                    // incongruous with the checks in CheckSignatureEncoding.
+                    uint32_t flags = SCRIPT_VERIFY_STRICTENC;
+                    if (vch.back() & SIGHASH_FORKID) {
+                        // If the transaction is using SIGHASH_FORKID, we need
+                        // to set the apropriate flag.
+                        // TODO: Remove after the Hard Fork.
+                        flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
+                    }
+                    if (CheckSignatureEncoding(vch, flags, nullptr)) {
                         const unsigned char chSigHashType = vch.back();
                         if (mapSigHashTypes.count(chSigHashType)) {
                             strSigHashDecode = "[" + mapSigHashTypes.find(chSigHashType)->second + "]";

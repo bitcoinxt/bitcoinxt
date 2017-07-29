@@ -1417,9 +1417,12 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false);
         }
 
+        unsigned int forkVerifyFlags = ((Opt().UAHFTime() != 0) && (chainActive.Tip()->GetMedianTimePast() >= Opt().UAHFTime()) ?
+                                        SCRIPT_ENABLE_SIGHASH_FORKID : 0);
+
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
-        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS, true))
+        if (!CheckInputs(tx, state, view, true, STANDARD_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true))
         {
             return error("AcceptToMemoryPool: ConnectInputs failed %s", hash.ToString());
         }
@@ -1433,7 +1436,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         // There is a similar check in CreateNewBlock() to prevent creating
         // invalid blocks, however allowing such transactions into the mempool
         // can be exploited as a DoS attack.
-        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS, true))
+        if (!CheckInputs(tx, state, view, true, MANDATORY_SCRIPT_VERIFY_FLAGS | forkVerifyFlags, true))
         {
             return error("AcceptToMemoryPool: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s", hash.ToString());
         }
@@ -1836,7 +1839,7 @@ void UpdateCoins(const CTransaction& tx, CValidationState &state, CCoinsViewCach
 
 bool CScriptCheck::operator()() {
     const CScript &scriptSig = ptxTo->vin[nIn].scriptSig;
-    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, CachingTransactionSignatureChecker(ptxTo, nIn, cacheStore), &error)) {
+    if (!VerifyScript(scriptSig, scriptPubKey, nFlags, CachingTransactionSignatureChecker(ptxTo, nIn, amount, cacheStore), &error)) {
         return ::error("CScriptCheck(): %s:%d VerifySignature failed: %s", ptxTo->GetHash().ToString(), nIn, ScriptErrorString(error));
     }
     return true;
@@ -2371,6 +2374,12 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         nLockTimeFlags |= LOCKTIME_VERIFY_SEQUENCE;
     }
 
+    // Allow UAHF replay-protected signatures if parent is at or after activation time
+    if ((Opt().UAHFTime() != 0) && (pindex->pprev != NULL) && (pindex->pprev->GetMedianTimePast() >= Opt().UAHFTime())) {
+        flags |= SCRIPT_VERIFY_STRICTENC;
+        flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
+    }
+
     CBlockUndo blockundo;
 
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && Opt().ScriptCheckThreads() ? &scriptcheckqueue : NULL);
@@ -2780,6 +2789,12 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew,
         return false;
     int64_t nTime5 = GetTimeMicros(); nTimeChainState += nTime5 - nTime4;
     LogPrint("bench", "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
+    // If we just activated the UAHF, clear the pool to be sure it doesn't contain tx invalid after the fork
+    if ((Opt().UAHFTime() != 0) &&
+        (pindexNew->GetMedianTimePast() >= Opt().UAHFTime()) &&
+        (pindexNew->pprev->GetMedianTimePast() < Opt().UAHFTime())) {
+        mempool.clear();
+    }
     // Remove conflicting transactions from the mempool.
     list<CTransaction> txConflicted;
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload());
@@ -2930,6 +2945,13 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
                 }
             }
         }
+    }
+
+    // If we reorged back across the UAHF, clear the pool to be sure it doesn't contain tx invalid before the fork
+    if ((Opt().UAHFTime() != 0) &&
+        pindexOldTip && pindexOldTip->pprev && (pindexOldTip->pprev->GetMedianTimePast() >= Opt().UAHFTime()) &&
+        (chainActive.Tip()->GetMedianTimePast() < Opt().UAHFTime())) {
+        mempool.clear();
     }
 
     if (fBlocksDisconnected) {

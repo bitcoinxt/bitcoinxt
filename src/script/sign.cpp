@@ -17,7 +17,7 @@ using namespace std;
 
 typedef vector<unsigned char> valtype;
 
-TransactionSignatureCreator::TransactionSignatureCreator(const CKeyStore* keystoreIn, const CTransaction* txToIn, unsigned int nInIn, int nHashTypeIn) : BaseSignatureCreator(keystoreIn), txTo(txToIn), nIn(nInIn), nHashType(nHashTypeIn), checker(txTo, nIn) {}
+TransactionSignatureCreator::TransactionSignatureCreator(const CKeyStore* keystoreIn, const CTransaction* txToIn, unsigned int nInIn, const CAmount &amountIn, uint32_t nHashTypeIn) : BaseSignatureCreator(keystoreIn), txTo(txToIn), nIn(nInIn), amount(amountIn), nHashType(nHashTypeIn), checker(txTo, nIn, amount) {}
 
 bool TransactionSignatureCreator::CreateSig(std::vector<unsigned char>& vchSig, const CKeyID& address, const CScript& scriptCode) const
 {
@@ -25,7 +25,7 @@ bool TransactionSignatureCreator::CreateSig(std::vector<unsigned char>& vchSig, 
     if (!keystore->GetKey(address, key))
         return false;
 
-    uint256 hash = SignatureHash(scriptCode, *txTo, nIn, nHashType);
+    uint256 hash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount);
     if (!key.Sign(hash, vchSig))
         return false;
     vchSig.push_back((unsigned char)nHashType);
@@ -122,28 +122,36 @@ bool ProduceSignature(const BaseSignatureCreator& creator, const CScript& fromPu
     }
 
     // Test solution
-    return VerifyScript(scriptSig, fromPubKey, STANDARD_SCRIPT_VERIFY_FLAGS, creator.Checker());
+    // Because we have no good way to get nHashType here, we just try with and
+    // without enabling it. One of the two must pass.
+    // TODO: Remove after the fork.
+    return (VerifyScript(scriptSig, fromPubKey,
+                         STANDARD_SCRIPT_VERIFY_FLAGS, creator.Checker()) ||
+            VerifyScript(scriptSig, fromPubKey,
+                         STANDARD_SCRIPT_VERIFY_FLAGS |
+                             SCRIPT_ENABLE_SIGHASH_FORKID,
+                         creator.Checker()));
 }
 
-bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CMutableTransaction& txTo, unsigned int nIn, int nHashType)
+bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CMutableTransaction& txTo, unsigned int nIn, const CAmount &amount, uint32_t nHashType)
 {
     assert(nIn < txTo.vin.size());
     CTxIn& txin = txTo.vin[nIn];
 
     CTransaction txToConst(txTo);
-    TransactionSignatureCreator creator(&keystore, &txToConst, nIn, nHashType);
+    TransactionSignatureCreator creator(&keystore, &txToConst, nIn, amount, nHashType);
 
     return ProduceSignature(creator, fromPubKey, txin.scriptSig);
 }
 
-bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CMutableTransaction& txTo, unsigned int nIn, int nHashType)
+bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CMutableTransaction& txTo, unsigned int nIn, uint32_t nHashType)
 {
     assert(nIn < txTo.vin.size());
     CTxIn& txin = txTo.vin[nIn];
     assert(txin.prevout.n < txFrom.vout.size());
     const CTxOut& txout = txFrom.vout[txin.prevout.n];
 
-    return SignSignature(keystore, txout.scriptPubKey, txTo, nIn, nHashType);
+    return SignSignature(keystore, txout.scriptPubKey, txTo, nIn, txout.nValue, nHashType);
 }
 
 static CScript PushAll(const vector<valtype>& values)
@@ -184,8 +192,14 @@ static CScript CombineMultisig(const CScript& scriptPubKey, const BaseSignatureC
             if (sigs.count(pubkey))
                 continue; // Already got a sig for this pubkey
 
-            if (checker.CheckSig(sig, pubkey, scriptPubKey))
-            {
+            // If the transaction is using SIGHASH_FORKID, we ned to set the
+            // apropriate flags.
+            // TODO: Remove after the Hard Fork.
+            uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS;
+            if (sig.back() & SIGHASH_FORKID) {
+                flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
+            }
+            if (checker.CheckSig(sig, pubkey, scriptPubKey, flags)) {
                 sigs[pubkey] = sig;
                 break;
             }
@@ -252,13 +266,6 @@ static CScript CombineSignatures(const CScript& scriptPubKey, const BaseSignatur
     }
 
     return CScript();
-}
-
-CScript CombineSignatures(const CScript& scriptPubKey, const CTransaction& txTo, unsigned int nIn,
-                          const CScript& scriptSig1, const CScript& scriptSig2)
-{
-    TransactionSignatureChecker checker(&txTo, nIn);
-    return CombineSignatures(scriptPubKey, checker, scriptSig1, scriptSig2);
 }
 
 CScript CombineSignatures(const CScript& scriptPubKey, const BaseSignatureChecker& checker,
