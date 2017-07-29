@@ -10,17 +10,30 @@ bool HaveBlockData(const uint256& hash) {
         && mapBlockIndex.find(hash)->second->nStatus & BLOCK_HAVE_DATA;
 }
 
+namespace {
+
 bool SupportsThinBlocks(const CNode& node) {
     return node.SupportsXThinBlocks() || node.SupportsCompactBlocks();
 }
 
+bool SignalsUAHF(const CNode& node) {
+    return node.nServices & NODE_BITCOIN_CASH;
+}
+
+} // ns anon
+
 bool KeepOutgoingPeer(const CNode& node) {
     assert(!node.fInbound);
 
-    if (!Opt().UsingThinBlocks())
-        return true;
+    // Thin blocks enabled. We want thin block peers only.
+    if (Opt().UsingThinBlocks() && !SupportsThinBlocks(node))
+        return false;
 
-    return SupportsThinBlocks(node);
+    // When we're on the UAHF fork, we want UAHF peers only.
+    // When we're not, we don't want UAHF peers.
+    return Opt().UAHFTime()
+        ? SignalsUAHF(node)
+        : !SignalsUAHF(node);
 }
 
 void UpdateBestHeaderSent(CNode& node, CBlockIndex* blockIndex) {

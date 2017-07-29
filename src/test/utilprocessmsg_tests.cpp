@@ -15,7 +15,7 @@ const int NOT_SET = std::numeric_limits<int>::min();
 struct UtilDummyArgGetter : public ArgGetter {
 
     UtilDummyArgGetter() : ArgGetter(),
-        usethin(NOT_SET)
+        usethin(NOT_SET), uahf(NOT_SET)
     {
     }
 
@@ -23,6 +23,8 @@ struct UtilDummyArgGetter : public ArgGetter {
 
         if (arg == "-use-thin-blocks")
             return usethin == NOT_SET ? def : usethin;
+        if (arg == "-uahftime")
+            return uahf == NOT_SET ? def : uahf;
 
         assert(false);
     }
@@ -39,14 +41,16 @@ struct UtilDummyArgGetter : public ArgGetter {
     }
 
     int usethin;
+    int64_t uahf;
 };
 
 BOOST_AUTO_TEST_SUITE(utilprocessmsg_tests);
 
-BOOST_AUTO_TEST_CASE(keep_outgoing_peer) {
+BOOST_AUTO_TEST_CASE(keep_outgoing_peer_thin) {
 
     auto arg = new UtilDummyArgGetter;
     auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+    arg->uahf = 0;
 
     // Node that does not support thin blocks.
     DummyNode node;
@@ -71,8 +75,32 @@ BOOST_AUTO_TEST_CASE(keep_outgoing_peer) {
 
     // Node supports compact blocks, keep.
     node.nServices = 0;
-    node.nServices = SHORT_IDS_BLOCKS_VERSION;
+    node.nVersion = SHORT_IDS_BLOCKS_VERSION;
     BOOST_CHECK(KeepOutgoingPeer(node));
+}
+
+BOOST_AUTO_TEST_CASE(keep_outgoing_peer_cash) {
+    auto arg = new UtilDummyArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+    arg->usethin = 0;
+
+    // Not on fork, we don't want UAHF peers
+    arg->uahf = 0;
+    {
+        DummyNode node;
+        BOOST_CHECK(KeepOutgoingPeer(node));
+        node.nServices |= NODE_BITCOIN_CASH;
+        BOOST_CHECK(!KeepOutgoingPeer(node));
+    }
+
+    // We're on fork. Keep only UAHF peers.
+    arg->uahf = UAHF_DEFAULT_ACTIVATION_TIME;
+    {
+        DummyNode node;
+        BOOST_CHECK(!KeepOutgoingPeer(node));
+        node.nServices |= NODE_BITCOIN_CASH;
+        BOOST_CHECK(KeepOutgoingPeer(node));
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()
