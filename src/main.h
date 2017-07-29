@@ -135,6 +135,8 @@ static const uint64_t nMinDiskSpace = 52428800;
 
 /** Initialize respend bloom filter **/
 void InitRespendFilter();
+/** This-chain replay protection commitment value */
+std::vector<unsigned char>& GetAntiReplayCommitment();
 
 /** Pruning-related variables and constants */
 /** True if any block files have ever been pruned. */
@@ -476,6 +478,8 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW = t
 /** Context-dependent validity checks */
 bool ContextualCheckBlockHeader(const CBlockHeader& block, CValidationState& state, CBlockIndex *pindexPrev);
 bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIndex *pindexPrev);
+bool ContextualCheckTransaction(const CTransaction &tx, CValidationState &state, int nHeight,
+                                int64_t nLockTimeCutoff, int64_t nMedianTimePastPrev);
 
 /** Check a block is completely valid from start to finish (only works on top of our current best block, with cs_main held) */
 bool TestBlockValidity(CValidationState &state, const CBlock& block, CBlockIndex *pindexPrev, bool fCheckPOW = true, bool fCheckMerkleRoot = true);
