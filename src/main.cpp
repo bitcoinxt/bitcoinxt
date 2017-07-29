@@ -3410,6 +3410,21 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
         nLockTimeFlags |= LOCKTIME_MEDIAN_TIME_PAST;
     }
 
+    const int64_t uahfTime = Opt().UAHFTime();
+    if (uahfTime != 0) {
+        // If UAHF is enabled for the current block, but not for the previous
+        // block, this is the fork block, so we must check that the block is larger than 1MB.
+        const int64_t nMTPPrevPrev = (pindexPrev == NULL || pindexPrev->pprev == NULL ? 0 :
+                                      pindexPrev->pprev->GetMedianTimePast());
+        if ((nMTPPrevPrev < uahfTime) && (uahfTime <= nMedianTimePastPrev)) {
+            const uint64_t currentBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
+            if (currentBlockSize <= MAX_BLOCK_SIZE) {
+                return state.DoS(100, error("%s: UAHF fork block must exceed %d, but this block is %d bytes",
+                        __func__, MAX_BLOCK_SIZE, currentBlockSize), REJECT_INVALID, "bad-blk-too-small");
+            }
+        }
+    }
+
     int64_t nLockTimeCutoff = (nLockTimeFlags & LOCKTIME_MEDIAN_TIME_PAST)
                               ? nMedianTimePastPrev
                               : block.GetBlockTime();
