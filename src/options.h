@@ -15,6 +15,7 @@ struct Opt {
     int ScriptCheckThreads();
     int64_t CheckpointDays();
     uint64_t MaxBlockSizeVote();
+    int64_t UAHFTime();
 
     // Thin block options
     bool UsingThinBlocks();
@@ -29,6 +30,9 @@ static const int MAX_SCRIPTCHECK_THREADS = 16;
 static const int DEFAULT_SCRIPTCHECK_THREADS = 0;
 // Blocks newer than n days will have their script validated during sync.
 static const int DEFAULT_CHECKPOINT_DAYS = 30;
+/** User-activated hard fork default activation time */
+static const int64_t UAHF_DEFAULT_ACTIVATION_TIME = 1501590000; // Tue 1 Aug 2017 12:20:00 UTC
+
 //
 // For unit testing
 //
