@@ -3785,7 +3785,8 @@ bool static LoadBlockIndexDB(bool* fRebuildRequired)
             pindex->BuildSkip();
         if (pindex->IsValid(BLOCK_VALID_TREE) && (pindexBestHeader == NULL || CBlockIndexWorkComparator()(pindexBestHeader, pindex)))
             pindexBestHeader = pindex;
-        if (item.first < chainparams.GetConsensus().bip100ActivationHeight) {
+        if (((Opt().UAHFTime() != 0) && pindex->pprev && (pindex->pprev->nTime >= Opt().UAHFTime())) ||
+            ((Opt().UAHFTime() == 0) && (item.first < chainparams.GetConsensus().bip100ActivationHeight))) {
             pindex->nMaxBlockSize = MAX_BLOCK_SIZE;
         } else if (firstBIP100Entry == vSortedByHeight.end()) {
             firstBIP100Entry = iter;

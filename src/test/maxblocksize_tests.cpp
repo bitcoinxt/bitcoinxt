@@ -6,6 +6,7 @@
 #include "maxblocksize.h"
 #include "chain.h"
 #include "chainparams.h"
+#include "options.h"
 #include <algorithm>
 
 BOOST_AUTO_TEST_SUITE(maxblocksize_tests);
@@ -14,16 +15,19 @@ void fillBlockIndex(
         Consensus::Params& params, std::vector<CBlockIndex>& blockIndexes,
         bool addVotes, int64_t currMax) {
 
-    int height = params.bip100ActivationHeight;
+    int height = 0;
+    int64_t blocktime = UAHF_DEFAULT_ACTIVATION_TIME;
+
     CBlockIndex* prev = nullptr;
     for (CBlockIndex& index : blockIndexes)
     {
         index.nHeight = height++;
+        index.nTime = blocktime++;
         index.nMaxBlockSize = currMax;
 
         if (addVotes)
             index.nMaxBlockSizeVote = std::max(
-                (index.nHeight - params.bip100ActivationHeight) * 1000000, 1000000);
+                index.nHeight * 1000000, 1000000);
 
         index.pprev = prev;
         prev = &index;

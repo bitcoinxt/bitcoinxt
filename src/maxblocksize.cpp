@@ -7,14 +7,23 @@
 
 #include "chain.h"
 #include "util.h"
+#include "options.h"
 #include <string>
 #include <boost/lexical_cast.hpp>
 
 uint64_t GetNextMaxBlockSize(const CBlockIndex* pindexLast, const Consensus::Params& params)
 {
     // BIP100 not active, return legacy max size
-    if (pindexLast == NULL || pindexLast->nHeight < params.bip100ActivationHeight)
+    if (pindexLast == NULL ||
+        ((Opt().UAHFTime() != 0) && (pindexLast->GetMedianTimePast() < Opt().UAHFTime())) ||
+        ((Opt().UAHFTime() == 0) && (pindexLast->nHeight < params.bip100ActivationHeight)))
         return MAX_BLOCK_SIZE;
+
+    // Bump to 8MB at UAHF fork
+    if ((Opt().UAHFTime() != 0) &&
+        (pindexLast->GetMedianTimePast() >= Opt().UAHFTime()) &&
+        (pindexLast->pprev && (pindexLast->pprev->GetMedianTimePast() < Opt().UAHFTime())))
+        return UAHF_INITIAL_MAX_BLOCK_SIZE;
 
     uint64_t nMaxBlockSize = pindexLast->nMaxBlockSize;
 
