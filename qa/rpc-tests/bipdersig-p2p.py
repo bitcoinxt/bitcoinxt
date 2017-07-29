@@ -66,7 +66,7 @@ class BIP66Test(ComparisonTestFramework):
         inputs = [{ "txid" : from_txid, "vout" : 0}]
         outputs = { to_address : amount }
         rawtx = node.createrawtransaction(inputs, outputs)
-        signresult = node.signrawtransaction(rawtx)
+        signresult = node.signrawtransaction(rawtx, None, None, "ALL")
         tx = CTransaction()
         f = cStringIO.StringIO(unhexlify(signresult['hex']))
         tx.deserialize(f)

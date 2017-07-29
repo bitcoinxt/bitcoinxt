@@ -12,6 +12,7 @@
 #include "consensus/validation.h"
 #include "main.h"
 #include "net.h"
+#include "options.h"
 #include "script/script.h"
 #include "script/sign.h"
 #include "timedata.h"
@@ -1946,10 +1947,16 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend,
                     txNew.vin.push_back(CTxIn(coin.first->GetHash(),coin.second,CScript(),
                                               std::numeric_limits<unsigned int>::max()-1));
 
+                // Transaction signature hash type changes at hard fork
+                int nHashType = SIGHASH_ALL;
+                if ((Opt().UAHFTime() != 0) && (chainActive.Tip()->GetMedianTimePast() >= Opt().UAHFTime())) {
+                    nHashType |= SIGHASH_FORKID;
+                }
+
                 // Sign
                 int nIn = 0;
                 BOOST_FOREACH(const PAIRTYPE(const CWalletTx*,unsigned int)& coin, setCoins)
-                    if (!SignSignature(*this, *coin.first, txNew, nIn++))
+                    if (!SignSignature(*this, *coin.first, txNew, nIn++, nHashType))
                     {
                         strFailReason = _("Signing transaction failed");
                         return false;
