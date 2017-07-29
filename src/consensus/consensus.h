@@ -18,6 +18,8 @@ static const unsigned int MAX_TRANSACTION_SIZE = 1000*1000;
 inline uint64_t MaxBlockSigops(uint64_t nBlockSize) {
     return ((nBlockSize - 1) / 1000000 + 1) * 1000000 / 50;
 }
+/** allowed number of signature check operations per transaction. */
+static const uint64_t MAX_TX_SIGOPS_COUNT = 20000;
 /** Coinbase transaction outputs can only be spent after this number of new blocks (network rule) */
 static const int COINBASE_MATURITY = 100;
 

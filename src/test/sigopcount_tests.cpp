@@ -2,6 +2,10 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "consensus/consensus.h"
+#include "consensus/validation.h"
+#include "random.h"
+#include "main.h"
 #include "pubkey.h"
 #include "key.h"
 #include "script/script.h"
@@ -62,6 +66,42 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount)
     CScript scriptSig2;
     scriptSig2 << OP_1 << ToByteVector(dummy) << ToByteVector(dummy) << Serialize(s2);
     BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(scriptSig2), 3U);
+}
+
+BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx) {
+    CMutableTransaction tx;
+    tx.nVersion = 1;
+    tx.vin.resize(1);
+    tx.vin[0].prevout.hash = GetRandHash();
+    tx.vin[0].prevout.n = 0;
+    tx.vin[0].scriptSig = CScript();
+    tx.vout.resize(1);
+    tx.vout[0].nValue = 1;
+    tx.vout[0].scriptPubKey = CScript();
+
+    {
+        CValidationState state;
+        BOOST_CHECK(CheckTransaction(tx, state));
+    }
+
+    // Get just before the limit.
+    for (size_t i = 0; i < MAX_TX_SIGOPS_COUNT; i++) {
+        tx.vout[0].scriptPubKey << OP_CHECKSIG;
+    }
+
+    {
+        CValidationState state;
+        BOOST_CHECK(CheckTransaction(tx, state));
+    }
+
+    // And go over.
+    tx.vout[0].scriptPubKey << OP_CHECKSIG;
+
+    {
+        CValidationState state;
+        BOOST_CHECK(!CheckTransaction(tx, state));
+        BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txn-sigops");
+    }
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -1119,6 +1119,10 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
                              REJECT_INVALID, "bad-txns-txouttotal-toolarge");
     }
 
+    if (GetLegacySigOpCount(tx) > MAX_TX_SIGOPS_COUNT) {
+        return state.DoS(100, error("CheckTransaction(): too many sigops in tx"), REJECT_INVALID, "bad-txn-sigops");
+    }
+
     // Check for duplicate inputs
     set<COutPoint> vInOutPoints;
     BOOST_FOREACH(const CTxIn& txin, tx.vin)
@@ -2379,7 +2383,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         const CTransaction &tx = block.vtx[i];
 
         nInputs += tx.vin.size();
-        nSigOps += GetLegacySigOpCount(tx);
+        unsigned int nTxSigOps = GetLegacySigOpCount(tx);
+        nSigOps += nTxSigOps;
         if (nSigOps > MaxBlockSigops(nBlockSize))
             return state.DoS(100, error("ConnectBlock(): too many sigops"),
                              REJECT_INVALID, "bad-blk-sigops");
@@ -2408,10 +2413,15 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                 // Add in sigops done by pay-to-script-hash inputs;
                 // this is to prevent a "rogue miner" from creating
                 // an incredibly-expensive-to-validate block.
-                nSigOps += GetP2SHSigOpCount(tx, view);
+                unsigned int nP2SHSigOps = GetP2SHSigOpCount(tx, view);
+                nSigOps += nP2SHSigOps;
+                nTxSigOps += nP2SHSigOps;
                 if (nSigOps > MaxBlockSigops(nBlockSize))
                     return state.DoS(100, error("ConnectBlock(): too many sigops"),
                                      REJECT_INVALID, "bad-blk-sigops");
+            }
+            if (nTxSigOps > MAX_TX_SIGOPS_COUNT) {
+                return state.DoS(100, error("ConnectBlock(): too many sigops in tx"), REJECT_INVALID, "bad-txn-sigops");
             }
 
             nFees += view.GetValueIn(tx)-tx.GetValueOut();
