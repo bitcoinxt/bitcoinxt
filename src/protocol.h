@@ -85,7 +85,10 @@ enum {
     NODE_WITNESS = (1 << 3),
 
     // Node supports xthin
-    NODE_THIN = (1 << 4)
+    NODE_THIN = (1 << 4),
+
+    // Node supports the Bitcoin Cash fork rules
+    NODE_BITCOIN_CASH = (1 << 5)
 
     // Bits 24-31 are reserved for temporary experiments. Just pick a bit that
     // isn't getting used, or one not being used much, and notify the
