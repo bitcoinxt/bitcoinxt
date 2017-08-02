@@ -10,6 +10,7 @@
 #include "chainparams.h"
 #include "blockencodings.h"
 #include "consensus/consensus.h" // MAX_BLOCK_SIZE
+#include "maxblocksize.h"
 #include <iostream>
 
 // Workaround for segfaulting
@@ -158,7 +159,7 @@ BOOST_AUTO_TEST_CASE(xthin_stub_self_validate) {
     // not too big
     {
         XThinBlock xblock(TestBlock1(), CBloomFilter(), false);
-        uint64_t nextMaxBlockSize = currMaxBlockSize * 105 / 100;
+        uint64_t nextMaxBlockSize = NextBlockRaiseCap(currMaxBlockSize);
         uint64_t notTooMany = nextMaxBlockSize / minTxSize();
         xblock.txHashes.resize(notTooMany);
         for (size_t i = 1 /* skip coinbase */; i < notTooMany; ++i)

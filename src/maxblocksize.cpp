@@ -146,3 +146,13 @@ uint64_t GetMaxBlockSizeVote(const CScript &coinbase, int32_t nHeight)
 
     return static_cast<uint64_t>(FindVote(s)) * 1000000;
 }
+
+uint64_t NextBlockRaiseCap(uint64_t maxCurrBlock) {
+    if (maxCurrBlock == MAX_BLOCK_SIZE) {
+        // next block may be a UAHF block
+        return UAHF_INITIAL_MAX_BLOCK_SIZE;
+    }
+
+    // BIP100 allows block size limit to be increased 5%.
+    return maxCurrBlock * 105 / 100;
+}

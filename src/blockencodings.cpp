@@ -8,6 +8,7 @@
 #include "consensus/validation.h"
 #include "chainparams.h"
 #include "hash.h"
+#include "maxblocksize.h"
 #include "random.h"
 #include "streams.h"
 #include "txmempool.h"
@@ -71,7 +72,7 @@ unsigned int minTxSize() {
 }
 
 void validateNumTxs(size_t transactions, uint64_t currMaxBlockSize) {
-    uint64_t maxBlockSize =  currMaxBlockSize * 105 / 100; // max size after next block adjustmnet
+    uint64_t maxBlockSize = NextBlockRaiseCap(currMaxBlockSize);
     if (transactions > maxBlockSize / minTxSize())
         throw std::invalid_argument("compact block exceeds max txs in a block");
 }

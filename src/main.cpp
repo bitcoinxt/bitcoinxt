@@ -4490,7 +4490,7 @@ static std::map<std::string, size_t> maxMessageSizes = boost::assign::map_list_o
 bool static SanityCheckMessage(CNode* peer, const CNetMessage& msg)
 {
     const std::string& strCommand = msg.hdr.GetCommand();
-    uint64_t nMaxMessageSize = GetMaxBlockSize() * 105 / 100;
+    uint64_t nMaxMessageSize = NextBlockRaiseCap(GetMaxBlockSize());
     if (msg.hdr.nMessageSize > nMaxMessageSize ||
         (maxMessageSizes.count(strCommand) && msg.hdr.nMessageSize > maxMessageSizes[strCommand])) {
         LogPrint("net", "Oversized %s message from peer=%i (%d bytes)\n",

@@ -79,7 +79,7 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
     s << block;
 
     // Test: too large
-    size_t nMaxMessageSize = chainActive.Tip()->nMaxBlockSize * 105 / 100;
+    size_t nMaxMessageSize = NextBlockRaiseCap(chainActive.Tip()->nMaxBlockSize);
     s.resize(nMaxMessageSize + headerLen + 1);
     CNetMessage::FinalizeHeader(s);
 
