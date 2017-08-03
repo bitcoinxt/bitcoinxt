@@ -88,7 +88,7 @@ class WalletTest (BitcoinTestFramework):
             inputs.append({ "txid" : utxo["txid"], "vout" : utxo["vout"]})
             outputs[self.nodes[2].getnewaddress("from1")] = utxo["amount"]
             raw_tx = self.nodes[0].createrawtransaction(inputs, outputs)
-            txns_to_send.append(self.nodes[0].signrawtransaction(raw_tx, None, None, "ALL"))
+            txns_to_send.append(self.nodes[0].signrawtransaction(raw_tx))
 
         # Have node 1 (miner) send the transactions
         self.nodes[1].sendrawtransaction(txns_to_send[0]["hex"], True)
@@ -161,7 +161,7 @@ class WalletTest (BitcoinTestFramework):
 
         rawTx = self.nodes[1].createrawtransaction(inputs, outputs).replace("c0833842", "00000000") #replace 11.11 with 0.0 (int32)
         decRawTx = self.nodes[1].decoderawtransaction(rawTx)
-        signedRawTx = self.nodes[1].signrawtransaction(rawTx, None, None, "ALL")
+        signedRawTx = self.nodes[1].signrawtransaction(rawTx)
         decRawTx = self.nodes[1].decoderawtransaction(signedRawTx['hex'])
         zeroValueTxid= decRawTx['txid']
         sendResp = self.nodes[1].sendrawtransaction(signedRawTx['hex'])

@@ -356,7 +356,7 @@ def send_zeropri_transaction(from_node, to_node, amount, fee):
     outputs[self_address] = float(amount+fee)
 
     self_rawtx = from_node.createrawtransaction(inputs, outputs)
-    self_signresult = from_node.signrawtransaction(self_rawtx, None, None, "ALL")
+    self_signresult = from_node.signrawtransaction(self_rawtx)
     self_txid = from_node.sendrawtransaction(self_signresult["hex"], True)
 
     vout = find_output(from_node, self_txid, amount+fee)
@@ -366,7 +366,7 @@ def send_zeropri_transaction(from_node, to_node, amount, fee):
     outputs = { to_node.getnewaddress() : float(amount) }
 
     rawtx = from_node.createrawtransaction(inputs, outputs)
-    signresult = from_node.signrawtransaction(rawtx, None, None, "ALL")
+    signresult = from_node.signrawtransaction(rawtx)
     txid = from_node.sendrawtransaction(signresult["hex"], True)
 
     return (txid, signresult["hex"])
@@ -396,7 +396,7 @@ def random_transaction(nodes, amount, min_fee, fee_increment, fee_variants):
     outputs[to_node.getnewaddress()] = float(amount)
 
     rawtx = from_node.createrawtransaction(inputs, outputs)
-    signresult = from_node.signrawtransaction(rawtx, None, None, "ALL")
+    signresult = from_node.signrawtransaction(rawtx)
     txid = from_node.sendrawtransaction(signresult["hex"], True)
 
     return (txid, signresult["hex"], fee)
@@ -420,7 +420,7 @@ def assert_raises(exc, fun, *args, **kwds):
         raise AssertionError("No exception raised")
 
 def satoshi_round(amount):
-    return Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
+    return  Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
 
 def get_bip9_status(node, key):
     info = node.getblockchaininfo()

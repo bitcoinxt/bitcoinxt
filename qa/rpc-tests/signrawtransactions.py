@@ -36,7 +36,7 @@ class SignRawTransactionsTest(BitcoinTestFramework):
         outputs = {'mpLQjfK79b7CCV4VMJWEWAj5Mpx8Up5zxB': 0.1}
 
         rawTx = self.nodes[0].createrawtransaction(inputs, outputs)
-        rawTxSigned = self.nodes[0].signrawtransaction(rawTx, inputs, privKeys, "ALL")
+        rawTxSigned = self.nodes[0].signrawtransaction(rawTx, inputs, privKeys)
 
         # 1) The transaction has a complete set of signatures
         assert 'complete' in rawTxSigned
@@ -77,7 +77,7 @@ class SignRawTransactionsTest(BitcoinTestFramework):
         outputs = {'mpLQjfK79b7CCV4VMJWEWAj5Mpx8Up5zxB': 0.1}
 
         rawTx = self.nodes[0].createrawtransaction(inputs, outputs)
-        rawTxSigned = self.nodes[0].signrawtransaction(rawTx, scripts, privKeys, "ALL")
+        rawTxSigned = self.nodes[0].signrawtransaction(rawTx, scripts, privKeys)
 
         # 3) The transaction has no complete set of signatures
         assert 'complete' in rawTxSigned

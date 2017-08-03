@@ -77,7 +77,7 @@ class BigBlockTest(BitcoinTestFramework):
                         if (limit >= 250):
                             break
                 rawtx = self.nodes[3].createrawtransaction(inputs, outputs)
-                txdata = self.nodes[3].signrawtransaction(rawtx, None, None, "ALL")["hex"]
+                txdata = self.nodes[3].signrawtransaction(rawtx)["hex"]
                 self.nodes[3].sendrawtransaction(txdata)
                 tx_file.write(txdata+"\n")
             tx_file.close()

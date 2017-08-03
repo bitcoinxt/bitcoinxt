@@ -61,7 +61,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         change_outputs = make_change(nodes[0], total_in, amount, fee)
         outputs = dict(change_outputs)
         outputs[nodes[3].getnewaddress()] = amount
-        signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(tx1_inputs, outputs), None, None, "ALL")
+        signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(tx1_inputs, outputs))
         txid1 = nodes[0].sendrawtransaction(signed["hex"], True)
         sync_mempools([nodes[0], nodes[3]])
 
@@ -79,7 +79,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         change_outputs = make_change(nodes[0], total_in, amount, fee)
         outputs = dict(change_outputs)
         outputs[nodes[0].getnewaddress()] = amount
-        signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(inputs2, outputs), None, None, "ALL")
+        signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(inputs2, outputs))
         txid2 = nodes[1].sendrawtransaction(signed["hex"], True)
         # Wait until txid2 is relayed to nodes[3] (but don't wait forever):
         # Note we can't use sync_mempools, because the respend isn't added to
@@ -98,7 +98,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         # Third spend: nodes[0] -> nodes[0]
         outputs = dict(change_outputs)
         outputs[nodes[0].getnewaddress()] = amount
-        signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(inputs2, outputs), None, None, "ALL")
+        signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(inputs2, outputs))
         txid3 = nodes[1].sendrawtransaction(signed["hex"], True)
         # Ensure txid3 not relayed to nodes[3]:
         time.sleep(9.1)
@@ -117,7 +117,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         change_outputs = make_change(nodes[0], total_in, amount, fee)
         outputs = dict(change_outputs)
         outputs[nodes[0].getnewaddress()] = amount
-        signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(inputs4, outputs), None, None, "ALL")
+        signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(inputs4, outputs))
         txid4 = nodes[1].sendrawtransaction(signed["hex"], True)
         # Wait until txid4 is relayed to nodes[3] (but don't wait forever):
         def txid4_relay():
@@ -138,7 +138,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         change_outputs = make_change(nodes[0], total_in, amount, fee)
         outputs = dict(change_outputs)
         outputs[nodes[0].getnewaddress()] = amount
-        signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(inputs5, outputs), None, None, "ALL")
+        signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(inputs5, outputs))
         txid5 = nodes[1].sendrawtransaction(signed["hex"], True)
         # Wait until txid5 is relayed to nodes[3] (but don't wait forever):
         def txid5_relay():
