@@ -1,3 +1,4 @@
+#include "chainparams.h"
 #include "options.h"
 #include "util.h"
 #include <stdexcept>
@@ -74,7 +75,11 @@ uint64_t Opt::MaxBlockSizeVote() {
 }
 
 int64_t Opt::UAHFTime() {
-    return Args->GetArg("-uahftime", UAHF_DEFAULT_ACTIVATION_TIME);
+    int64_t defaultUAHFTime = Params().NetworkIDString() == CBaseChainParams::REGTEST ?
+                              Params().GenesisBlock().nTime :
+                              UAHF_DEFAULT_ACTIVATION_TIME;
+
+    return Args->GetArg("-uahftime", defaultUAHFTime);
 }
 
 int Opt::UAHFProtectSunset() {

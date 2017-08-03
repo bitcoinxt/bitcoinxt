@@ -322,12 +322,16 @@ libbitcoin_util_a_CPPFLAGS = $(AM_CPPFLAGS) $(BITCOIN_INCLUDES)
 libbitcoin_util_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_util_a_SOURCES = \
   support/pagelocker.cpp \
+  chainparams.cpp \
   chainparamsbase.cpp \
   clientversion.cpp \
   compat/glibc_sanity.cpp \
   compat/glibcxx_sanity.cpp \
   compat/strnlen.cpp \
+  crypto/sha256.cpp \
   options.cpp \
+  primitives/block.cpp \
+  primitives/transaction.cpp \
   random.cpp \
   rpcprotocol.cpp \
   support/cleanse.cpp \
