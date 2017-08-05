@@ -205,4 +205,9 @@ BOOST_AUTO_TEST_CASE(get_max_blocksize_vote_no_vote) {
     BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(coinbase, 47));
 }
 
+BOOST_AUTO_TEST_CASE(next_block_raise_cap) {
+    BOOST_CHECK_EQUAL(UAHF_INITIAL_MAX_BLOCK_SIZE, NextBlockRaiseCap(MAX_BLOCK_SIZE));
+    BOOST_CHECK_EQUAL(MAX_BLOCK_SIZE * 10 * 1.05, NextBlockRaiseCap(MAX_BLOCK_SIZE * 10));
+}
+
 BOOST_AUTO_TEST_SUITE_END();
