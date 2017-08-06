@@ -33,8 +33,7 @@ class TxnMallTest(BitcoinTestFramework):
         starting_balance = 1250
         for i in range(4):
             assert_equal(self.nodes[i].getbalance(), starting_balance)
-            # bug workaround, coins generated assigned to first getnewaddress!
-            self.nodes[i].getnewaddress("")
+            self.nodes[i].getnewaddress("")  # bug workaround, coins generated assigned to first getnewaddress!
 
         # Assign coins to foo and bar accounts:
         self.nodes[0].settxfee(.001)
@@ -90,7 +89,7 @@ class TxnMallTest(BitcoinTestFramework):
 
         # Use a different signature hash type to sign.  This creates an equivalent but malleated clone.
         # Don't send the clone anywhere yet
-        tx1_clone = self.nodes[0].signrawtransaction(clone_raw, None, None, "ALL|ANYONECANPAY")
+        tx1_clone = self.nodes[0].signrawtransaction(clone_raw, None, None, "ALL|FORKID|ANYONECANPAY")
         assert_equal(tx1_clone["complete"], True)
 
         # Have node0 mine a block, if requested:

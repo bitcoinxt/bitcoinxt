@@ -55,7 +55,7 @@ class RawTransactionsTest(BitcoinTestFramework):
         inputs  = [ {'txid' : "1d1d4e24ed99057e84c3f80fd8fbec79ed9e1acee37da269356ecea000000000", 'vout' : 1}] #won't exists
         outputs = { self.nodes[0].getnewaddress() : 4.998 }
         rawtx   = self.nodes[2].createrawtransaction(inputs, outputs)
-        rawtx   = self.nodes[2].signrawtransaction(rawtx, None, None, "ALL")
+        rawtx   = self.nodes[2].signrawtransaction(rawtx)
 
         errorString = ""
         try:
@@ -125,16 +125,14 @@ class RawTransactionsTest(BitcoinTestFramework):
                 break;
 
         bal = self.nodes[0].getbalance()
-        inputs = [{ "txid" : txId, "vout" : vout['n'], "scriptPubKey" : vout['scriptPubKey']['hex']}]
+        inputs = [{ "txid" : txId, "vout" : vout['n'], "scriptPubKey" : vout['scriptPubKey']['hex'], "amount" : vout['value']}]
         outputs = { self.nodes[0].getnewaddress() : 2.19 }
         rawTx = self.nodes[2].createrawtransaction(inputs, outputs)
-        rawTxPartialSigned = self.nodes[1].signrawtransaction(rawTx, inputs, None, "ALL")
-        # node1 only has one key, can't comp. sign the tx
-        assert_equal(rawTxPartialSigned['complete'], False)
+        rawTxPartialSigned = self.nodes[1].signrawtransaction(rawTx, inputs)
+        assert_equal(rawTxPartialSigned['complete'], False) #node1 only has one key, can't comp. sign the tx
         
-        rawTxSigned = self.nodes[2].signrawtransaction(rawTx, inputs, None, "ALL")
-        # node2 can sign the tx compl., own two of three keys
-        assert_equal(rawTxSigned['complete'], True)
+        rawTxSigned = self.nodes[2].signrawtransaction(rawTx, inputs)
+        assert_equal(rawTxSigned['complete'], True) #node2 can sign the tx compl., own two of three keys
         self.nodes[2].sendrawtransaction(rawTxSigned['hex'])
         rawTx = self.nodes[0].decoderawtransaction(rawTxSigned['hex'])
         self.sync_all()

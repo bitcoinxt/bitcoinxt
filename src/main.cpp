@@ -3433,7 +3433,10 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
     }
 
     const int64_t uahfTime = Opt().UAHFTime();
-    if (uahfTime != 0) {
+    if (uahfTime != 0 &&
+        !((Params().NetworkIDString() == CBaseChainParams::REGTEST) &&
+          (uahfTime == Params().GenesisBlock().nTime))) {
+
         // If UAHF is enabled for the current block, but not for the previous
         // block, this is the fork block, so we must check that the block is larger than 1MB.
         const int64_t nMTPPrevPrev = (pindexPrev == NULL || pindexPrev->pprev == NULL ? 0 :

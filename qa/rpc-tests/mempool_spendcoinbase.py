@@ -32,7 +32,7 @@ class MempoolSpendCoinbaseTest(BitcoinTestFramework):
         inputs = [{ "txid" : from_txid, "vout" : 0}]
         outputs = { to_address : amount }
         rawtx = self.nodes[0].createrawtransaction(inputs, outputs)
-        signresult = self.nodes[0].signrawtransaction(rawtx, None, None, "ALL")
+        signresult = self.nodes[0].signrawtransaction(rawtx)
         assert_equal(signresult["complete"], True)
         return signresult["hex"]
 
