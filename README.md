@@ -1,5 +1,3 @@
-*Want to get XT? Download it from https://bitcoinxt.software*
-
 Bitcoin XT
 ==========
 
