@@ -49,7 +49,7 @@ class MempoolLimitTest(BitcoinTestFramework):
             outputs[addr1] = self.satoshi_round(send_value/2)
             outputs[addr2] = self.satoshi_round(send_value/2)
             raw_tx = self.nodes[0].createrawtransaction(inputs, outputs)
-            signed_tx = self.nodes[0].signrawtransaction(raw_tx, None, None, "NONE")["hex"]
+            signed_tx = self.nodes[0].signrawtransaction(raw_tx, None, None, "NONE|FORKID")["hex"]
             txid = self.nodes[0].sendrawtransaction(signed_tx)
 
         while (self.nodes[0].getmempoolinfo()['size'] > 0):
@@ -75,7 +75,7 @@ class MempoolLimitTest(BitcoinTestFramework):
             newtx = rawtx[0:92]
             newtx = newtx + self.txouts
             newtx = newtx + rawtx[94:]
-            signresult = self.nodes[0].signrawtransaction(newtx, None, None, "NONE")
+            signresult = self.nodes[0].signrawtransaction(newtx, None, None, "NONE|FORKID")
             txid = self.nodes[0].sendrawtransaction(signresult["hex"], True)
             txids.append(txid)
         return txids
@@ -102,7 +102,7 @@ class MempoolLimitTest(BitcoinTestFramework):
         inputs = [{ "txid" : us0["txid"], "vout" : us0["vout"]}]
         outputs = {self.nodes[0].getnewaddress() : us0['amount'] - self.relayfee}
         tx = self.nodes[0].createrawtransaction(inputs, outputs)
-        txFS = self.nodes[0].signrawtransaction(tx, None, None, "NONE")
+        txFS = self.nodes[0].signrawtransaction(tx, None, None, "NONE|FORKID")
         txid0 = self.nodes[0].sendrawtransaction(txFS['hex'])
         self.nodes[0].lockunspent(True, [us0])
 
@@ -111,7 +111,7 @@ class MempoolLimitTest(BitcoinTestFramework):
         inputs = [{ "txid" : us1["txid"], "vout" : us1["vout"]}]
         outputs = {self.nodes[0].getnewaddress() : us1['amount'] - self.relayfee}
         tx = self.nodes[0].createrawtransaction(inputs, outputs)
-        txFS = self.nodes[0].signrawtransaction(tx, None, None, "NONE")
+        txFS = self.nodes[0].signrawtransaction(tx, None, None, "NONE|FORKID")
         txid1 = self.nodes[1].sendrawtransaction(txFS['hex'])
         self.nodes[0].lockunspent(True, [us1])
 

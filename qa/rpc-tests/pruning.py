@@ -252,7 +252,7 @@ class PruneTest(BitcoinTestFramework):
             newtx = newtx + self.txouts
             newtx = newtx + rawtx[94:]
             # Appears to be ever so slightly faster to sign with SIGHASH_NONE
-            signresult = node.signrawtransaction(newtx,None,None,"NONE")
+            signresult = node.signrawtransaction(newtx,None,None,"NONE|FORKID")
             txid = node.sendrawtransaction(signresult["hex"], True)
         # Mine a full sized block which will be these transactions we just created
         node.generate(1)
