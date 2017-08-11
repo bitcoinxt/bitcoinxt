@@ -387,8 +387,8 @@
         <translation>Bitcoin XT</translation>
     </message>
     <message>
-        <source>Request payments (generates QR codes and bitcoin: URIs)</source>
-        <translation>Zatraži uplatu (stvara QR kod i bitcoin: URI adresu)</translation>
+        <source>Request payments (generates QR codes and %1: URIs)</source>
+        <translation>Zatraži uplatu (stvara QR kod i %1: URI adresu)</translation>
     </message>
     <message>
         <source>&amp;About Bitcoin XT</source>
@@ -407,8 +407,8 @@
         <translation>Prikaži popis korištenih adresa i oznaka za primanje novca</translation>
     </message>
     <message>
-        <source>Open a bitcoin: URI or payment request</source>
-        <translation>Otvori bitcoin: URI adresu ili zahtjev za uplatu</translation>
+        <source>Open a %1: URI or payment request</source>
+        <translation>Otvori %1: URI adresu ili zahtjev za uplatu</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>

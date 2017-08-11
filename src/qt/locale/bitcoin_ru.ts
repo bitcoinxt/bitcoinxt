@@ -379,8 +379,8 @@
         <translation>Bitcoin XT</translation>
     </message>
     <message>
-        <source>Request payments (generates QR codes and bitcoin: URIs)</source>
-        <translation>Запросить платежи (создаёт QR-коды и bitcoin: ссылки)</translation>
+        <source>Request payments (generates QR codes and %1: URIs)</source>
+        <translation>Запросить платежи (создаёт QR-коды и %1: ссылки)</translation>
     </message>
     <message>
         <source>&amp;About Bitcoin XT</source>
@@ -395,8 +395,8 @@
         <translation>Показать список использованных адресов и меток получения</translation>
     </message>
     <message>
-        <source>Open a bitcoin: URI or payment request</source>
-        <translation>Открыть bitcoin: URI или запрос платежа</translation>
+        <source>Open a %1: URI or payment request</source>
+        <translation>Открыть %1: URI или запрос платежа</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>

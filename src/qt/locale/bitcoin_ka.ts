@@ -363,8 +363,8 @@
         <translation>Bitcoin XT</translation>
     </message>
     <message>
-        <source>Request payments (generates QR codes and bitcoin: URIs)</source>
-        <translation>გადახდის მოთხოვნა (შეიქმნება QR-კოდები და bitcoin: ბმულები)</translation>
+        <source>Request payments (generates QR codes and %1: URIs)</source>
+        <translation>გადახდის მოთხოვნა (შეიქმნება QR-კოდები და %1: ბმულები)</translation>
     </message>
     <message>
         <source>&amp;About Bitcoin XT</source>
@@ -379,8 +379,8 @@
         <translation>გამოყენებული მიღების მისამართებისა და ნიშნულების სიის ჩვენება</translation>
     </message>
     <message>
-        <source>Open a bitcoin: URI or payment request</source>
-        <translation>bitcoin: URI-ის ან გადახდის მოთხოვნის გახსნა</translation>
+        <source>Open a %1: URI or payment request</source>
+        <translation>%1: URI-ის ან გადახდის მოთხოვნის გახსნა</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>
