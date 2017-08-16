@@ -107,14 +107,27 @@ class BIP66Test(ComparisonTestFramework):
         yield TestInstance(test_blocks, sync_every_block=False)
 
         '''
-        Check that the new DERSIG rules are not enforced in the 75th
+        Check that the new DERSIG rules are enforced in the 75th
         version 3 block.
+
+        Before UAHF the DERSIG rules were not enforced at this point.
         '''
         spendtx = self.create_transaction(self.nodes[0],
                 self.coinbase_blocks[0], self.nodeaddress, 1.0)
+
         unDERify(spendtx)
         spendtx.rehash()
 
+        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
+        block.nVersion = 3
+        block.vtx.append(spendtx)
+        block.hashMerkleRoot = block.calc_merkle_root()
+        block.rehash()
+        block.solve()
+        yield TestInstance([[block, False]])
+
+        spendtx = self.create_transaction(self.nodes[0],
+                self.coinbase_blocks[0], self.nodeaddress, 1.0)
         block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
         block.nVersion = 3
         block.vtx.append(spendtx)
