@@ -95,7 +95,9 @@ testScripts = [
     'decodescript.py',
     'sendheaders.py',
     'invalidblockrequest.py',
-    'invalidtxrequest.py'
+    'invalidtxrequest.py',
+    'p2p-fullblocktest.py',
+    'bipdersig-p2p.py'
 ]
 testScriptsExt = [
 # Needs update for BCC.

@@ -39,6 +39,7 @@ MY_VERSION = 70014
 MY_SUBVERSION = b"/python-mininode-tester:0.0.3/"
 
 MAX_INV_SZ = 50000
+MAX_BLOCK_SIZE = 1000000
 
 # Keep our own socket map for asyncore, so that we can track disconnects
 # ourselves (to workaround an issue with closing an asyncore socket when
