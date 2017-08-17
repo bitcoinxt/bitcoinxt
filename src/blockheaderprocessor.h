@@ -45,10 +45,10 @@ class DefaultHeaderProcessor : public BlockHeaderProcessor {
          CBlockIndex* acceptHeaders(
                 const std::vector<CBlockHeader>& headers);
 
+         // private, but protected for unittest
+         virtual std::vector<CBlockIndex*> findMissingBlocks(CBlockIndex* last);
+
     private:
-
-        std::vector<CBlockIndex*> findMissingBlocks(CBlockIndex* last);
-
         bool hasEqualOrMoreWork(CBlockIndex* last);
         void suggestDownload(
                 const std::vector<CBlockIndex*>& toFetch, CBlockIndex* last);
