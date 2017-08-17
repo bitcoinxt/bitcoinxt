@@ -172,6 +172,7 @@ BITCOIN_CORE_H = \
   utilstrencodings.h \
   utiltime.h \
   utilprocessmsg.h \
+  utilfork.h \
   validationinterface.h \
   version.h \
   versionbits.h \
@@ -239,6 +240,7 @@ libbitcoin_server_a_SOURCES = \
   txdb.cpp \
   txmempool.cpp \
   utilprocessmsg.cpp \
+  utilfork.cpp \
   validationinterface.cpp \
   xthin.cpp \
   versionbits.cpp \

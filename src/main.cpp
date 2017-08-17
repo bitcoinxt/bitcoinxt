@@ -34,6 +34,7 @@
 #include "ui_interface.h"
 #include "undo.h"
 #include "util.h"
+#include "utilfork.h"
 #include "utilmoneystr.h"
 #include "utilprocessmsg.h"
 #include "validationinterface.h"
@@ -2790,9 +2791,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew,
     int64_t nTime5 = GetTimeMicros(); nTimeChainState += nTime5 - nTime4;
     LogPrint("bench", "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
     // If we just activated the UAHF, clear the pool to be sure it doesn't contain tx invalid after the fork
-    if ((Opt().UAHFTime() != 0) &&
-        (pindexNew->GetMedianTimePast() >= Opt().UAHFTime()) &&
-        (pindexNew->pprev->GetMedianTimePast() < Opt().UAHFTime())) {
+    if (IsUAHFActivatingBlock(pindexNew->GetMedianTimePast(), pindexNew->pprev)) {
         mempool.clear();
     }
     // Remove conflicting transactions from the mempool.
@@ -3437,11 +3436,13 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
         !((Params().NetworkIDString() == CBaseChainParams::REGTEST) &&
           (uahfTime == Params().GenesisBlock().nTime))) {
 
+        CBlockIndex* pprevprev = pindexPrev == nullptr
+            ? nullptr
+            : pindexPrev->pprev;
+
         // If UAHF is enabled for the current block, but not for the previous
         // block, this is the fork block, so we must check that the block is larger than 1MB.
-        const int64_t nMTPPrevPrev = (pindexPrev == NULL || pindexPrev->pprev == NULL ? 0 :
-                                      pindexPrev->pprev->GetMedianTimePast());
-        if ((nMTPPrevPrev < uahfTime) && (uahfTime <= nMedianTimePastPrev)) {
+        if (IsUAHFActivatingBlock(nMedianTimePastPrev, pprevprev)) {
             const uint64_t currentBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
             if (currentBlockSize <= MAX_BLOCK_SIZE) {
                 return state.DoS(100, error("%s: UAHF fork block must exceed %d, but this block is %d bytes",
