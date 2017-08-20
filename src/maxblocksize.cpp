@@ -8,6 +8,7 @@
 #include "chain.h"
 #include "util.h"
 #include "options.h"
+#include "utilfork.h"
 #include <string>
 #include <boost/lexical_cast.hpp>
 
@@ -20,9 +21,7 @@ uint64_t GetNextMaxBlockSize(const CBlockIndex* pindexLast, const Consensus::Par
         return MAX_BLOCK_SIZE;
 
     // Bump to 8MB at UAHF fork
-    if ((Opt().UAHFTime() != 0) &&
-        (pindexLast->GetMedianTimePast() >= Opt().UAHFTime()) &&
-        (pindexLast->pprev && (pindexLast->pprev->GetMedianTimePast() < Opt().UAHFTime())))
+    if (pindexLast->pprev && IsUAHFActivatingBlock(pindexLast->GetMedianTimePast(), pindexLast->pprev))
         return UAHF_INITIAL_MAX_BLOCK_SIZE;
 
     uint64_t nMaxBlockSize = pindexLast->nMaxBlockSize;
@@ -36,7 +35,6 @@ uint64_t GetNextMaxBlockSize(const CBlockIndex* pindexLast, const Consensus::Par
     const CBlockIndex *pindexWalk = pindexLast;
     for (int64_t i = 0; i < params.DifficultyAdjustmentInterval(); i++) {
         assert(pindexWalk);
-        assert(pindexWalk->nMaxBlockSize == nMaxBlockSize);
         votes.push_back(pindexWalk->nMaxBlockSizeVote ? pindexWalk->nMaxBlockSizeVote : pindexWalk->nMaxBlockSize);
         pindexWalk = pindexWalk->pprev;
     }
