@@ -12,6 +12,8 @@ class CCoinControl
 {
 public:
     CTxDestination destChange;
+    //! Minimum absolute fee (not per kilobyte)
+    CAmount nMinimumTotalFee;
 
     CCoinControl()
     {
@@ -22,6 +24,7 @@ public:
     {
         destChange = CNoDestination();
         setSelected.clear();
+        nMinimumTotalFee = 0;
     }
 
     bool HasSelected() const
