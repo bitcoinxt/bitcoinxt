@@ -299,6 +299,10 @@
         <translation>bitcoin core</translation>
     </message>
     <message>
+        <source>Request payments (generates QR codes and %1: URIs)</source>
+        <translation>Pide pagos (genera codigos QR and %1: URls)</translation>
+    </message>
+    <message>
         <source>Error</source>
         <translation>Error</translation>
     </message>

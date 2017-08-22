@@ -383,8 +383,8 @@
         <translation>Bitcoin-ydin</translation>
     </message>
     <message>
-        <source>Request payments (generates QR codes and bitcoin: URIs)</source>
-        <translation>Pyydä maksuja (Luo QR koodit ja bitcoin: URIt)</translation>
+        <source>Request payments (generates QR codes and %1: URIs)</source>
+        <translation>Pyydä maksuja (Luo QR koodit ja %1: URIt)</translation>
     </message>
     <message>
         <source>&amp;About Bitcoin XT</source>
@@ -399,8 +399,8 @@
         <translation>Näytä vastaanottamiseen käytettyjen osoitteiden ja nimien lista</translation>
     </message>
     <message>
-        <source>Open a bitcoin: URI or payment request</source>
-        <translation>Avaa bitcoin: URI tai maksupyyntö</translation>
+        <source>Open a %1: URI or payment request</source>
+        <translation>Avaa %1: URI tai maksupyyntö</translation>
     </message>
     <message>
         <source>&amp;Command-line options</source>

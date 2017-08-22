@@ -367,6 +367,10 @@
         <translation>حول bitcoin core</translation>
     </message>
     <message>
+        <source>Open a %1: URI or payment request</source>
+        <translation>فتح URI : %1 أو طلب دفع</translation>
+    </message>
+    <message>
         <source>Error</source>
         <translation>خطأ</translation>
     </message>
