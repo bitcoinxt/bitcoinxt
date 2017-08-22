@@ -10,6 +10,7 @@
 #include "inflightindex.h"
 #include "utilprocessmsg.h" // BlockInFlightMarker
 #include <boost/range/adaptor/reversed.hpp>
+#include <deque>
 
 using namespace std;
 
@@ -51,7 +52,8 @@ CBlockIndex* DefaultHeaderProcessor::operator()(const std::vector<CBlockHeader>&
         pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256());
     }
 
-    if (pindexLast && maybeAnnouncement) {
+    if (pindexLast && maybeAnnouncement && hasEqualOrMoreWork(pindexLast)) {
+
         std::vector<CBlockIndex*> toFetch = findMissingBlocks(pindexLast);
 
         // We may or may not start downloading the blocks
@@ -88,13 +90,19 @@ CBlockIndex* DefaultHeaderProcessor::acceptHeaders(
 std::vector<CBlockIndex*> DefaultHeaderProcessor::findMissingBlocks(CBlockIndex* last) {
     assert(last);
 
-    vector<CBlockIndex*> toFetch;
+    std::deque<CBlockIndex*> toFetch;
     CBlockIndex* walk = last;
+
+    const int WALK_LIMIT = 144; // one day
+    int walked = 0;
 
     // Calculate all the blocks we'd need to switch to last, up to a limit.
     do {
-        if (toFetch.size() == MAX_BLOCKS_IN_TRANSIT_PER_PEER)
-            break;
+
+        if (++walked > WALK_LIMIT) {
+            // We're far behind. No gain in direct fetch.
+            return std::vector<CBlockIndex*>();
+        }
 
         if (chainActive.Contains(walk))
             break;
@@ -108,9 +116,14 @@ std::vector<CBlockIndex*> DefaultHeaderProcessor::findMissingBlocks(CBlockIndex*
         // We don't have this block, and it's not yet in flight.
         toFetch.push_back(walk);
 
+        // Avoid out of order fetching, trim off the newest block. Out of order
+        // fetching is conceptually fine, but confuses rpc tests that use comptool.
+        if (toFetch.size() > MAX_BLOCKS_IN_TRANSIT_PER_PEER)
+            toFetch.pop_front();
+
     } while ((walk = walk->pprev));
 
-    return toFetch;
+    return std::vector<CBlockIndex*>(begin(toFetch), end(toFetch));
 }
 
 bool DefaultHeaderProcessor::hasEqualOrMoreWork(CBlockIndex* last) {
@@ -120,9 +133,6 @@ bool DefaultHeaderProcessor::hasEqualOrMoreWork(CBlockIndex* last) {
 
 void DefaultHeaderProcessor::suggestDownload(const std::vector<CBlockIndex*>& toFetch, CBlockIndex* last) {
     std::vector<CInv> toGet;
-
-    if (!hasEqualOrMoreWork(last))
-        return;
 
     for (auto b : boost::adaptors::reverse(toFetch)) {
 
