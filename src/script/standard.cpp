@@ -321,3 +321,7 @@ CScript GetScriptForMultisig(int nRequired, const std::vector<CPubKey>& keys)
     script << CScript::EncodeOP_N(keys.size()) << OP_CHECKMULTISIG;
     return script;
 }
+
+bool IsValidDestination(const CTxDestination& dest) {
+    return dest.which() != 0;
+}
