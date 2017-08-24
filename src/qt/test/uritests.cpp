@@ -6,11 +6,17 @@
 
 #include "guiutil.h"
 #include "walletmodel.h"
+#include "chainparams.h"
 
 #include <QUrl>
 
 void URITests::uriTests()
 {
+    // UAHF status is checked to determine if
+    // prefix is bitcoin: or bitcoincash:
+    // This requires chainparams to be initialized.
+    SelectParams(CBaseChainParams::MAIN);
+
     SendCoinsRecipient rv;
     QUrl uri;
     uri.setUrl(QString("bitcoincash:175tWpb8K1S7NmH4Zx6rewF9WQrcZv245W?req-dontexist="));
