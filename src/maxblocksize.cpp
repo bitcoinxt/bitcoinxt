@@ -21,7 +21,7 @@ uint64_t GetNextMaxBlockSize(const CBlockIndex* pindexLast, const Consensus::Par
         return MAX_BLOCK_SIZE;
 
     // Bump to 8MB at UAHF fork
-    if (pindexLast->pprev && IsUAHFActivatingBlock(pindexLast->GetMedianTimePast(), pindexLast->pprev))
+    if (IsUAHFActivatingBlock(pindexLast->GetMedianTimePast(), pindexLast->pprev))
         return UAHF_INITIAL_MAX_BLOCK_SIZE;
 
     uint64_t nMaxBlockSize = pindexLast->nMaxBlockSize;
@@ -35,7 +35,7 @@ uint64_t GetNextMaxBlockSize(const CBlockIndex* pindexLast, const Consensus::Par
     const CBlockIndex *pindexWalk = pindexLast;
     for (int64_t i = 0; i < params.DifficultyAdjustmentInterval(); i++) {
         assert(pindexWalk);
-        votes.push_back(pindexWalk->nMaxBlockSizeVote ? pindexWalk->nMaxBlockSizeVote : pindexWalk->nMaxBlockSize);
+        votes.push_back(pindexWalk->nMaxBlockSizeVote ? pindexWalk->nMaxBlockSizeVote : nMaxBlockSize);
         pindexWalk = pindexWalk->pprev;
     }
 

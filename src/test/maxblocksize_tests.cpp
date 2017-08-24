@@ -16,7 +16,7 @@ void fillBlockIndex(
         bool addVotes, int64_t currMax) {
 
     int height = 0;
-    int64_t blocktime = UAHF_DEFAULT_ACTIVATION_TIME;
+    int64_t blocktime = Opt().UAHFTime();
 
     CBlockIndex* prev = nullptr;
     for (CBlockIndex& index : blockIndexes)
@@ -35,7 +35,7 @@ void fillBlockIndex(
 };
 
 BOOST_AUTO_TEST_CASE(get_next_max_blocksize) {
-    auto params = Params(CBaseChainParams::MAIN).GetConsensus();
+    auto params = Params(CBaseChainParams::REGTEST).GetConsensus();
     BOOST_CHECK_EQUAL(1512, params.nMaxBlockSizeChangePosition);
 
     // Genesis block, legacy block size
@@ -46,7 +46,7 @@ BOOST_AUTO_TEST_CASE(get_next_max_blocksize) {
     // Not at a difficulty adjustment interval,
     // should not change max block size.
     {
-        uint64_t currMax = 42 * 1000000;
+        uint64_t currMax = UAHF_INITIAL_MAX_BLOCK_SIZE;
         std::vector<CBlockIndex> blockInterval(interval);
         fillBlockIndex(params, blockInterval, true, currMax);
         CBlockIndex index;
