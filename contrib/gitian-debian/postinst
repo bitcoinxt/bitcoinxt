@@ -36,3 +36,14 @@ if [ -x "/bin/systemctl" ]; then
 else
     echo "The file '/bin/systemctl' is not executable or found, bitcoinxtd service not automatically enabled or started" 
 fi
+
+# ask which network to connect to
+db_input high bitcoinxt/select_network || true
+db_go || true
+db_get bitcoinxt/select_network
+if [ "$RET" = "Bitcoin (BTC)" ]; then
+    echo "uahftime=0" >> /etc/bitcoinxt/bitcoin.conf
+    echo "BTC Network: uahftime=0 added to /etc/bitcoinxt/bitcoin.conf"
+else
+    echo "BCC Network: Default settings kept."
+fi
