@@ -3,8 +3,13 @@
 # Source debconf library.
 . /usr/share/debconf/confmodule
 
-# add random rpc password to bitcoin.conf
-echo "rpcpassword=$(xxd -l 16 -p /dev/urandom)" >> /etc/bitcoinxt/bitcoin.conf 
+export BITCOIN_CONF="/etc/bitcoinxt/bitcoin.conf"
+
+# add random rpc password to bitcoin.conf, if there isn't one.
+if ! grep -q '^rpcpassword=' $BITCOIN_CONF; then
+    echo "Adding a random rcp password to $BITCOIN_CONF"
+    echo "rpcpassword=$(xxd -l 17 -p /dev/urandom)" >> $BITCOIN_CONF
+fi
 
 # add users
 adduser --system --group --quiet bitcoin
@@ -42,8 +47,18 @@ db_input high bitcoinxt/select_network || true
 db_go || true
 db_get bitcoinxt/select_network
 if [ "$RET" = "Bitcoin (BTC)" ]; then
-    echo "uahftime=0" >> /etc/bitcoinxt/bitcoin.conf
-    echo "BTC Network: uahftime=0 added to /etc/bitcoinxt/bitcoin.conf"
+    if grep -q '^uahftime' $BITCOIN_CONF; then
+        sed -i 's/^uahftime.*/uahftime=0/' $BITCOIN_CONF
+        echo "BTC selected: Setting uahftime=0 in $BITCOIN_CONF"
+    else
+        echo "uahftime=0" >> $BITCOIN_CONF
+        echo "BTC selected: Adding uahftime=0 to $BITCOIN_CONF"
+    fi;
 else
-    echo "BCC Network: Default settings kept."
+    if grep -q '^uahftime' $BITCOIN_CONF; then
+        sed -i 's/^uahftime.*//' $BITCOIN_CONF
+        echo "BCC selected: Removing uahftime from $BITCOIN_CONF"
+    else
+        echo "BCC selected: No configuration change needed."
+    fi;
 fi
