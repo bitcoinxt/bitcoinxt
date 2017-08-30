@@ -29,16 +29,16 @@
   <string>????</string>
 
   <key>CFBundleExecutable</key>
-  <string>Bitcoin-Qt</string>
+  <string>Bitcoin-XT</string>
   
   <key>CFBundleName</key>
-  <string>Bitcoin-Qt</string>
+  <string>Bitcoin-XT</string>
 
   <key>LSHasLocalizedDisplayName</key>
   <true/>
 
   <key>CFBundleIdentifier</key>
-  <string>org.bitcoincash.Bitcoin-Qt</string>
+  <string>org.bitcoincash.Bitcoin-XT</string>
 
   <key>CFBundleURLTypes</key>
   <array>
