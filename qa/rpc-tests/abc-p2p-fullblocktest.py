@@ -18,12 +18,16 @@ from test_framework.blocktools import *
 import time
 from test_framework.key import CECKey
 from test_framework.script import *
-from test_framework.cdefs import (ONE_MEGABYTE, LEGACY_MAX_BLOCK_SIZE,
+from test_framework.cdefs import (ONE_MEGABYTE,
                                   MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT)
+
+# Test was written for Bitcoin ABC. This enables/disables
+# tweaks that make it compatible with XT.
+XT_TWEAKS = True
+LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE
 
 # far into the past
 UAHF_START_TIME = 30000000
-
 
 class PreviousSpendableOutput(object):
 
@@ -71,7 +75,10 @@ class FullBlockTest(ComparisonTestFramework):
 
     def __init__(self):
         super().__init__()
-        self.excessive_block_size = 16 * ONE_MEGABYTE
+        if XT_TWEAKS:
+            self.excessive_block_size = 8 * ONE_MEGABYTE
+        else:
+            self.excessive_block_size = 16 * ONE_MEGABYTE
         self.num_nodes = 1
         self.block_heights = {}
         self.coinbase_key = CECKey()
@@ -81,7 +88,8 @@ class FullBlockTest(ComparisonTestFramework):
         self.blocks = {}
 
     def setup_network(self):
-        self.extra_args = [['-debug',
+        if not XT_TWEAKS:
+            self.extra_args = [['-debug',
                             '-norelaypriority',
                             '-whitelist=127.0.0.1',
                             '-limitancestorcount=9999',
@@ -92,6 +100,17 @@ class FullBlockTest(ComparisonTestFramework):
                             "-uahfstarttime=%d" % UAHF_START_TIME,
                             "-excessiveblocksize=%d"
                             % self.excessive_block_size]]
+        else:
+            self.extra_args = [['-debug',
+                            '-relaypriority=0',
+                            '-whitelist=127.0.0.1',
+                            '-limitancestorcount=9999',
+                            '-limitancestorsize=9999',
+                            '-limitdescendantcount=9999',
+                            '-limitdescendantsize=9999',
+                            '-maxmempool=999',
+                            "-uahftime=%d" % UAHF_START_TIME]]
+
         self.nodes = start_nodes(self.num_nodes, self.options.tmpdir,
                                  self.extra_args,
                                  binary=[self.options.testbinary])
@@ -106,8 +125,8 @@ class FullBlockTest(ComparisonTestFramework):
         self.test.add_all_connections(self.nodes)
         # Start up network handling in another thread
         NetworkThread().start()
-        # Set the blocksize to 2MB as initial condition
-        self.nodes[0].setexcessiveblock(self.excessive_block_size)
+        if not XT_TWEAKS:
+            self.nodes[0].setexcessiveblock(self.excessive_block_size)
         self.test.run()
 
     def add_transactions_to_block(self, block, tx_list):
@@ -152,7 +171,7 @@ class FullBlockTest(ComparisonTestFramework):
             block_time = self.tip.nTime + 1
         # First create the coinbase
         height = self.block_heights[base_block_hash] + 1
-        coinbase = create_coinbase(height, self.coinbase_pubkey)
+        coinbase = create_coinbase(absoluteHeight = height, pubkey = self.coinbase_pubkey)
         coinbase.vout[0].nValue += additional_coinbase_value
         if (spend != None):
             coinbase.vout[0].nValue += spend.tx.vout[
@@ -290,7 +309,11 @@ class FullBlockTest(ComparisonTestFramework):
         # Let's build some blocks and test them.
         for i in range(16):
             n = i + 1
-            block(n, spend=out[i], block_size=n * ONE_MEGABYTE)
+            if XT_TWEAKS:
+                block(n, spend=out[i], block_size=min(self.excessive_block_size,\
+                        n * ONE_MEGABYTE))
+            else:
+                block(n, spend=out[i], block_size=n * ONE_MEGABYTE)
             yield accepted()
 
         # block of maximal size
