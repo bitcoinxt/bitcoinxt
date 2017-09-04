@@ -13,8 +13,10 @@ import copy
 import time
 import numbers
 from test_framework.key import CECKey
-from test_framework.script import CScript, CScriptOp, SignatureHash, SIGHASH_ALL, OP_TRUE, OP_FALSE, SIGHASH_FORKID, SignatureHashForkId, hash160
+from test_framework.script import *
 import struct
+
+XT_TWEAK = True
 
 class PreviousSpendableOutput(object):
     def __init__(self, tx = CTransaction(), n = -1):
@@ -383,9 +385,10 @@ class FullBlockTest(ComparisonTestFramework):
         b24 = update_block(24, [tx])
         assert_equal(len(b24.serialize()), MAX_BLOCK_SIZE+1)
 
-        # TODO UAHF: This test has not been updated after UAHF to 8MB blocks.
-        # Skipping.
-        #yield rejected(RejectResult(16, b'bad-blk-length'))
+        ## TODO UAHF: This test has not been updated after UAHF to 8MB blocks.
+        ## Skipping.
+        if not XT_TWEAK:
+            yield rejected(RejectResult(16, b'bad-blk-length'))
 
         block(25, spend=out[7])
         yield rejected()
@@ -406,7 +409,10 @@ class FullBlockTest(ComparisonTestFramework):
 
         # Extend the b26 chain to make sure bitcoind isn't accepting b26
         b27 = block(27, spend=out[7])
-        yield rejected(RejectResult(16, b'bad-prevblk'))
+        if not XT_TWEAK:
+            # We never proccess blocks where previous is missing.
+            # Instead we re-request previous.
+            yield rejected(RejectResult(16, b'bad-prevblk'))
 
         # Now try a too-large-coinbase script
         tip(15)
@@ -418,7 +424,10 @@ class FullBlockTest(ComparisonTestFramework):
 
         # Extend the b28 chain to make sure bitcoind isn't accepting b28
         b29 = block(29, spend=out[7])
-        yield rejected(RejectResult(16, b'bad-prevblk'))
+        if not XT_TWEAK:
+            # We never proccess blocks where previous is missing.
+            # Instead we re-request previous.
+            yield rejected(RejectResult(16, b'bad-prevblk'))
 
         # b30 has a max-sized coinbase scriptSig.
         tip(23)
@@ -561,6 +570,7 @@ class FullBlockTest(ComparisonTestFramework):
         assert_equal(numTxes <= b39_outputs, True)
 
         lastOutpoint = COutPoint(b40.vtx[1].sha256, 0)
+        lastAmount = b40.vtx[1].vout[0].nValue
         new_txs = []
         for i in range(1, numTxes+1):
             tx = CTransaction()
@@ -569,8 +579,9 @@ class FullBlockTest(ComparisonTestFramework):
             # second input is corresponding P2SH output from b39
             tx.vin.append(CTxIn(COutPoint(b39.vtx[i].sha256, 0), b''))
             # Note: must pass the redeem_script (not p2sh_script) to the signature hash function
-            (sighash, err) = SignatureHash(redeem_script, tx, 1, SIGHASH_ALL)
-            sig = self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL]))
+            sighash = SignatureHashForkId(redeem_script, tx, 1,
+                    SIGHASH_ALL | SIGHASH_FORKID, lastAmount)
+            sig = self.coinbase_key.sign(sighash) + bytes(bytearray([SIGHASH_ALL | SIGHASH_FORKID]))
             scriptSig = CScript([sig, redeem_script])
 
             tx.vin[1].scriptSig = scriptSig
@@ -622,7 +633,7 @@ class FullBlockTest(ComparisonTestFramework):
         # The next few blocks are going to be created "by hand" since they'll do funky things, such as having
         # the first transaction be non-coinbase, etc.  The purpose of b44 is to make sure this works.
         height = self.block_heights[self.tip.sha256] + 1
-        coinbase = create_coinbase(height, self.coinbase_pubkey)
+        coinbase = create_coinbase(absoluteHeight = height, pubkey = self.coinbase_pubkey)
         b44 = CBlock()
         b44.nTime = self.tip.nTime + 1
         b44.hashPrevBlock = self.tip.sha256
@@ -699,7 +710,7 @@ class FullBlockTest(ComparisonTestFramework):
         # A block with two coinbase txns
         tip(44)
         b51 = block(51)
-        cb2 = create_coinbase(51, self.coinbase_pubkey)
+        cb2 = create_coinbase(absoluteHeight = 51, pubkey = self.coinbase_pubkey)
         b51 = update_block(51, [cb2])
         yield rejected(RejectResult(16, b'bad-cb-multiple'))
 
