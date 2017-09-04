@@ -5104,8 +5104,10 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv, int64_t
             // Ignore duplicate advertisements for the same item from the same peer. This check
             // prevents a peer from constantly promising to deliver an item that it never does,
             // thus blinding us to new transactions and blocks.
-            if (!Opt().IsStealthMode() && !pfrom->AddInventoryKnown(inv))
+            if (!Opt().IsStealthMode() && !pfrom->AddInventoryKnown(inv) && !pfrom->fWhitelisted) {
+                LogPrint("net", "ignoring inv: %s peer=%d\n", inv.ToString(), pfrom->id);
                 continue;
+            }
 
             bool fAlreadyHave = AlreadyHave(inv);
             LogPrint("net", "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
