@@ -77,6 +77,7 @@ BITCOIN_TESTS =\
   test/main_tests.cpp \
   test/maxblocksize_tests.cpp \
   test/mempool_tests.cpp \
+  test/merkleblock_tests.cpp \
   test/miner_tests.cpp \
   test/monolith_opcodes.cpp \
   test/multisig_tests.cpp \
