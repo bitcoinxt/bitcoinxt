@@ -1,4 +1,4 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 #
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
@@ -85,7 +85,7 @@ class SPVTest(BitcoinTestFramework):
         self.num_nodes = 2
 
     def setup_chain(self):
-        print "Initializing test directory "+self.options.tmpdir
+        print("Initializing test directory "+self.options.tmpdir)
         initialize_chain_clean(self.options.tmpdir, self.num_nodes)
 
     def setup_network(self):

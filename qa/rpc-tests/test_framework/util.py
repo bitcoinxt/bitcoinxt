@@ -1,6 +1,9 @@
-# Copyright (c) 2014 The Bitcoin Core developers
+#!/usr/bin/env python3
+# Copyright (c) 2014-2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
+
+
 #
 # Helpful routines for regression testing
 #
@@ -9,6 +12,8 @@
 import os
 import sys
 
+from binascii import hexlify, unhexlify
+from base64 import b64encode
 from decimal import Decimal, ROUND_DOWN
 import json
 import random
@@ -16,6 +21,7 @@ import shutil
 import subprocess
 import time
 import re
+import errno
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
@@ -31,7 +37,7 @@ MOCKTIME = 0
 
 def enable_mocktime():
     #For backwared compatibility of the python scripts
-    #with previous versions of the cache, set MOCKTIME 
+    #with previous versions of the cache, set MOCKTIME
     #to Jan 1, 2014 + (201 * 10 * 60)
     global MOCKTIME
     MOCKTIME = 1388534400 + (201 * 10 * 60)
@@ -90,6 +96,15 @@ def check_json_precision():
 def count_bytes(hex_string):
     return len(bytearray.fromhex(hex_string))
 
+def bytes_to_hex_str(byte_str):
+    return hexlify(byte_str).decode('ascii')
+
+def hex_str_to_bytes(hex_str):
+    return unhexlify(hex_str.encode('ascii'))
+
+def str_to_b64str(string):
+    return b64encode(string.encode('utf-8')).decode('ascii')
+
 def sync_blocks(rpc_connections, wait=1, timeout=60):
     """
     Wait until everybody has the same tip
@@ -125,23 +140,66 @@ def initialize_datadir(dirname, n):
     datadir = os.path.join(dirname, "node"+str(n))
     if not os.path.isdir(datadir):
         os.makedirs(datadir)
+    rpc_u, rpc_p = rpc_auth_pair(n)
     with open(os.path.join(datadir, "bitcoin.conf"), 'w') as f:
-        f.write("regtest=1\n");
-        f.write("rpcuser=rt\n");
-        f.write("rpcpassword=rt\n");
-        f.write("port="+str(p2p_port(n))+"\n");
-        f.write("rpcport="+str(rpc_port(n))+"\n");
+        f.write("regtest=1\n")
+        f.write("rpcuser=" + rpc_u + "\n")
+        f.write("rpcpassword=" + rpc_p + "\n")
+        f.write("port="+str(p2p_port(n))+"\n")
+        f.write("rpcport="+str(rpc_port(n))+"\n")
     return datadir
+
+def rpc_auth_pair(n):
+    return 'rpcuser💻' + str(n), 'rpcpass🔑' + str(n)
+
+def rpc_url(i, rpchost=None):
+    rpc_u, rpc_p = rpc_auth_pair(i)
+    host = '127.0.0.1'
+    port = rpc_port(i)
+    if rpchost:
+        parts = rpchost.split(':')
+        if len(parts) == 2:
+            host, port = parts
+        else:
+            host = rpchost
+    return "http://%s:%s@%s:%d" % (rpc_u, rpc_p, host, int(port))
+
+def wait_for_bitcoind_start(process, url, i):
+    '''
+    Wait for bitcoind to start. This means that RPC is accessible and fully initialized.
+    Raise an exception if bitcoind exits during initialization.
+    '''
+    while True:
+        if process.poll() is not None:
+            raise Exception('bitcoind exited with status %i during initialization' % process.returncode)
+        try:
+            rpc = get_rpc_proxy(url, i)
+            blocks = rpc.getblockcount()
+            break # break out of loop on success
+        except IOError as e:
+            if e.errno != errno.ECONNREFUSED: # Port not yet open?
+                raise # unknown IO error
+        except JSONRPCException as e: # Initialization phase
+            if e.error['code'] != -28: # RPC in warmup?
+                raise # unkown JSON RPC exception
+        time.sleep(0.25)
 
 def initialize_chain(test_dir):
     """
     Create (or copy from cache) a 200-block-long chain and
     4 wallets.
-    bitcoind and bitcoin-cli must be in search path.
     """
 
-    if not os.path.isdir(os.path.join("cache", "node0")):
-        devnull = open("/dev/null", "w+")
+    if (not os.path.isdir(os.path.join("cache","node0"))
+        or not os.path.isdir(os.path.join("cache","node1"))
+        or not os.path.isdir(os.path.join("cache","node2"))
+        or not os.path.isdir(os.path.join("cache","node3"))):
+
+        #find and delete old cache directories if any exist
+        for i in range(4):
+            if os.path.isdir(os.path.join("cache","node"+str(i))):
+                shutil.rmtree(os.path.join("cache","node"+str(i)))
+
         # Create cache directories, run bitcoinds:
         for i in range(4):
             datadir=initialize_datadir("cache", i)
@@ -150,19 +208,15 @@ def initialize_chain(test_dir):
                 args.append("-connect=127.0.0.1:"+str(p2p_port(0)))
             bitcoind_processes[i] = subprocess.Popen(args)
             if os.getenv("PYTHON_DEBUG", ""):
-                print "initialize_chain: bitcoind started, calling bitcoin-cli -rpcwait getblockcount"
-            subprocess.check_call([ os.getenv("BITCOINCLI", "bitcoin-cli"), "-datadir="+datadir,
-                                    "-rpcwait", "getblockcount"], stdout=devnull)
+                print("initialize_chain: bitcoind started, waiting for RPC to come up")
+            wait_for_bitcoind_start(bitcoind_processes[i], rpc_url(i), i)
             if os.getenv("PYTHON_DEBUG", ""):
-                print "initialize_chain: bitcoin-cli -rpcwait getblockcount completed"
-        devnull.close()
+                print("initialize_chain: RPC succesfully started")
 
         rpcs = []
-
         for i in range(4):
             try:
-                url = "http://rt:rt@127.0.0.1:%d" % (rpc_port(i),)
-                rpcs.append(get_rpc_proxy(url, i))
+                rpcs.append(get_rpc_proxy(rpc_url(i), i))
             except:
                 sys.stderr.write("Error connecting to "+url+"\n")
                 sys.exit(1)
@@ -237,17 +291,12 @@ def start_node(i, dirname, extra_args=None, rpchost=None, timewait=None, binary=
     args = [ binary, "-datadir="+datadir, "-keypool=1", "-discover=0", "-rest", "-mocktime="+str(get_mocktime()) ]
     if extra_args is not None: args.extend(extra_args)
     bitcoind_processes[i] = subprocess.Popen(args)
-    devnull = open("/dev/null", "w+")
     if os.getenv("PYTHON_DEBUG", ""):
-        print "start_node: bitcoind started, calling bitcoin-cli -rpcwait getblockcount"
-    subprocess.check_call([ os.getenv("BITCOINCLI", "bitcoin-cli"), "-datadir="+datadir] +
-                          _rpchost_to_args(rpchost)  +
-                          ["-rpcwait", "getblockcount"], stdout=devnull)
+        print("start_node: bitcoind started, waiting for RPC to come up")
+    url = rpc_url(i, rpchost)
+    wait_for_bitcoind_start(bitcoind_processes[i], url, i)
     if os.getenv("PYTHON_DEBUG", ""):
-        print "start_node: calling bitcoin-cli -rpcwait getblockcount returned"
-    devnull.close()
-    url = "http://rt:rt@%s:%d" % (rpchost or '127.0.0.1', rpc_port(i))
-
+        print("start_node: RPC succesfully started")
     proxy = get_rpc_proxy(url, i, timeout=timewait)
 
     if COVERAGE_DIR:
@@ -261,7 +310,14 @@ def start_nodes(num_nodes, dirname, extra_args=None, rpchost=None, binary=None):
     """
     if extra_args is None: extra_args = [ None for i in range(num_nodes) ]
     if binary is None: binary = [ None for i in range(num_nodes) ]
-    return [ start_node(i, dirname, extra_args[i], rpchost, binary=binary[i]) for i in range(num_nodes) ]
+    rpcs = []
+    try:
+        for i in range(num_nodes):
+            rpcs.append(start_node(i, dirname, extra_args[i], rpchost, binary=binary[i]))
+    except: # If one node failed to start, stop the others
+        stop_nodes(rpcs)
+        raise
+    return rpcs
 
 def log_filename(dirname, n_node, logname):
     return os.path.join(dirname, "node"+str(n_node), "regtest", logname)
@@ -423,7 +479,7 @@ def assert_raises(exc, fun, *args, **kwds):
         raise AssertionError("No exception raised")
 
 def satoshi_round(amount):
-    return  Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
+    return Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
 
 def get_bip9_status(node, key):
     info = node.getblockchaininfo()

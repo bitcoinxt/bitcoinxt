@@ -1,8 +1,8 @@
+#!/usr/bin/env python3
 # blocktools.py - utilities for manipulating blocks and transactions
 #
 # Distributed under the MIT/X11 software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#
 
 from .mininode import *
 from .script import CScript, OP_TRUE, OP_CHECKSIG
@@ -66,6 +66,6 @@ def create_transaction(prevtx, n, sig, value):
     tx = CTransaction()
     assert(n < len(prevtx.vout))
     tx.vin.append(CTxIn(COutPoint(prevtx.sha256, n), sig, 0xffffffff))
-    tx.vout.append(CTxOut(value, ""))
+    tx.vout.append(CTxOut(value, b""))
     tx.calc_sha256()
     return tx

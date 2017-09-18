@@ -1,5 +1,5 @@
-#!/usr/bin/env python2
-# Copyright (c) 2014-2015 The Bitcoin Core developers
+#!/usr/bin/env python3
+# Copyright (c) 2014-2016 The Bitcoin Core developers
 # Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -18,11 +18,11 @@ class MempoolLimitTest(BitcoinTestFramework):
         # So we have big transactions (and therefore can't fit very many into each block)
         # create one script_pubkey
         script_pubkey = "6a4d0200" #OP_RETURN OP_PUSH2 512 bytes
-        for i in xrange (512):
+        for i in range (512):
             script_pubkey = script_pubkey + "01"
         # concatenate 128 txouts of above script_pubkey which we'll insert before the txout for change
         self.txouts = "81"
-        for k in xrange(128):
+        for k in range(128):
             # add txout value
             self.txouts = self.txouts + "0000000000000000"
             # add length of script_pubkey
@@ -39,7 +39,7 @@ class MempoolLimitTest(BitcoinTestFramework):
         addr2 = self.nodes[0].getnewaddress()
         if iterations <= 0:
             return utxos
-        for i in xrange(iterations):
+        for i in range(iterations):
             t = utxos.pop()
             fee = self.relayfee
             inputs = []
@@ -64,7 +64,7 @@ class MempoolLimitTest(BitcoinTestFramework):
     def create_lots_of_big_transactions(self, utxos, fee):
         addr = self.nodes[0].getnewaddress()
         txids = []
-        for i in xrange(len(utxos)):
+        for i in range(len(utxos)):
             t = utxos.pop()
             inputs = []
             inputs.append({ "txid" : t["txid"], "vout" : t["vout"]})
@@ -119,7 +119,7 @@ class MempoolLimitTest(BitcoinTestFramework):
 
         #and now for the spam
         base_fee = self.relayfee*1000
-        for i in xrange (4):
+        for i in range (4):
             txids.append([])
             txids[i] = self.create_lots_of_big_transactions(utxos[30*i:30*i+30], (i+1)*base_fee)
 

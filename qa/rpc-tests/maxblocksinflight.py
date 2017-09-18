@@ -1,8 +1,7 @@
-#!/usr/bin/env python2
-#
-# Distributed under the MIT/X11 software license, see the accompanying
+#!/usr/bin/env python3
+# Copyright (c) 2015-2016 The Bitcoin Core developers
+# Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#
 
 from test_framework.mininode import *
 from test_framework.test_framework import BitcoinTestFramework
@@ -55,7 +54,7 @@ class TestManager(NodeConnCB):
                         current_invs = []
                 if len(current_invs) > 0:
                     self.connection.send_message(msg_inv(current_invs))
-                
+
                 # Wait and see how many blocks were requested
                 time.sleep(2)
 
@@ -67,14 +66,14 @@ class TestManager(NodeConnCB):
                             raise AssertionError("Error, test failed: block %064x requested more than once" % key)
                 if total_requests > MAX_REQUESTS:
                     raise AssertionError("Error, too many blocks (%d) requested" % total_requests)
-                print "Round %d: success (total requests: %d)" % (count, total_requests)
+                print("Round %d: success (total requests: %d)" % (count, total_requests))
         except AssertionError as e:
-            print "TEST FAILED: ", e.args
+            print("TEST FAILED: ", e.args)
 
         self.disconnectOkay = True
         self.connection.disconnect_node()
 
-        
+
 class MaxBlocksInFlightTest(BitcoinTestFramework):
     def add_options(self, parser):
         parser.add_option("--testbinary", dest="testbinary",
@@ -82,11 +81,11 @@ class MaxBlocksInFlightTest(BitcoinTestFramework):
                           help="Binary to test max block requests behavior")
 
     def setup_chain(self):
-        print "Initializing test directory "+self.options.tmpdir
+        print("Initializing test directory "+self.options.tmpdir)
         initialize_chain_clean(self.options.tmpdir, 1)
 
     def setup_network(self):
-        self.nodes = start_nodes(1, self.options.tmpdir, 
+        self.nodes = start_nodes(1, self.options.tmpdir,
                                  extra_args=[['-debug', '-whitelist=127.0.0.1']],
                                  binary=[self.options.testbinary])
 

@@ -1,8 +1,7 @@
-#!/usr/bin/env python2
+#!/usr/bin/env python3
 # Copyright (c) 2015 The Bitcoin Core developers
-# Distributed under the MIT/X11 software license, see the accompanying
+# Distributed under the MIT software license, see the accompanying
 # file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#
 
 from test_framework.blockstore import BlockStore
 from test_framework.test_framework import ComparisonTestFramework
@@ -11,7 +10,6 @@ from test_framework.mininode import CTransaction, NetworkThread
 from test_framework.blocktools import create_coinbase, create_block
 from test_framework.comptool import TestInstance, TestManager
 from test_framework.script import CScript, OP_1NEGATE, OP_CHECKSEQUENCEVERIFY, OP_DROP
-from binascii import hexlify, unhexlify
 from io import BytesIO
 import time
 import itertools
@@ -29,7 +27,6 @@ mine a further 143 blocks (LOCKED_IN)
 test that enforcement has not triggered (which triggers ACTIVE)
 test that enforcement has triggered
 '''
-
 
 
 class BIP9SoftForksTest(ComparisonTestFramework):
@@ -54,20 +51,20 @@ class BIP9SoftForksTest(ComparisonTestFramework):
         outputs = { to_address : amount }
         rawtx = node.createrawtransaction(inputs, outputs)
         tx = CTransaction()
-        f = BytesIO(unhexlify(rawtx))
+        f = BytesIO(hex_str_to_bytes(rawtx))
         tx.deserialize(f)
         tx.nVersion = 2
         return tx
 
     def sign_transaction(self, node, tx):
-        signresult = node.signrawtransaction(hexlify(tx.serialize()))
+        signresult = node.signrawtransaction(bytes_to_hex_str(tx.serialize()))
         tx = CTransaction()
-        f = BytesIO(unhexlify(signresult['hex']))
+        f = BytesIO(hex_str_to_bytes(signresult['hex']))
         tx.deserialize(f)
         return tx
 
     def generate_blocks(self, number, version, test_blocks = []):
-        for i in xrange(number):
+        for i in range(number):
             block = create_block(self.tip, create_coinbase(absoluteHeight=self.height), self.last_block_time + 1)
             block.nVersion = version
             block.rehash()
@@ -90,7 +87,7 @@ class BIP9SoftForksTest(ComparisonTestFramework):
         # generate some coins for later
         self.coinbase_blocks = self.nodes[0].generate(2)
         self.height = 3  # height of the next block to build
-        self.tip = int ("0x" + self.nodes[0].getbestblockhash() + "L", 0)
+        self.tip = int("0x" + self.nodes[0].getbestblockhash(), 0)
         self.nodeaddress = self.nodes[0].getnewaddress()
         self.last_block_time = int(time.time())
 
@@ -185,7 +182,6 @@ class BIP9SoftForksTest(ComparisonTestFramework):
         self.test.clear_all_connections()
         self.test.add_all_connections(self.nodes)
         NetworkThread().start() # Start up network handling in another thread
-
 
 
     def get_tests(self):
