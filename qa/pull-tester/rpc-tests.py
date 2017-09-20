@@ -31,6 +31,14 @@ import re
 
 from tests_config import *
 
+BOLD = ("","")
+if os.name == 'posix':
+    # primitive formatting on supported
+    # terminal via ANSI escape sequences:
+    BOLD = ('\033[0m', '\033[1m')
+
+RPC_TESTS_DIR = BUILDDIR + '/qa/rpc-tests/'
+
 #If imported values are not defined then set to zero (or disabled)
 if 'ENABLE_WALLET' not in vars():
     ENABLE_WALLET=0
@@ -41,37 +49,47 @@ if 'ENABLE_UTILS' not in vars():
 
 ENABLE_COVERAGE=0
 
-#Create a set to store arguments and create the passOn string
+#Create a set to store arguments and create the passon string
 opts = set()
-passOn = ""
-p = re.compile("^--")
+passon_args = []
+PASSON_REGEX = re.compile("^--")
+PARALLEL_REGEX = re.compile('^-parallel=')
 
-bold = ("","")
-if (os.name == 'posix'):
-    bold = ('\033[0m', '\033[1m')
+print_help = False
+run_parallel = 4
 
 for arg in sys.argv[1:]:
+    if arg == "--help" or arg == "-h" or arg == "-?":
+        print_help = True
+        break
     if arg == '--coverage':
         ENABLE_COVERAGE = 1
-    elif (p.match(arg) or arg == "-h"):
-        passOn += " " + arg
+    elif PASSON_REGEX.match(arg):
+        passon_args.append(arg)
+    elif PARALLEL_REGEX.match(arg):
+        run_parallel = int(arg.split(sep='=', maxsplit=1)[1])
     else:
         opts.add(arg)
 
 #Set env vars
-buildDir = BUILDDIR
 if "BITCOIND" not in os.environ:
-    os.environ["BITCOIND"] = buildDir + '/src/bitcoind' + EXEEXT
+    os.environ["BITCOIND"] = BUILDDIR + '/src/bitcoind' + EXEEXT
 if "BITCOINCLI" not in os.environ:
-    os.environ["BITCOINCLI"] = buildDir + '/src/bitcoin-cli' + EXEEXT
+    os.environ["BITCOINCLI"] = BUILDDIR + '/src/bitcoin-cli' + EXEEXT
 
-#Disable Windows tests by default
 if EXEEXT == ".exe" and "-win" not in opts:
-    print("Win tests currently disabled.  Use -win option to enable")
+    # https://github.com/bitcoin/bitcoin/commit/d52802551752140cf41f0d9a225a43e84404d3e9
+    # https://github.com/bitcoin/bitcoin/pull/5677#issuecomment-136646964
+    print("Win tests currently disabled by default.  Use -win option to enable")
+    sys.exit(0)
+
+if not (ENABLE_WALLET == 1 and ENABLE_UTILS == 1 and ENABLE_BITCOIND == 1):
+    print("No rpc tests to run. Wallet, utils, and bitcoind must all be enabled")
     sys.exit(0)
 
 #Tests
 testScripts = [
+    'walletbackup.py',
     'bip68-112-113-p2p.py',
     'spv.py',
     'wallet.py',
@@ -90,7 +108,6 @@ testScripts = [
     'proxy_test.py',
     'merkle_blocks.py',
     'signrawtransactions.py',
-    'walletbackup.py',
     'p2p-versionbits-warning.py',
     'decodescript.py',
     'sendheaders.py',
@@ -99,6 +116,7 @@ testScripts = [
     'p2p-fullblocktest.py',
     'bipdersig-p2p.py'
 ]
+
 testScriptsExt = [
 # Needs update for BCC.
 #    'bip100-sizelimit.py',
@@ -126,60 +144,105 @@ testScriptsExt = [
     'mempool_packages.py'
 ]
 
+
 def runtests():
+    test_list = []
+    if '-extended' in opts:
+        test_list = testScripts + testScriptsExt
+    elif len(opts) == 0 or (len(opts) == 1 and "-win" in opts):
+        test_list = testScripts
+    else:
+        for t in testScripts + testScriptsExt:
+            if t in opts or re.sub(".py$", "", t) in opts:
+                test_list.append(t)
+
+    if print_help:
+        # Only print help of the first script and exit
+        subprocess.check_call((RPC_TESTS_DIR + test_list[0]).split() + ['-h'])
+        sys.exit(0)
+
     coverage = None
 
     if ENABLE_COVERAGE:
         coverage = RPCCoverage()
         print("Initializing coverage directory at %s\n" % coverage.dir)
+    flags = ["--srcdir=%s/src" % BUILDDIR] + passon_args
+    if coverage:
+        flags.append(coverage.flag)
 
-    if(ENABLE_WALLET == 1 and ENABLE_UTILS == 1 and ENABLE_BITCOIND == 1):
-        rpcTestDir = buildDir + '/qa/rpc-tests/'
-        run_extended = '-extended' in opts
-        cov_flag = coverage.flag if coverage else ''
-        flags = " --srcdir %s/src %s %s" % (buildDir, cov_flag, passOn)
+    if len(test_list) > 1:
+        # Populate cache
+        subprocess.check_output([RPC_TESTS_DIR + 'create_cache.py'] + flags)
 
-        #Run Tests
-        for i in range(len(testScripts)):
-            if (len(opts) == 0
-                    or (len(opts) == 1 and "-win" in opts )
-                    or run_extended
-                    or testScripts[i] in opts
-                    or re.sub(".py$", "", testScripts[i]) in opts ):
+    #Run Tests
+    max_len_name = len(max(test_list, key=len))
+    time_sum = 0
+    time0 = time.time()
+    job_queue = RPCTestHandler(run_parallel, test_list, flags)
+    results = BOLD[1] + "%s | %s | %s\n\n" % ("TEST".ljust(max_len_name), "PASSED", "DURATION") + BOLD[0]
+    all_passed = True
+    for _ in range(len(test_list)):
+        (name, stdout, stderr, passed, duration) = job_queue.get_next()
+        all_passed = all_passed and passed
+        time_sum += duration
 
-                print("Running testscript %s%s%s ..." % (bold[1], testScripts[i], bold[0]))
-                time0 = time.time()
-                subprocess.check_call(
-                    rpcTestDir + testScripts[i] + flags, shell=True)
-                print("Duration: %s s\n" % (int(time.time() - time0)))
+        print('\n' + BOLD[1] + name + BOLD[0] + ":")
+        print(stdout)
+        print('stderr:\n' if not stderr == '' else '', stderr)
+        results += "%s | %s | %s s\n" % (name.ljust(max_len_name), str(passed).ljust(6), duration)
+        print("Pass: %s%s%s, Duration: %s s\n" % (BOLD[1], passed, BOLD[0], duration))
+    results += BOLD[1] + "\n%s | %s | %s s (accumulated)" % ("ALL".ljust(max_len_name), str(all_passed).ljust(6), time_sum) + BOLD[0]
+    print(results)
+    print("\nRuntime: %s s" % (int(time.time() - time0)))
 
-                # exit if help is called so we print just one set of
-                # instructions
-                p = re.compile(" -h| --help")
-                if p.match(passOn):
-                    sys.exit(0)
+    if coverage:
+        coverage.report_rpc_coverage()
 
-        # Run Extended Tests
-        for i in range(len(testScriptsExt)):
-            if (run_extended or testScriptsExt[i] in opts
-                    or re.sub(".py$", "", testScriptsExt[i]) in opts):
+        print("Cleaning up coverage data")
+        coverage.cleanup()
 
-                print(
-                    "Running 2nd level testscript "
-                    + "%s%s%s ..." % (bold[1], testScriptsExt[i], bold[0]))
-                time0 = time.time()
-                subprocess.check_call(
-                    rpcTestDir + testScriptsExt[i] + flags, shell=True)
-                print("Duration: %s s\n" % (int(time.time() - time0)))
+    sys.exit(not all_passed)
 
-        if coverage:
-            coverage.report_rpc_coverage()
 
-            print("Cleaning up coverage data")
-            coverage.cleanup()
+class RPCTestHandler:
+    """
+    Trigger the testscrips passed in via the list.
+    """
 
-    else:
-        print("No rpc tests to run. Wallet, utils, and bitcoind must all be enabled")
+    def __init__(self, num_tests_parallel, test_list=None, flags=None):
+        assert(num_tests_parallel >= 1)
+        self.num_jobs = num_tests_parallel
+        self.test_list = test_list
+        self.flags = flags
+        self.num_running = 0
+        self.jobs = []
+
+    def get_next(self):
+        while self.num_running < self.num_jobs and self.test_list:
+            # Add tests
+            self.num_running += 1
+            t = self.test_list.pop(0)
+            port_seed = ["--portseed=%s" % len(self.test_list)]
+            self.jobs.append((t,
+                              time.time(),
+                              subprocess.Popen((RPC_TESTS_DIR + t).split() + self.flags + port_seed,
+                                               universal_newlines=True,
+                                               stdout=subprocess.PIPE,
+                                               stderr=subprocess.PIPE)))
+        if not self.jobs:
+            raise IndexError('%s from empty list' % __name__)
+        while True:
+            # Return first proc that finishes
+            time.sleep(.5)
+            for j in self.jobs:
+                (name, time0, proc) = j
+                if proc.poll() is not None:
+                    (stdout, stderr) = proc.communicate(timeout=3)
+                    passed = stderr == "" and proc.returncode == 0
+                    self.num_running -= 1
+                    self.jobs.remove(j)
+                    return name, stdout, stderr, passed, int(time.time() - time0)
+            print('.', end='', flush=True)
 
 
 class RPCCoverage(object):
@@ -199,7 +262,7 @@ class RPCCoverage(object):
     """
     def __init__(self):
         self.dir = tempfile.mkdtemp(prefix="coverage")
-        self.flag = '--coveragedir %s' % self.dir
+        self.flag = '--coveragedir=%s' % self.dir
 
     def report_rpc_coverage(self):
         """

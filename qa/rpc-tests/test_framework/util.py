@@ -8,7 +8,6 @@
 # Helpful routines for regression testing
 #
 
-# Add python-bitcoinrpc to module search path:
 import os
 import sys
 
@@ -16,6 +15,7 @@ from binascii import hexlify, unhexlify
 from base64 import b64encode
 from decimal import Decimal, ROUND_DOWN
 import json
+import http.client
 import random
 import shutil
 import subprocess
@@ -27,6 +27,18 @@ from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
 
 COVERAGE_DIR = None
+
+# The maximum number of nodes a single test can spawn
+MAX_NODES = 8
+# Don't assign rpc or p2p ports lower than this
+PORT_MIN = 11000
+# The number of ports to "reserve" for p2p and rpc, each
+PORT_RANGE = 5000
+
+
+class PortSeed:
+    # Must be initialized with a unique integer for each process
+    n = None
 
 #Set Mocktime default to OFF.
 #MOCKTIME is only needed for scripts that use the
@@ -82,9 +94,11 @@ def get_rpc_proxy(url, node_number, timeout=None):
 
 
 def p2p_port(n):
-    return 11000 + n + os.getpid()%999
+    assert(n <= MAX_NODES)
+    return PORT_MIN + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
+
 def rpc_port(n):
-    return 12000 + n + os.getpid()%999
+    return PORT_MIN + PORT_RANGE + n + (MAX_NODES * PortSeed.n) % (PORT_RANGE - 1 - MAX_NODES)
 
 def check_json_precision():
     """Make sure json library being used does not lose precision converting BTC values"""
@@ -184,24 +198,28 @@ def wait_for_bitcoind_start(process, url, i):
                 raise # unkown JSON RPC exception
         time.sleep(0.25)
 
-def initialize_chain(test_dir):
+def initialize_chain(test_dir, num_nodes):
     """
-    Create (or copy from cache) a 200-block-long chain and
-    4 wallets.
+    Create a cache of a 200-block-long chain (with wallet) for MAX_NODES
+    Afterward, create num_nodes copies from the cache
     """
 
-    if (not os.path.isdir(os.path.join("cache","node0"))
-        or not os.path.isdir(os.path.join("cache","node1"))
-        or not os.path.isdir(os.path.join("cache","node2"))
-        or not os.path.isdir(os.path.join("cache","node3"))):
+    assert num_nodes <= MAX_NODES
+    create_cache = False
+    for i in range(MAX_NODES):
+        if not os.path.isdir(os.path.join('cache', 'node'+str(i))):
+            create_cache = True
+            break
+
+    if create_cache:
 
         #find and delete old cache directories if any exist
-        for i in range(4):
+        for i in range(MAX_NODES):
             if os.path.isdir(os.path.join("cache","node"+str(i))):
                 shutil.rmtree(os.path.join("cache","node"+str(i)))
 
         # Create cache directories, run bitcoinds:
-        for i in range(4):
+        for i in range(MAX_NODES):
             datadir=initialize_datadir("cache", i)
             args = [ os.getenv("BITCOIND", "bitcoind"), "-keypool=1", "-datadir="+datadir, "-discover=0" ]
             if i > 0:
@@ -214,15 +232,18 @@ def initialize_chain(test_dir):
                 print("initialize_chain: RPC succesfully started")
 
         rpcs = []
-        for i in range(4):
+        for i in range(MAX_NODES):
             try:
                 rpcs.append(get_rpc_proxy(rpc_url(i), i))
             except:
                 sys.stderr.write("Error connecting to "+url+"\n")
                 sys.exit(1)
 
-        # Create a 200-block-long chain; each of the 4 nodes
+        # Create a 200-block-long chain; each of the 4 first nodes
         # gets 25 mature blocks and 25 immature.
+        # Note: To preserve compatibility with older versions of
+        # initialize_chain, only 4 nodes will generate coins.
+        #
         # blocks are created with timestamps 10 minutes apart
         # starting from 2010 minutes in the past
         enable_mocktime()
@@ -240,13 +261,13 @@ def initialize_chain(test_dir):
         stop_nodes(rpcs)
         wait_bitcoinds()
         disable_mocktime()
-        for i in range(4):
+        for i in range(MAX_NODES):
             os.remove(log_filename("cache", i, "debug.log"))
             os.remove(log_filename("cache", i, "db.log"))
             os.remove(log_filename("cache", i, "peers.dat"))
             os.remove(log_filename("cache", i, "fee_estimates.dat"))
 
-    for i in range(4):
+    for i in range(num_nodes):
         from_dir = os.path.join("cache", "node"+str(i))
         to_dir = os.path.join(test_dir,  "node"+str(i))
         shutil.copytree(from_dir, to_dir)
@@ -308,8 +329,8 @@ def start_nodes(num_nodes, dirname, extra_args=None, rpchost=None, binary=None):
     """
     Start multiple bitcoinds, return RPC connections to them
     """
-    if extra_args is None: extra_args = [ None for i in range(num_nodes) ]
-    if binary is None: binary = [ None for i in range(num_nodes) ]
+    if extra_args is None: extra_args = [ None for _ in range(num_nodes) ]
+    if binary is None: binary = [ None for _ in range(num_nodes) ]
     rpcs = []
     try:
         for i in range(num_nodes):
@@ -323,13 +344,19 @@ def log_filename(dirname, n_node, logname):
     return os.path.join(dirname, "node"+str(n_node), "regtest", logname)
 
 def stop_node(node, i):
-    node.stop()
+    try:
+        node.stop()
+    except http.client.CannotSendRequest as e:
+        print("WARN: Unable to stop node: " + repr(e))
     bitcoind_processes[i].wait()
     del bitcoind_processes[i]
 
 def stop_nodes(nodes):
     for node in nodes:
-        node.stop()
+        try:
+            node.stop()
+        except http.client.CannotSendRequest as e:
+            print("WARN: Unable to stop node: " + repr(e))
     del nodes[:] # Emptying array closes connections as a side effect
 
 def set_node_times(nodes, t):

@@ -15,6 +15,11 @@ import shutil
 
 class TxnMallTest(BitcoinTestFramework):
 
+    def __init__(self):
+        super().__init__()
+        self.num_nodes = 4
+        self.setup_clean_chain = False
+
     def add_options(self, parser):
         parser.add_option("--mineblock", dest="mine_block", default=False, action="store_true",
                           help="Test double-spend of 1-confirmed transaction")

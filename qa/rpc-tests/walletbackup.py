@@ -37,13 +37,14 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 from random import randint
 import logging
-logging.basicConfig(format='%(levelname)s:%(message)s', level=logging.INFO)
+logging.basicConfig(format='%(levelname)s: %(message)s', level=logging.INFO, stream=sys.stdout)
 
 class WalletBackupTest(BitcoinTestFramework):
 
-    def setup_chain(self):
-        logging.info("Initializing test directory "+self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, 4)
+    def __init__(self):
+        super().__init__()
+        self.setup_clean_chain = True
+        self.num_nodes = 4
 
     # This mirrors how the network was setup in the bash test
     def setup_network(self, split=False):

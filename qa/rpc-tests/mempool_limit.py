@@ -14,6 +14,9 @@ class MempoolLimitTest(BitcoinTestFramework):
         return  Decimal(amount).quantize(Decimal('0.00000001'), rounding=ROUND_DOWN)
 
     def __init__(self):
+        super().__init__()
+        self.setup_clean_chain = True
+        self.num_nodes = 2
         # Some pre-processing to create a bunch of OP_RETURN txouts to insert into transactions we create
         # So we have big transactions (and therefore can't fit very many into each block)
         # create one script_pubkey
@@ -88,10 +91,6 @@ class MempoolLimitTest(BitcoinTestFramework):
         self.is_network_split = False
         self.sync_all()
         self.relayfee = self.nodes[0].getnetworkinfo()['relayfee']
-
-    def setup_chain(self):
-        print("Initializing test directory "+self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, 2)
 
     def run_test(self):
         txids = []

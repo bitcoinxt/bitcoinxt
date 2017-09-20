@@ -5,17 +5,16 @@
 
 # Base class for RPC testing
 
-# Add python-bitcoinrpc to module search path:
+import logging
+import optparse
 import os
 import sys
-
 import shutil
 import tempfile
 import traceback
 
 from .util import (
     initialize_chain,
-    assert_equal,
     start_nodes,
     connect_nodes_bi,
     sync_blocks,
@@ -25,21 +24,20 @@ from .util import (
     enable_coverage,
     check_json_precision,
     initialize_chain_clean,
+    PortSeed,
 )
-from .authproxy import AuthServiceProxy, JSONRPCException
+from .authproxy import JSONRPCException
 
 
 class BitcoinTestFramework(object):
 
     def __init__(self):
-        self.setup_clean_chain = False
         self.num_nodes = 4
+        self.setup_clean_chain = False
+        self.nodes = None
 
-    # These may be over-ridden by subclasses:
     def run_test(self):
-        for node in self.nodes:
-            assert_equal(node.getblockcount(), 200)
-            assert_equal(node.getbalance(), 25*50)
+        raise NotImplementedError
 
     def add_options(self, parser):
         pass
@@ -51,10 +49,10 @@ class BitcoinTestFramework(object):
         if self.setup_clean_chain:
             initialize_chain_clean(self.options.tmpdir, self.num_nodes)
         else:
-            initialize_chain(self.options.tmpdir)
+            initialize_chain(self.options.tmpdir, self.num_nodes)
 
     def setup_nodes(self):
-        return start_nodes(4, self.options.tmpdir)
+        return start_nodes(self.num_nodes, self.options.tmpdir)
 
     def setup_network(self, split = False):
         self.nodes = self.setup_nodes()
@@ -104,7 +102,6 @@ class BitcoinTestFramework(object):
         self.setup_network(False)
 
     def main(self):
-        import optparse
 
         parser = optparse.OptionParser(usage="%prog [options]")
         parser.add_option("--nocleanup", dest="nocleanup", default=False, action="store_true",
@@ -117,17 +114,20 @@ class BitcoinTestFramework(object):
                           help="Root directory for datadirs")
         parser.add_option("--tracerpc", dest="trace_rpc", default=False, action="store_true",
                           help="Print out all RPC calls as they are made")
+        parser.add_option("--portseed", dest="port_seed", default=os.getpid(), type='int',
+                          help="The seed to use for assigning port numbers (default: current process id)")
         parser.add_option("--coveragedir", dest="coveragedir",
                           help="Write tested RPC commands into this directory")
         self.add_options(parser)
         (self.options, self.args) = parser.parse_args()
 
         if self.options.trace_rpc:
-            import logging
-            logging.basicConfig(level=logging.DEBUG)
+            logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 
         if self.options.coveragedir:
             enable_coverage(self.options.coveragedir)
+
+        PortSeed.n = self.options.port_seed
 
         os.environ['PATH'] = self.options.srcdir+":"+os.environ['PATH']
 
@@ -154,6 +154,8 @@ class BitcoinTestFramework(object):
         except Exception as e:
             print("Unexpected exception caught during testing: "+str(e))
             traceback.print_tb(sys.exc_info()[2])
+        except KeyboardInterrupt as e:
+            print("Exiting after " + repr(e))
 
         if not self.options.noshutdown:
             print("Stopping nodes")
@@ -182,9 +184,8 @@ class BitcoinTestFramework(object):
 
 class ComparisonTestFramework(BitcoinTestFramework):
 
-    # Can override the num_nodes variable to indicate how many nodes to run.
     def __init__(self):
-        super(ComparisonTestFramework, self).__init__()
+        super().__init__()
         self.num_nodes = 2
         self.setup_clean_chain = True
 
@@ -195,10 +196,6 @@ class ComparisonTestFramework(BitcoinTestFramework):
         parser.add_option("--refbinary", dest="refbinary",
                           default=os.getenv("BITCOIND", "bitcoind"),
                           help="bitcoind binary to use for reference nodes (if any)")
-
-    def setup_chain(self):
-        print("Initializing test directory "+self.options.tmpdir)
-        initialize_chain_clean(self.options.tmpdir, self.num_nodes)
 
     def setup_network(self):
         self.nodes = start_nodes(

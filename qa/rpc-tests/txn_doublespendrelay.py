@@ -25,6 +25,11 @@ def wait_for(criteria):
 
 class DoubleSpendRelay(BitcoinTestFramework):
 
+    def __init__(self):
+        super().__init__()
+        self.num_nodes = 4
+        self.setup_clean_chain = False
+
     #
     # Create a 4-node network; roles for the nodes are:
     # [0] : transaction creator
