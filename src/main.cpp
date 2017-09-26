@@ -3208,7 +3208,8 @@ bool FindBlockPos(CValidationState &state, CDiskBlockPos &pos, unsigned int nAdd
     }
 
     if (!fKnown) {
-        while (vinfoBlockFile[nFile].nSize + nAddSize >= GetNextMaxBlockSize(chainActive.Tip(), Params().GetConsensus()) * MIN_BLOCKFILE_BLOCKS) {
+        while (vinfoBlockFile[nFile].nSize + nAddSize >=
+               GetNextMaxBlockSize(chainActive.Tip(), Params().GetConsensus()) * Params().MinBlockFileBlocks()) {
             LogPrintf("Leaving block file %i: %s\n", nFile, vinfoBlockFile[nFile].ToString());
             FlushBlockFile(true);
             nFile++;
