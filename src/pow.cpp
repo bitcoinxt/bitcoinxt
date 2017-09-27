@@ -102,6 +102,11 @@ unsigned int GetNextWorkRequired(const CBlockIndex *pindexPrev,
         return pindexPrev->nBits;
     }
 
+    if ((Opt().UAHFTime() != 0) && (pindexPrev->GetMedianTimePast() >=
+        GetArg("-newdaaactivationtime", params.cashHardForkActivationTime))) {
+        return GetNextCashWorkRequired(pindexPrev, pblock, params);
+    }
+
     return GetNextEDAWorkRequired(pindexPrev, pblock, params);
 }
 
