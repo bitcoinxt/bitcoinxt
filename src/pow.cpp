@@ -12,14 +12,13 @@
 #include "uint256.h"
 #include "util.h"
 
-unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params& params)
-{
-    unsigned int nProofOfWorkLimit = UintToArith256(params.powLimit).GetCompact();
-
-    // Genesis block
-    if (pindexLast == NULL)
-        return nProofOfWorkLimit;
-
+/**
+ * Compute the next required proof of work using the legacy Bitcoin difficulty
+ * adjustement + Emergency Difficulty Adjustement (EDA).
+ */
+static uint32_t GetNextEDAWorkRequired(const CBlockIndex *pindexLast,
+                                       const CBlockHeader *pblock,
+                                       const Consensus::Params &params) {
     // Only change once per difficulty adjustment interval
     uint32_t nHeight = pindexLast->nHeight + 1;
     if (nHeight % params.DifficultyAdjustmentInterval() == 0) {
@@ -32,6 +31,9 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
         return CalculateNextWorkRequired(pindexLast,
                                          pindexFirst->GetBlockTime(), params);
     }
+
+    const uint32_t nProofOfWorkLimit =
+        UintToArith256(params.powLimit).GetCompact();
 
     if (params.fPowAllowMinDifficultyBlocks) {
         // Special difficulty rule for testnet:
@@ -84,6 +86,22 @@ unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHead
     if (nPow > bnPowLimit) nPow = bnPowLimit;
 
     return nPow.GetCompact();
+}
+
+unsigned int GetNextWorkRequired(const CBlockIndex *pindexPrev,
+                             const CBlockHeader *pblock,
+                             const Consensus::Params &params) {
+    // Genesis block
+    if (pindexPrev == nullptr) {
+        return UintToArith256(params.powLimit).GetCompact();
+    }
+
+    // Special rule for regtest: we never retarget.
+    if (params.fPowNoRetargeting) {
+        return pindexPrev->nBits;
+    }
+
+    return GetNextEDAWorkRequired(pindexPrev, pblock, params);
 }
 
 unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nFirstBlockTime, const Consensus::Params& params)
