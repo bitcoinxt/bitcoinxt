@@ -114,7 +114,9 @@ testScripts = [
     'invalidblockrequest.py',
     'invalidtxrequest.py',
     'p2p-fullblocktest.py',
-    'bipdersig-p2p.py'
+    'bipdersig-p2p.py',
+    'abc-p2p-fullblocktest.py',
+    'mempool-accept-txn.py'
 ]
 
 testScriptsExt = [
