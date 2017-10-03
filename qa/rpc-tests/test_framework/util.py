@@ -590,7 +590,7 @@ def gen_return_txouts():
         txouts = txouts + script_pubkey
     return txouts
 
-def create_lots_of_big_transactions(node, txouts, utxos, num, fee):
+def create_lots_of_big_transactions(node, txouts, utxos, num, fee, tx_file=None):
     addr = node.getnewaddress()
     txids = []
     for _ in range(num):
@@ -606,6 +606,8 @@ def create_lots_of_big_transactions(node, txouts, utxos, num, fee):
         signresult = node.signrawtransaction(newtx, None, None, "NONE|FORKID")
         txid = node.sendrawtransaction(signresult["hex"], True)
         txids.append(txid)
+        if (tx_file):
+            tx_file.write(signresult["hex"] + "\n")
     return txids
 
 def mine_large_block(node):

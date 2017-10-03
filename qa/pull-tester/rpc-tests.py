@@ -120,8 +120,7 @@ testScripts = [
 ]
 
 testScriptsExt = [
-# Needs update for BCC.
-#    'bip100-sizelimit.py',
+    'bip100-sizelimit.py',
     'bip9-softforks.py',
     'bip65-cltv-p2p.py',
     'bip65-cltv.py',

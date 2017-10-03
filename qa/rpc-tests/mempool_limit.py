@@ -28,6 +28,7 @@ class MempoolLimitTest(BitcoinTestFramework):
     def run_test(self):
         txids = []
         utxos = create_confirmed_utxos(self.relayfee, self.nodes[0], 130, 102)
+        self.sync_all()
 
         #create a mempool tx that will be evicted by node 1
         us0 = utxos.pop()
@@ -36,8 +37,6 @@ class MempoolLimitTest(BitcoinTestFramework):
         tx = self.nodes[0].createrawtransaction(inputs, outputs)
         txFS = self.nodes[0].signrawtransaction(tx, None, None, "NONE|FORKID")
         txid0 = self.nodes[0].sendrawtransaction(txFS['hex'])
-        self.nodes[0].lockunspent(True, [us0])
-        time.sleep(3)
 
         #create a mempool tx that will NOT be evicted by node 1 (because submitted there)
         us1 = utxos.pop()
@@ -46,15 +45,14 @@ class MempoolLimitTest(BitcoinTestFramework):
         tx = self.nodes[0].createrawtransaction(inputs, outputs)
         txFS = self.nodes[0].signrawtransaction(tx, None, None, "NONE|FORKID")
         txid1 = self.nodes[1].sendrawtransaction(txFS['hex'])
-        self.nodes[0].lockunspent(True, [us1])
 
         #and now for the spam
         base_fee = self.relayfee*1000
         for i in range (4):
             txids.append([])
-            txids[i] = create_lots_of_big_transactions(self.nodes[0], self.txouts, utxos[30*i:30*i+30], 30, (i+1)*base_fee)
+            txids[i] = create_lots_of_big_transactions(self.nodes[0], self.txouts, utxos[30*i:30*i+30], 30, base_fee + i*base_fee/10)
 
-        time.sleep(3)
+        time.sleep(9)
         # txid0 should have been evicted by node 1, but txid1 should have been protected
         assert(txid0 not in self.nodes[1].getrawmempool())
         assert(txid1 in self.nodes[1].getrawmempool())
