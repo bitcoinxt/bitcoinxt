@@ -25,27 +25,6 @@ class PruneTest(BitcoinTestFramework):
         self.setup_clean_chain = True
         self.num_nodes = 3
 
-        self.utxo = []
-        self.address = ["",""]
-
-        # Some pre-processing to create a bunch of OP_RETURN txouts to insert into transactions we create
-        # So we have big transactions and full blocks to fill up our block files
-
-        # create one script_pubkey
-        script_pubkey = "6a4d0200" #OP_RETURN OP_PUSH2 512 bytes
-        for i in range (512):
-            script_pubkey = script_pubkey + "01"
-        # concatenate 128 txouts of above script_pubkey which we'll insert before the txout for change
-        self.txouts = "81"
-        for k in range(128):
-            # add txout value
-            self.txouts = self.txouts + "0000000000000000"
-            # add length of script_pubkey
-            self.txouts = self.txouts + "fd0402"
-            # add script_pubkey
-            self.txouts = self.txouts + script_pubkey
-
-
     def setup_network(self):
         self.nodes = []
         self.is_network_split = False
@@ -57,9 +36,6 @@ class PruneTest(BitcoinTestFramework):
         # Create node 2 to test pruning
         self.nodes.append(start_node(2, self.options.tmpdir, ["-debug","-maxreceivebuffer=20000","-prune=550"], timewait=900))
         self.prunedir = self.options.tmpdir+"/node2/regtest/blocks/"
-
-        self.address[0] = self.nodes[0].getnewaddress()
-        self.address[1] = self.nodes[1].getnewaddress()
 
         connect_nodes(self.nodes[0], 1)
         connect_nodes(self.nodes[1], 2)
@@ -73,7 +49,7 @@ class PruneTest(BitcoinTestFramework):
         self.nodes[0].generate(150)
         # Then mine enough full blocks to create more than 550MiB of data
         for i in range(645):
-            self.mine_full_block(self.nodes[0], self.address[0])
+            mine_large_block(self.nodes[0])
 
         sync_blocks(self.nodes[0:3])
 
@@ -85,7 +61,7 @@ class PruneTest(BitcoinTestFramework):
         print("Mining 25 more blocks should cause the first block file to be pruned")
         # Pruning doesn't run until we're allocating another chunk, 20 full blocks past the height cutoff will ensure this
         for i in range(25):
-            self.mine_full_block(self.nodes[0],self.address[0])
+            mine_large_block(self.nodes[0])
 
         waitstart = time.time()
         while os.path.isfile(self.prunedir+"blk00000.dat"):
@@ -110,17 +86,15 @@ class PruneTest(BitcoinTestFramework):
             stop_node(self.nodes[0],0)
             self.nodes[0]=start_node(0, self.options.tmpdir, ["-debug","-maxreceivebuffer=20000","-blockmaxsize=999000", "-checkblocks=5"], timewait=900)
             # Mine 24 blocks in node 1
-            self.utxo = self.nodes[1].listunspent()
             for i in range(24):
                 if j == 0:
-                    self.mine_full_block(self.nodes[1],self.address[1])
+                    mine_large_block(self.nodes[1])
                 else:
                     self.nodes[1].generate(1) #tx's already in mempool from previous disconnects
 
             # Reorg back with 25 block chain from node 0
-            self.utxo = self.nodes[0].listunspent()
             for i in range(25):
-                self.mine_full_block(self.nodes[0],self.address[0])
+                mine_large_block(self.nodes[0])
 
             # Create connections in the order so both nodes can see the reorg at the same time
             connect_nodes(self.nodes[1], 0)
@@ -231,32 +205,6 @@ class PruneTest(BitcoinTestFramework):
         assert(self.nodes[2].getbestblockhash() == goalbesthash)
         # Verify we can now have the data for a block previously pruned
         assert(self.nodes[2].getblock(self.forkhash)["height"] == self.forkheight)
-
-    def mine_full_block(self, node, address):
-        # Want to create a full block
-        # We'll generate a 66k transaction below, and 14 of them is close to the 1MB block limit
-        for j in range(14):
-            if len(self.utxo) < 14:
-                self.utxo = node.listunspent()
-            inputs=[]
-            outputs = {}
-            t = self.utxo.pop()
-            inputs.append({ "txid" : t["txid"], "vout" : t["vout"]})
-            remchange = t["amount"] - Decimal("0.001000")
-            outputs[address]=remchange
-            # Create a basic transaction that will send change back to ourself after account for a fee
-            # And then insert the 128 generated transaction outs in the middle rawtx[92] is where the #
-            # of txouts is stored and is the only thing we overwrite from the original transaction
-            rawtx = node.createrawtransaction(inputs, outputs)
-            newtx = rawtx[0:92]
-            newtx = newtx + self.txouts
-            newtx = newtx + rawtx[94:]
-            # Appears to be ever so slightly faster to sign with SIGHASH_NONE
-            signresult = node.signrawtransaction(newtx,None,None,"NONE|FORKID")
-            txid = node.sendrawtransaction(signresult["hex"], True)
-        # Mine a full sized block which will be these transactions we just created
-        node.generate(1)
-
 
     def run_test(self):
         print("Warning! This test requires 4GB of disk space and takes over 30 mins (up to 2 hours)")

@@ -543,3 +543,78 @@ def get_bip9_status(node, key):
         if row['id'] == key:
             return row
     raise IndexError ('key:"%s" not found' % key)
+
+def create_confirmed_utxos(fee, node, count, age=101):
+    node.generate(int(0.5*count) + age)
+    utxos = node.listunspent()
+    iterations = count - len(utxos)
+    addr1 = node.getnewaddress()
+    addr2 = node.getnewaddress()
+    if iterations <= 0:
+        return utxos
+    for _ in range(iterations):
+        t = utxos.pop()
+        inputs = []
+        inputs.append({ "txid" : t["txid"], "vout" : t["vout"]})
+        outputs = {}
+        send_value = t['amount'] - fee
+        outputs[addr1] = satoshi_round(send_value / 2)
+        outputs[addr2] = satoshi_round(send_value / 2)
+        raw_tx = node.createrawtransaction(inputs, outputs)
+        signed_tx = node.signrawtransaction(
+            raw_tx, None, None, "ALL|FORKID")["hex"]
+        txid = node.sendrawtransaction(signed_tx)
+
+    while (node.getmempoolinfo()['size'] > 0):
+        node.generate(1)
+
+    utxos = node.listunspent()
+    assert(len(utxos) >= count)
+    return utxos
+
+def gen_return_txouts():
+    # Some pre-processing to create a bunch of OP_RETURN txouts to insert into transactions we create
+    # So we have big transactions (and therefore can't fit very many into each block)
+    # create one script_pubkey
+    script_pubkey = "6a4d0200" #OP_RETURN OP_PUSH2 512 bytes
+    for i in range (512):
+        script_pubkey = script_pubkey + "01"
+    # concatenate 128 txouts of above script_pubkey which we'll insert before the txout for change
+    txouts = "81"
+    for k in range(128):
+        # add txout value
+        txouts = txouts + "0000000000000000"
+        # add length of script_pubkey
+        txouts = txouts + "fd0402"
+        # add script_pubkey
+        txouts = txouts + script_pubkey
+    return txouts
+
+def create_lots_of_big_transactions(node, txouts, utxos, num, fee, tx_file=None):
+    addr = node.getnewaddress()
+    txids = []
+    for _ in range(num):
+        t = utxos.pop()
+        inputs = [{"txid":t["txid"], "vout":t["vout"]}]
+        outputs = {}
+        change = t['amount'] - fee
+        outputs[addr] = satoshi_round(change)
+        rawtx = node.createrawtransaction(inputs, outputs)
+        newtx = rawtx[0:92]
+        newtx = newtx + txouts
+        newtx = newtx + rawtx[94:]
+        signresult = node.signrawtransaction(newtx, None, None, "NONE|FORKID")
+        txid = node.sendrawtransaction(signresult["hex"], True)
+        txids.append(txid)
+        if (tx_file):
+            tx_file.write(signresult["hex"] + "\n")
+    return txids
+
+def mine_large_block(node):
+    # generate a 66k transaction,
+    # and 14 of them is close to the 1MB block limit
+    txouts = gen_return_txouts()
+    utxos = node.listunspent()[:14]
+    fee = 100 * node.getnetworkinfo()["relayfee"]
+    create_lots_of_big_transactions(node, txouts, utxos, 14, fee=fee)
+    node.generate(1)
