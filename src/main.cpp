@@ -1236,6 +1236,19 @@ std::string FormatStateMessage(const CValidationState &state)
         state.GetRejectCode());
 }
 
+static bool IsCashHFEnabled(int64_t nMedianTimePast) {
+    return nMedianTimePast >=
+           Params().GetConsensus().cashHardForkActivationTime;
+}
+
+bool IsCashHFEnabled(const CBlockIndex *pindexPrev) {
+    if (pindexPrev == nullptr) {
+        return false;
+    }
+
+    return IsCashHFEnabled(pindexPrev->GetMedianTimePast());
+}
+
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
                         bool* pfMissingInputs, bool fOverrideMempoolLimit, bool fRejectAbsurdFee)
 {
