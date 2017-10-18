@@ -300,7 +300,7 @@ public:
         consensus.bip100ActivationHeight = 0;
         consensus.nMaxBlockSizeChangePosition = 1512;
 
-        // Nov, 13 hard fork
+        // Nov, 13 hard fork is always on on regtest.
         consensus.cashHardForkActivationTime = 0;
 
         pchMessageStart[0] = 0xfa;
