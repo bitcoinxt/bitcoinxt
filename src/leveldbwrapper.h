@@ -89,8 +89,9 @@ public:
         try {
             CDataStream ssKey(slKey.data(), slKey.data() + slKey.size(), SER_DISK, CLIENT_VERSION);
             ssKey >> key;
-        } catch(std::exception &e) {
-            return false;
+        } catch(const std::exception &e) {
+	    LogPrint("db", "%s: %s\n", __func__, e.what());
+	    return false;
         }
         return true;
     }
@@ -104,8 +105,9 @@ public:
         try {
             CDataStream ssValue(slValue.data(), slValue.data() + slValue.size(), SER_DISK, CLIENT_VERSION);
             ssValue >> value;
-        } catch(std::exception &e) {
-            return false;
+        } catch(const std::exception &e) {
+	    LogPrint("db", "%s: %s\n", __func__, e.what());
+	    return false;
         }
         return true;
     }
