@@ -55,6 +55,7 @@ BITCOIN_TESTS =\
   test/Checkpoints_tests.cpp \
   test/clientversion_tests.cpp \
   test/cashaddr_tests.cpp \
+  test/cashaddrenc_tests.cpp \
   test/coins_tests.cpp \
   test/compactblockprocessor_tests.cpp \
   test/compactprefiller_tests.cpp \

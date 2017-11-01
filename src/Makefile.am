@@ -87,6 +87,7 @@ BITCOIN_CORE_H = \
   blocksender.h \
   bloom.h \
   cashaddr.h \
+  cashaddrenc.h \
   chain.h \
   chainparams.h \
   chainparamsbase.h \
@@ -301,6 +302,7 @@ libbitcoin_common_a_SOURCES = \
   arith_uint256.cpp \
   base58.cpp \
   cashaddr.cpp \
+  cashaddrenc.cpp \
   chainparams.cpp \
   coins.cpp \
   compressor.cpp \
