@@ -563,7 +563,7 @@ bool CNode::ReceiveMsgBytes(const char *pch, unsigned int nBytes)
         // get current incomplete message, or create a new one
         if (vRecvMsg.empty() ||
             vRecvMsg.back().complete())
-            vRecvMsg.push_back(CNetMessage(Params().MessageStart(), SER_NETWORK, nRecvVersion));
+            vRecvMsg.push_back(CNetMessage(Params().NetworkMagic(), SER_NETWORK, nRecvVersion));
 
         CNetMessage& msg = vRecvMsg.back();
 
@@ -1367,9 +1367,9 @@ void ThreadOpenConnections()
         //  * Increase the number of connectable addresses in the tried table.
         //
         // Method:
-        //  * Choose a random address from new and attempt to connect to it if we can connect 
+        //  * Choose a random address from new and attempt to connect to it if we can connect
         //    successfully it is added to tried.
-        //  * Start attempting feeler connections only after node finishes making outbound 
+        //  * Start attempting feeler connections only after node finishes making outbound
         //    connections.
         //  * Only make a feeler connection once every few minutes.
         //
@@ -2002,7 +2002,7 @@ bool CAddrDB::Write(const CAddrMan& addr)
 
     // serialize addresses, checksum data up to that point, then append csum
     CDataStream ssPeers(SER_DISK, CLIENT_VERSION);
-    ssPeers << FLATDATA(Params().MessageStart());
+    ssPeers << FLATDATA(Params().DBMagic());
     ssPeers << addr;
     uint256 hash = Hash(ssPeers.begin(), ssPeers.end());
     ssPeers << hash;
@@ -2077,7 +2077,7 @@ bool CAddrDB::Read(CAddrMan& addr, CDataStream& ssPeers)
         ssPeers >> FLATDATA(pchMsgTmp);
 
         // ... verify the network matches ours
-        if (memcmp(pchMsgTmp, Params().MessageStart(), sizeof(pchMsgTmp)))
+        if (memcmp(pchMsgTmp, Params().DBMagic(), sizeof(pchMsgTmp)))
             return error("%s: Invalid network magic number", __func__);
 
         // de-serialize address data into one CAddrMan object
@@ -2206,7 +2206,7 @@ void CNode::BeginMessage(const char* pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSen
 {
     ENTER_CRITICAL_SECTION(cs_vSend);
     assert(ssSend.size() == 0);
-    ssSend << CMessageHeader(Params().MessageStart(), pszCommand, 0);
+    ssSend << CMessageHeader(Params().NetworkMagic(), pszCommand, 0);
     LogPrint("net", "sending: %s ", SanitizeString(pszCommand));
 }
 
