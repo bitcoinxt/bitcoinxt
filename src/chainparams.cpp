@@ -14,6 +14,7 @@
 #include <boost/assign/list_of.hpp>
 
 #include "chainparamsseeds.h"
+#include "options.h"
 
 static CBlock CreateGenesisBlock(const char* pszTimestamp, const CScript& genesisOutputScript, uint32_t nTime, uint32_t nNonce, uint32_t nBits, int32_t nVersion, const CAmount& genesisReward)
 {
@@ -52,6 +53,17 @@ static CBlock CreateGenesisBlock(uint32_t nTime, uint32_t nNonce, uint32_t nBits
     const char* pszTimestamp = "The Times 03/Jan/2009 Chancellor on brink of second bailout for banks";
     const CScript genesisOutputScript = CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") << OP_CHECKSIG;
     return CreateGenesisBlock(pszTimestamp, genesisOutputScript, nTime, nNonce, nBits, nVersion, genesisReward);
+}
+
+const CMessageHeader::MessageStartChars& CChainParams::NetworkMagic() const {
+    return Opt().UAHFTime() == 0
+        ? pchMessageStart
+        : pchCashMessageStart;
+}
+
+const CMessageHeader::MessageStartChars& CChainParams::DBMagic() const {
+    // Always use BTC bytes for backward compatability.
+    return pchMessageStart;
 }
 
 /**
@@ -107,6 +119,10 @@ public:
         pchMessageStart[1] = 0xbe;
         pchMessageStart[2] = 0xb4;
         pchMessageStart[3] = 0xd9;
+        pchCashMessageStart[0] = 0xe3;
+        pchCashMessageStart[1] = 0xe1;
+        pchCashMessageStart[2] = 0xf3;
+        pchCashMessageStart[3] = 0xe8;
         nDefaultPort = 8333;
         nPruneAfterHeight = 100000;
         nMinBlockfileBlocks = 128;
@@ -201,6 +217,10 @@ public:
         pchMessageStart[1] = 0x11;
         pchMessageStart[2] = 0x09;
         pchMessageStart[3] = 0x07;
+        pchCashMessageStart[0] = 0xf4;
+        pchCashMessageStart[1] = 0xe5;
+        pchCashMessageStart[2] = 0xf3;
+        pchCashMessageStart[3] = 0xf4;
         nDefaultPort = 18333;
         nPruneAfterHeight = 1000;
         nMinBlockfileBlocks = 128;
@@ -307,6 +327,10 @@ public:
         pchMessageStart[1] = 0xbf;
         pchMessageStart[2] = 0xb5;
         pchMessageStart[3] = 0xda;
+        pchCashMessageStart[0] = 0xda;
+        pchCashMessageStart[1] = 0xb5;
+        pchCashMessageStart[2] = 0xbf;
+        pchCashMessageStart[3] = 0xfa;
         nDefaultPort = 18444;
         nPruneAfterHeight = 1000;
         nMinBlockfileBlocks = 16;

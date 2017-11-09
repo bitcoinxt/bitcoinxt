@@ -26,7 +26,7 @@ BOOST_AUTO_TEST_CASE(FullMessages)
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
-    s << CMessageHeader(Params().MessageStart(), "ping", 0);
+    s << CMessageHeader(Params().NetworkMagic(), "ping", 0);
     s << (uint64_t)11; // ping nonce
     CNetMessage::FinalizeHeader(s);
 
@@ -74,7 +74,7 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
-    s << CMessageHeader(Params().MessageStart(), "block", 0);
+    s << CMessageHeader(Params().NetworkMagic(), "block", 0);
     size_t headerLen = s.size();
     s << block;
 
@@ -100,7 +100,7 @@ BOOST_AUTO_TEST_CASE(TooLargeVerack)
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
-    s << CMessageHeader(Params().MessageStart(), "verack", 0);
+    s << CMessageHeader(Params().NetworkMagic(), "verack", 0);
     size_t headerLen = s.size();
 
     CNetMessage::FinalizeHeader(s);
@@ -121,7 +121,7 @@ BOOST_AUTO_TEST_CASE(TooLargePing)
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
-    s << CMessageHeader(Params().MessageStart(), "ping", 0);
+    s << CMessageHeader(Params().NetworkMagic(), "ping", 0);
     s << (uint64_t)11; // 8-byte nonce
 
     CNetMessage::FinalizeHeader(s);
