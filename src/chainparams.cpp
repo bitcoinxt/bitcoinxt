@@ -95,6 +95,9 @@ public:
         consensus.bip100ActivationHeight = 449568;
         consensus.nMaxBlockSizeChangePosition = 1512;
 
+        // Nov, 13 hard fork
+        consensus.cashHardForkActivationTime = 1510600000;
+
         /**
          * The message start string is designed to be unlikely to occur in normal data.
          * The characters are rarely used upper ASCII, not valid as UTF-8, and produce
@@ -190,6 +193,9 @@ public:
         // BIP100 defined start height and max block size change critical vote position
         consensus.bip100ActivationHeight = 798336;
         consensus.nMaxBlockSizeChangePosition = 1512;
+
+        // Nov, 13 hard fork
+        consensus.cashHardForkActivationTime = 1510600000;
 
         pchMessageStart[0] = 0x0b;
         pchMessageStart[1] = 0x11;
@@ -293,6 +299,9 @@ public:
 
         consensus.bip100ActivationHeight = 0;
         consensus.nMaxBlockSizeChangePosition = 1512;
+
+        // Nov, 13 hard fork is always on on regtest.
+        consensus.cashHardForkActivationTime = 0;
 
         pchMessageStart[0] = 0xfa;
         pchMessageStart[1] = 0xbf;

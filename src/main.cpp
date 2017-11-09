@@ -1236,6 +1236,19 @@ std::string FormatStateMessage(const CValidationState &state)
         state.GetRejectCode());
 }
 
+static bool IsCashHFEnabled(int64_t nMedianTimePast) {
+    return nMedianTimePast >=
+           Params().GetConsensus().cashHardForkActivationTime;
+}
+
+bool IsCashHFEnabled(const CBlockIndex *pindexPrev) {
+    if (pindexPrev == nullptr) {
+        return false;
+    }
+
+    return IsCashHFEnabled(pindexPrev->GetMedianTimePast());
+}
+
 bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransaction &tx, bool fLimitFree,
                         bool* pfMissingInputs, bool fOverrideMempoolLimit, bool fRejectAbsurdFee)
 {
@@ -2384,6 +2397,15 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if ((Opt().UAHFTime() != 0) && (pindex->pprev != NULL) && (pindex->pprev->GetMedianTimePast() >= Opt().UAHFTime())) {
         flags |= SCRIPT_VERIFY_STRICTENC;
         flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
+    }
+
+    // If the Cash HF is enabled, we start rejecting transaction that use a high
+    // s in their signature. We also make sure that signature that are supposed
+    // to fail (for instance in multisig or other forms of smart contracts) are
+    // null.
+    if ((Opt().UAHFTime() != 0) && IsCashHFEnabled(pindex->pprev)) {
+        flags |= SCRIPT_VERIFY_LOW_S;
+        flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 
     CBlockUndo blockundo;

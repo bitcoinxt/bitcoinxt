@@ -66,6 +66,9 @@ struct Params {
     int64_t nPowTargetSpacing;
     int64_t nPowTargetTimespan;
     int64_t DifficultyAdjustmentInterval() const { return nPowTargetTimespan / nPowTargetSpacing; }
+
+    /** Activation time at which the cash HF kicks in. */
+    int64_t cashHardForkActivationTime;
 };
 } // namespace Consensus
 
