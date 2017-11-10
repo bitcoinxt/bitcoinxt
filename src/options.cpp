@@ -74,7 +74,7 @@ uint64_t Opt::MaxBlockSizeVote() {
     return Args->GetArg("-maxblocksizevote", 0);
 }
 
-int64_t Opt::UAHFTime() {
+int64_t Opt::UAHFTime() const {
     int64_t defaultUAHFTime = Params().NetworkIDString() == CBaseChainParams::REGTEST ?
                               Params().GenesisBlock().nTime :
                               UAHF_DEFAULT_ACTIVATION_TIME;
@@ -88,6 +88,10 @@ int Opt::UAHFProtectSunset() {
 
 int64_t Opt::RespendRelayLimit() const {
     return Args->GetArg("-limitrespendrelay", 100);
+}
+
+bool Opt::UseCashAddr() const {
+    return Args->GetBool("-usecashaddr", bool(UAHFTime()));
 }
 
 bool Opt::UsingThinBlocks() {

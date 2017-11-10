@@ -10,7 +10,7 @@
 #include "scicon.h"
 #include "walletmodel.h"
 
-#include "base58.h"
+#include "dstencode.h"
 #include "init.h"
 #include "main.h" // For strMessageMagic
 #include "wallet/wallet.h"

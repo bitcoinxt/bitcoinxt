@@ -15,9 +15,10 @@ struct Opt {
     int ScriptCheckThreads();
     int64_t CheckpointDays();
     uint64_t MaxBlockSizeVote();
-    int64_t UAHFTime();
+    int64_t UAHFTime() const;
     int UAHFProtectSunset();
     int64_t RespendRelayLimit() const;
+    bool UseCashAddr() const;
 
     // Thin block options
     bool UsingThinBlocks();

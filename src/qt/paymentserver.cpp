@@ -8,8 +8,8 @@
 #include "guiutil.h"
 #include "optionsmodel.h"
 
-#include "base58.h"
 #include "chainparams.h"
+#include "dstencode.h"
 #include "main.h"
 #include "ui_interface.h"
 #include "util.h"

@@ -113,6 +113,7 @@ BITCOIN_CORE_H = \
   compacttxfinder.h \
   core_memusage.h \
   dbwrapper.h \
+  dstencode.h \
   dummythin.h \
   hash.h \
   httprpc.h \
@@ -306,6 +307,7 @@ libbitcoin_common_a_SOURCES = \
   chainparams.cpp \
   coins.cpp \
   compressor.cpp \
+  dstencode.cpp \
   core_read.cpp \
   core_write.cpp \
   hash.cpp \
