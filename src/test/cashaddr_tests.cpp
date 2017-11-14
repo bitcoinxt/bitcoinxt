@@ -38,8 +38,8 @@ BOOST_AUTO_TEST_CASE(cashaddr_testvectors_valid) {
         "PREFIX:X64NX6HZ",
         "p:gpf8m4h7",
         "bitcoincash:qpzry9x8gf2tvdw0s3jn54khce6mua7lcw20ayyn",
-        "bcctest:testnetaddressqm3zpk4w",
-        "bccreg:555555555555555555555555555555555555555555555lmxjk3an",
+        "bchtest:testnetaddress4d6njnut",
+        "bchreg:555555555555555555555555555555555555555555555udxmlmrz",
     };
     for (const std::string &str : CASES) {
         auto ret = cashaddr::Decode(str);
@@ -58,8 +58,8 @@ BOOST_AUTO_TEST_CASE(cashaddr_testvectors_invalid) {
         "pref1x:6m8cxv73",
         "prefix:",
         ":u9wsx07j",
-        "bccreg:555555555555555555x55555555555555555555555555lmxjk3an",
-        "bccreg:555555555555555555555555555555551555555555555lmxjk3an",
+        "bchreg:555555555555555555x55555555555555555555555555udxmlmrz",
+        "bchreg:555555555555555555555555555555551555555555555udxmlmrz",
         "pre:fix:x32nx6hz",
         "prefixx64nx6hz",
     };
