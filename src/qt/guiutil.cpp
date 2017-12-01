@@ -112,7 +112,8 @@ void setupAddressWidget(QValidatedLineEdit *widget, QWidget *parent)
     // and this is the only place, where this address is supplied.
     widget->setPlaceholderText(QObject::tr("Enter a Bitcoin address (e.g. %1)").arg("ppu67kyzxl0ukp49np4fklrmga34cdd33hvcce6l2d"));
 #endif
-    widget->setValidator(new BitcoinAddressEntryValidator(parent));
+    widget->setValidator(
+        new BitcoinAddressEntryValidator(bitcoinURIScheme().toStdString(), parent));
     widget->setCheckValidator(new BitcoinAddressCheckValidator(parent));
 }
 

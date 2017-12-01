@@ -6,9 +6,10 @@
 #include "config/bitcoin-config.h"
 #endif
 
-#include "util.h"
-#include "uritests.h"
+#include "bitcoinaddressvalidatortests.h"
 #include "guiutiltests.h"
+#include "uritests.h"
+#include "util.h"
 
 #ifdef ENABLE_WALLET
 #include "paymentservertests.h"
@@ -52,6 +53,9 @@ int main(int argc, char *argv[])
     GUIUtilTests test3;
     if (QTest::qExec(&test3) != 0)
         fInvalid = true;
+    BitcoinAddressValidatorTests test4;
+    if (QTest::qExec(&test4) != 0)
+	    fInvalid = true;
 
     return fInvalid;
 }
