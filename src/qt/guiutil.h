@@ -46,8 +46,10 @@ namespace GUIUtil
 
     // Parse "bitcoincash:" URI into recipient object, return true on successful
     // parsing
-    bool parseBitcoinURI(const QUrl &uri, SendCoinsRecipient *out);
-    bool parseBitcoinURI(QString uri, SendCoinsRecipient *out);
+    bool parseBitcoinURI(const QString &scheme, const QUrl &uri,
+                         SendCoinsRecipient *out);
+    bool parseBitcoinURI(const QString &scheme, QString uri,
+                         SendCoinsRecipient *out);
     QString formatBitcoinURI(const SendCoinsRecipient &info);
 
     QString uriPrefix();
