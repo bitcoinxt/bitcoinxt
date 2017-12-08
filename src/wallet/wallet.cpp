@@ -2281,9 +2281,9 @@ bool CWallet::SetAddressBook(const CTxDestination& address, const string& strNam
                              strPurpose, (fUpdated ? CT_UPDATED : CT_NEW) );
     if (!fFileBacked)
         return false;
-    if (!strPurpose.empty() && !CWalletDB(strWalletFile).WritePurpose(EncodeDestination(address), strPurpose))
+    if (!strPurpose.empty() && !CWalletDB(strWalletFile).WritePurpose(address, strPurpose))
         return false;
-    return CWalletDB(strWalletFile).WriteName(EncodeDestination(address), strName);
+    return CWalletDB(strWalletFile).WriteName(address, strName);
 }
 
 bool CWallet::DelAddressBook(const CTxDestination& address)
@@ -2294,10 +2294,9 @@ bool CWallet::DelAddressBook(const CTxDestination& address)
         if(fFileBacked)
         {
             // Delete destdata tuples associated with address
-            std::string strAddress = EncodeDestination(address);
             for (const std::pair<std::string, std::string>& item : mapAddressBook[address].destdata)
             {
-                CWalletDB(strWalletFile).EraseDestData(strAddress, item.first);
+                CWalletDB(strWalletFile).EraseDestData(address, item.first);
             }
         }
         mapAddressBook.erase(address);
@@ -2307,8 +2306,8 @@ bool CWallet::DelAddressBook(const CTxDestination& address)
 
     if (!fFileBacked)
         return false;
-    CWalletDB(strWalletFile).ErasePurpose(EncodeDestination(address));
-    return CWalletDB(strWalletFile).EraseName(EncodeDestination(address));
+    CWalletDB(strWalletFile).ErasePurpose(address);
+    return CWalletDB(strWalletFile).EraseName(address);
 }
 
 bool CWallet::SetDefaultKey(const CPubKey &vchPubKey)
@@ -2811,7 +2810,7 @@ bool CWallet::AddDestData(const CTxDestination &dest, const std::string &key, co
     mapAddressBook[dest].destdata.insert(std::make_pair(key, value));
     if (!fFileBacked)
         return true;
-    return CWalletDB(strWalletFile).WriteDestData(EncodeDestination(dest), key, value);
+    return CWalletDB(strWalletFile).WriteDestData(dest, key, value);
 }
 
 bool CWallet::EraseDestData(const CTxDestination &dest, const std::string &key)
@@ -2820,7 +2819,7 @@ bool CWallet::EraseDestData(const CTxDestination &dest, const std::string &key)
         return false;
     if (!fFileBacked)
         return true;
-    return CWalletDB(strWalletFile).EraseDestData(EncodeDestination(dest), key);
+    return CWalletDB(strWalletFile).EraseDestData(dest, key);
 }
 
 bool CWallet::LoadDestData(const CTxDestination &dest, const std::string &key, const std::string &value)
