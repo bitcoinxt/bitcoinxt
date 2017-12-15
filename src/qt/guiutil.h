@@ -19,6 +19,7 @@
 
 class QValidatedLineEdit;
 class SendCoinsRecipient;
+class CChainParams;
 
 QT_BEGIN_NAMESPACE
 class QAbstractItemView;
@@ -44,6 +45,8 @@ namespace GUIUtil
     void setupAddressWidget(QValidatedLineEdit *widget, QWidget *parent);
     void setupAmountWidget(QLineEdit *widget, QWidget *parent);
 
+    QString bitcoinURIScheme(const CChainParams&);
+    QString bitcoinURIScheme();
     // Parse "bitcoincash:" URI into recipient object, return true on successful
     // parsing
     bool parseBitcoinURI(const QString &scheme, const QUrl &uri,
@@ -210,7 +213,7 @@ namespace GUIUtil
 #else
     typedef QProgressBar ProgressBar;
 #endif
-    
+
 } // namespace GUIUtil
 
 #endif // BITCOIN_QT_GUIUTIL_H

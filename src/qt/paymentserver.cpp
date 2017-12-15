@@ -207,6 +207,7 @@ void PaymentServer::ipcParseCommandLine(int argc, char* argv[])
     for (int i = 1; i < argc; i++)
     {
         QString arg(argv[i]);
+        QString scheme = GUIUtil::bitcoinURIScheme();
         if (arg.startsWith("-"))
             continue;
 
@@ -214,12 +215,12 @@ void PaymentServer::ipcParseCommandLine(int argc, char* argv[])
         // network as that would require fetching and parsing the payment request.
         // That means clicking such an URI which contains a testnet payment request
         // will start a mainnet instance and throw a "wrong network" error.
-        if (arg.startsWith(GUIUtil::uriPrefix(), Qt::CaseInsensitive)) // bitcoin: URI
+        if (arg.startsWith(scheme, Qt::CaseInsensitive)) // bitcoin: URI
         {
             savedPaymentRequests.append(arg);
 
             SendCoinsRecipient r;
-            if (GUIUtil::parseBitcoinURI(GUIUtil::uriPrefix(), arg, &r) && !r.address.isEmpty())
+            if (GUIUtil::parseBitcoinURI(scheme, arg, &r) && !r.address.isEmpty())
             {
                 if (IsValidDestinationString(r.address.toStdString(), Params(CBaseChainParams::MAIN)))
                 {
@@ -325,7 +326,7 @@ PaymentServer::PaymentServer(QObject* parent, bool startLocalServer) :
         if (!uriServer->listen(name)) {
             // constructor is called early in init, so don't use "Q_EMIT message()" here
             QMessageBox::critical(0, tr("Payment request error"),
-                tr("Cannot start bitcoin: click-to-pay handler"));
+                tr("Cannot start click-to-pay handler"));
         }
         else {
             connect(uriServer, SIGNAL(newConnection()), this, SLOT(handleURIConnection()));
@@ -406,7 +407,8 @@ void PaymentServer::handleURIOrFile(const QString& s)
         return;
     }
 
-    if (s.startsWith(GUIUtil::uriPrefix(), Qt::CaseInsensitive)) // bitcoin: URI
+    QString scheme = GUIUtil::bitcoinURIScheme();
+    if (s.startsWith(scheme, Qt::CaseInsensitive)) // bitcoin: URI
     {
 #if QT_VERSION < 0x050000
         QUrl uri(s);
@@ -438,7 +440,7 @@ void PaymentServer::handleURIOrFile(const QString& s)
         else // normal URI
         {
             SendCoinsRecipient recipient;
-            if (GUIUtil::parseBitcoinURI(GUIUtil::uriPrefix(), s, &recipient))
+            if (GUIUtil::parseBitcoinURI(scheme, s, &recipient))
             {
                 if (!IsValidDestinationString(recipient.address.toStdString())) {
                     Q_EMIT message(tr("URI handling"), tr("Invalid payment address %1").arg(recipient.address),

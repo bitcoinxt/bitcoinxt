@@ -197,3 +197,22 @@ void URITests::uriTestFormatURI() {
                 "bitcoincash:175tWpb8K1S7NmH4Zx6rewF9WQrcZv245W?message=test");
     }
 }
+
+void URITests::uriTestScheme() {
+    auto arg = new DummyArgGetter;
+    auto raii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+    {
+        // cashaddr - scheme depends on selected chain params
+        arg->useCashAddr = true;
+        QVERIFY("bitcoincash" == GUIUtil::bitcoinURIScheme(Params(CBaseChainParams::MAIN)));
+        QVERIFY("bchtest" == GUIUtil::bitcoinURIScheme(Params(CBaseChainParams::TESTNET)));
+        QVERIFY("bchreg" == GUIUtil::bitcoinURIScheme(Params(CBaseChainParams::REGTEST)));
+    }
+    {
+        // legacy - scheme is "bitcoincash" regardless of chain params
+        arg->useCashAddr = false;
+        QVERIFY("bitcoincash" == GUIUtil::bitcoinURIScheme(Params(CBaseChainParams::MAIN)));
+        QVERIFY("bitcoincash" == GUIUtil::bitcoinURIScheme(Params(CBaseChainParams::TESTNET)));
+        QVERIFY("bitcoincash" == GUIUtil::bitcoinURIScheme(Params(CBaseChainParams::REGTEST)));
+    }
+}
