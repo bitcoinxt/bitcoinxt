@@ -8,6 +8,7 @@
 
 #include "util.h"
 #include "uritests.h"
+#include "guiutiltests.h"
 
 #ifdef ENABLE_WALLET
 #include "paymentservertests.h"
@@ -48,6 +49,9 @@ int main(int argc, char *argv[])
     if (QTest::qExec(&test2) != 0)
         fInvalid = true;
 #endif
+    GUIUtilTests test3;
+    if (QTest::qExec(&test3) != 0)
+        fInvalid = true;
 
     return fInvalid;
 }
