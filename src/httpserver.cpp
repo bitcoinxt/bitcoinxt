@@ -253,7 +253,7 @@ static void http_request_cb(struct evhttp_request* req, void* arg)
 
     // Dispatch to worker thread
     if (i != iend) {
-        std::auto_ptr<HTTPWorkItem> item(new HTTPWorkItem(hreq.release(), path, i->handler));
+        std::unique_ptr<HTTPWorkItem> item(new HTTPWorkItem(hreq.release(), path, i->handler));
         assert(workQueue);
         if (workQueue->Enqueue(item.get()))
             item.release(); /* if true, queue took ownership */

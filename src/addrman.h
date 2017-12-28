@@ -170,8 +170,8 @@ public:
 //! the maximum number of nodes to return in a getaddr call
 #define ADDRMAN_GETADDR_MAX 2500
 
-/** 
- * Stochastical (IP) address manager 
+/**
+ * Stochastical (IP) address manager
  */
 class CAddrMan
 {
@@ -478,7 +478,7 @@ public:
     }
 
     //! Return the number of (unique) addresses in all tables.
-    int size()
+    size_t size()
     {
         return vRandom.size();
     }
