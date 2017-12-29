@@ -156,7 +156,8 @@ void ThinBlockWorker::stopWork(const uint256& block) {
 }
 
 void ThinBlockWorker::stopAllWork() {
-    for (auto b : blocks)
+    std::set<uint256> blocksCpy = blocks;
+    for (const uint256& b : blocksCpy)
         stopWork(b);
 }
 
