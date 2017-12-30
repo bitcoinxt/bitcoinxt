@@ -178,7 +178,7 @@ BOOST_AUTO_TEST_CASE(support_xthin_test) {
 // when node is destructed.
 BOOST_AUTO_TEST_CASE(ipgroup_assigned) {
     CNetAddr ip("10.0.0.1");
-    std::auto_ptr<CNode> node(new CNode(
+    std::unique_ptr<CNode> node(new CNode(
                 INVALID_SOCKET, CAddress(CService(ip, 1234))));
 
     CIPGroupData ipgroup = FindGroupForIP(ip);
