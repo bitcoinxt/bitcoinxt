@@ -93,3 +93,8 @@ bool CLevelDBWrapper::WriteBatch(CLevelDBBatch& batch, bool fSync) throw(leveldb
 
 // Taken from future release of DBWrapper
 const std::string CLevelDBWrapper::OBFUSCATE_KEY_KEY("\000obfuscate_key", 14);
+
+CLevelDBIterator::~CLevelDBIterator() { delete piter; }
+bool CLevelDBIterator::Valid() { return piter->Valid(); }
+void CLevelDBIterator::SeekToFirst() { piter->SeekToFirst(); }
+void CLevelDBIterator::Next() { piter->Next(); }
