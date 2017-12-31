@@ -13,20 +13,6 @@
 #include <leveldb/filter_policy.h>
 #include <memenv.h>
 
-void HandleError(const leveldb::Status& status) throw(dbwrapper_error)
-{
-    if (status.ok())
-        return;
-    LogPrintf("%s\n", status.ToString());
-    if (status.IsCorruption())
-        throw dbwrapper_error("Database corrupted");
-    if (status.IsIOError())
-        throw dbwrapper_error("Database I/O error");
-    if (status.IsNotFound())
-        throw dbwrapper_error("Database entry missing");
-    throw dbwrapper_error("Unknown database error");
-}
-
 static leveldb::Options GetOptions(size_t nCacheSize)
 {
     leveldb::Options options;
@@ -59,13 +45,13 @@ CDBWrapper::CDBWrapper(const boost::filesystem::path& path, size_t nCacheSize, b
         if (fWipe) {
             LogPrintf("Wiping LevelDB in %s\n", path.string());
             leveldb::Status result = leveldb::DestroyDB(path.string(), options);
-            HandleError(result);
+            dbwrapper_private::HandleError(result);
         }
         TryCreateDirectory(path);
         LogPrintf("Opening LevelDB in %s\n", path.string());
     }
     leveldb::Status status = leveldb::DB::Open(options, path.string(), &pdb);
-    HandleError(status);
+    dbwrapper_private::HandleError(status);
     LogPrintf("Opened LevelDB successfully\n");
 
     std::vector<unsigned char> obfuscate_key;
@@ -84,10 +70,10 @@ CDBWrapper::~CDBWrapper()
     options.env = NULL;
 }
 
-bool CDBWrapper::WriteBatch(CDBBatch& batch, bool fSync) throw(dbwrapper_error)
+bool CDBWrapper::WriteBatch(CDBBatch& batch, bool fSync)
 {
     leveldb::Status status = pdb->Write(fSync ? syncoptions : writeoptions, &batch.batch);
-    HandleError(status);
+    dbwrapper_private::HandleError(status);
     return true;
 }
 
@@ -98,3 +84,21 @@ CDBIterator::~CDBIterator() { delete piter; }
 bool CDBIterator::Valid() { return piter->Valid(); }
 void CDBIterator::SeekToFirst() { piter->SeekToFirst(); }
 void CDBIterator::Next() { piter->Next(); }
+
+namespace dbwrapper_private {
+
+void HandleError(const leveldb::Status& status)
+{
+    if (status.ok())
+        return;
+    LogPrintf("%s\n", status.ToString());
+    if (status.IsCorruption())
+        throw dbwrapper_error("Database corrupted");
+    if (status.IsIOError())
+        throw dbwrapper_error("Database I/O error");
+    if (status.IsNotFound())
+        throw dbwrapper_error("Database entry missing");
+    throw dbwrapper_error("Unknown database error");
+}
+
+} // ns dbwrapper_private
