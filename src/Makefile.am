@@ -106,6 +106,7 @@ BITCOIN_CORE_H = \
   compactthin.h \
   compacttxfinder.h \
   core_memusage.h \
+  dbwrapper.h \
   dummythin.h \
   hash.h \
   httprpc.h \
@@ -116,7 +117,6 @@ BITCOIN_CORE_H = \
   key.h \
   keystore.h \
   leakybucket.h \
-  leveldbwrapper.h \
   limitedmap.h \
   main.h \
   maxblocksize.h \
@@ -207,13 +207,13 @@ libbitcoin_server_a_SOURCES = \
   compactthin.cpp \
   compacttxfinder.cpp \
   curl_wrapper.cpp \
+  dbwrapper.cpp \
   httprpc.cpp \
   httpserver.cpp \
   inflightindex.cpp \
   init.cpp \
   ipgroups.cpp \
   leakybucket.cpp \
-  leveldbwrapper.cpp \
   main.cpp \
   maxblocksize.cpp \
   merkleblock.cpp \

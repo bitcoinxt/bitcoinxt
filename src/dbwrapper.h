@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#ifndef BITCOIN_LEVELDBWRAPPER_H
-#define BITCOIN_LEVELDBWRAPPER_H
+#ifndef BITCOIN_DBWRAPPER_H
+#define BITCOIN_DBWRAPPER_H
 
 #include "clientversion.h"
 #include "serialize.h"
@@ -16,18 +16,18 @@
 #include <leveldb/db.h>
 #include <leveldb/write_batch.h>
 
-class leveldb_error : public std::runtime_error
+class dbwrapper_error : public std::runtime_error
 {
 public:
-    leveldb_error(const std::string& msg) : std::runtime_error(msg) {}
+    dbwrapper_error(const std::string& msg) : std::runtime_error(msg) {}
 };
 
-void HandleError(const leveldb::Status& status) throw(leveldb_error);
+void HandleError(const leveldb::Status& status) throw(dbwrapper_error);
 
-/** Batch of changes queued to be written to a CLevelDBWrapper */
-class CLevelDBBatch
+/** Batch of changes queued to be written to a CDBWrapper */
+class CDBBatch
 {
-    friend class CLevelDBWrapper;
+    friend class CDBWrapper;
 
 private:
     leveldb::WriteBatch batch;
@@ -61,14 +61,14 @@ public:
     }
 };
 
-class CLevelDBIterator
+class CDBIterator
 {
 private:
     leveldb::Iterator *piter;
 
 public:
-    CLevelDBIterator(leveldb::Iterator *piterIn) : piter(piterIn) {}
-    ~CLevelDBIterator();
+    CDBIterator(leveldb::Iterator *piterIn) : piter(piterIn) {}
+    ~CDBIterator();
 
     bool Valid();
 
@@ -118,7 +118,7 @@ public:
 
 };
 
-class CLevelDBWrapper
+class CDBWrapper
 {
 private:
     //! custom environment this database is using (may be NULL in case of default environment)
@@ -146,11 +146,11 @@ private:
     static const std::string OBFUSCATE_KEY_KEY;
 
 public:
-    CLevelDBWrapper(const boost::filesystem::path& path, size_t nCacheSize, bool &isObfuscated, bool fMemory = false, bool fWipe = false);
-    ~CLevelDBWrapper();
+    CDBWrapper(const boost::filesystem::path& path, size_t nCacheSize, bool &isObfuscated, bool fMemory = false, bool fWipe = false);
+    ~CDBWrapper();
 
     template <typename K, typename V>
-    bool Read(const K& key, V& value) const throw(leveldb_error)
+    bool Read(const K& key, V& value) const throw(dbwrapper_error)
     {
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
         ssKey.reserve(ssKey.GetSerializeSize(key));
@@ -175,15 +175,15 @@ public:
     }
 
     template <typename K, typename V>
-    bool Write(const K& key, const V& value, bool fSync = false) throw(leveldb_error)
+    bool Write(const K& key, const V& value, bool fSync = false) throw(dbwrapper_error)
     {
-        CLevelDBBatch batch;
+        CDBBatch batch;
         batch.Write(key, value);
         return WriteBatch(batch, fSync);
     }
 
     template <typename K>
-    bool Exists(const K& key) const throw(leveldb_error)
+    bool Exists(const K& key) const throw(dbwrapper_error)
     {
         CDataStream ssKey(SER_DISK, CLIENT_VERSION);
         ssKey.reserve(ssKey.GetSerializeSize(key));
@@ -202,14 +202,14 @@ public:
     }
 
     template <typename K>
-    bool Erase(const K& key, bool fSync = false) throw(leveldb_error)
+    bool Erase(const K& key, bool fSync = false) throw(dbwrapper_error)
     {
-        CLevelDBBatch batch;
+        CDBBatch batch;
         batch.Erase(key);
         return WriteBatch(batch, fSync);
     }
 
-    bool WriteBatch(CLevelDBBatch& batch, bool fSync = false) throw(leveldb_error);
+    bool WriteBatch(CDBBatch& batch, bool fSync = false) throw(dbwrapper_error);
 
     // not available for LevelDB; provide for compatibility with BDB
     bool Flush()
@@ -217,16 +217,16 @@ public:
         return true;
     }
 
-    bool Sync() throw(leveldb_error)
+    bool Sync() throw(dbwrapper_error)
     {
-        CLevelDBBatch batch;
+        CDBBatch batch;
         return WriteBatch(batch, true);
     }
 
-    CLevelDBIterator *NewIterator()
+    CDBIterator *NewIterator()
     {
-        return new CLevelDBIterator(pdb->NewIterator(iteroptions));
+        return new CDBIterator(pdb->NewIterator(iteroptions));
     }
 };
 
-#endif // BITCOIN_LEVELDBWRAPPER_H
+#endif // BITCOIN_DBWRAPPER_H
