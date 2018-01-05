@@ -2,6 +2,8 @@
 #define BITCOIN_UTILPROCESSMSG_H
 
 #include <vector>
+#include <cstdint>
+
 class uint256;
 class CNode;
 class CBlockHeader;
@@ -26,5 +28,8 @@ inline BlockInFlightMarker::~BlockInFlightMarker() { }
 bool KeepOutgoingPeer(const CNode&);
 
 void UpdateBestHeaderSent(CNode& node, CBlockIndex* blockIndex);
+
+// Exponentially limit the rate of nSize flow to nLimit.  nLimit unit is thousands-per-minute.
+bool RateLimitExceeded(double& dCount, int64_t& nLastTime, int64_t nLimit, unsigned int nSize);
 
 #endif

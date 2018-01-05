@@ -86,6 +86,10 @@ int Opt::UAHFProtectSunset() {
     return Args->GetArg("-uahfprotectsunset", UAHF_DEFAULT_PROTECT_THIS_SUNSET);
 }
 
+int64_t Opt::RespendRelayLimit() const {
+    return Args->GetArg("-limitrespendrelay", 100);
+}
+
 bool Opt::UsingThinBlocks() {
     if (IsStealthMode())
         return false;
@@ -114,4 +118,3 @@ std::unique_ptr<ArgReset> SetDummyArgGetter(std::unique_ptr<ArgGetter> getter) {
 ArgReset::~ArgReset() {
     Args.reset(new DefaultGetter());
 }
-
