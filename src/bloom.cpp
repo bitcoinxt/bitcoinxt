@@ -71,12 +71,16 @@ void CBloomFilter::insert(const vector<unsigned char>& vKey)
     isEmpty = false;
 }
 
-void CBloomFilter::insert(const COutPoint& outpoint)
-{
+static std::vector<unsigned char> ToVector(const COutPoint& outpoint) {
     CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
     stream << outpoint;
-    vector<unsigned char> data(stream.begin(), stream.end());
-    insert(data);
+    return std::vector<unsigned char>(stream.begin(), stream.end());
+}
+
+
+void CBloomFilter::insert(const COutPoint& outpoint)
+{
+    insert(ToVector(outpoint));
 }
 
 void CBloomFilter::insert(const uint256& hash)
@@ -103,10 +107,7 @@ bool CBloomFilter::contains(const vector<unsigned char>& vKey) const
 
 bool CBloomFilter::contains(const COutPoint& outpoint) const
 {
-    CDataStream stream(SER_NETWORK, PROTOCOL_VERSION);
-    stream << outpoint;
-    vector<unsigned char> data(stream.begin(), stream.end());
-    return contains(data);
+    return contains(ToVector(outpoint));
 }
 
 bool CBloomFilter::contains(const uint256& hash) const
@@ -151,7 +152,7 @@ bool CBloomFilter::IsRelevantAndUpdate(const CTransaction& tx)
         const CTxOut& txout = tx.vout[i];
         // Match if the filter contains any arbitrary script data element in any scriptPubKey in tx
         // If this matches, also add the specific output that was matched.
-        // This means clients don't have to update the filter themselves when a new relevant tx 
+        // This means clients don't have to update the filter themselves when a new relevant tx
         // is discovered in order to find spending transactions, which avoids round-tripping and race conditions.
         CScript::const_iterator pc = txout.scriptPubKey.begin();
         vector<unsigned char> data;
@@ -298,10 +299,20 @@ bool CRollingBloomFilter::contains(const std::vector<unsigned char>& vKey) const
     return true;
 }
 
+void CRollingBloomFilter::insert(const COutPoint& outpoint)
+{
+    insert(ToVector(outpoint));
+}
+
 bool CRollingBloomFilter::contains(const uint256& hash) const
 {
     vector<unsigned char> vData(hash.begin(), hash.end());
     return contains(vData);
+}
+
+bool CRollingBloomFilter::contains(const COutPoint& outpoint) const
+{
+    return contains(ToVector(outpoint));
 }
 
 void CRollingBloomFilter::reset()
