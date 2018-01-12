@@ -8,7 +8,7 @@ class CNode;
 class ThinBlockWorker;
 struct XThinReReqResponse;
 class CompactReReqResponse;
-struct BlockInFlightMarker;
+class BlockInFlightMarker;
 
 // Finishes a block using response from a transaction re-request.
 struct XThinBlockConcluder {

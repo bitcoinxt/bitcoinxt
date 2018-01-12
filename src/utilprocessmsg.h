@@ -12,7 +12,8 @@ typedef int NodeId;
 
 bool HaveBlockData(const uint256& hash);
 
-struct BlockInFlightMarker {
+class BlockInFlightMarker {
+public:
     virtual ~BlockInFlightMarker() = 0;
     virtual void operator()(
         NodeId nodeid, const uint256& hash,
