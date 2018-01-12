@@ -42,12 +42,12 @@ BOOST_AUTO_TEST_CASE(parse_ip_data_ok)
 
 BOOST_AUTO_TEST_CASE(parse_ip_data_bad)
 {
-    BOOST_CHECK_EQUAL(ParseIPData("").size(), 0);
-    BOOST_CHECK_EQUAL(ParseIPData("Blah blah blah\t\t").size(), 0);
-    BOOST_CHECK_EQUAL(ParseIPData("   #").size(), 0);
-    BOOST_CHECK_EQUAL(ParseIPData("256.0.0.0").size(), 0);
-    BOOST_CHECK_EQUAL(ParseIPData("-1.0.0.0").size(), 0);
-    BOOST_CHECK_EQUAL(ParseIPData("1.2.").size(), 0);
+    BOOST_CHECK_EQUAL(ParseIPData("").size(), size_t(0));
+    BOOST_CHECK_EQUAL(ParseIPData("Blah blah blah\t\t").size(), size_t(0));
+    BOOST_CHECK_EQUAL(ParseIPData("   #").size(), size_t(0));
+    BOOST_CHECK_EQUAL(ParseIPData("256.0.0.0").size(), size_t(0));
+    BOOST_CHECK_EQUAL(ParseIPData("-1.0.0.0").size(), size_t(0));
+    BOOST_CHECK_EQUAL(ParseIPData("1.2.").size(), size_t(0));
 
     // These tests reveal that the CSubNet parser can sometimes fail to spot that a subnet specification is invalid.
     // If/when CSubNet("") is tightened up we can have more aggressive testing of junk here.

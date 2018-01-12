@@ -13,7 +13,7 @@ BOOST_AUTO_TEST_CASE(coinbase_only_test) {
     CBlock block = TestBlock2();
 
     std::vector<PrefilledTransaction> prefilled = filler.fillFrom(block);
-    BOOST_CHECK_EQUAL(1, prefilled.size());
+    BOOST_CHECK_EQUAL(size_t(1), prefilled.size());
     BOOST_CHECK_EQUAL(
             block.vtx.at(0).GetHash().ToString(),
             prefilled.at(0).tx.GetHash().ToString());

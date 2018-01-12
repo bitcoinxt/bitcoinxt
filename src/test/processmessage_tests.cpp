@@ -222,7 +222,7 @@ BOOST_AUTO_TEST_CASE(compactblockprocessor_fetch_full) {
     p(stream, mpool, currMaxBlockSize, 1);
 
     // should have rejected the block
-    BOOST_CHECK_EQUAL(1, node.messages.size());
+    BOOST_CHECK_EQUAL(size_t(1), node.messages.size());
     BOOST_CHECK_EQUAL("reject", node.messages.at(0));
 }
 

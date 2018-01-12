@@ -24,7 +24,7 @@ BOOST_AUTO_TEST_CASE(get_next_work)
     pindexLast.nHeight = 32255;
     pindexLast.nTime = 1262152739;  // Block #32255
     pindexLast.nBits = 0x1d00ffff;
-    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1d00d86a);
+    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1d00d86au);
 }
 
 /* Test the constraint on the upper bound for next work */
@@ -38,7 +38,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_pow_limit)
     pindexLast.nHeight = 2015;
     pindexLast.nTime = 1233061996;  // Block #2015
     pindexLast.nBits = 0x1d00ffff;
-    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1d00ffff);
+    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1d00ffffu);
 }
 
 /* Test the constraint on the lower bound for actual time taken */
@@ -52,7 +52,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_lower_limit_actual)
     pindexLast.nHeight = 68543;
     pindexLast.nTime = 1279297671;  // Block #68543
     pindexLast.nBits = 0x1c05a3f4;
-    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1c0168fd);
+    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1c0168fdu);
 }
 
 /* Test the constraint on the upper bound for actual time taken */
@@ -66,7 +66,7 @@ BOOST_AUTO_TEST_CASE(get_next_work_upper_limit_actual)
     pindexLast.nHeight = 46367;
     pindexLast.nTime = 1269211443;  // Block #46367
     pindexLast.nBits = 0x1c387f6f;
-    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1d00e1fd);
+    BOOST_CHECK_EQUAL(CalculateNextWorkRequired(&pindexLast, nLastRetargetTime, params), 0x1d00e1fdu);
 }
 
 BOOST_AUTO_TEST_CASE(GetBlockProofEquivalentTime_test)
@@ -272,7 +272,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
     }
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1c0fe7b1);
+    BOOST_CHECK_EQUAL(nBits, 0x1c0fe7b1u);
 
     // If we dramatically shorten block production, difficulty increases faster.
     for (size_t j = 0; j < 20; i++, j++) {
@@ -293,7 +293,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
     }
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1c0db19f);
+    BOOST_CHECK_EQUAL(nBits, 0x1c0db19fu);
 
     // We start to emit blocks significantly slower. The first block has no
     // impact.
@@ -301,7 +301,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
     nBits = GetNextCashWorkRequired(&blocks[i++], &blkHeaderDummy, params);
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1c0d9222);
+    BOOST_CHECK_EQUAL(nBits, 0x1c0d9222u);
 
     // If we dramatically slow down block production, difficulty decreases.
     for (size_t j = 0; j < 93; i++, j++) {
@@ -323,13 +323,13 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
     }
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1c2f13b9);
+    BOOST_CHECK_EQUAL(nBits, 0x1c2f13b9u);
 
     // Due to the window of time being bounded, next block's difficulty actually
     // gets harder.
     blocks[i] = GetBlockIndex(&blocks[i - 1], 6000, nBits);
     nBits = GetNextCashWorkRequired(&blocks[i++], &blkHeaderDummy, params);
-    BOOST_CHECK_EQUAL(nBits, 0x1c2ee9bf);
+    BOOST_CHECK_EQUAL(nBits, 0x1c2ee9bfu);
 
     // And goes down again. It takes a while due to the window being bounded and
     // the skewed block causes 2 blocks to get out of the window.
@@ -352,7 +352,7 @@ BOOST_AUTO_TEST_CASE(cash_difficulty_test) {
     }
 
     // Check the actual value.
-    BOOST_CHECK_EQUAL(nBits, 0x1d00ffff);
+    BOOST_CHECK_EQUAL(nBits, 0x1d00ffffu);
 
     // Once the difficulty reached the minimum allowed level, it doesn't get any
     // easier.
