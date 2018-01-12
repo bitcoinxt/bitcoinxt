@@ -24,7 +24,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeVersionMessage)
     s << std::string(256, 'a'); // 256 is the max allowed length in the Bitcoin Core/XT protocol processing code
     s << n.nStartingHeight;
     s << n.fRelayTxes;
-    BOOST_CHECK_EQUAL(352, s.size());
+    BOOST_CHECK_EQUAL(size_t(352), s.size());
     BOOST_CHECK(ProcessMessage(&n, "version", s, 0));
 }
 
@@ -42,7 +42,7 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeVersionMessage)
     s << std::string(257, 'a'); // invalid, max is 256
     s << n.nStartingHeight;
     s << n.fRelayTxes;
-    BOOST_CHECK_EQUAL(353, s.size());
+    BOOST_CHECK_EQUAL(size_t(353), s.size());
     BOOST_CHECK_THROW(ProcessMessage(&n, "version", s, 0), std::ios_base::failure);
 }
 
@@ -54,7 +54,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
     s << std::string(12, 'a'); // not a real command, but it uses the max of 12 here.
     s << (uint8_t)0x10;
     s << std::string(111, 'a');
-    BOOST_CHECK_EQUAL(126, s.size());
+    BOOST_CHECK_EQUAL(size_t(126), s.size());
     bool temp = fDebug;
     fDebug = true;
     BOOST_CHECK(ProcessMessage(&n, "reject", s, 0));
@@ -70,7 +70,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeValidRejectMessage)
     s << (uint8_t)0x10;
     s << std::string(111, 'a');
     s << uint256();
-    BOOST_CHECK_EQUAL(151, s.size());
+    BOOST_CHECK_EQUAL(size_t(151), s.size());
     bool temp = fDebug;
     fDebug = true;
     BOOST_CHECK(ProcessMessage(&n, "reject", s, 0));
@@ -85,7 +85,7 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeWeirdRejectMessage)
     s << std::string(13, 'a'); // invalid, max is 12
     s << (uint8_t)0x10;
     s << std::string(111, 'a');
-    BOOST_CHECK_EQUAL(127, s.size());
+    BOOST_CHECK_EQUAL(size_t(127), s.size());
     bool temp = fDebug;
     fDebug = true;
     BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0)); // check this way since the reject message processing swallows the exception
@@ -101,7 +101,7 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeValidRejectMessage)
     s << (uint8_t)0x10;
     s << std::string(112, 'a'); // invalid, max is 111
     s << uint256();
-    BOOST_CHECK_EQUAL(152, s.size());
+    BOOST_CHECK_EQUAL(size_t(152), s.size());
     bool temp = fDebug;
     fDebug = true;
     BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0)); // check this way since the reject message processing swallows the exception

@@ -53,7 +53,7 @@ BOOST_AUTO_TEST_CASE(only_coinbase) {
     // Should still get coinbase tx.
     XThinBlock thinb(b, filter);
     BOOST_CHECK_EQUAL(thinb.txHashes.size(), b.vtx.size());
-    BOOST_CHECK_EQUAL(1, thinb.missing.size());
+    BOOST_CHECK_EQUAL(size_t(1), thinb.missing.size());
     BOOST_CHECK_EQUAL(
             b.vtx[0].GetHash().ToString(),
             thinb.missing[0].GetHash().ToString());

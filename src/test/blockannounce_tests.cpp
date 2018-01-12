@@ -124,7 +124,7 @@ BOOST_AUTO_TEST_CASE(fetch_when_wanted) {
         std::vector<CInv> toFetch;
         DummyBlockIndexEntry entry(block);
         BOOST_CHECK(!ann.onBlockAnnounced(toFetch));
-        BOOST_CHECK_EQUAL(0, toFetch.size());
+        BOOST_CHECK_EQUAL(size_t(0), toFetch.size());
     }
 }
 
@@ -279,7 +279,7 @@ BOOST_AUTO_TEST_CASE(onannounced_downl_thin) {
 
     // thin blocks come with a header, we should not
     // have requested headers.
-    BOOST_CHECK_EQUAL(0, node.messages.size());
+    BOOST_CHECK_EQUAL(size_t(0), node.messages.size());
 }
 
 BOOST_AUTO_TEST_CASE(onannounced_downl_full) {
@@ -290,7 +290,7 @@ BOOST_AUTO_TEST_CASE(onannounced_downl_full) {
 
     std::vector<CInv> toFetch;
     BOOST_CHECK(ann.onBlockAnnounced(toFetch));
-    BOOST_CHECK_EQUAL(1, toFetch.size());
+    BOOST_CHECK_EQUAL(size_t(1), toFetch.size());
     BOOST_CHECK_EQUAL(block.ToString(), toFetch.at(0).hash.ToString());
 
     // Should also have requested headers.
@@ -309,7 +309,7 @@ BOOST_AUTO_TEST_CASE(onannounced_dont_downl) {
     std::vector<CInv> toFetch;
     BOOST_CHECK(!ann.onBlockAnnounced(toFetch));
     BOOST_CHECK_EQUAL(0, worker->reqs);
-    BOOST_CHECK_EQUAL(0, toFetch.size());
+    BOOST_CHECK_EQUAL(size_t(0), toFetch.size());
 
     // If we don't download, we should still ask for the header.
     BOOST_ASSERT(node.messages.size() > 0);
@@ -328,7 +328,7 @@ BOOST_AUTO_TEST_CASE(onannounced_dowl_thin_later) {
     std::vector<CInv> toFetch;
     BOOST_CHECK(!ann.onBlockAnnounced(toFetch));
     BOOST_CHECK_EQUAL(0, worker->reqs);
-    BOOST_CHECK_EQUAL(0, toFetch.size());
+    BOOST_CHECK_EQUAL(size_t(0), toFetch.size());
 
     // If we don't download, we should still ask for the header.
     BOOST_ASSERT(node.messages.size() > 0);
@@ -438,13 +438,13 @@ BOOST_AUTO_TEST_CASE(announce_with_headers) {
     // Can't connect headers with known best on peer, bail out.
     to.blocksToAnnounce = { entry2.hash, entry3.hash };
     BOOST_CHECK(!ann.announceWithHeaders());
-    BOOST_CHECK_EQUAL(0, to.messages.size());
+    BOOST_CHECK_EQUAL(size_t(0), to.messages.size());
 
     // Peer knows about entry1. Should announce entry2 and entry3.
     to.blocksToAnnounce = { entry1.hash, entry2.hash, entry3.hash };
     NodeStatePtr(to.id)->bestHeaderSent = &entry1.index;
     BOOST_CHECK(ann.announceWithHeaders());
-    BOOST_CHECK_EQUAL(1, to.messages.size());
+    BOOST_CHECK_EQUAL(size_t(1), to.messages.size());
     BOOST_CHECK_EQUAL("headers", to.messages.at(0));
 
     // bestHeaderSent should now be entry3
@@ -461,7 +461,7 @@ BOOST_AUTO_TEST_CASE(announce_with_inv) {
 
     ann.announceWithInv();
 
-    BOOST_CHECK_EQUAL(1, to.vInventoryToSend.size());
+    BOOST_CHECK_EQUAL(size_t(1), to.vInventoryToSend.size());
     BOOST_CHECK_EQUAL(MSG_BLOCK, to.vInventoryToSend.at(0).type);
     BOOST_CHECK_EQUAL(
             entry2.hash.ToString(),
@@ -516,7 +516,7 @@ BOOST_AUTO_TEST_CASE(announce_with_block) {
     };
     DummyBlockSender sender;
     ann.announceWithBlock(sender);
-    BOOST_CHECK_EQUAL(1, to.messages.size());
+    BOOST_CHECK_EQUAL(size_t(1), to.messages.size());
     BOOST_CHECK_EQUAL("cmpctblock", to.messages.at(0));
 
     // bestHeaderSent should now be entry3
@@ -571,7 +571,7 @@ BOOST_AUTO_TEST_CASE(find_headers_to_announce) {
     entry4.index.nHeight = 3;
 
     std::vector<uint256> toAnnounce = findHeadersToAnnounce(&entry2.index, &entry4.index);
-    BOOST_CHECK_EQUAL(2, toAnnounce.size());
+    BOOST_CHECK_EQUAL(size_t(2), toAnnounce.size());
     BOOST_CHECK_EQUAL(entry3.hash.ToString(), toAnnounce.at(0).ToString());
     BOOST_CHECK_EQUAL(entry4.hash.ToString(), toAnnounce.at(1).ToString());
 }

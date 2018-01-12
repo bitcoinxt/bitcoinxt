@@ -36,7 +36,7 @@ void fillBlockIndex(
 
 BOOST_AUTO_TEST_CASE(get_next_max_blocksize) {
     auto params = Params(CBaseChainParams::REGTEST).GetConsensus();
-    BOOST_CHECK_EQUAL(1512, params.nMaxBlockSizeChangePosition);
+    BOOST_CHECK_EQUAL(uint32_t(1512), params.nMaxBlockSizeChangePosition);
 
     // Genesis block, legacy block size
     BOOST_CHECK_EQUAL(MAX_BLOCK_SIZE, GetNextMaxBlockSize(nullptr, params));
@@ -91,13 +91,13 @@ BOOST_AUTO_TEST_CASE(get_next_max_blocksize) {
         std::vector<CBlockIndex> blockInterval(interval);
         fillBlockIndex(params, blockInterval, true, currMax);
         uint64_t newLimit = GetNextMaxBlockSize(&blockInterval.back(), params);
-        BOOST_CHECK_EQUAL(int(currMax * 1.05), newLimit);
+        BOOST_CHECK_EQUAL(uint64_t(currMax * 1.05), newLimit);
 
         // Test lower.
         currMax = 1000 * 2000000;
         fillBlockIndex(params, blockInterval, true, currMax);
         newLimit = GetNextMaxBlockSize(&blockInterval.back(), params);
-        BOOST_CHECK_EQUAL(int(currMax / 1.05), newLimit);
+        BOOST_CHECK_EQUAL(uint64_t(currMax / 1.05), newLimit);
     }
 }
 
@@ -113,25 +113,25 @@ BOOST_AUTO_TEST_CASE(get_max_blocksize_vote_b) {
 
     // Coinbase as in the internal miner
     CScript coinbase = CScript() << height << vote << OP_0;
-    BOOST_CHECK_EQUAL(2000000, GetMaxBlockSizeVote(coinbase, height));
+    BOOST_CHECK_EQUAL(2000000u, GetMaxBlockSizeVote(coinbase, height));
 
     // Coinbase as created with IncrementExtraNonce
     unsigned int nonce = 1;
     CScript coinbase_flags;
     coinbase = (CScript() << height << vote << CScriptNum(nonce)) + coinbase_flags;
-    BOOST_CHECK_EQUAL(2000000, GetMaxBlockSizeVote(coinbase, height));
+    BOOST_CHECK_EQUAL(2000000u, GetMaxBlockSizeVote(coinbase, height));
 
     // coinbase without height should also work
     coinbase = (CScript() << vote << CScriptNum(nonce)) + coinbase_flags;
-    BOOST_CHECK_EQUAL(2000000, GetMaxBlockSizeVote(coinbase, height));
+    BOOST_CHECK_EQUAL(2000000u, GetMaxBlockSizeVote(coinbase, height));
 
     // can't vote twice, only first one counts.
     coinbase = (CScript() << to_uchar("/BIP100/B4/EB6/BIP100/B8/"));
-    BOOST_CHECK_EQUAL(4000000, GetMaxBlockSizeVote(coinbase, height));
+    BOOST_CHECK_EQUAL(4000000u, GetMaxBlockSizeVote(coinbase, height));
 
     // B-votes override EB, even though EB is first.
     coinbase = (CScript() << to_uchar("/EB6/BIP100/B8/"));
-    BOOST_CHECK_EQUAL(8000000, GetMaxBlockSizeVote(coinbase, height));
+    BOOST_CHECK_EQUAL(8000000u, GetMaxBlockSizeVote(coinbase, height));
 }
 
 // If /B/ is not present, we count /EB/ as a vote.
@@ -140,59 +140,59 @@ BOOST_AUTO_TEST_CASE(get_max_blocksize_vote_eb) {
     int32_t height = 600000;
 
     CScript coinbase = CScript() << height << vote << OP_0;
-    BOOST_CHECK_EQUAL(1000000, GetMaxBlockSizeVote(coinbase, height));
+    BOOST_CHECK_EQUAL(1000000u, GetMaxBlockSizeVote(coinbase, height));
 
     unsigned int nonce = 1;
     CScript coinbase_flags;
     coinbase = (CScript() << height << vote << CScriptNum(nonce)) + coinbase_flags;
-    BOOST_CHECK_EQUAL(1000000, GetMaxBlockSizeVote(coinbase, height));
+    BOOST_CHECK_EQUAL(1000000u, GetMaxBlockSizeVote(coinbase, height));
 
     // Example of a Bitcoin Unlimited coinbase string
     coinbase = CScript() << height << to_uchar("/EB16/AD12/a miner comment");
-    BOOST_CHECK_EQUAL(16000000, GetMaxBlockSizeVote(coinbase, height));
+    BOOST_CHECK_EQUAL(16000000u, GetMaxBlockSizeVote(coinbase, height));
 
     // can't vote twice, only first one counts.
     coinbase = (CScript() << to_uchar("some data/EB6/EB8/"));
-    BOOST_CHECK_EQUAL(6000000, GetMaxBlockSizeVote(coinbase, height));
+    BOOST_CHECK_EQUAL(6000000u, GetMaxBlockSizeVote(coinbase, height));
 }
 
 BOOST_AUTO_TEST_CASE(get_max_blocksize_vote_no_vote) {
     int32_t height = 600000;
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << OP_0, height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << OP_0, height));
 
     // votes must begin and end with /
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("/EB2"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("EB2/"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("/BIP100/B2"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("BIP100/B2/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("/EB2"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("EB2/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("/BIP100/B2"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("BIP100/B2/"), height));
 
     // whitespace is not allowed
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("/ EB2/"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("/EB2 /"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("/EB 2/"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("/BIP100/B2 /"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("/BIP100/ B2/"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("/BIP100/B 2/"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("/BIP100 /B2/"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("/ BIP100/B2/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("/ EB2/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("/EB2 /"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("/EB 2/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("/BIP100/B2 /"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("/BIP100/ B2/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("/BIP100/B 2/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("/BIP100 /B2/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("/ BIP100/B2/"), height));
 
     // decimals not supported
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("/EB2.2/"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << height << to_uchar("/BIP100/B2.2/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("/EB2.2/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << height << to_uchar("/BIP100/B2.2/"), height));
 
     // missing mb value
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << to_uchar("/BIP100/B/"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << to_uchar("/EB/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << to_uchar("/BIP100/B/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << to_uchar("/EB/"), height));
 
     // missing BIP100 prefix
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << to_uchar("/B2/"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << to_uchar("/BIP100/B/B8/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << to_uchar("/B2/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << to_uchar("/BIP100/B/B8/"), height));
 
     //Explicit zeros and garbage
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << to_uchar("/BIP100/B0/BIP100/B2"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << to_uchar("/EB0/EB2/"), height));
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(CScript() << to_uchar("/BIP100/Bgarbage/B2/"), height));
-    BOOST_CHECK_EQUAL(2000000, GetMaxBlockSizeVote(CScript() << to_uchar("/EBgarbage/EB2/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << to_uchar("/BIP100/B0/BIP100/B2"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << to_uchar("/EB0/EB2/"), height));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(CScript() << to_uchar("/BIP100/Bgarbage/B2/"), height));
+    BOOST_CHECK_EQUAL(2000000u, GetMaxBlockSizeVote(CScript() << to_uchar("/EBgarbage/EB2/"), height));
 
 
     // Test that height is not a part of the vote string.
@@ -202,7 +202,7 @@ BOOST_AUTO_TEST_CASE(get_max_blocksize_vote_no_vote) {
     BOOST_CHECK_EQUAL('/', coinbase.back());
     std::vector<unsigned char> vote = to_uchar("BIP100/B8/");
     coinbase.insert(coinbase.end(), vote.begin(), vote.end()); // insert instead of << to avoid size being prepended
-    BOOST_CHECK_EQUAL(0, GetMaxBlockSizeVote(coinbase, 47));
+    BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(coinbase, 47));
 }
 
 BOOST_AUTO_TEST_CASE(next_block_raise_cap) {

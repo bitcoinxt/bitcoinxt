@@ -31,7 +31,7 @@ BOOST_AUTO_TEST_CASE(test_connect_chain_req) {
 
     BOOST_CHECK(p.requestConnectHeaders(header, from));
     BOOST_CHECK_EQUAL(1, NodeStatePtr(from.id)->unconnectingHeaders);
-    BOOST_CHECK_EQUAL(1, from.messages.size());
+    BOOST_CHECK_EQUAL(size_t(1), from.messages.size());
     BOOST_CHECK_EQUAL("getheaders", from.messages.at(0));
 
     // Add entry so that header connects. Try again.
@@ -40,7 +40,7 @@ BOOST_AUTO_TEST_CASE(test_connect_chain_req) {
 
     from.messages.clear();
     BOOST_CHECK(!p.requestConnectHeaders(header, from));
-    BOOST_CHECK_EQUAL(0, from.messages.size());
+    BOOST_CHECK_EQUAL(size_t(0), from.messages.size());
     BOOST_CHECK_EQUAL(1 /* no change */, NodeStatePtr(from.id)->unconnectingHeaders);
 }
 
@@ -82,13 +82,13 @@ BOOST_AUTO_TEST_CASE(test_find_missing_blocks) {
     std::vector<CBlockIndex*> missing = p.findMissingBlocks(&tip);
 
     // we have data for prev1, so only tip should be returned.
-    BOOST_CHECK_EQUAL(1, missing.size());
+    BOOST_CHECK_EQUAL(size_t(1), missing.size());
     BOOST_CHECK_EQUAL(&tip, missing[0]);
 
     // we don't have data for prev1, both should be returned.
     prev1.nStatus = 0;
     missing = p.findMissingBlocks(&tip);
-    BOOST_CHECK_EQUAL(2, missing.size());
+    BOOST_CHECK_EQUAL(size_t(2), missing.size());
     BOOST_CHECK_EQUAL(&tip, missing[0]);
     BOOST_CHECK_EQUAL(&prev1, missing[1]);
 }
@@ -114,7 +114,7 @@ BOOST_AUTO_TEST_CASE(test_find_missing_blocks_trim) {
     std::vector<CBlockIndex*> missing = p.findMissingBlocks(&blocks.back());
 
     // blocks.back() should be trimmed off.
-    BOOST_CHECK_EQUAL(MAX_BLOCKS_IN_TRANSIT_PER_PEER, missing.size());
+    BOOST_CHECK_EQUAL(static_cast<size_t>(MAX_BLOCKS_IN_TRANSIT_PER_PEER), missing.size());
     BOOST_CHECK_EQUAL(&blocks[blocks.size() - 2], missing.front());
     BOOST_CHECK_EQUAL(&blocks.front(), missing.back());
 }
@@ -137,7 +137,7 @@ BOOST_AUTO_TEST_CASE(test_find_missing_blocks_toofarbehind) {
     DummyHeaderProcessor p(GetDummyThinBlockMg());
     std::vector<CBlockIndex*> missing = p.findMissingBlocks(&blocks.back());
 
-    BOOST_CHECK_EQUAL(0, missing.size());
+    BOOST_CHECK_EQUAL(size_t(0), missing.size());
 }
 
 BOOST_AUTO_TEST_SUITE_END();

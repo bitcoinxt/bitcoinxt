@@ -56,7 +56,7 @@ BOOST_AUTO_TEST_CASE(trigger_next_request) {
 
     // different hash, should not trigger
     b.triggerNextRequest(active, CInv(MSG_BLOCK, block2), node2);
-    BOOST_CHECK_EQUAL(0, node2.ssSend.size());
+    BOOST_CHECK_EQUAL(size_t(0), node2.ssSend.size());
 }
 
 BOOST_AUTO_TEST_CASE(can_send) {
