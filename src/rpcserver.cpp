@@ -89,7 +89,8 @@ void RPCTypeCheck(const UniValue& params,
 
 void RPCTypeCheckObj(const UniValue& o,
                   const map<string, UniValue::VType>& typesExpected,
-                  bool fAllowNull)
+                  bool fAllowNull,
+                  bool fStrict)
 {
     BOOST_FOREACH(const PAIRTYPE(string, UniValue::VType)& t, typesExpected)
     {
@@ -102,6 +103,18 @@ void RPCTypeCheckObj(const UniValue& o,
             string err = strprintf("Expected type %s for %s, got %s",
                                    uvTypeName(t.second), t.first, uvTypeName(v.type()));
             throw JSONRPCError(RPC_TYPE_ERROR, err);
+        }
+    }
+
+    if (fStrict)
+    {
+        BOOST_FOREACH(const string& k, o.getKeys())
+        {
+            if (typesExpected.count(k) == 0)
+            {
+                string err = strprintf("Unexpected key %s", k);
+                throw JSONRPCError(RPC_TYPE_ERROR, err);
+            }
         }
     }
 }
@@ -306,6 +319,9 @@ static const CRPCCommand vRPCCommands[] =
     { "rawtransactions",    "getrawtransaction",      &getrawtransaction,      true  },
     { "rawtransactions",    "sendrawtransaction",     &sendrawtransaction,     false },
     { "rawtransactions",    "signrawtransaction",     &signrawtransaction,     false }, /* uses wallet if enabled */
+#ifdef ENABLE_WALLET
+    { "rawtransactions",    "fundrawtransaction",     &fundrawtransaction,     false },
+#endif
 
     /* Utility functions */
     { "util",               "createmultisig",         &createmultisig,         true  },
@@ -343,6 +359,7 @@ static const CRPCCommand vRPCCommands[] =
     { "wallet",             "importprivkey",          &importprivkey,          true  },
     { "wallet",             "importwallet",           &importwallet,           true  },
     { "wallet",             "importaddress",          &importaddress,          true  },
+    { "wallet",             "importpubkey",           &importpubkey,           true  },
     { "wallet",             "keypoolrefill",          &keypoolrefill,          true  },
     { "wallet",             "listaccounts",           &listaccounts,           false },
     { "wallet",             "listaddressgroupings",   &listaddressgroupings,   false },
