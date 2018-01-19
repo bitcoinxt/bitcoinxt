@@ -118,7 +118,8 @@ testScripts = [
     'bipdersig-p2p.py',
     'abc-p2p-fullblocktest.py',
     'mempool-accept-txn.py',
-    'blockchain.py'
+    'blockchain.py',
+    'disablewallet.py',
 ]
 
 testScriptsExt = [
