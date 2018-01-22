@@ -310,6 +310,7 @@ case $host in
          bdb_prefix=`$BREW --prefix berkeley-db4 2>/dev/null`
          qt5_prefix=`$BREW --prefix qt5 2>/dev/null`
          curl_prefix=`$BREW --prefix curl 2>/dev/null`
+         sodium_prefix=`$BREW --prefix libsodium 2>/dev/null`
          if test x$openssl_prefix != x; then
            PKG_CONFIG_PATH="$openssl_prefix/lib/pkgconfig:$PKG_CONFIG_PATH"
            export PKG_CONFIG_PATH
@@ -324,6 +325,9 @@ case $host in
          fi
          if test x$curl_prefix != x; then
            PKG_CONFIG_PATH="$curl_prefix/lib/pkgconfig:$PKG_CONFIG_PATH"
+         fi
+         if test x$sodium_prefix != x; then
+           PKG_CONFIG_PATH="$sodium_prefix/lib/pkgconfig:$PKG_CONFIG_PATH"
          fi
        fi
      else
@@ -712,6 +716,7 @@ if test x$use_pkgconfig = xyes; then
         BITCOIN_QT_CHECK([PKG_CHECK_MODULES([QR], [libqrencode], [have_qrencode=yes], [have_qrencode=no])])
       fi
       PKG_CHECK_MODULES([CURL], [libcurl],,[AC_MSG_ERROR(libcurl not found)])
+      PKG_CHECK_MODULES([SODIUM], [libsodium],,[AC_MSG_ERROR(libsodium not found)])
       if test x$build_bitcoin_utils$build_bitcoind$bitcoin_enable_qt$use_tests != xnononono; then
         PKG_CHECK_MODULES([EVENT], [libevent],, [AC_MSG_ERROR(libevent not found.)])
         if test x$TARGET_OS != xwindows; then
@@ -743,6 +748,9 @@ else
 
   AC_CHECK_HEADER([curl/curl.h],,AC_MSG_ERROR(libcurl headers missing))
   AC_CHECK_LIB([curl], [main],CURL_LIBS=-lcurl, AC_MSG_ERROR(libcurl missing))
+
+  AC_CHECK_HEADER([sodium.h],,AC_MSG_ERROR(libsodium headers missing))
+  AC_CHECK_LIB([sodium], [main],CURL_LIBS=-lsodium, AC_MSG_ERROR(libsodium missing))
 fi
 
 BITCOIN_QT_PATH_PROGS([PROTOC], [protoc],$protoc_bin_path)
@@ -931,6 +939,8 @@ AC_SUBST(CRYPTO_LIBS)
 AC_SUBST(SSL_LIBS)
 AC_SUBST(PROTOBUF_LIBS)
 AC_SUBST(QR_LIBS)
+AC_SUBST(SODIUM_FLAGS)
+AC_SUBST(SODIUM_LIBS)
 AC_CONFIG_FILES([Makefile src/Makefile share/setup.nsi share/qt/Info.plist src/test/buildenv.py])
 AC_CONFIG_FILES([qa/pull-tester/run-bitcoind-for-test.sh],[chmod +x qa/pull-tester/run-bitcoind-for-test.sh])
 AC_CONFIG_FILES([qa/pull-tester/tests_config.py],[chmod +x qa/pull-tester/tests_config.py])
