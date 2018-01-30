@@ -26,6 +26,7 @@
 #include "options.h"
 #include "pow.h"
 #include "process_xthinblock.h"
+#include "respend/respenddetector.h"
 #include "thinblockbuilder.h"
 #include "thinblockconcluder.h"
 #include "thinblockmanager.h"
@@ -202,13 +203,6 @@ namespace {
     set<int> setDirtyFileInfo;
 } // anon namespace
 
-// Bloom filter to limit respend relays to one
-static const unsigned int MAX_DOUBLESPEND_BLOOM = 100000;
-static CBloomFilter doubleSpendFilter;
-void InitRespendFilter() {
-    seed_insecure_rand();
-    doubleSpendFilter = CBloomFilter(MAX_DOUBLESPEND_BLOOM, 0.01, insecure_rand(), BLOOM_UPDATE_NONE);
-}
 // UAHF chain considers an OP_RETURN that commits to this string invalid
 static const std::string ANTI_REPLAY_COMMITMENT = "Bitcoin: A Peer-to-Peer Electronic Cash System";
 std::vector<unsigned char>& GetAntiReplayCommitment() {
@@ -1192,41 +1186,6 @@ CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowF
     return nMinFee;
 }
 
-// Exponentially limit the rate of nSize flow to nLimit.  nLimit unit is thousands-per-minute.
-bool RateLimitExceeded(double& dCount, int64_t& nLastTime, int64_t nLimit, unsigned int nSize)
-{
-    static CCriticalSection csLimiter;
-    int64_t nNow = GetTime();
-
-    LOCK(csLimiter);
-
-    dCount *= pow(1.0 - 1.0/600.0, (double)(nNow - nLastTime));
-    nLastTime = nNow;
-    if (dCount >= nLimit*10*1000)
-        return true;
-    dCount += nSize;
-    return false;
-}
-
-static bool RespendRelayExceeded(const CTransaction& doubleSpend)
-{
-    // Apply an independent rate limit to double-spend relays
-    static double dRespendCount;
-    static int64_t nLastRespendTime;
-    static int64_t nRespendLimit = GetArg("-limitrespendrelay", 100);
-    unsigned int nSize = ::GetSerializeSize(doubleSpend, SER_NETWORK, PROTOCOL_VERSION);
-
-    if (RateLimitExceeded(dRespendCount, nLastRespendTime, nRespendLimit, nSize))
-    {
-        LogPrint("mempool", "Double-spend relay rejected by rate limiter\n");
-        return true;
-    }
-
-    LogPrint("mempool", "Rate limit dRespendCount: %g => %g\n", dRespendCount, dRespendCount+nSize);
-
-    return false;
-}
-
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state)
 {
@@ -1284,30 +1243,16 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
     if (pool.exists(hash))
         return false;
 
-    // Check for conflicts with in-memory transactions
-    bool fRespend = false;
-    COutPoint relayForOutpoint;
+    // Check for conflicts with in-memory transactions and triggers actions at
+    // end of scope (relay tx, sync wallet, etc)
+    respend::RespendDetector respend(pool, tx);
+
+    if (respend.IsRespend() && !respend.IsInteresting())
     {
-    LOCK(pool.cs); // protect pool.mapNextTx
-    for (unsigned int i = 0; i < tx.vin.size(); i++)
-    {
-        COutPoint outpoint = tx.vin[i].prevout;
-        // A respend is a tx that conflicts with a member of the pool
-        if (pool.mapNextTx.count(outpoint))
-        {
-            fRespend = true;
-            // Relay only one tx per respent outpoint, but not if tx is equivalent to pool member
-            if (!doubleSpendFilter.contains(outpoint) && !tx.IsEquivalentTo(*pool.mapNextTx[outpoint].ptx))
-            {
-                relayForOutpoint = outpoint;
-                break;
-            }
-        }
-    }
-    if (fRespend && (relayForOutpoint.IsNull() || RespendRelayExceeded(tx)))
+        // Tx is a respend, and it's not an interesting one (we don't care to
+        // validate it further)
         return false;
     }
-
     {
         CCoinsView dummy;
         CCoinsViewCache view(&dummy);
@@ -1411,6 +1356,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             static double dFreeCount;
             static int64_t nLastFreeTime;
             static int64_t nFreeLimit = GetArg("-limitfreerelay", 15);
+            static CCriticalSection csLimiter;
+            LOCK(csLimiter);
 
             // At default rate it would take over a month to fill 1GB
             if (RateLimitExceeded(dFreeCount, nLastFreeTime, nFreeLimit, nSize))
@@ -1460,20 +1407,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             return error("AcceptToMemoryPool: BUG! PLEASE REPORT THIS! ConnectInputs failed against MANDATORY but not STANDARD flags %s", hash.ToString());
         }
 
-        if (fRespend)
-        {
-            // Clear the filter on average every MAX_DOUBLE_SPEND_BLOOM insertions
-            if (insecure_rand()%MAX_DOUBLESPEND_BLOOM == 0)
-                doubleSpendFilter.clear();
-            doubleSpendFilter.insert(relayForOutpoint);
-
-            if (!Opt().IsStealthMode()) {
-                std::vector<uint256> vAncestors;
-                vAncestors.push_back(hash); // Alert only for the tx itself
-                RelayTransaction(tx, vAncestors);
-            }
-        }
-        else
+        respend.SetValid(true);
+        if (!respend.IsRespend())
         {
             // Set a fee delta to protect local wallet transactions from mempool size-based eviction
             if (!fLimitFree) {
@@ -1494,12 +1429,12 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                 if (!pool.exists(tx.GetHash()))
                     return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool full");
             }
+            SyncWithWallets(tx, NULL, false);
         }
     }
 
-    SyncWithWallets(tx, NULL, fRespend);
 
-    return !fRespend;
+    return !respend.IsRespend();
 }
 
 /** Return transaction in tx, and if it was found inside a block, its hash is placed in hashBlock */

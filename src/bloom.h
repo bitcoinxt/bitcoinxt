@@ -38,9 +38,9 @@ static const unsigned char BLOOM_ANCESTOR_UPDATE_BIT = 4;
 /**
  * BloomFilter is a probabilistic filter which SPV clients provide
  * so that we can filter the transactions we send them.
- * 
+ *
  * This allows for significantly more efficient transaction and block downloads.
- * 
+ *
  * Because bloom filters are probabilistic, a SPV node can increase the false-
  * positive rate, making us send it transactions which aren't actually its,
  * allowing clients to trade more bandwidth for more privacy by obfuscating which
@@ -133,9 +133,11 @@ public:
     CRollingBloomFilter(const unsigned int nElements, const double nFPRate);
 
     void insert(const std::vector<unsigned char>& vKey);
+    void insert(const COutPoint& outpoint);
     void insert(const uint256& hash);
     bool contains(const std::vector<unsigned char>& vKey) const;
     bool contains(const uint256& hash) const;
+    bool contains(const COutPoint& outpoint) const;
 
     void reset();
 

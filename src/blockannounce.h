@@ -22,6 +22,7 @@ class BlockAnnounceReceiver {
             block(block), from(from), thinmg(thinmg), blocksInFlight(inFlightIndex)
         {
         }
+	virtual ~BlockAnnounceReceiver() { }
 
         bool onBlockAnnounced(std::vector<CInv>& toFetch);
 

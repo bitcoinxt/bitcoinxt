@@ -17,6 +17,7 @@ struct Opt {
     uint64_t MaxBlockSizeVote();
     int64_t UAHFTime();
     int UAHFProtectSunset();
+    int64_t RespendRelayLimit() const;
 
     // Thin block options
     bool UsingThinBlocks();

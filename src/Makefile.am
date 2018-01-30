@@ -137,6 +137,11 @@ BITCOIN_CORE_H = \
   protocol.h \
   pubkey.h \
   random.h \
+  respend/respendaction.h \
+  respend/respendlogger.h \
+  respend/respendrelayer.h \
+  respend/respenddetector.h \
+  respend/walletnotifier.h \
   rpcclient.h \
   rpcprotocol.h \
   rpcserver.h \
@@ -227,6 +232,10 @@ libbitcoin_server_a_SOURCES = \
   pow.cpp \
   process_xthinblock.cpp \
   rest.cpp \
+  respend/respendlogger.cpp \
+  respend/respendrelayer.cpp \
+  respend/respenddetector.cpp \
+  respend/walletnotifier.cpp \
   rpcblockchain.cpp \
   rpcmining.cpp \
   rpcmisc.cpp \
