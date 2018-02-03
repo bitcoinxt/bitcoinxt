@@ -121,6 +121,8 @@ class BitcoinTestFramework(object):
         self.add_options(parser)
         (self.options, self.args) = parser.parse_args()
 
+        self.options.tmpdir += '/' + str(self.options.port_seed)
+
         if self.options.trace_rpc:
             logging.basicConfig(level=logging.DEBUG, stream=sys.stdout)
 
@@ -164,9 +166,11 @@ class BitcoinTestFramework(object):
         else:
             print("Note: bitcoinds were not stopped and may still be running")
 
-        if not self.options.nocleanup and not self.options.noshutdown:
+        if not self.options.nocleanup and not self.options.noshutdown and success:
             print("Cleaning up")
             shutil.rmtree(self.options.tmpdir)
+        else:
+            print("Not cleaning up dir %s" % self.options.tmpdir)
 
         if success:
             print("Tests successful")
