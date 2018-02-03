@@ -43,7 +43,8 @@ BOOST_AUTO_TEST_CASE(empty_bloom) {
 
 BOOST_AUTO_TEST_CASE(only_coinbase) {
     CBlock b = TestBlock1();
-    CBloomFilter filter(b.vtx.size(), 0.000001, insecure_rand(), BLOOM_UPDATE_ALL);
+    FastRandomContext insecure_rand;
+    CBloomFilter filter(b.vtx.size(), 0.000001, insecure_rand.rand32(), BLOOM_UPDATE_ALL);
 
     // Filter out all
     typedef std::vector<CTransaction>::const_iterator auto_;
@@ -63,7 +64,8 @@ BOOST_AUTO_TEST_CASE(only_coinbase) {
 BOOST_AUTO_TEST_CASE(filter_some) {
 
     CBlock b = TestBlock1();
-    CBloomFilter filter(b.vtx.size(), 0.000001, insecure_rand(), BLOOM_UPDATE_ALL);
+    FastRandomContext insecure_rand;
+    CBloomFilter filter(b.vtx.size(), 0.000001, insecure_rand.rand32(), BLOOM_UPDATE_ALL);
 
     filter.insert(b.vtx[1].GetHash());
     filter.insert(b.vtx[2].GetHash());

@@ -89,8 +89,9 @@ CBloomFilter createDontWantFilter(TxHashProvider& hashProvider)
     int filterElements = std::min(10000, static_cast<int>(hashes.size()));
     int toInsert = filterElements;
     filterElements = std::max(1, filterElements); // >= 1 required by bloom filter
+    FastRandomContext insecure_rand;
     CBloomFilter filter(filterElements, 0.0001,
-            insecure_rand(), BLOOM_UPDATE_ALL);
+            insecure_rand.rand32(), BLOOM_UPDATE_ALL);
 
     for (int i = 0; i < toInsert; ++i)
         filter.insert(hashes[i]);
