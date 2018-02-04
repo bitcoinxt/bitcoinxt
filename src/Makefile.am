@@ -150,6 +150,7 @@ BITCOIN_CORE_H = \
   rpcserver.h \
   scheduler.h \
   script/interpreter.h \
+  script/ismine.h \
   script/script.h \
   script/script_error.h \
   script/sigcache.h \
@@ -189,7 +190,6 @@ BITCOIN_CORE_H = \
   wallet/db.h \
   wallet/rpcwallet.h \
   wallet/wallet.h \
-  wallet/wallet_ismine.h \
   wallet/walletdb.h \
   xthin.h
 
@@ -245,6 +245,7 @@ libbitcoin_server_a_SOURCES = \
   rpcnet.cpp \
   rpcrawtransaction.cpp \
   rpcserver.cpp \
+  script/ismine.cpp \
   script/sigcache.cpp \
   thinblock.cpp \
   thinblockbuilder.cpp \
@@ -270,7 +271,6 @@ libbitcoin_wallet_a_SOURCES = \
   wallet/rpcdump.cpp \
   wallet/rpcwallet.cpp \
   wallet/wallet.cpp \
-  wallet/wallet_ismine.cpp \
   wallet/walletdb.cpp \
   $(BITCOIN_CORE_H)
 
