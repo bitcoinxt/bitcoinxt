@@ -2,8 +2,8 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include "rpcserver.h"
-#include "rpcclient.h"
+#include "rpc/server.h"
+#include "rpc/client.h"
 
 #include "base58.h"
 #include "main.h"
@@ -285,7 +285,6 @@ BOOST_AUTO_TEST_CASE(rpc_getblocktemplate_vote)
     UniValue hasVote = CallRPC("getblocktemplate");
     f = get_coinbaseaux_flags(hasVote);
     BOOST_CHECK(f.find("/BIP100/B16/EB1/") != std::string::npos);
-
 }
 
 BOOST_AUTO_TEST_SUITE_END()
