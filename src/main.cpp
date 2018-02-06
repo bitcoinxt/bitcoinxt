@@ -1253,6 +1253,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         // validate it further)
         return false;
     }
+
     {
         CCoinsView dummy;
         CCoinsViewCache view(&dummy);
@@ -1408,33 +1409,33 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
 
         respend.SetValid(true);
-        if (!respend.IsRespend())
-        {
-            // Set a fee delta to protect local wallet transactions from mempool size-based eviction
-            if (!fLimitFree) {
-                pool.PrioritiseTransaction(hash, hash.ToString(), 0, 1);
-            }
+        if (respend.IsRespend())
+            return false;
 
-            // Store transaction in memory
-        	pool.addUnchecked(hash, entry, setAncestors, !IsInitialBlockDownload());
-
-            if (!fOverrideMempoolLimit) {
-                // Expire
-                int expired = pool.Expire(GetTime() - GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
-                if (expired != 0)
-                    LogPrint("mempool", "Expired %i transactions from the memory pool\n", expired);
-
-                // Trim
-                pool.TrimToSize(GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000);
-                if (!pool.exists(tx.GetHash()))
-                    return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool full");
-            }
-            SyncWithWallets(tx, NULL, false);
+        // Set a fee delta to protect local wallet transactions from mempool size-based eviction
+        if (!fLimitFree) {
+            pool.PrioritiseTransaction(hash, hash.ToString(), 0, 1);
         }
+
+        // Store transaction in memory
+        pool.addUnchecked(hash, entry, setAncestors, !IsInitialBlockDownload());
+
+        if (!fOverrideMempoolLimit) {
+            // Expire
+            int expired = pool.Expire(GetTime() - GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
+            if (expired != 0)
+                LogPrint("mempool", "Expired %i transactions from the memory pool\n", expired);
+
+            // Trim
+            pool.TrimToSize(GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000);
+            if (!pool.exists(tx.GetHash()))
+                return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool full");
+        }
+
+        SyncWithWallets(tx, NULL, false);
     }
 
-
-    return !respend.IsRespend();
+    return true;
 }
 
 /** Return transaction in tx, and if it was found inside a block, its hash is placed in hashBlock */
