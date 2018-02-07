@@ -154,6 +154,11 @@ public:
      void AddTestNode(CNode* n);
 
     void AddWhitelistedRange(const CSubNet &subnet);
+
+    uint64_t GetTotalBytesRecv();
+    uint64_t GetTotalBytesSent();
+
+
 private:
     struct ListenSocket {
         SOCKET socket;
@@ -184,6 +189,18 @@ private:
     NodeId GetNewNodeId();
 
     void DumpAddresses();
+
+    // Network stats
+    void RecordBytesRecv(uint64_t bytes);
+    void RecordBytesSent(uint64_t bytes);
+
+    // Network usage totals
+    CCriticalSection cs_totalBytesRecv;
+    CCriticalSection cs_totalBytesSent;
+    uint64_t nTotalBytesRecv;
+    uint64_t nTotalBytesSent;
+
+
 
     // Whitelisted ranges. Any node connecting from these is automatically
     // whitelisted (as well as those connecting to whitelisted binds).
@@ -459,12 +476,6 @@ public:
     virtual ~CNode();
 
 private:
-    // Network usage totals
-    static CCriticalSection cs_totalBytesRecv;
-    static CCriticalSection cs_totalBytesSent;
-    static uint64_t nTotalBytesRecv;
-    static uint64_t nTotalBytesSent;
-
     CNode(const CNode&);
     void operator=(const CNode&);
 
@@ -740,13 +751,6 @@ public:
     void CloseSocketDisconnect();
 
     void copyStats(CNodeStats &stats);
-
-    // Network stats
-    static void RecordBytesRecv(uint64_t bytes);
-    static void RecordBytesSent(uint64_t bytes);
-
-    static uint64_t GetTotalBytesRecv();
-    static uint64_t GetTotalBytesSent();
 
     bool SupportsXThinBlocks() const;
     bool SupportsCompactBlocks() const;

@@ -302,12 +302,6 @@ bool IsReachable(const CNetAddr& addr)
     return IsReachable(net);
 }
 
-uint64_t CNode::nTotalBytesRecv = 0;
-uint64_t CNode::nTotalBytesSent = 0;
-CCriticalSection CNode::cs_totalBytesRecv;
-CCriticalSection CNode::cs_totalBytesSent;
-
-
 CNode* CConnman::FindNode(const CNetAddr& ip)
 {
     LOCK(cs_vNodes);
@@ -690,7 +684,6 @@ size_t SocketSendData(CNode *pnode)
             pnode->nLastSend = GetTime();
             pnode->nSendBytes += nBytes;
             pnode->nSendOffset += nBytes;
-            pnode->RecordBytesSent(nBytes);
             bool empty = !sendShaper.consume(nBytes);
             nSentSize += nBytes;
             if (pnode->nSendOffset == data.size()) {
@@ -1036,7 +1029,7 @@ void CConnman::ThreadSocketHandler()
                                 messageHandlerCondition.notify_one();
                             pnode->nLastRecv = GetTime();
                             pnode->nRecvBytes += nBytes;
-                            pnode->RecordBytesRecv(nBytes);
+                            RecordBytesRecv(nBytes);
                         }
                         else if (nBytes == 0)
                         {
@@ -1071,7 +1064,8 @@ void CConnman::ThreadSocketHandler()
                 if (lockSend && sendShaper.try_consume(0))
                 {
                     progress++;
-                    SocketSendData(pnode);
+                    size_t nBytes = SocketSendData(pnode);
+		    RecordBytesSent(nBytes);
                 }
             }
 
@@ -1800,6 +1794,8 @@ NodeId CConnman::GetNewNodeId()
 
 bool CConnman::Start(boost::thread_group& threadGroup, CScheduler& scheduler, std::string& strNodeError)
 {
+    nTotalBytesRecv = 0;
+    nTotalBytesSent = 0;
     uiInterface.InitMessage(_("Loading addresses..."));
     // Load addresses for peers.dat
     int64_t nStart = GetTimeMillis();
@@ -2068,25 +2064,25 @@ void CConnman::RelayTransaction(const CTransaction& tx, std::vector<uint256>& vA
 }
 
 
-void CNode::RecordBytesRecv(uint64_t bytes)
+void CConnman::RecordBytesRecv(uint64_t bytes)
 {
     LOCK(cs_totalBytesRecv);
     nTotalBytesRecv += bytes;
 }
 
-void CNode::RecordBytesSent(uint64_t bytes)
+void CConnman::RecordBytesSent(uint64_t bytes)
 {
     LOCK(cs_totalBytesSent);
     nTotalBytesSent += bytes;
 }
 
-uint64_t CNode::GetTotalBytesRecv()
+uint64_t CConnman::GetTotalBytesRecv()
 {
     LOCK(cs_totalBytesRecv);
     return nTotalBytesRecv;
 }
 
-uint64_t CNode::GetTotalBytesSent()
+uint64_t CConnman::GetTotalBytesSent()
 {
     LOCK(cs_totalBytesSent);
     return nTotalBytesSent;
