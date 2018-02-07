@@ -13,6 +13,7 @@
 #include "serialize.h"
 #include "util.h"
 #include "maxblocksize.h"
+#include "thinblockutil.h"
 
 #include "test/test_bitcoin.h"
 
@@ -99,7 +100,7 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
 
 BOOST_AUTO_TEST_CASE(TooLargeVerack)
 {
-    CNode testNode(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    DummyNode testNode;
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
@@ -121,7 +122,7 @@ BOOST_AUTO_TEST_CASE(TooLargeVerack)
 
 BOOST_AUTO_TEST_CASE(TooLargePing)
 {
-    CNode testNode(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    DummyNode testNode;
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
