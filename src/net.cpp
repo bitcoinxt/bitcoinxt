@@ -708,8 +708,6 @@ size_t SocketSendData(CNode *pnode)
     return nSentSize;
 }
 
-static std::list<CNode*> vNodesDisconnected;
-
 void CConnman::AcceptConnection(const ListenSocket& hListenSocket) {
     struct sockaddr_storage sockaddr;
     socklen_t len = sizeof(sockaddr);
