@@ -480,7 +480,7 @@ public:
     /** Remove a set of transactions from the mempool.
      *  If a transaction is in this set, then all in-mempool descendants must
      *  also be in the set, unless this transaction is being removed for being
-     *  in a block. 
+     *  in a block.
      *  Set updateDescendants to true when removing a tx that was in a block, so
      *  that any in-mempool descendants have their ancestor state updated.
      */
@@ -513,7 +513,7 @@ public:
      *  txHash = tx hash for which to find ancestors
      *  vAncestors = returned ancestor tx hashes, including txHash.
      */
-    void queryAncestors(const uint256 txHash, std::vector<uint256>& vAncestors);
+    void queryAncestors(const uint256 txHash, std::vector<uint256>& vAncestors, uint64_t nLocalServices);
 
     /** Remove transactions from the mempool until its dynamic size is <= sizelimit. */
     void TrimToSize(size_t sizelimit);
@@ -546,7 +546,7 @@ public:
 
     /** Estimate priority needed to get into the next nBlocks */
     double estimatePriority(int nBlocks) const;
-    
+
     /** Write/Read estimates to disk */
     bool WriteFeeEstimates(CAutoFile& fileout) const;
     bool ReadFeeEstimates(CAutoFile& filein);
@@ -594,7 +594,7 @@ private:
     void removeUnchecked(txiter entry);
 };
 
-/** 
+/**
  * CCoinsView that brings transactions from a memorypool into view.
  * It does not check for spendings by memory pool transactions.
  */

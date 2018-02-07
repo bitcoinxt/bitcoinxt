@@ -4917,7 +4917,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             if (fListen && !IsInitialBlockDownload())
             {
                 FastRandomContext insecure_rand;
-                CAddress addr = GetLocalAddress(&pfrom->addr);
+                CAddress addr = GetLocalAddress(&pfrom->addr, pfrom->GetLocalServices());
                 if (addr.IsRoutable())
                 {
                     pfrom->PushAddress(addr, insecure_rand);
@@ -5297,7 +5297,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         {
             mempool.check(pcoinsTip);
             std::vector<uint256> vAncestors;
-            mempool.queryAncestors(tx.GetHash(), vAncestors);
+            mempool.queryAncestors(tx.GetHash(), vAncestors, connman->GetLocalServices());
             connman->RelayTransaction(tx, vAncestors);
             vWorkQueue.push_back(inv.hash);
 
@@ -5333,7 +5333,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
                     {
                         LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
                         std::vector<uint256> vAncestors;
-                        mempool.queryAncestors(orphanTx.GetHash(), vAncestors);
+                        mempool.queryAncestors(orphanTx.GetHash(), vAncestors, connman->GetLocalServices());
                         connman->RelayTransaction(orphanTx, vAncestors);
                         vWorkQueue.push_back(orphanHash);
                         vEraseQueue.push_back(orphanHash);
@@ -5383,7 +5383,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
                 // whitelisted peer could get us banned! We may want to change
                 // that.
                 std::vector<uint256> vAncestors;
-                mempool.queryAncestors(tx.GetHash(), vAncestors);
+                mempool.queryAncestors(tx.GetHash(), vAncestors, connman->GetLocalServices());
                 connman->RelayTransaction(tx, vAncestors);
             }
         }
@@ -5632,7 +5632,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             // No filter, or filter matched
             std::vector<uint256> vAncestors;
             if (pfrom->pfilter && pfrom->pfilter->WantsAncestors())
-                mempool.queryAncestors(hash, vAncestors);
+                mempool.queryAncestors(hash, vAncestors, connman->GetLocalServices());
             else
             	vAncestors.push_back(hash);
             BOOST_FOREACH(uint256& hashFound, vAncestors) {

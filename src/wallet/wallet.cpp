@@ -1185,7 +1185,7 @@ bool CWalletTx::RelayWalletTransaction(CConnman* connman)
             LogPrintf("Relaying wtx %s\n", GetHash().ToString());
 	    if (connman) {
 	        std::vector<uint256> vAncestors;
-	        mempool.queryAncestors(GetHash(), vAncestors);
+	        mempool.queryAncestors(GetHash(), vAncestors, connman->GetLocalServices());
 	        connman->RelayTransaction((CTransaction)*this, vAncestors);
 	        return true;
 	    }

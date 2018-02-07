@@ -96,7 +96,7 @@ public:
 
     CConnman();
     virtual ~CConnman();
-    bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, std::string& strNodeError);
+    bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServices, std::string& strNodeError);
     void Stop();
     bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
     bool OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
@@ -148,6 +148,8 @@ public:
     unsigned int GetSendBufferSize() const;
 
     void AddWhitelistedRange(const CSubNet &subnet);
+
+    uint64_t GetLocalServices() const;
 
     uint64_t GetTotalBytesRecv();
     uint64_t GetTotalBytesSent();
@@ -221,12 +223,15 @@ private:
     mutable CCriticalSection cs_vNodes;
     std::atomic<NodeId> nLastNodeId;
     boost::condition_variable messageHandlerCondition;
+
+    /** Services this instance offers */
+    uint64_t nLocalServices;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void MapPort(bool fUseUPnP);
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
-bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& scheduler, std::string& strNodeError);
+bool StartNode(CConnman& connman, boost::thread_group& threadGroup, CScheduler& scheduler, uint64_t nLocalServices, std::string& strNodeError);
 bool StopNode(CConnman& connman);
 size_t SocketSendData(CNode *pnode);
 
@@ -289,12 +294,11 @@ bool GetLocal(CService &addr, const CNetAddr *paddrPeer = NULL);
 bool IsReachable(enum Network net);
 bool IsReachable(const CNetAddr &addr);
 void SetReachable(enum Network net, bool fFlag = true);
-CAddress GetLocalAddress(const CNetAddr *paddrPeer = NULL);
+CAddress GetLocalAddress(const CNetAddr *paddrPeer, uint64_t nLocalServices);
 
 
 extern bool fDiscover;
 extern bool fListen;
-extern uint64_t nLocalServices;
 
 /** Maximum number of connections to simultaneously allow (aka connection slots) */
 extern int nMaxConnections;
@@ -473,7 +477,7 @@ public:
     // adds connection to ipgroup (for prioritising connection slots)
     std::unique_ptr<IPGroupSlot> ipgroupSlot;
 
-    CNode(NodeId id, SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
+    CNode(NodeId id, uint64_t nLocalServicesIn, SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
     virtual ~CNode();
 
 private:
@@ -481,6 +485,7 @@ private:
     void operator=(const CNode&);
 
     uint64_t nLocalHostNonce;
+    uint64_t nLocalServices;
 public:
 
     NodeId GetId() const {
@@ -752,6 +757,11 @@ public:
     void CloseSocketDisconnect();
 
     void copyStats(CNodeStats &stats);
+
+    uint64_t GetLocalServices() const 
+    {
+        return nLocalServices;
+    }
 
     bool SupportsXThinBlocks() const;
     bool SupportsCompactBlocks() const;

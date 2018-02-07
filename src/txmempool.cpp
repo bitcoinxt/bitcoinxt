@@ -223,7 +223,8 @@ bool CTxMemPool::CalculateMemPoolAncestors(const CTxMemPoolEntry &entry, setEntr
     return true;
 }
 
-void CTxMemPool::queryAncestors(const uint256 txHash, std::vector<uint256>& vAncestors) {
+void CTxMemPool::queryAncestors(const uint256 txHash,
+                                std::vector<uint256>& vAncestors, uint64_t nLocalServices) {
     CTxMemPool::setEntries setAncestors;
 	const uint64_t nNoLimit = std::numeric_limits<uint64_t>::max();
 	std::string dummy;
@@ -310,7 +311,7 @@ void CTxMemPool::UpdateForRemoveFromMempool(const setEntries &entriesToRemove, b
         // should be a bit faster.
         // However, if we happen to be in the middle of processing a reorg, then
         // the mempool can be in an inconsistent state.  In this case, the set
-        // of ancestors reachable via mapLinks will be the same as the set of 
+        // of ancestors reachable via mapLinks will be the same as the set of
         // ancestors whose packages include this transaction, because when we
         // add a new transaction to the mempool in addUnchecked(), we assume it
         // has no children, and in the case of a reorg where that assumption is

@@ -931,6 +931,8 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // Option to startup with mocktime set (used for regression testing):
     SetMockTime(GetArg("-mocktime", 0)); // SetMockTime(0) is a no-op
 
+    uint64_t nLocalServices = NODE_NETWORK | NODE_GETUTXO | NODE_BLOOM | NODE_THIN;
+
     if (Opt().UAHFTime())
         nLocalServices |= NODE_BITCOIN_CASH;
 
@@ -1502,7 +1504,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
 #endif
 
     std::string strNodeError;
-    if(!StartNode(connman, threadGroup, scheduler, strNodeError))
+    if(!StartNode(connman, threadGroup, scheduler, nLocalServices, strNodeError))
         return InitError(strNodeError);
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected

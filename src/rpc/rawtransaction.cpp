@@ -881,7 +881,7 @@ UniValue sendrawtransaction(const UniValue& params, bool fHelp)
     CInv inv(MSG_TX, hashTx);
 
     std::vector<uint256> vAncestors;
-    mempool.queryAncestors(tx.GetHash(), vAncestors);
+    mempool.queryAncestors(tx.GetHash(), vAncestors, g_connman->GetLocalServices());
     g_connman->RelayTransaction(tx, vAncestors);
     return hashTx.GetHex();
 }
