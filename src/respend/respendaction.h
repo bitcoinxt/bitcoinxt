@@ -4,9 +4,9 @@
 #ifndef BITCOIN_RESPEND_RESPENDACTION_H
 #define BITCOIN_RESPEND_RESPENDACTION_H
 
+#include "txmempool.h"
+
 #include <memory>
-class COutPoint;
-class CTransaction;
 
 namespace respend {
 
@@ -20,9 +20,8 @@ class RespendAction {
         virtual bool AddOutpointConflict(
                 // conflicting outpoint
                 const COutPoint& out,
-                // TX in our mempool. Pointer is owned by mempool, use to
-                // extract info or take a copy.
-                const CTransaction* originalTx,
+                // Existing mempool entry
+                const CTxMemPool::txiter mempoolEntry,
                 // Current TX that is respending
                 const CTransaction& respendTx,
                 // If we've seen a valid tx respending this output before

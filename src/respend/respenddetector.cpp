@@ -9,7 +9,6 @@
 #include "respend/respendlogger.h"
 #include "respend/respendrelayer.h"
 #include "respend/walletnotifier.h"
-#include "txmempool.h"
 #include "util.h"
 
 #include <algorithm>
@@ -70,12 +69,16 @@ void RespendDetector::CheckForRespend(
     {
         const COutPoint outpoint = in.prevout;
 
-        // Any conflicting inputs?
-        if (!pool.mapNextTx.count(outpoint))
+        // Is there a conflicting spend?
+        auto spendIter = pool.mapNextTx.find(outpoint);
+        if (spendIter == pool.mapNextTx.end())
             continue;
 
         conflictingOutpoints.push_back(outpoint);
-        const CTransaction* orig = pool.mapNextTx.find(outpoint)->second.ptx;
+
+        CTxMemPool::txiter poolIter = pool.mapTx.find(spendIter->second.ptx->GetHash());
+        if (poolIter == pool.mapTx.end())
+            continue;
 
         bool collectMore = false;
         bool seen;
@@ -86,8 +89,8 @@ void RespendDetector::CheckForRespend(
         for (auto& a : actions) {
             // Actions can return true if they want to check more
             // outpoints for conflicts.
-            bool m = a->AddOutpointConflict(outpoint, orig, tx, seen,
-                                                   tx.IsEquivalentTo(*orig));
+            bool m = a->AddOutpointConflict(outpoint, poolIter, tx, seen,
+                                                   tx.IsEquivalentTo(poolIter->GetTx()));
             collectMore = collectMore || m;
         }
         if (!collectMore)

@@ -1,19 +1,15 @@
 // Copyright (c) 2018 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
-#ifndef BITCOIN_RESPEND_RESPENDTRIGGER_H
-#define BITCOIN_RESPEND_RESPENDTRIGGER_H
+#ifndef BITCOIN_RESPEND_RESPENDDETECTOR_H
+#define BITCOIN_RESPEND_RESPENDDETECTOR_H
 
 #include "respend/respendaction.h"
-#include "primitives/transaction.h"
 
 #include <atomic>
 #include <memory>
 #include <mutex>
 
-
-class CTxMemPool;
-class CTransaction;
 class CRollingBloomFilter;
 
 namespace respend {

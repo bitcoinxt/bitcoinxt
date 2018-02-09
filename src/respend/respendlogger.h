@@ -14,7 +14,7 @@ class RespendLogger : public RespendAction {
         RespendLogger();
 
         bool AddOutpointConflict(
-                const COutPoint&, const CTransaction* originalTx,
+                const COutPoint&, const CTxMemPool::txiter mempoolEntry,
                 const CTransaction& respendTx, bool seen, bool isEquivalent) override;
 
         virtual bool IsInteresting() const override;

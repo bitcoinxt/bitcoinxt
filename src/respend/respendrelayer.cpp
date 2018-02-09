@@ -5,7 +5,6 @@
 #include "respend/respendrelayer.h"
 #include "net.h" // RelayTransaction
 #include "options.h"
-#include "primitives/transaction.h"
 #include "protocol.h"
 #include "streams.h"
 #include "util.h"
@@ -51,7 +50,7 @@ RespendRelayer::RespendRelayer() : interesting(false), valid(false)
 }
 
 bool RespendRelayer::AddOutpointConflict(
-        const COutPoint&, const CTransaction*,
+        const COutPoint&, const CTxMemPool::txiter,
         const CTransaction& respendTx,
         bool seenBefore, bool isEquivalent)
 {

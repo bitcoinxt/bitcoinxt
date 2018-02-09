@@ -3,7 +3,6 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "respend/respendlogger.h"
-#include "primitives/transaction.h"
 #include "util.h"
 
 namespace respend {
@@ -14,10 +13,10 @@ RespendLogger::RespendLogger() :
 }
 
 bool RespendLogger::AddOutpointConflict(
-        const COutPoint&, const CTransaction* mempoolTx,
+        const COutPoint&, const CTxMemPool::txiter mempoolEntry,
         const CTransaction& respendTx, bool seen, bool isEquivalent)
 {
-    orig = mempoolTx->GetHash().ToString();
+    orig = mempoolEntry->GetTx().GetHash().ToString();
     respend = respendTx.GetHash().ToString();
     equivalent = isEquivalent;
     newConflict = newConflict || !seen;

@@ -16,15 +16,15 @@ BOOST_FIXTURE_TEST_SUITE(respendrelayer_tests, BasicTestingSetup);
 BOOST_AUTO_TEST_CASE(not_interesting) {
     RespendRelayer r;
     BOOST_CHECK(!r.IsInteresting());
-    CTransaction dummy;
+    CTxMemPool::txiter dummy;
     bool lookAtMore;
 
-    lookAtMore = r.AddOutpointConflict(COutPoint{}, &dummy, CTransaction{},
+    lookAtMore = r.AddOutpointConflict(COutPoint{}, dummy, CTransaction{},
                                             true /* seen before */, false);
     BOOST_CHECK(lookAtMore);
     BOOST_CHECK(!r.IsInteresting());
 
-    lookAtMore = r.AddOutpointConflict(COutPoint{}, &dummy, CTransaction{},
+    lookAtMore = r.AddOutpointConflict(COutPoint{}, dummy, CTransaction{},
                                        false, true /* is equivalent */);
     BOOST_CHECK(lookAtMore);
     BOOST_CHECK(!r.IsInteresting());
@@ -32,16 +32,16 @@ BOOST_AUTO_TEST_CASE(not_interesting) {
 
 BOOST_AUTO_TEST_CASE(is_interesting) {
     RespendRelayer r;
-    CTransaction dummy;
+    CTxMemPool::txiter dummy;
     bool lookAtMore;
 
-    lookAtMore = r.AddOutpointConflict(COutPoint{}, &dummy, CTransaction{}, false, false);
+    lookAtMore = r.AddOutpointConflict(COutPoint{}, dummy, CTransaction{}, false, false);
     BOOST_CHECK(!lookAtMore);
     BOOST_CHECK(r.IsInteresting());
 }
 
 BOOST_AUTO_TEST_CASE(triggers_correctly) {
-    CTransaction dummy;
+    CTxMemPool::txiter dummy;
     CMutableTransaction respend;
     respend.vin.resize(1);
     respend.vin[0].prevout.n = 0;
@@ -55,7 +55,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
 
     // Create a "not interesting" respend
     RespendRelayer r;
-    r.AddOutpointConflict(COutPoint{}, &dummy, respend, true, false);
+    r.AddOutpointConflict(COutPoint{}, dummy, respend, true, false);
     r.Trigger();
     BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
     r.SetValid(true);
@@ -63,7 +63,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
     BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
 
     // Create an interesting, but invalid respend
-    r.AddOutpointConflict(COutPoint{}, &dummy, respend, false, false);
+    r.AddOutpointConflict(COutPoint{}, dummy, respend, false, false);
     BOOST_CHECK(r.IsInteresting());
     r.SetValid(false);
     r.Trigger();

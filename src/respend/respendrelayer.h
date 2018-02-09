@@ -5,7 +5,6 @@
 #define BITCOIN_RESPEND_RESPENDRELAYER_H
 
 #include "respend/respendaction.h"
-#include "primitives/transaction.h"
 
 namespace respend {
 
@@ -15,7 +14,7 @@ class RespendRelayer : public RespendAction {
         RespendRelayer();
 
         bool AddOutpointConflict(
-                const COutPoint&, const CTransaction*,
+                const COutPoint&, const CTxMemPool::txiter,
                 const CTransaction& respendTx,
                 bool seenBefore, bool isEquivalent) override;
 
