@@ -52,18 +52,18 @@ class BigBlockTest(BitcoinTestFramework):
             # Create a 2012-block chain in a 75% ratio for increase (genesis block votes for 1MB)
             # Make sure they are not already sorted correctly
             self.nodes[1].generate(503)
-            assert(self.sync_blocks(self.nodes[1:3]))
+            assert(sync_blocks(self.nodes[1:3]))
             self.nodes[2].generate(502) # <--- genesis is 503rd vote for no increase
-            assert(self.sync_blocks(self.nodes[2:4]))
+            assert(sync_blocks(self.nodes[2:4]))
 
             relayfee = self.nodes[3].getnetworkinfo()['relayfee']
             utxos = create_confirmed_utxos(relayfee, self.nodes[3], 128)
 
             # 166 node 3 blocks were already mined to create utxos
             self.nodes[3].generate(503 - 166)
-            assert(self.sync_blocks(self.nodes[1:4]))
+            assert(sync_blocks(self.nodes[1:4]))
             self.nodes[1].generate(503)
-            assert(self.sync_blocks(self.nodes))
+            assert(sync_blocks(self.nodes))
 
             print("Creating transaction data")
             txouts = gen_return_txouts()
@@ -84,17 +84,6 @@ class BigBlockTest(BitcoinTestFramework):
             to_dir = os.path.join(self.options.tmpdir,  "node"+str(i))
             shutil.copytree(from_dir, to_dir)
             initialize_datadir(self.options.tmpdir, i) # Overwrite port/rpcport in bitcoin.conf
-
-    def sync_blocks(self, rpc_connections, wait=1, max_wait=60):
-        """
-        Wait until everybody has the same block count
-        """
-        for i in range(0,max_wait):
-            if i > 0: time.sleep(wait)
-            counts = [ x.getblockcount() for x in rpc_connections ]
-            if counts == [ counts[0] ]*len(counts):
-                return True
-        return False
 
     def setup_network(self):
         self.nodes = []
@@ -118,7 +107,7 @@ class BigBlockTest(BitcoinTestFramework):
         # Test if node0 will mine a block bigger than MAX_BLOCK_SIZE
         b1hash = self.nodes[0].generate(1)[0]
         b1 = self.nodes[0].getblock(b1hash, True)
-        assert(self.sync_blocks(self.nodes[0:3]))
+        assert(sync_blocks(self.nodes[0:3]))
 
         if expect_big:
             assert(b1['size'] > MAX_BLOCK_SIZE)
@@ -128,7 +117,7 @@ class BigBlockTest(BitcoinTestFramework):
             b2hash = self.nodes[1].generate(1)[0]
             b2 = self.nodes[1].getblock(b2hash, True)
             assert(b2['previousblockhash'] == b1hash)
-            assert(self.sync_blocks(self.nodes[0:3]))
+            assert(sync_blocks(self.nodes[0:3]))
 
         else:
             assert(b1['size'] <= MAX_BLOCK_SIZE)
@@ -136,7 +125,7 @@ class BigBlockTest(BitcoinTestFramework):
         # Reset chain to before b1hash:
         for node in self.nodes[0:3]:
             node.invalidateblock(b1hash)
-        assert(self.sync_blocks(self.nodes[0:3]))
+        assert(sync_blocks(self.nodes[0:3]))
 
 
     def run_test(self):
@@ -150,10 +139,10 @@ class BigBlockTest(BitcoinTestFramework):
 
         # Create a situation where the 1512th-highest vote is for 9MB
         self.nodes[2].generate(1)
-        assert(self.sync_blocks(self.nodes[1:3]))
+        assert(sync_blocks(self.nodes[1:3]))
         ahash = self.nodes[1].generate(3)[2]
         assert_equal(self.nodes[1].getblocktemplate()["sizelimit"], int(MAX_BLOCK_SIZE * 1.05))
-        assert(self.sync_blocks(self.nodes[0:2]))
+        assert(sync_blocks(self.nodes[0:2]))
         self.TestMineBig(True)
 
         # Shutdown then restart node[0], it should produce a big block.
@@ -171,7 +160,7 @@ class BigBlockTest(BitcoinTestFramework):
         assert_equal(self.nodes[2].getblocktemplate()["sizelimit"], MAX_BLOCK_SIZE)
         self.nodes[2].generate(2)
         assert_equal(self.nodes[2].getblocktemplate()["sizelimit"], MAX_BLOCK_SIZE)
-        assert(self.sync_blocks(self.nodes[1:3]))
+        assert(sync_blocks(self.nodes[1:3]))
 
         # Restart node0, it should re-org onto longer chain,
         # and refuse to mine a big block:
@@ -179,14 +168,14 @@ class BigBlockTest(BitcoinTestFramework):
         self.load_mempool(self.nodes[0])
         connect_nodes_bi(self.nodes, 0, 1)
         connect_nodes_bi(self.nodes, 0, 2)
-        assert(self.sync_blocks(self.nodes[0:3]))
+        assert(sync_blocks(self.nodes[0:3]))
         assert_equal(self.nodes[0].getblocktemplate()["sizelimit"], MAX_BLOCK_SIZE)
         self.TestMineBig(False)
 
         # Mine 4 blocks voting for 10MB. Bigger block NOT ok, we are in the next voting period
         self.nodes[1].generate(4)
         assert_equal(self.nodes[1].getblocktemplate()["sizelimit"], MAX_BLOCK_SIZE)
-        assert(self.sync_blocks(self.nodes[0:3]))
+        assert(sync_blocks(self.nodes[0:3]))
         self.TestMineBig(False)
 
 
