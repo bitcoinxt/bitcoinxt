@@ -25,7 +25,7 @@ class DummyRespendAction : public RespendAction {
 
         bool AddOutpointConflict(
                 const COutPoint& out,
-                const CTransaction* originalTx,
+                const CTxMemPool::txiter mempoolEntry,
                 const CTransaction& respendTx,
                 bool respentBefore,
                 bool isEquivalent) override

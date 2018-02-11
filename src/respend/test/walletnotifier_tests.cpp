@@ -16,15 +16,15 @@ BOOST_FIXTURE_TEST_SUITE(respend_walletnotifier_tests, BasicTestingSetup);
 BOOST_AUTO_TEST_CASE(not_interesting) {
     WalletNotifier w;
     BOOST_CHECK(!w.IsInteresting());
-    CTransaction dummy;
+    CTxMemPool::txiter dummy;
     bool lookAtMore;
 
-    lookAtMore = w.AddOutpointConflict(COutPoint{}, &dummy, CTransaction{},
+    lookAtMore = w.AddOutpointConflict(COutPoint{}, dummy, CTransaction{},
                                             true /* seen before */, false);
     BOOST_CHECK(lookAtMore);
     BOOST_CHECK(!w.IsInteresting());
 
-    lookAtMore = w.AddOutpointConflict(COutPoint{}, &dummy, CTransaction{},
+    lookAtMore = w.AddOutpointConflict(COutPoint{}, dummy, CTransaction{},
                                        false, true /* is equivalent */);
     BOOST_CHECK(lookAtMore);
     BOOST_CHECK(!w.IsInteresting());
@@ -32,10 +32,10 @@ BOOST_AUTO_TEST_CASE(not_interesting) {
 
 BOOST_AUTO_TEST_CASE(is_interesting) {
     WalletNotifier w;
-    CTransaction dummy;
+    CTxMemPool::txiter dummy;
     bool lookAtMore;
 
-    lookAtMore = w.AddOutpointConflict(COutPoint{}, &dummy, CTransaction{}, false, false);
+    lookAtMore = w.AddOutpointConflict(COutPoint{}, dummy, CTransaction{}, false, false);
     BOOST_CHECK(!lookAtMore);
     BOOST_CHECK(w.IsInteresting());
 }
@@ -51,7 +51,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
     };
     GetMainSignals().SyncTransaction.connect(dummyslot);
 
-    CTransaction dummy;
+    CTxMemPool::txiter dummy;
     CMutableTransaction respend;
     respend.vin.resize(1);
     respend.vin[0].prevout.n = 0;
@@ -60,7 +60,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
 
     // Create a "not interesting" respend
     WalletNotifier w;
-    w.AddOutpointConflict(COutPoint{}, &dummy, respend, true, false);
+    w.AddOutpointConflict(COutPoint{}, dummy, respend, true, false);
     w.Trigger();
     BOOST_CHECK_EQUAL(0, slotCalls);
     w.SetValid(true);
@@ -68,7 +68,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
     BOOST_CHECK_EQUAL(0, slotCalls);
 
     // Create an interesting, but invalid respend
-    w.AddOutpointConflict(COutPoint{}, &dummy, respend, false, false);
+    w.AddOutpointConflict(COutPoint{}, dummy, respend, false, false);
     BOOST_CHECK(w.IsInteresting());
     w.SetValid(false);
     w.Trigger();

@@ -12,7 +12,7 @@ WalletNotifier::WalletNotifier() : valid(false), interesting(false)
 }
 
 bool WalletNotifier::AddOutpointConflict(
-        const COutPoint&, const CTransaction*,
+        const COutPoint&, const CTxMemPool::txiter,
         const CTransaction& respendTx,
         bool seenBefore, bool isEquivalent)
 {
