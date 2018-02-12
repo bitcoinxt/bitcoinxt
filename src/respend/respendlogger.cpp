@@ -31,7 +31,7 @@ bool RespendLogger::IsInteresting() const {
 }
 
 void RespendLogger::Trigger() {
-    if (respend.empty())
+    if (respend.empty() || !newConflict)
         return;
 
     const std::string msg = "respend: Tx %s conflicts with %s"

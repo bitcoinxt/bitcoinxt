@@ -145,6 +145,7 @@ BITCOIN_CORE_H = \
   respend/respendrelayer.h \
   respend/respenddetector.h \
   respend/walletnotifier.h \
+  respend/mempoolremover.h \
   rpc/client.h \
   rpc/protocol.h \
   rpc/server.h \
@@ -239,6 +240,7 @@ libbitcoin_server_a_SOURCES = \
   respend/respendrelayer.cpp \
   respend/respenddetector.cpp \
   respend/walletnotifier.cpp \
+  respend/mempoolremover.cpp \
   rpc/blockchain.cpp \
   rpc/mining.cpp \
   rpc/misc.cpp \
