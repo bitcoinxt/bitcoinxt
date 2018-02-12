@@ -15,6 +15,9 @@
 #include "util.h"
 #include "utilmoneystr.h"
 #include "version.h"
+#include "respend/respenddetector.h"
+#include "respend/respendlogger.h"
+#include "respend/mempoolremover.h"
 
 using namespace std;
 
@@ -564,17 +567,13 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
 void CTxMemPool::removeConflicts(const CTransaction &tx, std::list<CTransaction>& removed)
 {
     // Remove transactions which depend on inputs of tx, recursively
-    LOCK(cs);
-    BOOST_FOREACH(const CTxIn &txin, tx.vin) {
-        std::map<COutPoint, CInPoint>::iterator it = mapNextTx.find(txin.prevout);
-        if (it != mapNextTx.end()) {
-            const CTransaction &txConflict = *it->second.ptx;
-            if (txConflict != tx)
-            {
-                removeRecursive(txConflict, removed);
-            }
-        }
-    }
+    std::vector<respend::RespendActionPtr> actions;
+    if (LogAcceptCategory("respend"))
+        actions.push_back(respend::RespendActionPtr(new respend::RespendLogger{}));
+    actions.push_back(respend::RespendActionPtr(new respend::MempoolRemover{*this, removed}));
+
+    respend::RespendDetector detector(*this, tx, actions);
+    detector.SetValid(true);
 }
 
 /**

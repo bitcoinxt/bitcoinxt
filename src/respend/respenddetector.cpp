@@ -77,7 +77,7 @@ void RespendDetector::CheckForRespend(
         conflictingOutpoints.push_back(outpoint);
 
         CTxMemPool::txiter poolIter = pool.mapTx.find(spendIter->second.ptx->GetHash());
-        if (poolIter == pool.mapTx.end())
+        if (poolIter == pool.mapTx.end() || poolIter->GetTx() == tx)
             continue;
 
         bool collectMore = false;
