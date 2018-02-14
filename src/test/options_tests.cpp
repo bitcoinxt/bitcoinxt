@@ -4,15 +4,18 @@
 
 #include <boost/test/unit_test.hpp>
 
+#include "test/test_bitcoin.h"
 #include "options.h"
+
 #include <limits.h>
 
 const int NOT_SET = std::numeric_limits<int>::min();
 
-struct DummyArgGetter : public ArgGetter {
+class DummyArgGetter : public ArgGetter {
+    public:
 
     DummyArgGetter() : ArgGetter(),
-        par(NOT_SET), checkpdays(NOT_SET)
+                       par(NOT_SET), checkpdays(NOT_SET), uahftime(NOT_SET)
     {
     }
 
@@ -23,7 +26,10 @@ struct DummyArgGetter : public ArgGetter {
         if (strArg == "-checkpoint-days")
             return checkpdays == NOT_SET ? nDefault : checkpdays;
 
-        assert(false);
+        if (strArg == "-uahftime" && uahftime != NOT_SET)
+            return uahftime;
+
+        return nDefault;
     }
     virtual std::vector<std::string> GetMultiArgs(const std::string& arg) {
         assert(false);
@@ -33,9 +39,10 @@ struct DummyArgGetter : public ArgGetter {
     }
     int par;
     int checkpdays;
+    int64_t uahftime;
 };
 
-BOOST_AUTO_TEST_SUITE(options_tests);
+BOOST_FIXTURE_TEST_SUITE(options_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(scripthreads) {
     std::unique_ptr<DummyArgGetter> arg(new DummyArgGetter);
@@ -73,6 +80,18 @@ BOOST_AUTO_TEST_CASE(checkpointdays) {
      // Can't have less than 1 day
     argPtr->checkpdays = 0;
     BOOST_CHECK_EQUAL(1, Opt().CheckpointDays());
+}
+
+BOOST_AUTO_TEST_CASE(may2018hftime_ignored_for_btc) {
+    auto arg = new DummyArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+
+    // Enabled by default
+    BOOST_CHECK_EQUAL(1526400000, Opt().May2018HFTime());
+
+    // Disabled if we're not on Bitcoin Cash chain
+    arg->uahftime = 0;
+    BOOST_CHECK_EQUAL(0, Opt().May2018HFTime());
 }
 
 BOOST_AUTO_TEST_SUITE_END()

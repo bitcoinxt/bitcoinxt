@@ -8,5 +8,6 @@
 class CBlockIndex;
 
 bool IsUAHFActivatingBlock(int64_t mtpCurrent, CBlockIndex* pindexPrev);
+bool IsMay2018HFActive(int64_t mtpChainTip);
 
 #endif
