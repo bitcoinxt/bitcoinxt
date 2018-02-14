@@ -20,3 +20,12 @@ bool IsUAHFActivatingBlock(int64_t mtpCurrent, CBlockIndex* pindexPrev) {
 
     return pindexPrev->GetMedianTimePast() < Opt().UAHFTime();
 }
+
+bool IsThirdHFActive(int64_t mtpChainTip) {
+    int64_t mtpHF = Opt().ThirdHFTime();
+
+    if (!mtpHF)
+        return false;
+
+    return mtpChainTip >= mtpHF;
+}
