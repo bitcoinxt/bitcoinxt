@@ -4425,6 +4425,19 @@ string GetWarnings(string strFor)
         strStatusBar = strRPC = _("Warning: We do not appear to fully agree with our peers! You may need to upgrade, or other nodes may need to upgrade.");
     }
 
+    {
+        LOCK(cs_main);
+        CBlockIndex* tip = chainActive.Tip();
+        if (tip && IsMay2018HFActive(tip->GetMedianTimePast()))
+        {
+            std::string err =
+                "Error: This version of Bitcoin XT is outdated, please upgrade. "
+                "Sending transactions MAY CAUSE LOSS OF FUNDS. "
+                "Network upgrade (hard fork) was scheduled for May 15th 2018.";
+            strStatusBar = strRPC = err;
+        }
+    }
+
     if (strFor == "statusbar")
         return strStatusBar;
     else if (strFor == "rpc")
