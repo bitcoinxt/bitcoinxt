@@ -20,3 +20,12 @@ bool IsUAHFActivatingBlock(int64_t mtpCurrent, CBlockIndex* pindexPrev) {
 
     return pindexPrev->GetMedianTimePast() < Opt().UAHFTime();
 }
+
+bool IsMay2018HFActive(int64_t mtpChainTip) {
+    int64_t mtpHF = Opt().May2018HFTime();
+
+    if (!mtpHF)
+        return false;
+
+    return mtpChainTip >= mtpHF;
+}
