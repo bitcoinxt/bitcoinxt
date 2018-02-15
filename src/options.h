@@ -1,8 +1,9 @@
 #ifndef BITCOIN_OPTIONS_H
 #define BITCOIN_OPTIONS_H
 
+#include <cstdint>
 #include <memory>
-#include <stdint.h>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -42,19 +43,38 @@ static const int UAHF_DEFAULT_PROTECT_THIS_SUNSET = 530000;
 // For unit testing
 //
 
-struct ArgGetter {
-    virtual bool GetBool(const std::string& arg, bool def) = 0;
-    virtual std::vector<std::string> GetMultiArgs(const std::string& arg) = 0;
-    virtual int64_t GetArg(const std::string& strArg, int64_t nDefault) = 0;
+class ArgGetter {
+    public:
+        virtual ~ArgGetter() = 0;
+        virtual bool GetBool(const std::string& arg, bool def) = 0;
+        virtual std::vector<std::string> GetMultiArgs(const std::string& arg) = 0;
+        virtual int64_t GetArg(const std::string& arg, int64_t def) = 0;
 };
+inline ArgGetter::~ArgGetter() { }
 
 struct ArgReset {
     ~ArgReset();
 };
 
 // Temporary replace the global getter for fetching user configurations.
-//
 // Returns a RAII object that sets system back to default state.
 std::unique_ptr<ArgReset> SetDummyArgGetter(std::unique_ptr<ArgGetter>);
+
+// Reusable dummy class for simple use cases.
+// Example usage:
+//     auto arg = new DummyArgGetter;
+//     auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+//     arg->Set("-maxblocksizevote", 64);
+class DummyArgGetter : public ArgGetter {
+    public:
+        bool GetBool(const std::string& arg, bool def) override;
+        std::vector<std::string> GetMultiArgs(const std::string& arg) override;
+        int64_t GetArg(const std::string& str, int64_t def) override;
+
+        void Set(const std::string& arg, int64_t val);
+
+    private:
+        std::map<std::string, int64_t> customArgs;
+};
 
 #endif
