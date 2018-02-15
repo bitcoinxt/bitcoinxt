@@ -7,25 +7,26 @@
 #include <string>
 #include <vector>
 
-struct Opt {
-    Opt();
+class Opt {
+    public:
+        Opt();
 
-    bool IsStealthMode();
-    bool HidePlatform();
-    std::vector<std::string> UAComment(bool validate = false);
-    int ScriptCheckThreads();
-    int64_t CheckpointDays();
-    uint64_t MaxBlockSizeVote();
-    int64_t UAHFTime() const;
-    int UAHFProtectSunset();
-    int64_t RespendRelayLimit() const;
-    bool UseCashAddr() const;
+        bool IsStealthMode();
+        bool HidePlatform();
+        std::vector<std::string> UAComment(bool validate = false);
+        int ScriptCheckThreads();
+        int64_t CheckpointDays();
+        uint64_t MaxBlockSizeVote();
+        int64_t UAHFTime() const;
+        int UAHFProtectSunset();
+        int64_t RespendRelayLimit() const;
+	bool UseCashAddr() const;
 
-    // Thin block options
-    bool UsingThinBlocks();
-    bool AvoidFullBlocks();
-    int ThinBlocksMaxParallel();
-    bool PreferXThinBlocks() const;
+        // Thin block options
+        bool UsingThinBlocks();
+        bool AvoidFullBlocks();
+        int ThinBlocksMaxParallel();
+        bool PreferXThinBlocks() const;
 };
 
 /** Maximum number of script-checking threads allowed */
