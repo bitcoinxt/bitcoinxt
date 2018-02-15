@@ -128,34 +128,6 @@ BOOST_AUTO_TEST_CASE(fetch_when_wanted) {
     }
 }
 
-const int NOT_SET = std::numeric_limits<int>::min();
-
-struct DummyArgGetter : public ArgGetter {
-
-    DummyArgGetter() : ArgGetter(),
-        usethin(NOT_SET), maxparallel(NOT_SET)
-    {
-    }
-
-    virtual int64_t GetArg(const std::string& arg, int64_t def) {
-        if (arg == "-use-thin-blocks")
-            return usethin == NOT_SET ? def : usethin;
-        if (arg == "-thin-blocks-max-parallel")
-            return maxparallel == NOT_SET ? def : maxparallel;
-        return def;
-    }
-    virtual std::vector<std::string> GetMultiArgs(const std::string& arg) {
-        assert(false);
-    }
-    virtual bool GetBool(const std::string& arg, bool def) {
-        if (arg == "-use-thin-blocks")
-            return usethin == NOT_SET ? def : bool(usethin);
-        return def;
-    }
-    int usethin;
-    int maxparallel;
-};
-
 BOOST_AUTO_TEST_CASE(dowl_strategy_full_now) {
 
     // Peer does not support thin blocks and we are almost synced.
@@ -169,13 +141,11 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_full_now) {
             ann.pickDownloadStrategy());
 
     // Node supports thin, but thin is disabled.
-    std::unique_ptr<DummyArgGetter> arg(new DummyArgGetter);
-    DummyArgGetter* argPtr = arg.get();
-    std::unique_ptr<ArgReset> argraii
-        = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg.release()));
+    auto arg = new DummyArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
 
     node.nServices = NODE_THIN;
-    argPtr->usethin = 0;
+    arg->Set("-use-thin-blocks", 0);
     BOOST_CHECK_EQUAL(
             BlockAnnounceReceiver::DOWNL_FULL_NOW,
             ann.pickDownloadStrategy());
@@ -187,10 +157,9 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_dont_downl_1) {
     // then don't download.
 
     // Set max parallel to 1
-    auto arg(new DummyArgGetter);
-    std::unique_ptr<ArgReset> argraii
-        = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
-    arg->maxparallel = 1;
+    auto arg = new DummyArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+    arg->Set("-thin-blocks-max-parallel", 1);
     BOOST_CHECK_EQUAL(1, Opt().ThinBlocksMaxParallel());
 
     // Put one node to work
@@ -245,7 +214,7 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_dont_dowl_5) {
 
     auto arg = new DummyArgGetter;
     auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
-    arg->usethin = 3; // xthin only, avoid full blocks
+    arg->Set("-use-thin-blocks", 3); // xthin only, avoid full blocks
 
     BOOST_CHECK_EQUAL(BlockAnnounceReceiver::DONT_DOWNL,
             ann.pickDownloadStrategy());

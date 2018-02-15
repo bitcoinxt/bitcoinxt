@@ -9,25 +9,6 @@
 
 #include <boost/test/unit_test.hpp>
 
-namespace {
-
-class DummyArgGetter : public ArgGetter {
-    public:
-        DummyArgGetter() : ArgGetter(), useCashAddr(false) { }
-        int64_t GetArg(const std::string& strArg, int64_t def) override {
-            return def;
-        }
-        std::vector<std::string> GetMultiArgs(const std::string& arg) override {
-            assert(false);
-        }
-        bool GetBool(const std::string& arg, bool def) override {
-            return arg == "-usecashaddr" ? useCashAddr : def;
-        }
-        bool useCashAddr;
-};
-
-} // anon ns
-
 BOOST_FIXTURE_TEST_SUITE(dstencode_tests, BasicTestingSetup)
 
 BOOST_AUTO_TEST_CASE(test_addresses) {
@@ -50,10 +31,10 @@ BOOST_AUTO_TEST_CASE(test_addresses) {
     auto raii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
 
     // Check encoding
-    arg->useCashAddr = true;
+    arg->Set("-usecashaddr", 1);
     BOOST_CHECK_EQUAL(cashaddr_pubkey, EncodeDestination(dstKey, params));
     BOOST_CHECK_EQUAL(cashaddr_script, EncodeDestination(dstScript, params));
-    arg->useCashAddr = false;
+    arg->Set("-usecashaddr", 0);
     BOOST_CHECK_EQUAL(base58_pubkey, EncodeDestination(dstKey, params));
     BOOST_CHECK_EQUAL(base58_script, EncodeDestination(dstScript, params));
 

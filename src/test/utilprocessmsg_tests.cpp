@@ -10,47 +10,12 @@
 
 #include <limits.h>
 
-const int NOT_SET = std::numeric_limits<int>::min();
-
-struct UtilDummyArgGetter : public ArgGetter {
-
-    UtilDummyArgGetter() : ArgGetter(),
-        usethin(NOT_SET), uahf(NOT_SET)
-    {
-    }
-
-    int64_t GetArg(const std::string& arg, int64_t def) override {
-
-        if (arg == "-use-thin-blocks")
-            return usethin == NOT_SET ? def : usethin;
-        if (arg == "-uahftime")
-            return uahf == NOT_SET ? def : uahf;
-
-        assert(false);
-    }
-
-    std::vector<std::string> GetMultiArgs(const std::string& arg) override {
-        assert(false);
-    }
-
-    bool GetBool(const std::string& arg, bool def) override {
-        if (arg == "-use-thin-blocks")
-            return usethin == NOT_SET ? def : usethin;
-
-        return def;
-    }
-
-    int usethin;
-    int64_t uahf;
-};
-
 BOOST_AUTO_TEST_SUITE(utilprocessmsg_tests);
 
 BOOST_AUTO_TEST_CASE(keep_outgoing_peer_thin) {
-
-    auto arg = new UtilDummyArgGetter;
+    auto arg = new DummyArgGetter;
     auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
-    arg->uahf = 0;
+    arg->Set("-uahftime", 0);
 
     // Node that does not support thin blocks.
     DummyNode node;
@@ -58,11 +23,11 @@ BOOST_AUTO_TEST_CASE(keep_outgoing_peer_thin) {
     node.nVersion = SENDHEADERS_VERSION; //< version before compact blocks
 
     // Thin blocks disabled. Still a keeper.
-    arg->usethin = 0;
+    arg->Set("-use-thin-blocks", 0);
     BOOST_CHECK(KeepOutgoingPeer(node));
 
     // Thin block enabled. Node does not support it.
-    arg->usethin = 1;
+    arg->Set("-use-thin-blocks", 1);
     BOOST_CHECK(!KeepOutgoingPeer(node));
 
     // Node supports xthin, keep.
@@ -80,12 +45,12 @@ BOOST_AUTO_TEST_CASE(keep_outgoing_peer_thin) {
 }
 
 BOOST_AUTO_TEST_CASE(keep_outgoing_peer_cash) {
-    auto arg = new UtilDummyArgGetter;
+    auto arg = new DummyArgGetter;
     auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
-    arg->usethin = 0;
+    arg->Set("-use-thin-blocks", 0);
 
     // Not on fork, we don't want UAHF peers
-    arg->uahf = 0;
+    arg->Set("-uahftime", 0);
     {
         DummyNode node;
         BOOST_CHECK(KeepOutgoingPeer(node));
@@ -94,7 +59,7 @@ BOOST_AUTO_TEST_CASE(keep_outgoing_peer_cash) {
     }
 
     // We're on fork. Keep only UAHF peers.
-    arg->uahf = UAHF_DEFAULT_ACTIVATION_TIME;
+    arg->Set("-uahftime", UAHF_DEFAULT_ACTIVATION_TIME);
     {
         DummyNode node;
         BOOST_CHECK(!KeepOutgoingPeer(node));

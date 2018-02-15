@@ -14,9 +14,9 @@
 
 BOOST_AUTO_TEST_SUITE(clientversion_tests)
 
-struct DummyArgGetter : public ArgGetter {
+struct CVArgGetter : public ArgGetter {
 
-    DummyArgGetter() : stealthmode(false), hideplatform(false)
+    CVArgGetter() : stealthmode(false), hideplatform(false)
     {
     }
 
@@ -55,10 +55,8 @@ bool OsInStr(const std::string& version) {
 
 BOOST_AUTO_TEST_CASE(platform_in_xtsubversion)
 {
-    std::unique_ptr<DummyArgGetter> arg(new DummyArgGetter);
-    DummyArgGetter* argPtr = arg.get();
-    std::unique_ptr<ArgReset> argraii
-        = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg.release()));
+    auto argPtr = new CVArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(argPtr));
 
     argPtr->hideplatform = true;
     argPtr->stealthmode = false;
@@ -77,10 +75,8 @@ BOOST_AUTO_TEST_CASE(platform_in_xtsubversion)
 
 BOOST_AUTO_TEST_CASE(xtsubversion_stealthmode)
 {
-    std::unique_ptr<DummyArgGetter> arg(new DummyArgGetter);
-    DummyArgGetter* argPtr = arg.get();
-    std::unique_ptr<ArgReset> argraii
-        = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg.release()));
+    auto argPtr = new CVArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(argPtr));
 
     argPtr->stealthmode = true;
     BOOST_CHECK(XTSubVersion(0).find("XT") == std::string::npos);
@@ -91,10 +87,8 @@ BOOST_AUTO_TEST_CASE(xtsubversion_stealthmode)
 
 BOOST_AUTO_TEST_CASE(xtsubversion_uacomment)
 {
-    std::unique_ptr<DummyArgGetter> arg(new DummyArgGetter);
-    DummyArgGetter* argPtr = arg.get();
-    std::unique_ptr<ArgReset> argraii
-        = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg.release()));
+    auto argPtr = new CVArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(argPtr));
 
     argPtr->hideplatform = true;
 
@@ -127,4 +121,3 @@ BOOST_AUTO_TEST_CASE(xtsubversion_eb)
 }
 
 BOOST_AUTO_TEST_SUITE_END()
-

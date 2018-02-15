@@ -398,19 +398,9 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_bip100str)
     BOOST_CHECK(c.find("/BIP100/EB1/") != std::string::npos);
     BOOST_CHECK(c.find("/B1/") == std::string::npos);
 
-    // Vote for 16MB blocks (using -maxblocksizevote)
-    struct Dummy : public ArgGetter {
-        int64_t GetArg(const std::string& arg, int64_t def) override {
-            return arg == "-maxblocksizevote" ? 16 : def;
-        }
-
-        bool GetBool(const std::string&, bool def) override
-        { return def; }
-
-        std::vector<std::string> GetMultiArgs(const std::string&) override
-        { return { }; }
-    };
-    auto reset = SetDummyArgGetter(std::unique_ptr<ArgGetter>(new Dummy));
+    auto arg = new DummyArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+    arg->Set("-maxblocksizevote", 16);
 
     c = DefaultCoinbaseStr();
     BOOST_CHECK(c.find("/BIP100/B16/EB1/") != std::string::npos);
