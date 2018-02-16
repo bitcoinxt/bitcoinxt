@@ -37,7 +37,7 @@ LIBUNIVALUE=univalue/libunivalue.la
 
 $(LIBSECP256K1): $(wildcard secp256k1/src/*) $(wildcard secp256k1/include/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C $(@D) $(@F)
-  
+
 $(LIBUNIVALUE): $(wildcard univalue/lib/*)
 	$(AM_V_at)$(MAKE) $(AM_MAKEFLAGS) -C univalue/
 
@@ -182,11 +182,12 @@ BITCOIN_CORE_H = \
   uint256.h \
   undo.h \
   util.h \
+  utildebug.h \
+  utilfork.h \
   utilmoneystr.h \
+  utilprocessmsg.h \
   utilstrencodings.h \
   utiltime.h \
-  utilprocessmsg.h \
-  utilfork.h \
   validationinterface.h \
   version.h \
   versionbits.h \
@@ -259,8 +260,9 @@ libbitcoin_server_a_SOURCES = \
   timedata.cpp \
   txdb.cpp \
   txmempool.cpp \
-  utilprocessmsg.cpp \
+  utildebug.cpp \
   utilfork.cpp \
+  utilprocessmsg.cpp \
   validationinterface.cpp \
   xthin.cpp \
   versionbits.cpp \
