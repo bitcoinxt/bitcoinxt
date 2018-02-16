@@ -28,6 +28,7 @@
 #include "txdb.h"
 #include "ui_interface.h"
 #include "util.h"
+#include "utildebug.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
 #ifdef ENABLE_WALLET
@@ -652,7 +653,8 @@ bool AppInitServers(boost::thread_group& threadGroup)
     std::set_new_handler(std::terminate);
     LogPrintf("Error: Out of memory. Terminating.\n");
 
-    // The log was successful, terminate now.
+    dump_backtrace_stderr();
+
     std::terminate();
 };
 
