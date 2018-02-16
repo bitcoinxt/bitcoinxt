@@ -13,6 +13,7 @@
 #include "walletmodel.h"
 
 #include "coincontrol.h"
+#include "dstencode.h"
 #include "init.h"
 #include "main.h"
 #include "wallet/wallet.h"

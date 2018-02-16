@@ -8,6 +8,7 @@
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
 #include "core_io.h"
+#include "dstencode.h"
 #include "init.h"
 #include "main.h"
 #include "maxblocksize.h"

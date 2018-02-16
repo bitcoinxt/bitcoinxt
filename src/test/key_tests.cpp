@@ -5,6 +5,7 @@
 #include "key.h"
 
 #include "base58.h"
+#include "dstencode.h"
 #include "script/script.h"
 #include "uint256.h"
 #include "util.h"

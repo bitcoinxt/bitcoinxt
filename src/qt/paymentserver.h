@@ -133,6 +133,7 @@ protected:
 private:
     bool processPaymentRequest(const PaymentRequestPlus& request, SendCoinsRecipient& recipient);
     void fetchRequest(const QUrl& url);
+    bool handleURI(const QString &scheme, const QString &s);
 
     // Setup networking
     void initNetManager();

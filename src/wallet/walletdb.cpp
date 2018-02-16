@@ -1,6 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2014 The Bitcoin Core developers
-// Copyright (c) 2016 The Bitcoin XT developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2016-2018 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -15,6 +15,7 @@
 #include "base58.h"
 #include "consensus/validation.h"
 #include "main.h"
+#include "dstencode.h"
 #include "protocol.h"
 #include "serialize.h"
 #include "sync.h"
@@ -35,30 +36,42 @@ static uint64_t nAccountingEntryNumber = 0;
 // CWalletDB
 //
 
-bool CWalletDB::WriteName(const string& strAddress, const string& strName)
+bool CWalletDB::WriteName(const CTxDestination& address, const string& strName)
 {
+    if (!IsValidDestination(address)) {
+        return false;
+    }
     nWalletDBUpdated++;
-    return Write(make_pair(string("name"), strAddress), strName);
+    return Write(make_pair(string("name"), EncodeLegacyAddr(address, Params())), strName);
 }
 
-bool CWalletDB::EraseName(const string& strAddress)
+bool CWalletDB::EraseName(const CTxDestination& address)
 {
     // This should only be used for sending addresses, never for receiving addresses,
     // receiving addresses must always have an address book entry if they're not change return.
+    if (!IsValidDestination(address)) {
+        return false;
+    }
     nWalletDBUpdated++;
-    return Erase(make_pair(string("name"), strAddress));
+    return Erase(make_pair(string("name"), EncodeLegacyAddr(address, Params())));
 }
 
-bool CWalletDB::WritePurpose(const string& strAddress, const string& strPurpose)
+bool CWalletDB::WritePurpose(const CTxDestination& address, const string& strPurpose)
 {
+    if (!IsValidDestination(address)) {
+        return false;
+    }
     nWalletDBUpdated++;
-    return Write(make_pair(string("purpose"), strAddress), strPurpose);
+    return Write(make_pair(string("purpose"), EncodeLegacyAddr(address, Params())), strPurpose);
 }
 
-bool CWalletDB::ErasePurpose(const string& strPurpose)
+bool CWalletDB::ErasePurpose(const CTxDestination& address)
 {
+    if (!IsValidDestination(address)) {
+        return false;
+    }
     nWalletDBUpdated++;
-    return Erase(make_pair(string("purpose"), strPurpose));
+    return Erase(make_pair(string("purpose"), EncodeLegacyAddr(address, Params())));
 }
 
 bool CWalletDB::WriteTx(uint256 hash, const CWalletTx& wtx)
@@ -990,14 +1003,17 @@ bool CWalletDB::Recover(CDBEnv& dbenv, const std::string& filename)
     return CWalletDB::Recover(dbenv, filename, false);
 }
 
-bool CWalletDB::WriteDestData(const std::string &address, const std::string &key, const std::string &value)
+bool CWalletDB::WriteDestData(const CTxDestination& address, const std::string &key, const std::string &value)
 {
+    if (!IsValidDestination(address)) {
+        return false;
+    }
     nWalletDBUpdated++;
-    return Write(std::make_pair(std::string("destdata"), std::make_pair(address, key)), value);
+    return Write(std::make_pair(std::string("destdata"), std::make_pair(EncodeLegacyAddr(address, Params()), key)), value);
 }
 
-bool CWalletDB::EraseDestData(const std::string &address, const std::string &key)
+bool CWalletDB::EraseDestData(const CTxDestination& address, const std::string &key)
 {
     nWalletDBUpdated++;
-    return Erase(std::make_pair(std::string("destdata"), std::make_pair(address, key)));
+    return Erase(std::make_pair(std::string("destdata"), std::make_pair(EncodeLegacyAddr(address, Params()), key)));
 }

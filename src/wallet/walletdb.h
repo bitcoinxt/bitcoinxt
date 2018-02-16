@@ -1,5 +1,6 @@
 // Copyright (c) 2009-2010 Satoshi Nakamoto
-// Copyright (c) 2009-2013 The Bitcoin Core developers
+// Copyright (c) 2009-2016 The Bitcoin Core developers
+// Copyright (c) 2017 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -7,6 +8,7 @@
 #define BITCOIN_WALLET_WALLETDB_H
 
 #include "amount.h"
+#include "script/standard.h" // for CTxDestination
 #include "wallet/db.h"
 #include "key.h"
 #include "keystore.h"
@@ -80,11 +82,12 @@ public:
     {
     }
 
-    bool WriteName(const std::string& strAddress, const std::string& strName);
-    bool EraseName(const std::string& strAddress);
+    bool WriteName(const CTxDestination &address, const std::string &strName);
+    bool EraseName(const CTxDestination &address);
 
-    bool WritePurpose(const std::string& strAddress, const std::string& purpose);
-    bool ErasePurpose(const std::string& strAddress);
+    bool WritePurpose(const CTxDestination &address,
+                      const std::string &purpose);
+    bool ErasePurpose(const CTxDestination &address);
 
     bool WriteTx(uint256 hash, const CWalletTx& wtx);
     bool EraseTx(uint256 hash);
@@ -114,10 +117,11 @@ public:
     bool ReadAccount(const std::string& strAccount, CAccount& account);
     bool WriteAccount(const std::string& strAccount, const CAccount& account);
 
-    /// Write destination data key,value tuple to database
-    bool WriteDestData(const std::string &address, const std::string &key, const std::string &value);
-    /// Erase destination data tuple from wallet database
-    bool EraseDestData(const std::string &address, const std::string &key);
+    /// Write destination data key,value tuple to database.
+    bool WriteDestData(const CTxDestination &address, const std::string &key,
+                       const std::string &value);
+    /// Erase destination data tuple from wallet database.
+    bool EraseDestData(const CTxDestination &address, const std::string &key);
 
     bool WriteAccountingEntry(const CAccountingEntry& acentry);
     CAmount GetAccountCreditDebit(const std::string& strAccount);
