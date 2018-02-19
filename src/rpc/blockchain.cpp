@@ -886,7 +886,7 @@ UniValue invalidateblock(const UniValue& params, bool fHelp)
     }
 
     if (state.IsValid()) {
-        ActivateBestChain(state);
+        ActivateBestChain(state, nullptr, BlockSource{}, g_connman.get());
     }
 
     if (!state.IsValid()) {
@@ -925,7 +925,7 @@ UniValue reconsiderblock(const UniValue& params, bool fHelp)
     }
 
     if (state.IsValid()) {
-        ActivateBestChain(state);
+        ActivateBestChain(state, nullptr, BlockSource{}, g_connman.get());
     }
 
     if (!state.IsValid()) {

@@ -23,16 +23,19 @@ struct NullFinder : public TxFinder {
 };
 
 struct DummyNode : public CNode {
-    DummyNode(NodeId myid = 42, ThinBlockManager* mgr = nullptr) : CNode(INVALID_SOCKET, CAddress()) {
+        DummyNode(NodeId myid = 42, ThinBlockManager* mgr = nullptr) : CNode(myid, NODE_NETWORK, 0, INVALID_SOCKET, CAddress()) {
         static auto staticmgr = GetDummyThinBlockMg();
         if (!mgr)
             mgr = staticmgr.get();
 
-        id = myid;
         NodeStatePtr::insert(id, this, *mgr);
         nVersion = PROTOCOL_VERSION;
     }
-    virtual ~DummyNode() { NodeStatePtr(id).erase(); }
+    virtual ~DummyNode() {
+        bool fUpdateConnectionTime;
+        GetNodeSignals().FinalizeNode(id, fUpdateConnectionTime);
+        NodeStatePtr(id).erase();
+    }
     virtual void BeginMessage(const char* pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend) {
         messages.push_back(pszCommand);
         CNode::BeginMessage(pszCommand);

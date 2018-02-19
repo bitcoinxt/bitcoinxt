@@ -481,7 +481,7 @@ public:
     }
 
     //! Return the number of (unique) addresses in all tables.
-    size_t size()
+    size_t size() const
     {
         return vRandom.size();
     }

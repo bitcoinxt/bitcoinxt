@@ -13,6 +13,7 @@
 #include "serialize.h"
 #include "util.h"
 #include "maxblocksize.h"
+#include "thinblockutil.h"
 
 #include "test/test_bitcoin.h"
 
@@ -22,7 +23,7 @@ BOOST_FIXTURE_TEST_SUITE(ReceiveMsgBytes_tests, TestingSetup)
 
 BOOST_AUTO_TEST_CASE(FullMessages)
 {
-    CNode testNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode testNode(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
@@ -34,7 +35,8 @@ BOOST_AUTO_TEST_CASE(FullMessages)
 
     // Receive a full 'ping' message
     {
-        BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size()));
+        bool complete;
+        BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
         BOOST_CHECK_EQUAL(testNode.vRecvMsg.size(),1UL);
         CNetMessage& msg = testNode.vRecvMsg[0];
         BOOST_CHECK(msg.complete());
@@ -50,7 +52,8 @@ BOOST_AUTO_TEST_CASE(FullMessages)
     // ...receive it one byte at a time:
     {
         for (size_t i = 0; i < s.size(); i++) {
-            BOOST_CHECK(testNode.ReceiveMsgBytes(&s[i], 1));
+            bool complete;
+            BOOST_CHECK(testNode.ReceiveMsgBytes(&s[i], 1, complete));
         }
         BOOST_CHECK_EQUAL(testNode.vRecvMsg.size(),1UL);
         CNetMessage& msg = testNode.vRecvMsg[0];
@@ -70,7 +73,7 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
     CDataStream stream(ParseHex("0100000079cda856b143d9db2c1caff01d1aecc8630d30625d10e8b4b8b0000000000000b50cc069d6a3e33e3ff84a5c41d9d3febe7c770fdcc96b2c3ff60abe184f196367291b4d4c86041b8fa45d630101000000010000000000000000000000000000000000000000000000000000000000000000ffffffff08044c86041b020a02ffffffff0100f2052a01000000434104ecd3229b0571c3be876feaac0442a9f13c5a572742927af1dc623353ecf8c202225f64868137a18cdd85cbbb4c74fbccfd4f49639cf1bdc94a5672bb15ad5d4cac00000000"), SER_NETWORK, PROTOCOL_VERSION);
     stream >> block;
 
-    CNode testNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode testNode(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
@@ -83,7 +86,8 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
     s.resize(nMaxMessageSize + headerLen + 1);
     CNetMessage::FinalizeHeader(s);
 
-    BOOST_CHECK(!testNode.ReceiveMsgBytes(&s[0], s.size()));
+    bool complete;
+    BOOST_CHECK(!testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
 
     testNode.vRecvMsg.clear();
 
@@ -91,12 +95,12 @@ BOOST_AUTO_TEST_CASE(TooLargeBlock)
     s.resize(nMaxMessageSize + headerLen);
     CNetMessage::FinalizeHeader(s);
 
-    BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size()));
+    BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
 }
 
 BOOST_AUTO_TEST_CASE(TooLargeVerack)
 {
-    CNode testNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    DummyNode testNode;
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
@@ -104,12 +108,13 @@ BOOST_AUTO_TEST_CASE(TooLargeVerack)
     size_t headerLen = s.size();
 
     CNetMessage::FinalizeHeader(s);
-    BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size()));
+    bool complete;
+    BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
 
     // verack is zero-length, so even one byte bigger is too big:
     s.resize(headerLen+1);
     CNetMessage::FinalizeHeader(s);
-    BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size()));
+    BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
     CNodeStateStats stats;
     GetNodeStateStats(testNode.GetId(), stats);
     BOOST_CHECK(stats.nMisbehavior > 0);
@@ -117,7 +122,7 @@ BOOST_AUTO_TEST_CASE(TooLargeVerack)
 
 BOOST_AUTO_TEST_CASE(TooLargePing)
 {
-    CNode testNode(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    DummyNode testNode;
     testNode.nVersion = 1;
 
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
@@ -125,12 +130,13 @@ BOOST_AUTO_TEST_CASE(TooLargePing)
     s << (uint64_t)11; // 8-byte nonce
 
     CNetMessage::FinalizeHeader(s);
-    BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size()));
+    bool complete;
+    BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
 
     // Add another nonce, sanity check should fail
     s << (uint64_t)11; // 8-byte nonce
     CNetMessage::FinalizeHeader(s);
-    BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size()));
+    BOOST_CHECK(testNode.ReceiveMsgBytes(&s[0], s.size(), complete));
     CNodeStateStats stats;
     GetNodeStateStats(testNode.GetId(), stats);
     BOOST_CHECK(stats.nMisbehavior > 0);

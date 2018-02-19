@@ -6,6 +6,8 @@
 #ifndef BITCOIN_NET_H
 #define BITCOIN_NET_H
 
+#include "addrdb.h"
+#include "addrman.h"
 #include "bloom.h"
 #include "compat.h"
 #include "hash.h"
@@ -22,6 +24,7 @@
 
 #include <deque>
 #include <stdint.h>
+#include <memory>
 
 #ifndef WIN32
 #include <arpa/inet.h>
@@ -56,7 +59,8 @@ static const unsigned int MAX_ADDR_TO_SEND = 1000;
 static const int MAX_RECV_CHUNK = 256*1024;
 /** Maximum length of strSubVer in `version` message */
 static const unsigned int MAX_SUBVERSION_LENGTH = 256;
-
+/** Maximum number of outgoing nodes */
+static const int MAX_OUTBOUND_CONNECTIONS = 8;
 /** -listen default */
 static const bool DEFAULT_LISTEN = true;
 /** -upnp default */
@@ -67,25 +71,275 @@ static const bool DEFAULT_UPNP = false;
 #endif
 /** The maximum number of entries in mapAskFor */
 static const size_t MAPASKFOR_MAX_SZ = MAX_INV_SZ;
+/** The maximum number of peer connections to maintain. */
+static const unsigned int DEFAULT_MAX_PEER_CONNECTIONS = 125;
+
+typedef int NodeId;
+
+struct AddedNodeInfo
+{
+    std::string strAddedNode;
+    CService resolvedAddress;
+    bool fConnected;
+    bool fInbound;
+};
+
+class CTransaction;
+class CNodeStats;
+class CClientUIInterface;
+
+class CConnman
+{
+public:
+
+    enum NumConnections {
+        CONNECTIONS_NONE = 0,
+        CONNECTIONS_IN = (1U << 0),
+        CONNECTIONS_OUT = (1U << 1),
+        CONNECTIONS_ALL = (CONNECTIONS_IN | CONNECTIONS_OUT),
+    };
+
+    struct Options
+    {
+        uint64_t nLocalServices = 0;
+        int nMaxConnections = 0;
+        int nMaxOutbound = 0;
+        int nMaxFeeler = 0;
+        int nBestHeight = 0;
+        CClientUIInterface* uiInterface = nullptr;
+        unsigned int nSendBufferMaxSize = 0;
+        unsigned int nReceiveFloodSize = 0;
+    };
+    CConnman();
+    virtual ~CConnman();
+    bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, std::string& strNodeError, Options options);
+    void Stop();
+    bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
+    bool OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
+    virtual bool CheckIncomingNonce(uint64_t nonce);
+
+    bool ForNode(NodeId id, std::function<bool(CNode* pnode)> func);
+
+    template<typename Callable>
+    bool ForEachNodeContinueIf(Callable&& func)
+    {
+        LOCK(cs_vNodes);
+        for (auto&& node : vNodes)
+            if(!func(node))
+                return false;
+        return true;
+    };
+
+    template<typename Callable>
+    bool ForEachNodeContinueIf(Callable&& func) const
+    {
+        LOCK(cs_vNodes);
+        for (const auto& node : vNodes)
+            if(!func(node))
+                return false;
+        return true;
+    };
+
+    template<typename Callable, typename CallableAfter>
+    bool ForEachNodeContinueIfThen(Callable&& pre, CallableAfter&& post)
+    {
+        bool ret = true;
+        LOCK(cs_vNodes);
+        for (auto&& node : vNodes)
+            if(!pre(node)) {
+                ret = false;
+                break;
+            }
+        post();
+        return ret;
+    };
+
+    template<typename Callable, typename CallableAfter>
+    bool ForEachNodeContinueIfThen(Callable&& pre, CallableAfter&& post) const
+    {
+        bool ret = true;
+        LOCK(cs_vNodes);
+        for (const auto& node : vNodes)
+            if(!pre(node)) {
+                ret = false;
+                break;
+            }
+        post();
+        return ret;
+    };
+
+    template<typename Callable>
+    void ForEachNode(Callable&& func)
+    {
+        LOCK(cs_vNodes);
+        for (auto&& node : vNodes)
+            func(node);
+    };
+
+    template<typename Callable>
+    void ForEachNode(Callable&& func) const
+    {
+        LOCK(cs_vNodes);
+        for (const auto& node : vNodes)
+            func(node);
+    };
+
+    template<typename Callable, typename CallableAfter>
+    void ForEachNodeThen(Callable&& pre, CallableAfter&& post)
+    {
+        LOCK(cs_vNodes);
+        for (auto&& node : vNodes)
+            pre(node);
+        post();
+    };
+
+    template<typename Callable, typename CallableAfter>
+    void ForEachNodeThen(Callable&& pre, CallableAfter&& post) const
+    {
+        LOCK(cs_vNodes);
+        for (const auto& node : vNodes)
+            pre(node);
+        post();
+    };
+
+    void RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors);
+    void RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors);
+
+    // Addrman functions
+    size_t GetAddressCount() const;
+    void MarkAddressGood(const CAddress& addr);
+    void AddNewAddress(const CAddress& addr, const CAddress& addrFrom, int64_t nTimePenalty = 0);
+    void AddNewAddresses(const std::vector<CAddress>& vAddr, const CAddress& addrFrom, int64_t nTimePenalty = 0);
+    std::vector<CAddress> GetAddresses();
+
+    // Denial-of-service detection/prevention
+    // The idea is to detect peers that are behaving
+    // badly and disconnect/ban them, but do it in a
+    // one-coding-mistake-won't-shatter-the-entire-network
+    // way.
+    // IMPORTANT:  There should be nothing I can give a
+    // node that it will forward on that will make that
+    // node's peers drop it. If there is, an attacker
+    // can isolate a node and/or try to split the network.
+    // Dropping a node for sending stuff that is invalid
+    // now but might be valid in a later version is also
+    // dangerous, because it can cause a network split
+    // between nodes running old code and nodes running
+    // new code.
+    bool Ban(const CNetAddr &addr);
+    void ClearBanned(); // needed for unit testing
+    bool IsBanned(CNetAddr ip);
+
+    void AddOneShot(const std::string& strDest);
+
+    bool AddNode(const std::string& node);
+    bool RemoveAddedNode(const std::string& node);
+    std::vector<AddedNodeInfo> GetAddedNodeInfo();
+
+    size_t GetNodeCount(NumConnections num);
+    void GetNodeStats(std::vector<CNodeStats>& vstats);
+
+    unsigned int GetSendBufferSize() const;
+
+    void AddWhitelistedRange(const CSubNet &subnet);
+
+    uint64_t GetLocalServices() const;
+
+    uint64_t GetTotalBytesRecv();
+    uint64_t GetTotalBytesSent();
+
+    void SetBestHeight(int height);
+    int GetBestHeight() const;
+
+    // for unittesting
+    void AddTestNode(CNode* n);
+
+private:
+    struct ListenSocket {
+        SOCKET socket;
+        bool whitelisted;
+
+        ListenSocket(SOCKET socket_, bool whitelisted_) : socket(socket_), whitelisted(whitelisted_) {}
+    };
+
+    void ThreadOpenAddedConnections();
+    void ProcessOneShot();
+    void ThreadOpenConnections();
+    void ThreadMessageHandler();
+    void AcceptConnection(const ListenSocket& hListenSocket);
+    void ThreadSocketHandler();
+    void ThreadDNSAddressSeed();
+
+    CNode* FindNode(const CNetAddr& ip);
+    CNode* FindNode(const CSubNet& subNet);
+    CNode* FindNode(const std::string& addrName);
+    CNode* FindNode(const CService& addr);
+
+    bool AttemptToEvictConnection();
+    CNode* ConnectNode(CAddress addrConnect, const char *pszDest, bool fCountFailure);
+    bool IsWhitelistedRange(const CNetAddr &addr);
+
+    void DeleteNode(CNode* pnode);
+
+    NodeId GetNewNodeId();
+
+    void DumpAddresses();
+
+    unsigned int GetReceiveFloodSize() const;
+
+    // Network stats
+    void RecordBytesRecv(uint64_t bytes);
+    void RecordBytesSent(uint64_t bytes);
+
+    // Network usage totals
+    CCriticalSection cs_totalBytesRecv;
+    CCriticalSection cs_totalBytesSent;
+    uint64_t nTotalBytesRecv;
+    uint64_t nTotalBytesSent;
 
 
-unsigned int ReceiveFloodSize();
-unsigned int SendBufferSize();
 
-void AddOneShot(std::string strDest);
-void AddressCurrentlyConnected(const CService& addr);
-CNode* FindNode(const CNetAddr& ip);
-CNode* FindNode(const std::string& addrName);
-CNode* FindNode(const CService& ip);
-bool OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
+    // Whitelisted ranges. Any node connecting from these is automatically
+    // whitelisted (as well as those connecting to whitelisted binds).
+    std::vector<CSubNet> vWhitelistedRange;
+    CCriticalSection cs_vWhitelistedRange;
+
+    unsigned int nSendBufferMaxSize;
+    unsigned int nReceiveFloodSize;
+
+    std::vector<ListenSocket> vhListenSocket;
+    std::map<CNetAddr, int64_t> setBanned;
+    CCriticalSection cs_setBanned;
+    bool fAddressesInitialized;
+    CAddrMan addrman;
+    std::deque<std::string> vOneShots;
+    CCriticalSection cs_vOneShots;
+    std::vector<std::string> vAddedNodes;
+    CCriticalSection cs_vAddedNodes;
+    std::vector<CNode*> vNodes;
+    std::list<CNode*> vNodesDisconnected;
+    mutable CCriticalSection cs_vNodes;
+    std::atomic<NodeId> nLastNodeId;
+    boost::condition_variable messageHandlerCondition;
+
+    /** Services this instance offers */
+    uint64_t nLocalServices;
+
+    CSemaphore *semOutbound;
+    int nMaxConnections;
+    int nMaxOutbound;
+    int nMaxFeeler;
+    std::atomic<int> nBestHeight;
+    CClientUIInterface* clientInterface;
+};
+extern std::unique_ptr<CConnman> g_connman;
+void Discover(boost::thread_group& threadGroup);
+void InitNetworkShapers();
 void MapPort(bool fUseUPnP);
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
-void StartNode(boost::thread_group& threadGroup, CScheduler& scheduler);
-bool StopNode();
-void SocketSendData(CNode *pnode);
+size_t SocketSendData(CNode *pnode);
 
-typedef int NodeId;
 
 struct CombinerAll
 {
@@ -105,15 +359,14 @@ struct CombinerAll
 // Signals are used to communicate with higher-level code.
 struct CNodeSignals
 {
-    boost::signals2::signal<int ()> GetHeight;
     // register a handler for this signal to do sanity checks as the bytes of a message are being
     // received. Note that the message may not be completely read (so this can be
     // used to prevent DoS attacks using over-size messages).
     boost::signals2::signal<bool (CNode*, const CNetMessage&), CombinerAll> SanityCheckMessages;
-    boost::signals2::signal<bool (CNode*), CombinerAll> ProcessMessages;
-    boost::signals2::signal<bool (CNode*), CombinerAll> SendMessages;
+    boost::signals2::signal<bool (CNode*, CConnman*), CombinerAll> ProcessMessages;
+    boost::signals2::signal<bool (CNode*, CConnman*), CombinerAll> SendMessages;
     boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
-    boost::signals2::signal<void (NodeId)> FinalizeNode;
+    boost::signals2::signal<void (NodeId, bool&)> FinalizeNode;
     boost::signals2::signal<int ()> GetMaxBlockSize;
 };
 
@@ -145,28 +398,16 @@ bool GetLocal(CService &addr, const CNetAddr *paddrPeer = NULL);
 bool IsReachable(enum Network net);
 bool IsReachable(const CNetAddr &addr);
 void SetReachable(enum Network net, bool fFlag = true);
-CAddress GetLocalAddress(const CNetAddr *paddrPeer = NULL);
+CAddress GetLocalAddress(const CNetAddr *paddrPeer, uint64_t nLocalServices);
 
 
 extern bool fDiscover;
 extern bool fListen;
-extern uint64_t nLocalServices;
-extern uint64_t nLocalHostNonce;
-extern CAddrMan addrman;
-extern int nMaxConnections;
 
-extern std::vector<CNode*> vNodes;
-extern CCriticalSection cs_vNodes;
 extern std::map<CInv, CDataStream> mapRelay;
 extern std::deque<std::pair<int64_t, CInv> > vRelayExpiration;
 extern CCriticalSection cs_mapRelay;
 extern limitedmap<CInv, int64_t> mapAlreadyAskedFor;
-
-extern std::vector<std::string> vAddedNodes;
-extern CCriticalSection cs_vAddedNodes;
-
-extern NodeId nLastNodeId;
-extern CCriticalSection cs_nLastNodeId;
 
 struct LocalServiceInfo {
     int nScore;
@@ -243,9 +484,6 @@ public:
 };
 
 
-
-
-
 /** Information about a peer */
 class CNode
 {
@@ -302,17 +540,6 @@ public:
     NodeId id;
 
 protected:
-
-    // Denial-of-service detection/prevention
-    // Key is IP address, value is banned-until-time
-    static std::map<CNetAddr, int64_t> setBanned;
-    static CCriticalSection cs_setBanned;
-
-    // Whitelisted ranges. Any node connecting from these is automatically
-    // whitelisted (as well as those connecting to whitelisted binds).
-    static std::vector<CSubNet> vWhitelistedRange;
-    static CCriticalSection cs_vWhitelistedRange;
-
     // Basic fuzz-testing
     void Fuzz(int nChance); // modifies ssSend
 
@@ -351,23 +578,24 @@ public:
     // adds connection to ipgroup (for prioritising connection slots)
     std::unique_ptr<IPGroupSlot> ipgroupSlot;
 
-    CNode(SOCKET hSocketIn, CAddress addrIn, std::string addrNameIn = "", bool fInboundIn=false);
+    CNode(NodeId id, uint64_t nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
     virtual ~CNode();
 
 private:
-    // Network usage totals
-    static CCriticalSection cs_totalBytesRecv;
-    static CCriticalSection cs_totalBytesSent;
-    static uint64_t nTotalBytesRecv;
-    static uint64_t nTotalBytesSent;
-
     CNode(const CNode&);
     void operator=(const CNode&);
 
+    uint64_t nLocalHostNonce;
+    uint64_t nLocalServices;
+    int nMyStartingHeight;
 public:
 
     NodeId GetId() const {
       return id;
+    }
+
+    uint64_t GetLocalNonce() const {
+      return nLocalHostNonce;
     }
 
     int GetRefCount()
@@ -386,7 +614,7 @@ public:
     }
 
     // requires LOCK(cs_vRecvMsg)
-    bool ReceiveMsgBytes(const char *pch, unsigned int nBytes);
+    bool ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete);
 
     // requires LOCK(cs_vRecvMsg)
     void SetRecvVersion(int nVersionIn)
@@ -630,34 +858,12 @@ public:
 
     void CloseSocketDisconnect();
 
-    // Denial-of-service detection/prevention
-    // The idea is to detect peers that are behaving
-    // badly and disconnect/ban them, but do it in a
-    // one-coding-mistake-won't-shatter-the-entire-network
-    // way.
-    // IMPORTANT:  There should be nothing I can give a
-    // node that it will forward on that will make that
-    // node's peers drop it. If there is, an attacker
-    // can isolate a node and/or try to split the network.
-    // Dropping a node for sending stuff that is invalid
-    // now but might be valid in a later version is also
-    // dangerous, because it can cause a network split
-    // between nodes running old code and nodes running
-    // new code.
-    static void ClearBanned(); // needed for unit testing
-    static bool IsBanned(CNetAddr ip);
-    static bool Ban(const CNetAddr &ip);
     void copyStats(CNodeStats &stats);
 
-    static bool IsWhitelistedRange(const CNetAddr &ip);
-    static void AddWhitelistedRange(const CSubNet &subnet);
-
-    // Network stats
-    static void RecordBytesRecv(uint64_t bytes);
-    static void RecordBytesSent(uint64_t bytes);
-
-    static uint64_t GetTotalBytesRecv();
-    static uint64_t GetTotalBytesSent();
+    uint64_t GetLocalServices() const
+    {
+        return nLocalServices;
+    }
 
     bool SupportsXThinBlocks() const;
     bool SupportsCompactBlocks() const;
@@ -665,23 +871,7 @@ public:
 
 
 
-class CTransaction;
-void RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors);
-void RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors);
-
 bool FindTransactionInRelayMap(uint256 hash, CTransaction &out);
-
-/** Access to the (IP) address database (peers.dat) */
-class CAddrDB
-{
-private:
-    boost::filesystem::path pathAddr;
-public:
-    CAddrDB();
-    bool Write(const CAddrMan& addr);
-    bool Read(CAddrMan& addr);
-    bool Read(CAddrMan& addr, CDataStream& ssPeers);
-};
 
 /** Return a timestamp in the future (in microseconds) for exponentially distributed events. */
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds);

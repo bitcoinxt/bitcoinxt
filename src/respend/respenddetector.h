@@ -10,11 +10,14 @@
 #include <memory>
 #include <mutex>
 
+class CConnman;
+class CTxMemPool;
+class CTransaction;
 class CRollingBloomFilter;
 
 namespace respend {
 
-std::vector<RespendActionPtr> CreateDefaultActions();
+std::vector<RespendActionPtr> CreateDefaultActions(CConnman*);
 
 // Detects if a transaction is in conflict with mempool, and feeds various
 // actions with data about the respend. Finally triggers the actions.
@@ -22,7 +25,7 @@ class RespendDetector {
     public:
 
         RespendDetector(const CTxMemPool& pool, const CTransaction& tx,
-                       std::vector<RespendActionPtr> = CreateDefaultActions());
+                        std::vector<RespendActionPtr>);
 
         ~RespendDetector();
         void CheckForRespend(const CTxMemPool& pool, const CTransaction& tx);

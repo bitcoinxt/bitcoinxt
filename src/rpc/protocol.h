@@ -61,6 +61,7 @@ enum RPCErrorCode
     RPC_CLIENT_IN_INITIAL_DOWNLOAD  = -10, //! Still downloading initial blocks
     RPC_CLIENT_NODE_ALREADY_ADDED   = -23, //! Node is already added
     RPC_CLIENT_NODE_NOT_ADDED       = -24, //! Node has not been added before
+    RPC_CLIENT_P2P_DISABLED         = -31, //!< No valid connection manager instance found
 
     //! Wallet errors
     RPC_WALLET_ERROR                = -4,  //! Unspecified problem with wallet (key not found etc.)

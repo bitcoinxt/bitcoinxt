@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "main.h"
+#include "net.h"
 
 #include "test/test_bitcoin.h"
 
@@ -10,11 +11,21 @@
 
 BOOST_FIXTURE_TEST_SUITE(p2p_protocol_tests, TestingSetup)
 
+namespace {
+class DummyConnman : public CConnman {
+        bool CheckIncomingNonce(uint64_t nonce) override {
+            // this trips the version message logic to end shortly after reading
+            // the data (which is the focus the tests using this dummy object)
+            return false;
+        }
+};
+} // ns anon
+
 BOOST_AUTO_TEST_CASE(MaxSizeVersionMessage)
 {
-    CNode n(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode n(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
-    nLocalHostNonce = 2; // this trips the version message logic to end shortly after reading the data (which is the focus of this test)
+    uint64_t nLocalHostNonce = 2;
     s << PROTOCOL_VERSION;
     s << n.nServices;
     s << GetTime();
@@ -25,14 +36,15 @@ BOOST_AUTO_TEST_CASE(MaxSizeVersionMessage)
     s << n.nStartingHeight;
     s << n.fRelayTxes;
     BOOST_CHECK_EQUAL(size_t(352), s.size());
-    BOOST_CHECK(ProcessMessage(&n, "version", s, 0));
+    DummyConnman dummy;
+    BOOST_CHECK(ProcessMessage(&n, "version", s, 0, &dummy));
 }
 
 BOOST_AUTO_TEST_CASE(OverMaxSizeVersionMessage)
 {
-    CNode n(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode n(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
-    nLocalHostNonce = 2; // this trips the version message logic to end shortly after reading the data (which is the focus of this test)
+    uint64_t nLocalHostNonce = 2;
     s << PROTOCOL_VERSION;
     s << n.nServices;
     s << GetTime();
@@ -43,12 +55,13 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeVersionMessage)
     s << n.nStartingHeight;
     s << n.fRelayTxes;
     BOOST_CHECK_EQUAL(size_t(353), s.size());
-    BOOST_CHECK_THROW(ProcessMessage(&n, "version", s, 0), std::ios_base::failure);
+    DummyConnman dummy;
+    BOOST_CHECK_THROW(ProcessMessage(&n, "version", s, 0, &dummy), std::ios_base::failure);
 }
 
 BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
 {
-    CNode n(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode n(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     n.nVersion = PROTOCOL_VERSION;
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     s << std::string(12, 'a'); // not a real command, but it uses the max of 12 here.
@@ -57,13 +70,14 @@ BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
     BOOST_CHECK_EQUAL(size_t(126), s.size());
     bool temp = fDebug;
     fDebug = true;
-    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0));
+    CConnman dummy;
+    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, &dummy));
     fDebug = temp;
 }
 
 BOOST_AUTO_TEST_CASE(MaxSizeValidRejectMessage)
 {
-    CNode n(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode n(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     n.nVersion = PROTOCOL_VERSION;
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     s << std::string("block"); // does not use the max of 12, but "block" is the longest command that has a defined extension of 32 bytes
@@ -73,13 +87,14 @@ BOOST_AUTO_TEST_CASE(MaxSizeValidRejectMessage)
     BOOST_CHECK_EQUAL(size_t(151), s.size());
     bool temp = fDebug;
     fDebug = true;
-    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0));
+    CConnman dummy;
+    BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, &dummy));
     fDebug = temp;
 }
 
 BOOST_AUTO_TEST_CASE(OverMaxSizeWeirdRejectMessage)
 {
-    CNode n(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode n(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     n.nVersion = PROTOCOL_VERSION;
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     s << std::string(13, 'a'); // invalid, max is 12
@@ -88,13 +103,14 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeWeirdRejectMessage)
     BOOST_CHECK_EQUAL(size_t(127), s.size());
     bool temp = fDebug;
     fDebug = true;
-    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0)); // check this way since the reject message processing swallows the exception
+    CConnman dummy;
+    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, &dummy)); // check this way since the reject message processing swallows the exception
     fDebug = temp;
 }
 
 BOOST_AUTO_TEST_CASE(OverMaxSizeValidRejectMessage)
 {
-    CNode n(INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
+    CNode n(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService("127.0.0.1", 0), NODE_NETWORK));
     n.nVersion = PROTOCOL_VERSION;
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     s << std::string("block");
@@ -104,7 +120,8 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeValidRejectMessage)
     BOOST_CHECK_EQUAL(size_t(152), s.size());
     bool temp = fDebug;
     fDebug = true;
-    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0)); // check this way since the reject message processing swallows the exception
+    CConnman dummy;
+    BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, &dummy)); // check this way since the reject message processing swallows the exception
     fDebug = temp;
 }
 

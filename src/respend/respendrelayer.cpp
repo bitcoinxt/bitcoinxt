@@ -45,8 +45,11 @@ class RelayLimiter {
 
 } // ns anon
 
-RespendRelayer::RespendRelayer() : interesting(false), valid(false)
+RespendRelayer::RespendRelayer(CConnman* connman) :
+    interesting(false), valid(false), connman(connman)
 {
+    if (!connman)
+        throw std::invalid_argument(std::string(__func__ ) + " requires connection manager");
 }
 
 bool RespendRelayer::AddOutpointConflict(
@@ -84,7 +87,7 @@ void RespendRelayer::Trigger() {
 
     std::vector<uint256> vAncestors;
     vAncestors.push_back(respend.GetHash()); // Alert only for the tx itself
-    RelayTransaction(respend, vAncestors);
+    connman->RelayTransaction(respend, vAncestors);
 }
 
 } // ns respend

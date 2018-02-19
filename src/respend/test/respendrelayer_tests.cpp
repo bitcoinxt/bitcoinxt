@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "net.h" // for CConnman
 #include "random.h"
 #include "respend/respendrelayer.h"
 #include "test/test_bitcoin.h"
@@ -14,7 +15,8 @@ using namespace respend;
 BOOST_FIXTURE_TEST_SUITE(respendrelayer_tests, BasicTestingSetup);
 
 BOOST_AUTO_TEST_CASE(not_interesting) {
-    RespendRelayer r;
+    CConnman connman;
+    RespendRelayer r(&connman);
     BOOST_CHECK(!r.IsInteresting());
     CTxMemPool::txiter dummy;
     bool lookAtMore;
@@ -31,7 +33,8 @@ BOOST_AUTO_TEST_CASE(not_interesting) {
 }
 
 BOOST_AUTO_TEST_CASE(is_interesting) {
-    RespendRelayer r;
+    CConnman connman;
+    RespendRelayer r(&connman);
     CTxMemPool::txiter dummy;
     bool lookAtMore;
 
@@ -50,11 +53,11 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
 
     DummyNode node;
     node.fRelayTxes = true;
-    LOCK(cs_vNodes);
-    vNodes.push_back(&node);
+    CConnman connman;
+    connman.AddTestNode(&node);
 
     // Create a "not interesting" respend
-    RespendRelayer r;
+    RespendRelayer r(&connman);
     r.AddOutpointConflict(COutPoint{}, dummy, respend, true, false);
     r.Trigger();
     BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
@@ -73,7 +76,6 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
     r.Trigger();
     BOOST_CHECK_EQUAL(size_t(1), node.vInventoryToSend.size());
     BOOST_CHECK(respend.GetHash() == node.vInventoryToSend.at(0).hash);
-    vNodes.erase(vNodes.end() - 1);
 }
 
 BOOST_AUTO_TEST_SUITE_END();

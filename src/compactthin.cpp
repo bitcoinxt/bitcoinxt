@@ -28,7 +28,7 @@ class CompactAnn : public BlockAnnHandle {
 
             enableCompactBlocks(*node, true);
 
-            finalizeCallb = [=](NodeId id) {
+            finalizeCallb = [=](NodeId id, bool) {
                 if (id != nodeID())
                     return;
                 node = nullptr;
@@ -57,7 +57,7 @@ class CompactAnn : public BlockAnnHandle {
         }
 
         CNode* node;
-        std::function<void(NodeId)> finalizeCallb;
+        std::function<void(NodeId, bool)> finalizeCallb;
         boost::signals2::connection finalizeCallbConn;
 };
 
