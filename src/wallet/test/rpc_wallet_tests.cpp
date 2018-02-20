@@ -19,7 +19,21 @@
 
 using namespace std;
 
-extern UniValue createArgs(int nRequired, const char* address1 = NULL, const char* address2 = NULL);
+JSONRPCRequest createArgs(int nRequired, const char* address1=NULL, const char* address2=NULL)
+{
+    UniValue params(UniValue::VARR);
+    params.push_back(nRequired);
+    UniValue addresses(UniValue::VARR);
+    if (address1) addresses.push_back(address1);
+    if (address2) addresses.push_back(address2);
+    params.push_back(addresses);
+
+    JSONRPCRequest req;
+    req.params = params;
+    req.fHelp = false;
+    return req;
+}
+
 extern UniValue CallRPC(string args);
 
 extern CWallet* pwalletMain;
@@ -38,27 +52,27 @@ BOOST_AUTO_TEST_CASE(rpc_addmultisig)
     const char address2Hex[] = "0388c2037017c62240b6b72ac1a2a5f94da790596ebd06177c8572752922165cb4";
 
     UniValue v;
-    BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(1, address1Hex), false));
+    BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(1, address1Hex)));
     BOOST_CHECK(IsValidDestinationString(v.get_str()));
 
-    BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(1, address1Hex, address2Hex), false));
+    BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(1, address1Hex, address2Hex)));
     BOOST_CHECK(IsValidDestinationString(v.get_str()));
 
-    BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(2, address1Hex, address2Hex), false));
+    BOOST_CHECK_NO_THROW(v = addmultisig(createArgs(2, address1Hex, address2Hex)));
     BOOST_CHECK(IsValidDestinationString(v.get_str()));
 
-    BOOST_CHECK_THROW(addmultisig(createArgs(0), false), runtime_error);
-    BOOST_CHECK_THROW(addmultisig(createArgs(1), false), runtime_error);
-    BOOST_CHECK_THROW(addmultisig(createArgs(2, address1Hex), false), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(0)), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(1)), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(2, address1Hex)), runtime_error);
 
-    BOOST_CHECK_THROW(addmultisig(createArgs(1, ""), false), runtime_error);
-    BOOST_CHECK_THROW(addmultisig(createArgs(1, "NotAValidPubkey"), false), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(1, "")), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(1, "NotAValidPubkey")), runtime_error);
 
     string short1(address1Hex, address1Hex + sizeof(address1Hex) - 2); // last byte missing
-    BOOST_CHECK_THROW(addmultisig(createArgs(2, short1.c_str()), false), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(2, short1.c_str())), runtime_error);
 
     string short2(address1Hex + 1, address1Hex + sizeof(address1Hex)); // first byte missing
-    BOOST_CHECK_THROW(addmultisig(createArgs(2, short2.c_str()), false), runtime_error);
+    BOOST_CHECK_THROW(addmultisig(createArgs(2, short2.c_str())), runtime_error);
 }
 
 BOOST_AUTO_TEST_CASE(rpc_wallet)

@@ -120,6 +120,7 @@ testScripts = [
     'mempool-accept-txn.py',
     'blockchain.py',
     'disablewallet.py',
+    'rpcnamedargs.py',
 ]
 
 testScriptsExt = [
