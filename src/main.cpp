@@ -516,7 +516,7 @@ void OnBlockFinished::rejectAndPunish(const CValidationState& state,
         }
         if (dos <= 0)
             return true;
-        Misbehaving(pnode->id, dos);
+        Misbehaving(pnode->id, dos, "invalid block: " + reason);
         return true;
     };
 
@@ -1683,7 +1683,7 @@ void CheckForkWarningConditionsOnNewFork(CBlockIndex* pindexNewForkTip)
     CheckForkWarningConditions();
 }
 
-void Misbehaving(NodeId pnode, int howmuch)
+void Misbehaving(NodeId pnode, int howmuch, const std::string& what)
 {
     if (howmuch == 0)
         return;
@@ -1696,10 +1696,12 @@ void Misbehaving(NodeId pnode, int howmuch)
     int banscore = GetArg("-banscore", 100);
     if (state->nMisbehavior >= banscore && state->nMisbehavior - howmuch < banscore)
     {
-        LogPrintf("%s: %s (%d -> %d) BAN THRESHOLD EXCEEDED\n", __func__, state->name, state->nMisbehavior-howmuch, state->nMisbehavior);
+        LogPrintf("%s: %s (%d -> %d) [%s] BAN THRESHOLD EXCEEDED\n", __func__,
+                  state->name, state->nMisbehavior-howmuch, state->nMisbehavior, what);
         state->fShouldBan = true;
     } else
-        LogPrintf("%s: %s (%d -> %d)\n", __func__, state->name, state->nMisbehavior-howmuch, state->nMisbehavior);
+        LogPrintf("%s: %s (%d -> %d) [%s]\n", __func__, state->name,
+                  state->nMisbehavior-howmuch, state->nMisbehavior, what);
 }
 
 void static InvalidChainFound(CBlockIndex* pindexNew)
@@ -1730,7 +1732,7 @@ void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state
             CBlockReject reject = {state.GetRejectCode(), state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), pindex->GetBlockHash()};
             nodeState->rejects.push_back(reject);
             if (blockSource.canMisbehave && nDoS > 0)
-                Misbehaving(id, nDoS);
+                Misbehaving(id, nDoS, "invalid block: " + state.GetRejectReason());
         }
     }
     if (!state.CorruptionPossible()) {
@@ -4456,7 +4458,7 @@ bool static SanityCheckMessage(CNode* peer, const CNetMessage& msg)
         (maxMessageSizes.count(strCommand) && msg.hdr.nMessageSize > maxMessageSizes[strCommand])) {
         LogPrint("net", "Oversized %s message from peer=%i (%d bytes)\n",
                  SanitizeString(strCommand), peer->GetId(), msg.hdr.nMessageSize);
-        Misbehaving(peer->GetId(), 20);
+        Misbehaving(peer->GetId(), 20, "oversized message");
         return msg.hdr.nMessageSize <= nMaxMessageSize;
     }
     // This would be a good place for more sophisticated DoS detection/prevention.
@@ -4786,7 +4788,7 @@ void unexpectedThinError(const std::string& cmd, CNode& from, const std::string&
     {
         LOCK(cs_main);
         NodeStatePtr(from.id)->thinblock->stopAllWork();
-        Misbehaving(from.id, 10);
+        Misbehaving(from.id, 10, "thinblock: " + err);
     }
     from.PushMessage("reject", cmd, REJECT_MALFORMED, err);
 }
@@ -4816,7 +4818,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         if (pfrom->nVersion != 0)
         {
             pfrom->PushMessage("reject", strCommand, REJECT_DUPLICATE, string("Duplicate version message"));
-            Misbehaving(pfrom->GetId(), 1);
+            Misbehaving(pfrom->GetId(), 1, "duplicate version messge");
             return false;
         }
 
@@ -4956,7 +4958,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
     else if (pfrom->nVersion == 0)
     {
         // Must have a version message before anything else
-        Misbehaving(pfrom->GetId(), 1);
+        Misbehaving(pfrom->GetId(), 1, "no version received");
         return false;
     }
 
@@ -4995,7 +4997,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             return true;
         if (vAddr.size() > 1000)
         {
-            Misbehaving(pfrom->GetId(), 20);
+            Misbehaving(pfrom->GetId(), 20, "addr msg exceeded limits");
             return error("message addr size() = %u", vAddr.size());
         }
 
@@ -5057,7 +5059,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         vRecv >> vInv;
         if (vInv.size() > MAX_INV_SZ)
         {
-            Misbehaving(pfrom->GetId(), 20);
+            Misbehaving(pfrom->GetId(), 20, "inv msg size exceeded limits");
             return error("message inv size() = %u", vInv.size());
         }
 
@@ -5096,7 +5098,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             GetMainSignals().Inventory(inv.hash);
 
             if (pfrom->nSendSize > (nMaxSendBufferSize * 2)) {
-                Misbehaving(pfrom->GetId(), 50);
+                Misbehaving(pfrom->GetId(), 50, "send buffer size exceeded");
                 return error("send buffer size() = %u", pfrom->nSendSize);
             }
         }
@@ -5141,7 +5143,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         vRecv >> vInv;
         if (vInv.size() > MAX_INV_SZ)
         {
-            Misbehaving(pfrom->GetId(), 20);
+            Misbehaving(pfrom->GetId(), 20, "getdata msg size exceeded");
             return error("message getdata size() = %u", vInv.size());
         }
 
@@ -5260,7 +5262,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             if (ProcessGetUTXOs(vOutPoints, fCheckMemPool, &bitmap, &outs, connman))
                 pfrom->PushMessage("utxos", chainActive.Height(), chainActive.Tip()->GetBlockHash(), bitmap, outs);
             else
-                Misbehaving(pfrom->GetId(), 20);
+                Misbehaving(pfrom->GetId(), 20, "getutxos request invalid");
         }
     }
 
@@ -5335,7 +5337,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
                         if (stateDummy.IsInvalid(nDos) && nDos > 0)
                         {
                             // Punish peer that gave us an invalid orphan tx
-                            Misbehaving(fromPeer, nDos);
+                            Misbehaving(fromPeer, nDos, "invalid orphan tx");
                             setMisbehaving.insert(fromPeer);
                             LogPrint("mempool", "   invalid orphan tx %s\n", orphanHash.ToString());
                         }
@@ -5387,7 +5389,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
                                state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), inv.hash);
             if (nDoS > 0)
-                Misbehaving(pfrom->GetId(), nDoS);
+                Misbehaving(pfrom->GetId(), nDoS, "tx rejected: " + state.GetRejectReason());
         }
     }
     else if (strCommand == "headers" && !fImporting && !fReindex) // Ignore headers received while importing
@@ -5397,7 +5399,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         // Bypass the normal CBlock deserialization, as we don't want to risk deserializing 2000 full blocks.
         unsigned int nCount = ReadCompactSize(vRecv);
         if (nCount > MAX_HEADERS_RESULTS) {
-            Misbehaving(pfrom->GetId(), 20);
+            Misbehaving(pfrom->GetId(), 20, "headers msg exceeded size limits");
             return error("headers message size = %u", nCount);
         }
         headers.resize(nCount);
@@ -5507,7 +5509,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
         if (!dontWant.IsWithinSizeConstraints())
             // There is no excuse for sending a too-large filter
-            Misbehaving(pfrom->GetId(), 100);
+            Misbehaving(pfrom->GetId(), 100, "get_xthin: filter too large");
         else
         {
             LOCK(pfrom->cs_xfilter);
@@ -5728,7 +5730,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
         if (!filter.IsWithinSizeConstraints())
             // There is no excuse for sending a too-large filter
-            Misbehaving(pfrom->GetId(), 100);
+            Misbehaving(pfrom->GetId(), 100, "filterload: filter too large");
         else
         {
             LOCK(pfrom->cs_filter);
@@ -5749,13 +5751,13 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         // and thus, the maximum size any matched object can have) in a filteradd message
         if (vData.size() > MAX_SCRIPT_ELEMENT_SIZE)
         {
-            Misbehaving(pfrom->GetId(), 100);
+            Misbehaving(pfrom->GetId(), 100, "filteradd: script size limits exceeded");
         } else {
             LOCK(pfrom->cs_filter);
             if (pfrom->pfilter)
                 pfrom->pfilter->insert(vData);
             else
-                Misbehaving(pfrom->GetId(), 100);
+                Misbehaving(pfrom->GetId(), 100, "filteradd: filter not loaded");
         }
     }
 

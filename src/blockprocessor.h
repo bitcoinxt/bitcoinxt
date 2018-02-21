@@ -25,7 +25,7 @@ class BlockProcessor {
     protected:
         CNode& from;
         ThinBlockWorker& worker;
-        virtual void misbehave(int howmuch);
+        virtual void misbehave(int howmuch, const std::string& what);
         bool requestConnectHeaders(const CBlockHeader&);
         CBlockIndex* processHeader(const CBlockHeader& header, bool maybeAnnouncement);
 

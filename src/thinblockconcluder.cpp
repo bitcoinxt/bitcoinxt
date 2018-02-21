@@ -37,7 +37,7 @@ static void handleReRequestFailed(ThinBlockWorker& worker, CNode& from, uint256 
         fallbackDownload(from, block, markInFlight);
     }
     else
-        Misbehaving(worker.nodeID(), 10);
+        Misbehaving(worker.nodeID(), 10, "unfulfilled-rerequest");
 }
 
 void XThinBlockConcluder::operator()(const XThinReReqResponse& resp,
