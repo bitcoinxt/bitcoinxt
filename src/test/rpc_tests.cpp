@@ -258,19 +258,10 @@ BOOST_AUTO_TEST_CASE(rpc_getblocktemplate_vote)
     BOOST_CHECK(f.find("/BIP100/EB1/") != std::string::npos);
     BOOST_CHECK(f.find("/B1/") == std::string::npos);
 
-    // Vote for 16MB blocks (using -maxblocksizevote)
-    struct Dummy : public ArgGetter {
-        int64_t GetArg(const std::string& arg, int64_t def) override {
-            return arg == "-maxblocksizevote" ? 16 : def;
-        }
-
-        bool GetBool(const std::string&, bool def) override
-        { return def; }
-
-        std::vector<std::string> GetMultiArgs(const std::string&) override
-        { return { }; }
-    };
-    auto reset = SetDummyArgGetter(std::unique_ptr<ArgGetter>(new Dummy));
+    // Vote for 16MB blocks
+    auto arg = new DummyArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+    arg->Set("-maxblocksizevote", 16);
 
     UniValue hasVote = CallRPC("getblocktemplate");
     f = get_coinbaseaux_flags(hasVote);

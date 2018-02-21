@@ -122,3 +122,19 @@ std::unique_ptr<ArgReset> SetDummyArgGetter(std::unique_ptr<ArgGetter> getter) {
 ArgReset::~ArgReset() {
     Args.reset(new DefaultGetter());
 }
+
+bool DummyArgGetter::GetBool(const std::string& arg, bool def) {
+    return customArgs.count(arg) ? bool(customArgs[arg]) : def;
+}
+
+std::vector<std::string> DummyArgGetter::GetMultiArgs(const std::string&) {
+    assert(!"not supported");
+}
+
+int64_t DummyArgGetter::GetArg(const std::string& arg, int64_t def) {
+    return customArgs.count(arg) ? customArgs[arg] : def;
+}
+
+void DummyArgGetter::Set(const std::string& arg, int64_t val) {
+    customArgs[arg] = val;
+}

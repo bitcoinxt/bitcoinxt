@@ -155,30 +155,12 @@ void URITests::uriTestsCashAddr() {
     QVERIFY(!GUIUtil::parseBitcoinURI(scheme, uri, &rv));
 }
 
-namespace {
-class DummyArgGetter : public ArgGetter {
-    public:
-        DummyArgGetter() : ArgGetter(), useCashAddr(false) { }
-        int64_t GetArg(const std::string& strArg, int64_t def) override {
-            return def;
-        }
-        std::vector<std::string> GetMultiArgs(const std::string& arg) override {
-            assert(false);
-        }
-        bool GetBool(const std::string& arg, bool def) override {
-            return arg == "-usecashaddr" ? useCashAddr : def;
-        }
-        bool useCashAddr;
-};
-
-} // anon ns
-
 void URITests::uriTestFormatURI() {
 
     auto arg = new DummyArgGetter;
     auto raii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
     {
-        arg->useCashAddr = true;
+        arg->Set("-usecashaddr", 1);
         SendCoinsRecipient r;
         r.address = "bitcoincash:qpm2qsznhks23z7629mms6s4cwef74vcwvy22gdx6a";
         r.message = "test";
@@ -188,7 +170,7 @@ void URITests::uriTestFormatURI() {
     }
 
     {
-        arg->useCashAddr = false;
+        arg->Set("-usecashaddr", 0);
         SendCoinsRecipient r;
         r.address = "175tWpb8K1S7NmH4Zx6rewF9WQrcZv245W";
         r.message = "test";
@@ -203,14 +185,14 @@ void URITests::uriTestScheme() {
     auto raii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
     {
         // cashaddr - scheme depends on selected chain params
-        arg->useCashAddr = true;
+        arg->Set("-usecashaddr", 1);
         QVERIFY("bitcoincash" == GUIUtil::bitcoinURIScheme(Params(CBaseChainParams::MAIN)));
         QVERIFY("bchtest" == GUIUtil::bitcoinURIScheme(Params(CBaseChainParams::TESTNET)));
         QVERIFY("bchreg" == GUIUtil::bitcoinURIScheme(Params(CBaseChainParams::REGTEST)));
     }
     {
         // legacy - scheme is "bitcoincash" regardless of chain params
-        arg->useCashAddr = false;
+        arg->Set("-usecashaddr", 0);
         QVERIFY("bitcoincash" == GUIUtil::bitcoinURIScheme(Params(CBaseChainParams::MAIN)));
         QVERIFY("bitcoincash" == GUIUtil::bitcoinURIScheme(Params(CBaseChainParams::TESTNET)));
         QVERIFY("bitcoincash" == GUIUtil::bitcoinURIScheme(Params(CBaseChainParams::REGTEST)));
