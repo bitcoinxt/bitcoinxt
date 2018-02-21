@@ -57,13 +57,18 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
     if (hasBlockData())
         return DONT_DOWNL;
 
+    NodeStatePtr nodestate(from.id);
+    // Peer has an unresolved unconnecting header situation, requesting new
+    // blocks may cause yet another unconnecting header to arrive.
+    if (nodestate->unconnectingHeaders)
+        return DONT_DOWNL;
+
+    if (nodestate->nBlocksInFlight >= MAX_BLOCKS_IN_TRANSIT_PER_PEER)
+        return DONT_DOWNL;
+
     if (!fetchAsThin()) {
 
         if (blocksInFlight.isInFlight(block))
-            return DONT_DOWNL;
-
-        NodeStatePtr nodestate(from.id);
-        if (nodestate->nBlocksInFlight >= MAX_BLOCKS_IN_TRANSIT_PER_PEER)
             return DONT_DOWNL;
 
         if (Opt().AvoidFullBlocks()) {

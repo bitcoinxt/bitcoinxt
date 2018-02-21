@@ -320,6 +320,10 @@ struct MarkBlockAsInFlight : public BlockInFlightMarker {
         nQueuedValidatedHeaders += newentry.fValidatedHeaders;
         list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
         state->nBlocksInFlight++;
+        if (state->nBlocksInFlight > MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
+            LogPrintf("Warning: Too many blocks in flight (%d of max %d) for peer=%d\n",
+                      state->nBlocksInFlight, MAX_BLOCKS_IN_TRANSIT_PER_PEER, nodeid);
+        }
         state->nBlocksInFlightValidHeaders += newentry.fValidatedHeaders;
         blocksInFlight.insert(it);
     };

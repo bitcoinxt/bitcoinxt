@@ -220,6 +220,19 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_dont_dowl_5) {
             ann.pickDownloadStrategy());
 }
 
+BOOST_AUTO_TEST_CASE(dowl_strategy_dont_dowl_6) {
+
+    // Don't download a block from a peer if there are unconnecting headers
+
+    nodestate->unconnectingHeaders = 1;
+    BOOST_CHECK_EQUAL(BlockAnnounceReceiver::DONT_DOWNL,
+            ann.pickDownloadStrategy());
+
+    nodestate->unconnectingHeaders = 0;
+    BOOST_CHECK_EQUAL(BlockAnnounceReceiver::DOWNL_FULL_NOW,
+            ann.pickDownloadStrategy());
+}
+
 /// Helper class to check if request block is called.
 struct RequestBlockWorker : public DummyThinWorker {
     RequestBlockWorker(ThinBlockManager& mg, NodeId id)
