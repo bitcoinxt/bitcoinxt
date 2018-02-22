@@ -259,9 +259,8 @@ BOOST_AUTO_TEST_CASE(onannounced_downl_thin) {
     BOOST_CHECK(ann.onBlockAnnounced(r));
     BOOST_CHECK_EQUAL(1, worker->reqs);
 
-    // thin blocks come with a header, we should not
-    // have requested headers.
-    BOOST_CHECK_EQUAL(size_t(0), node.messages.size());
+    // we should request headers also, to avoid unconnected headers
+    BOOST_CHECK_EQUAL("getheaders", node.messages.at(0));
 }
 
 BOOST_AUTO_TEST_CASE(onannounced_downl_full) {

@@ -112,6 +112,13 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch) {
     NodeStatePtr nodestate(from.id);
     DownloadStrategy s = pickDownloadStrategy();
 
+    // Request headers preceding the announced block (if any), so by the time
+    // the full block arrives, the header chain leading up to it is already
+    // validated. Not doing this will result in block being discarded and
+    // re-downloaded later.
+    if (!hasBlockData() && !blockHeaderIsKnown() && !blocksInFlight.isInFlight(block))
+        requestHeaders(from, block);
+
     if (s == DOWNL_THIN_NOW) {
         int numDownloading = thinmg.numWorkers(block);
         LogPrint("thin", "requesting %s from peer %d (%d of %d parallel)\n",
@@ -121,13 +128,6 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch) {
         nodestate->thinblock->addWork(block);
         return true;
     }
-
-    // Request headers preceding the announced block (if any), so by the time
-    // the full block arrives, the header chain leading up to it is already
-    // validated. Not doing this will result in block being discarded and
-    // re-downloaded later.
-    if (!hasBlockData() && !blockHeaderIsKnown() && !blocksInFlight.isInFlight(block))
-        requestHeaders(from, block);
 
     if (s == DONT_DOWNL)
         return false;
