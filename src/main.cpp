@@ -5422,10 +5422,11 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         MarkBlockAsInFlight inFlight;
         DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight, CheckBlockIndex);
 
-        if (p.requestConnectHeaders(headers.at(0), *pfrom))
+        if (p.requestConnectHeaders(headers.at(0), *pfrom, true)) {
             // headers don't connect to active chain, requested
             // new headers to connect.
             return true;
+        }
 
         try {
             p(headers, nCount == MAX_HEADERS_RESULTS, true);
@@ -5487,7 +5488,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         MarkBlockAsInFlight inFlight;
         DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight, CheckBlockIndex);
 
-        if (p.requestConnectHeaders(block.GetBlockHeader(), *pfrom)) {
+        if (p.requestConnectHeaders(block.GetBlockHeader(), *pfrom, true)) {
             LogPrintf("Received block %s from peer=%d, but headers do "
                     "not connect. Discarding.\n",
                     inv.hash.ToString(), pfrom->id);

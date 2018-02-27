@@ -22,7 +22,7 @@ struct CmpctDummyHeaderProcessor : public BlockHeaderProcessor {
         index.nHeight = 2;
         return &index;
     }
-    bool requestConnectHeaders(const CBlockHeader& h, CNode& from) override {
+    bool requestConnectHeaders(const CBlockHeader& h, CNode& from, bool) override {
         return reqConnHeadResp;
     }
     bool reqConnHeadResp;

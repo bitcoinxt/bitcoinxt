@@ -29,17 +29,21 @@ BOOST_AUTO_TEST_CASE(test_connect_chain_req) {
 
     DefaultHeaderProcessor p(&from, inFlight, *thinmg, markAsInFlight, checkBlockIndex);
 
-    BOOST_CHECK(p.requestConnectHeaders(header, from));
+    BOOST_CHECK(p.requestConnectHeaders(header, from, true));
     BOOST_CHECK_EQUAL(1, NodeStatePtr(from.id)->unconnectingHeaders);
     BOOST_CHECK_EQUAL(size_t(1), from.messages.size());
     BOOST_CHECK_EQUAL("getheaders", from.messages.at(0));
+
+    // Test that unconnecting headers isn't bumped when requested not to
+    BOOST_CHECK(p.requestConnectHeaders(header, from, false));
+    BOOST_CHECK_EQUAL(1 /* no change */, NodeStatePtr(from.id)->unconnectingHeaders);
 
     // Add entry so that header connects. Try again.
 
     DummyBlockIndexEntry e3(header.hashPrevBlock);
 
     from.messages.clear();
-    BOOST_CHECK(!p.requestConnectHeaders(header, from));
+    BOOST_CHECK(!p.requestConnectHeaders(header, from, true));
     BOOST_CHECK_EQUAL(size_t(0), from.messages.size());
     BOOST_CHECK_EQUAL(1 /* no change */, NodeStatePtr(from.id)->unconnectingHeaders);
 }

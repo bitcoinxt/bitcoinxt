@@ -31,7 +31,7 @@ void XThinBlockProcessor::operator()(
         return;
     }
 
-    if (requestConnectHeaders(block.header)) {
+    if (requestConnectHeaders(block.header, true)) {
         worker.stopWork(hash);
         return;
     }
@@ -70,4 +70,3 @@ void XThinBlockProcessor::operator()(
 
     from.PushMessage("get_xblocktx", req);
 }
-

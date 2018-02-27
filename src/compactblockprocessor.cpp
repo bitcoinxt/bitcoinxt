@@ -29,7 +29,11 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
         return;
     }
 
-    if (requestConnectHeaders(block.header)) {
+    // We (may) have requested node to announce blocks to us and it will
+    // continue to do so even if we haven't kept up. Don't misbehave it for
+    // sending us unconnected headers.
+    bool bumpUnconnecting = false;
+    if (requestConnectHeaders(block.header, bumpUnconnecting)) {
         worker.stopWork(hash);
         return;
     }
