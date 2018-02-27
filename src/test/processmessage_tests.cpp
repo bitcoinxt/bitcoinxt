@@ -82,7 +82,7 @@ struct DummyXThinProcessor : public XThinBlockProcessor {
         BlockHeaderProcessor& h) : XThinBlockProcessor(f, w, h), misbehaved(0)
     { }
 
-    virtual void misbehave(int howmuch) {
+    void misbehave(int howmuch, const std::string&) override {
         misbehaved += howmuch;
     }
     int misbehaved;
