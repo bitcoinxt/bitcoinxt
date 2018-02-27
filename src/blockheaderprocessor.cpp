@@ -72,14 +72,14 @@ CBlockIndex* DefaultHeaderProcessor::acceptHeaders(
     for (const CBlockHeader& header : headers) {
         CValidationState state;
         if (pindexLast != nullptr && header.hashPrevBlock != pindexLast->GetBlockHash()) {
-            Misbehaving(pfrom->GetId(), 20);
+            Misbehaving(pfrom->GetId(), 20, "non-continuous header sequence");
             throw BlockHeaderError("non-continuous headers sequence");
         }
         if (!AcceptBlockHeader(header, state, &pindexLast)) {
             int nDoS;
             if (state.IsInvalid(nDoS)) {
                 if (nDoS > 0)
-                    Misbehaving(pfrom->GetId(), nDoS);
+                    Misbehaving(pfrom->GetId(), nDoS, "invalid header");
                 throw BlockHeaderError("invalid header received");
             }
         }
@@ -175,7 +175,7 @@ bool DefaultHeaderProcessor::requestConnectHeaders(const CBlockHeader& h, CNode&
             chainActive.GetLocator(pindexBestHeader), uint256());
 
     if (NodeStatePtr(from.id)->unconnectingHeaders % MAX_UNCONNECTING_HEADERS == 0)
-        Misbehaving(from.id, 20);
+        Misbehaving(from.id, 20, "unconnecting-headers");
 
     return true;
 }

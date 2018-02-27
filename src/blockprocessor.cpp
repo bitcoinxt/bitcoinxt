@@ -6,8 +6,8 @@
 #include "util.h"
 #include "utilprocessmsg.h"
 
-void BlockProcessor::misbehave(int howmuch) {
-    Misbehaving(from.id, howmuch);
+void BlockProcessor::misbehave(int howmuch, const std::string& what) {
+    Misbehaving(from.id, howmuch, what);
 }
 
 void BlockProcessor::rejectBlock(
@@ -18,7 +18,7 @@ void BlockProcessor::rejectBlock(
 
     from.PushMessage("reject", netcmd, REJECT_MALFORMED, reason, block);
 
-    this->misbehave(misbehave);
+    this->misbehave(misbehave, "block rejected " + reason);
     worker.stopWork(block);
 }
 
