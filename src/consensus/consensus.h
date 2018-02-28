@@ -12,6 +12,8 @@
 static const unsigned int MAX_BLOCK_SIZE = 1000000;
 /** UAHF initial block size */
 static const unsigned int UAHF_INITIAL_MAX_BLOCK_SIZE = 8000000;
+/** Initial block size of the third BCH hard fork */
+static const unsigned int THIRD_HF_INITIAL_MAX_BLOCK_SIZE = 32000000;
 /** The maximum allowed size for a serialized transaction, in bytes */
 static const unsigned int MAX_TRANSACTION_SIZE = 1000*1000;
 /** The maximum allowed number of signature check operations in a block (network rule) */

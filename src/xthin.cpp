@@ -9,7 +9,9 @@
 #include "pow.h"
 #include "protocol.h"
 #include "blockencodings.h"
+
 #include <algorithm>
+#include <unordered_set>
 
 bool isCollision(const std::vector<uint64_t>& txHashes, const uint64_t& hash) {
     return std::find(txHashes.begin(), txHashes.end(), hash)
@@ -58,12 +60,12 @@ void XThinBlock::selfValidate(uint64_t currMaxBlockSize) const {
     validateNumTxs(txHashes.size(), currMaxBlockSize);
 
     typedef std::vector<uint64_t>::const_iterator auto_;
-    std::vector<uint64_t> copy;
+    std::unordered_set<uint64_t> copy;
     for (auto_ t = txHashes.begin(); t != txHashes.end(); ++t)
     {
-        if (isCollision(copy, *t))
+        if (copy.count(*t))
             throw std::invalid_argument("hash collision in thin block");
-        copy.push_back(*t);
+        copy.insert(*t);
     }
 
     typedef std::vector<CTransaction>::const_iterator auto__;

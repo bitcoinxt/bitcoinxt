@@ -9,7 +9,10 @@
 #include "util.h"
 #include "options.h"
 #include "utilfork.h"
+
 #include <string>
+#include <algorithm>
+
 #include <boost/lexical_cast.hpp>
 
 uint64_t GetNextMaxBlockSize(const CBlockIndex* pindexLast, const Consensus::Params& params)
@@ -146,11 +149,16 @@ uint64_t GetMaxBlockSizeVote(const CScript &coinbase, int32_t nHeight)
 }
 
 uint64_t NextBlockRaiseCap(uint64_t maxCurrBlock) {
-    if (maxCurrBlock == MAX_BLOCK_SIZE) {
-        // next block may be a UAHF block
-        return UAHF_INITIAL_MAX_BLOCK_SIZE;
-    }
+    if (maxCurrBlock < MAX_BLOCK_SIZE)
+        throw std::invalid_argument("Current block max can't be less than MAX_BLOCK_SIZE");
 
     // BIP100 allows block size limit to be increased 5%.
-    return maxCurrBlock * 105 / 100;
+    uint64_t bip100bump = maxCurrBlock * 105 / 100;
+
+    // We're on the BTC chain.
+    if (!Opt().UAHFTime())
+        return bip100bump;
+
+    return std::max(bip100bump,
+                    static_cast<uint64_t>(THIRD_HF_INITIAL_MAX_BLOCK_SIZE));
 }

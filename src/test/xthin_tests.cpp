@@ -147,25 +147,27 @@ BOOST_AUTO_TEST_CASE(xthin_stub_self_validate) {
         BOOST_CHECK_THROW(xblock.selfValidate(MAX_BLOCK_SIZE), std::invalid_argument);
     }
 
-    uint64_t currMaxBlockSize = 1000 * 100; // 100kb (for faster unittest)
+    uint64_t dummyhash = 1;
+    uint64_t currMaxBlockSize = MAX_BLOCK_SIZE;
+    uint64_t nextMaxBlockSize = NextBlockRaiseCap(currMaxBlockSize);
     // too big
     {
         XThinBlock xblock(TestBlock1(), CBloomFilter(), false);
-        size_t tooManyTx = std::ceil(currMaxBlockSize * 1.05 / minTxSize()) + 1;
+        size_t tooManyTx = std::ceil(nextMaxBlockSize / minTxSize()) + 1;
         xblock.txHashes.resize(tooManyTx);
         for (size_t i = 1 /* skip coinbase */; i < tooManyTx; ++i)
-            xblock.txHashes[i] = GetRand(std::numeric_limits<unsigned int>::max());
+            xblock.txHashes[i] = ++dummyhash;
         BOOST_CHECK_THROW(xblock.selfValidate(currMaxBlockSize), std::invalid_argument);
     }
 
     // not too big
     {
         XThinBlock xblock(TestBlock1(), CBloomFilter(), false);
-        uint64_t nextMaxBlockSize = NextBlockRaiseCap(currMaxBlockSize);
         uint64_t notTooMany = nextMaxBlockSize / minTxSize();
         xblock.txHashes.resize(notTooMany);
+
         for (size_t i = 1 /* skip coinbase */; i < notTooMany; ++i)
-            xblock.txHashes[i] = GetRand(std::numeric_limits<unsigned int>::max());
+            xblock.txHashes[i] = ++dummyhash;
 
         BOOST_CHECK_NO_THROW(xblock.selfValidate(currMaxBlockSize));
     }
