@@ -231,6 +231,29 @@ BOOST_AUTO_TEST_CASE(next_block_raise_cap_btc) {
     BOOST_CHECK_THROW(NextBlockRaiseCap(MAX_BLOCK_SIZE - 1), std::invalid_argument);
 }
 
+BOOST_AUTO_TEST_CASE(third_hf_bump) {
+
+    auto params = Params(CBaseChainParams::MAIN).GetConsensus();
+
+    uint64_t currMax = UAHF_INITIAL_MAX_BLOCK_SIZE;
+
+    std::vector<CBlockIndex> blocks(5);
+    fillBlockIndex(params, blocks, false, currMax);
+    blocks[2].nTime = Opt().ThirdHFTime();
+    blocks[3].nTime = blocks[2].nTime + 1;
+    blocks[4].nTime = blocks[3].nTime + 1;
+
+    for (size_t i = 1; i < blocks.size(); ++i) {
+        blocks[i].nMaxBlockSize = GetNextMaxBlockSize(&blocks[i - 1], params);
+    }
+
+    BOOST_CHECK_EQUAL(currMax, GetNextMaxBlockSize(&blocks[0], params));
+    BOOST_CHECK_EQUAL(currMax, GetNextMaxBlockSize(&blocks[1], params));
+    // block is at HF time, but MTP isn't.
+    BOOST_CHECK_EQUAL(currMax, GetNextMaxBlockSize(&blocks[2], params));
+    // MTP passes fork point
+    BOOST_CHECK_EQUAL(THIRD_HF_INITIAL_MAX_BLOCK_SIZE, GetNextMaxBlockSize(&blocks[3], params));
+    BOOST_CHECK_EQUAL(THIRD_HF_INITIAL_MAX_BLOCK_SIZE, GetNextMaxBlockSize(&blocks[4], params));
 }
 
 BOOST_AUTO_TEST_SUITE_END();

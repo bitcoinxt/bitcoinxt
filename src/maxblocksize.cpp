@@ -27,6 +27,10 @@ uint64_t GetNextMaxBlockSize(const CBlockIndex* pindexLast, const Consensus::Par
     if (IsUAHFActivatingBlock(pindexLast->GetMedianTimePast(), pindexLast->pprev))
         return UAHF_INITIAL_MAX_BLOCK_SIZE;
 
+    // Bump to 32MB at third BCH fork
+    if (IsThirdHFActivatingBlock(pindexLast->GetMedianTimePast(), pindexLast->pprev))
+        return THIRD_HF_INITIAL_MAX_BLOCK_SIZE;
+
     uint64_t nMaxBlockSize = pindexLast->nMaxBlockSize;
 
     // Only change once per difficulty adjustment interval
