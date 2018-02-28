@@ -6,19 +6,29 @@
 #include "chain.h"
 #include "options.h"
 
-// Check if this block activates UAHF. The next block is fork block and must be > 1MB.
-bool IsUAHFActivatingBlock(int64_t mtpCurrent, CBlockIndex* pindexPrev) {
-    if (!Opt().UAHFTime())
+static bool IsForkActivatingBlock(int64_t mtpActivationTime,
+                                  int64_t mtpCurrent, CBlockIndex* pindexPrev)
+{
+    if (!mtpActivationTime)
         return false;
 
-    if (mtpCurrent < Opt().UAHFTime())
+    if (mtpCurrent < mtpActivationTime)
         return false;
 
     if (pindexPrev == nullptr)
         // we activated at genesis (happens in regtest)
         return true;
 
-    return pindexPrev->GetMedianTimePast() < Opt().UAHFTime();
+    return pindexPrev->GetMedianTimePast() < mtpActivationTime;
+}
+
+// Check if this block activates UAHF. The next block is fork block and must be > 1MB.
+bool IsUAHFActivatingBlock(int64_t mtpCurrent, CBlockIndex* pindexPrev) {
+    return IsForkActivatingBlock(Opt().UAHFTime(), mtpCurrent, pindexPrev);
+}
+
+bool IsThirdHFActivatingBlock(int64_t mtpCurrent, CBlockIndex* pindexPrev) {
+    return IsForkActivatingBlock(Opt().ThirdHFTime(), mtpCurrent, pindexPrev);
 }
 
 bool IsThirdHFActive(int64_t mtpChainTip) {
