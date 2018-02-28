@@ -176,12 +176,52 @@ bool blocksConnect(const std::vector<uint256>& blocksToAnnounce) {
     return true;
 }
 
+// Best effort guess on if the headers we want to announce will connect at
+// peer. This is to avoid unconnecting headers situtation where the node
+// may misbehave us.
+static bool headerConnectsAtNode(
+        const NodeStatePtr& state, const uint256& toAnnounceHash, NodeId id)
+{
+    auto blockIter = mapBlockIndex.find(toAnnounceHash);
+    if (blockIter == end(mapBlockIndex))
+        return false;
+
+    CBlockIndex* toAnnounceBlock = blockIter->second;
+
+    auto getHeight = [](CBlockIndex* b) {
+        return b ? b->nHeight : 0;
+    };
+
+    int bestSent = getHeight(state->bestHeaderSent);
+    int bestKnown = getHeight(state->pindexBestKnownBlock);
+    int toAnnounce = getHeight(toAnnounceBlock);
+
+    if (toAnnounce > (bestSent + 1) && toAnnounce > (bestKnown + 1)) {
+        LogPrint("ann", "ann: skipping header announcement, "
+                "guessing that it won't connect. "
+                "heights - announce: %d best sent: %d best known: %d peer=%d\n",
+                toAnnounce, bestSent, bestKnown, id);
+        return false;
+    }
+    return true;
+}
+
 bool BlockAnnounceSender::canAnnounceWithHeaders() const {
+
+    if (to.blocksToAnnounce.empty())
+        return false;
 
     // Set too many blocks to announce. In this corner case
     // we revert to announcing blocks as inv even though
     // peer prefers header announcements.
     if (to.blocksToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE)
+        return false;
+
+    NodeStatePtr state(to.id);
+    if (state.IsNull())
+        return false;
+
+    if (!headerConnectsAtNode(state, to.blocksToAnnounce.at(0), to.id))
         return false;
 
     // If we come across any

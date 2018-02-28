@@ -409,6 +409,40 @@ BOOST_AUTO_TEST_CASE(canAnnounceWithHeaders_canconnect) {
     }
 }
 
+BOOST_AUTO_TEST_CASE(canAnnounceWithHeaders_connectAtNode) {
+    DummyBlockIndexEntry entry1(uint256S("0xBAD"));
+    DummyBlockIndexEntry entry2(uint256S("0xBEEF"));
+    DummyBlockIndexEntry entry3(uint256S("0xF00D"));
+    entry2.index.pprev = &entry1.index;
+    entry3.index.pprev = &entry2.index;
+
+    int height = 0;
+    entry1.index.nHeight = height++;
+    entry2.index.nHeight = height++;
+    entry3.index.nHeight = height++;
+
+    SetTipRAII activeTip(&entry3.index);
+
+    NodeStatePtr state(to.id);
+    state->prefersHeaders = true;
+
+    // entry2 connects with bestHeaderSent
+    state->pindexBestKnownBlock = nullptr;
+    state->bestHeaderSent = &entry1.index;
+    to.blocksToAnnounce = { entry2.hash, entry3.hash };
+    BOOST_CHECK(ann.canAnnounceWithHeaders());
+
+    // entry2 connects with pindexBestKnownBlock
+    std::swap(state->pindexBestKnownBlock, state->bestHeaderSent);
+    BOOST_CHECK(ann.canAnnounceWithHeaders());
+
+    // entry3 by itself doesn't connect on node
+    to.blocksToAnnounce = { entry3.hash };
+    BOOST_CHECK(!ann.canAnnounceWithHeaders());
+    std::swap(state->pindexBestKnownBlock, state->bestHeaderSent);
+    BOOST_CHECK(!ann.canAnnounceWithHeaders());
+}
+
 BOOST_AUTO_TEST_CASE(announce_with_headers) {
     DummyBlockIndexEntry entry1(uint256S("0xBAD"));
     DummyBlockIndexEntry entry2(uint256S("0xBEEF"));
