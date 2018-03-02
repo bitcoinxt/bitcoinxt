@@ -57,13 +57,18 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
     if (hasBlockData())
         return DONT_DOWNL;
 
+    NodeStatePtr nodestate(from.id);
+    // Peer has an unresolved unconnecting header situation, requesting new
+    // blocks may cause yet another unconnecting header to arrive.
+    if (nodestate->unconnectingHeaders)
+        return DONT_DOWNL;
+
+    if (nodestate->nBlocksInFlight >= MAX_BLOCKS_IN_TRANSIT_PER_PEER)
+        return DONT_DOWNL;
+
     if (!fetchAsThin()) {
 
         if (blocksInFlight.isInFlight(block))
-            return DONT_DOWNL;
-
-        NodeStatePtr nodestate(from.id);
-        if (nodestate->nBlocksInFlight >= MAX_BLOCKS_IN_TRANSIT_PER_PEER)
             return DONT_DOWNL;
 
         if (Opt().AvoidFullBlocks()) {
@@ -107,6 +112,13 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch) {
     NodeStatePtr nodestate(from.id);
     DownloadStrategy s = pickDownloadStrategy();
 
+    // Request headers preceding the announced block (if any), so by the time
+    // the full block arrives, the header chain leading up to it is already
+    // validated. Not doing this will result in block being discarded and
+    // re-downloaded later.
+    if (!hasBlockData() && !blockHeaderIsKnown() && !blocksInFlight.isInFlight(block))
+        requestHeaders(from, block);
+
     if (s == DOWNL_THIN_NOW) {
         int numDownloading = thinmg.numWorkers(block);
         LogPrint("thin", "requesting %s from peer %d (%d of %d parallel)\n",
@@ -116,13 +128,6 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch) {
         nodestate->thinblock->addWork(block);
         return true;
     }
-
-    // Request headers preceding the announced block (if any), so by the time
-    // the full block arrives, the header chain leading up to it is already
-    // validated. Not doing this will result in block being discarded and
-    // re-downloaded later.
-    if (!hasBlockData() && !blockHeaderIsKnown() && !blocksInFlight.isInFlight(block))
-        requestHeaders(from, block);
 
     if (s == DONT_DOWNL)
         return false;
@@ -171,12 +176,52 @@ bool blocksConnect(const std::vector<uint256>& blocksToAnnounce) {
     return true;
 }
 
+// Best effort guess on if the headers we want to announce will connect at
+// peer. This is to avoid unconnecting headers situtation where the node
+// may misbehave us.
+static bool headerConnectsAtNode(
+        const NodeStatePtr& state, const uint256& toAnnounceHash, NodeId id)
+{
+    auto blockIter = mapBlockIndex.find(toAnnounceHash);
+    if (blockIter == end(mapBlockIndex))
+        return false;
+
+    CBlockIndex* toAnnounceBlock = blockIter->second;
+
+    auto getHeight = [](CBlockIndex* b) {
+        return b ? b->nHeight : 0;
+    };
+
+    int bestSent = getHeight(state->bestHeaderSent);
+    int bestKnown = getHeight(state->pindexBestKnownBlock);
+    int toAnnounce = getHeight(toAnnounceBlock);
+
+    if (toAnnounce > (bestSent + 1) && toAnnounce > (bestKnown + 1)) {
+        LogPrint("ann", "ann: skipping header announcement, "
+                "guessing that it won't connect. "
+                "heights - announce: %d best sent: %d best known: %d peer=%d\n",
+                toAnnounce, bestSent, bestKnown, id);
+        return false;
+    }
+    return true;
+}
+
 bool BlockAnnounceSender::canAnnounceWithHeaders() const {
+
+    if (to.blocksToAnnounce.empty())
+        return false;
 
     // Set too many blocks to announce. In this corner case
     // we revert to announcing blocks as inv even though
     // peer prefers header announcements.
     if (to.blocksToAnnounce.size() > MAX_BLOCKS_TO_ANNOUNCE)
+        return false;
+
+    NodeStatePtr state(to.id);
+    if (state.IsNull())
+        return false;
+
+    if (!headerConnectsAtNode(state, to.blocksToAnnounce.at(0), to.id))
         return false;
 
     // If we come across any

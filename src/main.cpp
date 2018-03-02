@@ -320,6 +320,10 @@ struct MarkBlockAsInFlight : public BlockInFlightMarker {
         nQueuedValidatedHeaders += newentry.fValidatedHeaders;
         list<QueuedBlock>::iterator it = state->vBlocksInFlight.insert(state->vBlocksInFlight.end(), newentry);
         state->nBlocksInFlight++;
+        if (state->nBlocksInFlight > MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
+            LogPrintf("Warning: Too many blocks in flight (%d of max %d) for peer=%d\n",
+                      state->nBlocksInFlight, MAX_BLOCKS_IN_TRANSIT_PER_PEER, nodeid);
+        }
         state->nBlocksInFlightValidHeaders += newentry.fValidatedHeaders;
         blocksInFlight.insert(it);
     };
@@ -5418,10 +5422,11 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         MarkBlockAsInFlight inFlight;
         DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight, CheckBlockIndex);
 
-        if (p.requestConnectHeaders(headers.at(0), *pfrom))
+        if (p.requestConnectHeaders(headers.at(0), *pfrom, true)) {
             // headers don't connect to active chain, requested
             // new headers to connect.
             return true;
+        }
 
         try {
             p(headers, nCount == MAX_HEADERS_RESULTS, true);
@@ -5483,7 +5488,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         MarkBlockAsInFlight inFlight;
         DefaultHeaderProcessor p(pfrom, blocksInFlight, thinblockmg, inFlight, CheckBlockIndex);
 
-        if (p.requestConnectHeaders(block.GetBlockHeader(), *pfrom)) {
+        if (p.requestConnectHeaders(block.GetBlockHeader(), *pfrom, true)) {
             LogPrintf("Received block %s from peer=%d, but headers do "
                     "not connect. Discarding.\n",
                     inv.hash.ToString(), pfrom->id);

@@ -26,7 +26,7 @@ class BlockProcessor {
         CNode& from;
         ThinBlockWorker& worker;
         virtual void misbehave(int howmuch, const std::string& what);
-        bool requestConnectHeaders(const CBlockHeader&);
+        bool requestConnectHeaders(const CBlockHeader&, bool bumpUnconnecting);
         CBlockIndex* processHeader(const CBlockHeader& header, bool maybeAnnouncement);
 
     private:

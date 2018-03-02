@@ -160,7 +160,10 @@ void DefaultHeaderProcessor::suggestDownload(const std::vector<CBlockIndex*>& to
 //
 // Return: If header request was needed. In this case,
 // the current header cannot be processed.
-bool DefaultHeaderProcessor::requestConnectHeaders(const CBlockHeader& h, CNode& from) {
+bool DefaultHeaderProcessor::requestConnectHeaders(const CBlockHeader& h,
+                                                   CNode& from,
+                                                   bool bumpUnconnecting)
+{
     if (headerConnects(h))
         return false;
 
@@ -169,12 +172,15 @@ bool DefaultHeaderProcessor::requestConnectHeaders(const CBlockHeader& h, CNode&
     LogPrint("net", "Headers for %s do not connect. We don't have pprev %s peer=%d\n",
             h.GetHash().ToString(), h.hashPrevBlock.ToString(), from.id);
 
-    NodeStatePtr(from.id)->unconnectingHeaders++;
 
     from.PushMessage("getheaders",
             chainActive.GetLocator(pindexBestHeader), uint256());
 
-    if (NodeStatePtr(from.id)->unconnectingHeaders % MAX_UNCONNECTING_HEADERS == 0)
+    if (!bumpUnconnecting)
+        return true;
+
+    int unconnecting = ++NodeStatePtr(from.id)->unconnectingHeaders;
+    if (unconnecting % MAX_UNCONNECTING_HEADERS == 0)
         Misbehaving(from.id, 20, "unconnecting-headers");
 
     return true;

@@ -46,7 +46,7 @@ struct DummyHeaderProcessor : public BlockHeaderProcessor {
         index.nHeight = 2;
         return &index;
     }
-    bool requestConnectHeaders(const CBlockHeader& h, CNode& from) override {
+    bool requestConnectHeaders(const CBlockHeader& h, CNode& from, bool) override {
         return false;
     }
     bool headerOK;
@@ -82,7 +82,7 @@ struct DummyXThinProcessor : public XThinBlockProcessor {
         BlockHeaderProcessor& h) : XThinBlockProcessor(f, w, h), misbehaved(0)
     { }
 
-    virtual void misbehave(int howmuch) {
+    void misbehave(int howmuch, const std::string&) override {
         misbehaved += howmuch;
     }
     int misbehaved;

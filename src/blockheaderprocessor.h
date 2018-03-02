@@ -23,7 +23,8 @@ class BlockHeaderProcessor {
                 bool peerSentMax,
                 bool maybeAnnouncement) = 0;
         virtual ~BlockHeaderProcessor() = 0;
-        virtual bool requestConnectHeaders(const CBlockHeader& h, CNode& from) = 0;
+        virtual bool requestConnectHeaders(const CBlockHeader& h, CNode& from,
+                                           bool bumpUnconnecting) = 0;
 };
 inline BlockHeaderProcessor::~BlockHeaderProcessor() { }
 
@@ -39,7 +40,8 @@ class DefaultHeaderProcessor : public BlockHeaderProcessor {
                 bool peerSentMax,
                 bool maybeAnnouncement) override;
 
-        bool requestConnectHeaders(const CBlockHeader& h, CNode& from) override;
+        bool requestConnectHeaders(const CBlockHeader& h, CNode& from,
+                                   bool bumpUnconnecting) override;
 
     protected:
          CBlockIndex* acceptHeaders(

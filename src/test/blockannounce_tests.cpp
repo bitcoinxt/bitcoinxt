@@ -220,6 +220,19 @@ BOOST_AUTO_TEST_CASE(dowl_strategy_dont_dowl_5) {
             ann.pickDownloadStrategy());
 }
 
+BOOST_AUTO_TEST_CASE(dowl_strategy_dont_dowl_6) {
+
+    // Don't download a block from a peer if there are unconnecting headers
+
+    nodestate->unconnectingHeaders = 1;
+    BOOST_CHECK_EQUAL(BlockAnnounceReceiver::DONT_DOWNL,
+            ann.pickDownloadStrategy());
+
+    nodestate->unconnectingHeaders = 0;
+    BOOST_CHECK_EQUAL(BlockAnnounceReceiver::DOWNL_FULL_NOW,
+            ann.pickDownloadStrategy());
+}
+
 /// Helper class to check if request block is called.
 struct RequestBlockWorker : public DummyThinWorker {
     RequestBlockWorker(ThinBlockManager& mg, NodeId id)
@@ -246,9 +259,8 @@ BOOST_AUTO_TEST_CASE(onannounced_downl_thin) {
     BOOST_CHECK(ann.onBlockAnnounced(r));
     BOOST_CHECK_EQUAL(1, worker->reqs);
 
-    // thin blocks come with a header, we should not
-    // have requested headers.
-    BOOST_CHECK_EQUAL(size_t(0), node.messages.size());
+    // we should request headers also, to avoid unconnected headers
+    BOOST_CHECK_EQUAL("getheaders", node.messages.at(0));
 }
 
 BOOST_AUTO_TEST_CASE(onannounced_downl_full) {
@@ -395,6 +407,40 @@ BOOST_AUTO_TEST_CASE(canAnnounceWithHeaders_canconnect) {
         SetTipRAII activeTip(&entry2.index);
         BOOST_CHECK(ann.canAnnounceWithHeaders());
     }
+}
+
+BOOST_AUTO_TEST_CASE(canAnnounceWithHeaders_connectAtNode) {
+    DummyBlockIndexEntry entry1(uint256S("0xBAD"));
+    DummyBlockIndexEntry entry2(uint256S("0xBEEF"));
+    DummyBlockIndexEntry entry3(uint256S("0xF00D"));
+    entry2.index.pprev = &entry1.index;
+    entry3.index.pprev = &entry2.index;
+
+    int height = 0;
+    entry1.index.nHeight = height++;
+    entry2.index.nHeight = height++;
+    entry3.index.nHeight = height++;
+
+    SetTipRAII activeTip(&entry3.index);
+
+    NodeStatePtr state(to.id);
+    state->prefersHeaders = true;
+
+    // entry2 connects with bestHeaderSent
+    state->pindexBestKnownBlock = nullptr;
+    state->bestHeaderSent = &entry1.index;
+    to.blocksToAnnounce = { entry2.hash, entry3.hash };
+    BOOST_CHECK(ann.canAnnounceWithHeaders());
+
+    // entry2 connects with pindexBestKnownBlock
+    std::swap(state->pindexBestKnownBlock, state->bestHeaderSent);
+    BOOST_CHECK(ann.canAnnounceWithHeaders());
+
+    // entry3 by itself doesn't connect on node
+    to.blocksToAnnounce = { entry3.hash };
+    BOOST_CHECK(!ann.canAnnounceWithHeaders());
+    std::swap(state->pindexBestKnownBlock, state->bestHeaderSent);
+    BOOST_CHECK(!ann.canAnnounceWithHeaders());
 }
 
 BOOST_AUTO_TEST_CASE(announce_with_headers) {

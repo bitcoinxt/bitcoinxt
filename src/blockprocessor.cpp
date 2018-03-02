@@ -78,8 +78,8 @@ bool BlockProcessor::setToWork(const CBlockHeader& header, int activeChainHeight
     }
 }
 
-bool BlockProcessor::requestConnectHeaders(const CBlockHeader& header) {
-    bool needPrevHeaders = headerProcessor.requestConnectHeaders(header, from);
+bool BlockProcessor::requestConnectHeaders(const CBlockHeader& header, bool bumpUnconnecting) {
+    bool needPrevHeaders = headerProcessor.requestConnectHeaders(header, from, bumpUnconnecting);
 
     if (needPrevHeaders) {
         // We don't have previous block. We can't connect it to the chain.
