@@ -85,7 +85,7 @@ std::vector<ThinTx> CompactStub::allTransactions() const {
             ++offset;
 
         all.at(i + offset) = ThinTx(block.shorttxids.at(i),
-                    block.shorttxidk0, block.shorttxidk1);
+			{ block.shorttxidk0, block.shorttxidk1 });
     }
 
     for (size_t i = 0; i < all.size(); ++i) {

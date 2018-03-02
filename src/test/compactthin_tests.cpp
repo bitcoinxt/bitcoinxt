@@ -77,7 +77,7 @@ BOOST_AUTO_TEST_CASE(ids_are_correct) {
                 thin.shorttxidk0, thin.shorttxidk1,
                 testblock.vtx[i].GetHash());
 
-        BOOST_CHECK_EQUAL(shortID, all[i].obfuscated());
+        BOOST_CHECK_EQUAL(shortID, all[i].shortid());
     }
 }
 

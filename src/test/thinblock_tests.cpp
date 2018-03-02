@@ -11,6 +11,7 @@ BOOST_AUTO_TEST_CASE(thintx_init) {
     ThinTx a = ThinTx::Null();
     BOOST_CHECK(!a.hasFull());
     BOOST_CHECK(!a.hasCheap());
+    BOOST_CHECK(!a.hasShortid());
     BOOST_CHECK(a.isNull());
 
     ThinTx b = ThinTx(uint256S("0xCBA"));
@@ -19,11 +20,23 @@ BOOST_AUTO_TEST_CASE(thintx_init) {
     BOOST_CHECK(b.hasCheap());
     BOOST_CHECK(b.cheap() == uint256S("0xCBA").GetCheapHash());
     BOOST_CHECK(!b.isNull());
+    BOOST_CHECK(!b.hasShortid());
 
-    ThinTx c = ThinTx(GetShortID(0xabc, 0xbbc, uint256S("0xCBA")), 0xabc, 0xbcc);
+    std::pair<uint64_t, uint64_t> idk = {0xabc, 0xbcc};
+    uint64_t shortid = GetShortID(idk, uint256S("0xCBA"));
+    ThinTx c = ThinTx(shortid, idk);
     BOOST_CHECK(!c.hasFull());
     BOOST_CHECK(!c.hasCheap());
+    BOOST_CHECK(c.hasShortid());
+    BOOST_CHECK(c.shortid() == shortid);
     BOOST_CHECK(!c.isNull());
+
+    ThinTx d = ThinTx(uint256S("0xCBA"), idk);
+    BOOST_CHECK(d.hasFull());
+    BOOST_CHECK(d.hasCheap());
+    BOOST_CHECK(d.hasShortid());
+    BOOST_CHECK(d.shortid() == shortid);
+    BOOST_CHECK(!d.isNull());
 }
 
 BOOST_AUTO_TEST_CASE(thintx_equal) {
@@ -32,8 +45,7 @@ BOOST_AUTO_TEST_CASE(thintx_equal) {
     ThinTx b = ThinTx::Null();
     ThinTx c = ThinTx(uint256S("0xCBA"));
 
-    const uint64_t idk0_a = 0xf00;
-    const uint64_t idk1_a = 0xbaa;
+    const std::pair<uint64_t, uint64_t> idk = {0xf00, 0xbaa};
 
     // null
     BOOST_CHECK(a.equals(b));
@@ -48,19 +60,13 @@ BOOST_AUTO_TEST_CASE(thintx_equal) {
     BOOST_CHECK(a.equals(b));
     BOOST_CHECK(!a.equals(ThinTx(c.cheap())));
 
-    a = b = ThinTx(GetShortID(
-        idk0_a, idk1_a, uint256S("0xABC")),
-        idk0_a, idk1_a);
+    a = b = ThinTx(GetShortID(idk, uint256S("0xABC")), idk);
 
     BOOST_CHECK(a.equals(b));
-    c = ThinTx(GetShortID(
-        0xfefe, 0xbaba, uint256S("0xABC")),
-        0xfefe, 0xbaba);
+    c = ThinTx(GetShortID({0xfefe, 0xbaba}, uint256S("0xABC")), {0xfefe, 0xbaba});
     BOOST_CHECK(!a.equals(c));
     BOOST_CHECK(!c.equals(a));
-    c = ThinTx(GetShortID(
-        idk0_a, idk1_a, uint256S("0xCBA")),
-        idk0_a, idk1_a);
+    c = ThinTx(GetShortID(idk, uint256S("0xCBA")), idk);
     BOOST_CHECK(!c.equals(a));
 
 
@@ -73,10 +79,8 @@ BOOST_AUTO_TEST_CASE(thintx_equal) {
     BOOST_CHECK(!a.equals(b));
     BOOST_CHECK(!b.equals(a));
 
-    // full vs obfuscated
-    a = ThinTx(GetShortID(
-        0xfefe, 0xbaba, uint256S("0xABC")),
-        0xfefe, 0xbaba);
+    // full vs shortid
+    a = ThinTx(GetShortID({0xfefe, 0xbaba}, uint256S("0xABC")), {0xfefe, 0xbaba});
     b = ThinTx(uint256S("0xABC"));
     BOOST_CHECK(a.equals(b));
 }

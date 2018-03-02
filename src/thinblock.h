@@ -21,41 +21,47 @@ class CBlockHeader;
 // ThisTx is an encapsulation for all the formats.
 class ThinTx {
 public:
+    // assumes !full.IsNull()
     ThinTx(const uint256& full);
     ThinTx(const uint64_t& cheap);
-    ThinTx(const uint64_t& obfuscated,
-            const uint64_t& idk0, const uint64_t& idk1);
-    static ThinTx Null() { return ThinTx(uint256()); }
+    ThinTx(const uint64_t& shortid, const std::pair<uint64_t, uint64_t>& idk);
+    // assumes !full.IsNull()
+    ThinTx(const uint256& full, const std::pair<uint64_t, uint64_t>& idk);
+    static ThinTx Null() { return ThinTx(uint64_t(0)); }
 
     // If it is known that tx is the same as this
     // one, grab any additional info possible.
     void merge(const ThinTx& tx);
 
-    bool hasFull() const;
-    const uint256& full() const;
-    const uint64_t& cheap() const;
-    uint64_t obfuscated() const;
-    bool hasCheap() const { return cheap_ != 0; }
+    bool hasFull() const { return hasFull_; }
+    const uint256& full() const { return full_; }
+
+    bool hasCheap() const { return cheap_ != 0 || hasFull(); }
+    uint64_t cheap() const;
+
+    bool hasShortid() const { return shortid_.id != 0; }
+    uint64_t shortid() const { return shortid_.id; }
+    const std::pair<uint64_t, uint64_t>& shortidIdk() const {
+        return shortid_.idk;
+    }
 
     bool isNull() const {
-        return !hasFull() && !hasCheap() && !hasObfuscated();
+        return !hasFull() && !hasCheap() && !hasShortid();
     }
 
     bool equals(const ThinTx& b) const;
-    bool equals(const uint256& b) const;
 
 private:
-
-    uint256 full_; //< Bundled/prefilled transactions have known full hash.
-    uint64_t cheap_; //< Used by xthin
+    // Bundled/prefilled transactions have known full hash
+    uint256 full_;
+    bool hasFull_ = false;
+    // Used by xthin, mutable to allow lazy creation
+    mutable uint64_t cheap_ = 0;
+    // Used by compact blocks
     struct {
         uint64_t id;
-        uint64_t idk0;
-        uint64_t idk1;
-    } obfuscated_; //< Used by compact thin
-
-    bool hasObfuscated() const;
-
+        std::pair<uint64_t, uint64_t> idk;
+    } shortid_;
 };
 
 struct StubData {
