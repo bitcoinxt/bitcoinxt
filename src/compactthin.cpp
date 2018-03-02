@@ -3,9 +3,11 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "compactthin.h"
-#include "protocol.h"
+#include "blockencodings.h"
 #include "net.h"
+#include "protocol.h"
 #include "util.h"
+
 #include <sstream>
 
 CompactWorker::CompactWorker(ThinBlockManager& m, NodeId n) :
