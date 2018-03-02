@@ -26,6 +26,12 @@ uint64_t GetShortID(
     return SipHashUint256(shorttxidk0, shorttxidk1, txhash) & 0xffffffffffffL;
 }
 
+uint64_t GetShortID(
+        const std::pair<uint64_t, uint64_t>& idk, const uint256& txhash)
+{
+    return GetShortID(idk.first, idk.second, txhash);
+}
+
 CompactBlock::CompactBlock(const CBlock& block, const CompactPrefiller& prefiller) :
         nonce(GetRand(std::numeric_limits<uint64_t>::max())), header(block)
 {

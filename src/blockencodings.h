@@ -16,6 +16,10 @@ uint64_t GetShortID(
         const uint64_t& shorttxidk1,
         const uint256& txhash);
 
+uint64_t GetShortID(
+        const std::pair<uint64_t, uint64_t>& shorttxidk,
+        const uint256& txhash);
+
 class CTxMemPool;
 
 class CompactReRequest {
