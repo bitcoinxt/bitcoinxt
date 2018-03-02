@@ -66,6 +66,12 @@ const CMessageHeader::MessageStartChars& CChainParams::DBMagic() const {
     return pchMessageStart;
 }
 
+bool CChainParams::RequireStandard() const {
+    // the acceptnonstdtxn flag can only be used to narrow the behavior.
+    // A blockchain whose default is to allow nonstandard txns can be configured to disallow them.
+    return fRequireStandard || !GetArg("-acceptnonstdtxn", true);
+}
+
 /**
  * Main network
  */
