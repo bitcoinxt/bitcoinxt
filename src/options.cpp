@@ -56,8 +56,10 @@ std::vector<std::string> Opt::UAComment(bool validate) {
 int Opt::ScriptCheckThreads() {
     // -par=0 means autodetect, but nScriptCheckThreads==0 means no concurrency
     int nScriptCheckThreads = Args->GetArg("-par", DEFAULT_SCRIPTCHECK_THREADS);
-    if (nScriptCheckThreads <= 0)
-        nScriptCheckThreads += GetNumCores();
+    if (nScriptCheckThreads <= 0) {
+        static int numCores = GetNumCores();
+        nScriptCheckThreads += numCores;
+    }
     if (nScriptCheckThreads <= 1)
         nScriptCheckThreads = 0;
     else if (nScriptCheckThreads > MAX_SCRIPTCHECK_THREADS)
