@@ -906,7 +906,7 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     // If we specified an override but that override was not accepted then its an error
     if (fStandard != Params().RequireStandard())
         return InitError(
-            strprintf("acceptnonstdtxn is not currently supported for %s chain", chainparams.NetworkIDString()));
+            strprintf("-acceptnonstdtxn is not currently supported for %s chain", chainparams.NetworkIDString()));
 
 #ifdef ENABLE_WALLET
     if (mapArgs.count("-mintxfee"))
