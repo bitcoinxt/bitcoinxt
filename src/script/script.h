@@ -7,6 +7,7 @@
 #define BITCOIN_SCRIPT_SCRIPT_H
 
 #include "crypto/common.h"
+#include "serialize.h"
 
 #include <assert.h>
 #include <climits>
@@ -363,8 +364,10 @@ private:
     int64_t m_value;
 };
 
+using CScriptBase = std::vector<uint8_t>;
+
 /** Serialized script, used inside transaction inputs and outputs */
-class CScript : public std::vector<unsigned char>
+class CScript : public CScriptBase
 {
 protected:
     CScript& push_int64(int64_t n)
@@ -385,9 +388,16 @@ protected:
     }
 public:
     CScript() { }
-    CScript(const CScript& b) : std::vector<unsigned char>(b.begin(), b.end()) { }
-    CScript(const_iterator pbegin, const_iterator pend) : std::vector<unsigned char>(pbegin, pend) { }
-    CScript(const unsigned char* pbegin, const unsigned char* pend) : std::vector<unsigned char>(pbegin, pend) { }
+    CScript(const CScript& b) : CScriptBase(b.begin(), b.end()) { }
+    CScript(const_iterator pbegin, const_iterator pend) : CScriptBase(pbegin, pend) { }
+    CScript(const unsigned char* pbegin, const unsigned char* pend) : CScriptBase(pbegin, pend) { }
+
+    ADD_SERIALIZE_METHODS;
+
+    template <typename Stream, typename Operation>
+    inline void SerializationOp(Stream& s, Operation ser_action) {
+        READWRITE(static_cast<CScriptBase&>(*this));
+    }
 
     CScript& operator+=(const CScript& b)
     {
