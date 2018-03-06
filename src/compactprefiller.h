@@ -33,7 +33,7 @@ public:
 
 struct PrefilledTransaction {
     // Used as an offset since last prefilled tx in CompactBlock,
-    uint16_t index;
+    uint32_t index;
     CTransaction tx;
 
     ADD_SERIALIZE_METHODS;
@@ -42,8 +42,8 @@ struct PrefilledTransaction {
     inline void SerializationOp(Stream& s, Operation ser_action, int nType, int nVersion) {
         uint64_t idx = index;
         READWRITE(COMPACTSIZE(idx));
-        if (idx > std::numeric_limits<uint16_t>::max())
-            throw std::ios_base::failure("index overflowed 16-bits");
+        if (idx > std::numeric_limits<uint32_t>::max())
+            throw std::ios_base::failure("index overflowed 32-bits");
         index = idx;
         READWRITE(REF(TransactionCompressor(tx)));
     }

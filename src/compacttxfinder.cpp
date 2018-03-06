@@ -35,14 +35,13 @@ CTransaction CompactTxFinder::operator()(const ThinTx& hash) const {
 
     CTransaction match;
 
-    if (!mappedMempool.count(hash.obfuscated()))
+    if (!mappedMempool.count(hash.shortid()))
         return match;
 
-    uint256 realHash = mappedMempool.find(hash.obfuscated())->second;
+    uint256 realHash = mappedMempool.find(hash.shortid())->second;
 
     // Tx may not exist anymore in mempool.
     // Lookup leaves match empty if it does not.
     mempool.lookup(realHash, match);
     return match;
 }
-

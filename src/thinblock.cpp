@@ -1,4 +1,4 @@
-// Copyright (c) 2015-2016 The Bitcoin XT developers
+// Copyright (c) 2015-2018 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "thinblock.h"
@@ -9,21 +9,28 @@
 #include <sstream>
 
 
-ThinTx::ThinTx(const uint256& h) : full_(h), cheap_(h.GetCheapHash())
+ThinTx::ThinTx(const uint256& full) : full_(full), hasFull_(true)
 {
-    obfuscated_.id = 0;
+    shortid_.id = 0;
 }
 
-ThinTx::ThinTx(const uint64_t& h) : cheap_(h)
+ThinTx::ThinTx(const uint64_t& cheap) : cheap_(cheap)
 {
-    obfuscated_.id = 0;
+    shortid_.id = 0;
 }
 
-ThinTx::ThinTx(const uint64_t& id,
-        const uint64_t& idk0, const uint64_t& idk1) : cheap_(0) {
-    obfuscated_.id = id;
-    obfuscated_.idk0 = idk0;
-    obfuscated_.idk1 = idk1;
+ThinTx::ThinTx(const uint64_t& shortid,
+               const std::pair<uint64_t, uint64_t>& idk)
+{
+    shortid_.id = shortid;
+    shortid_.idk = idk;
+}
+
+ThinTx::ThinTx(const uint256& full, const std::pair<uint64_t, uint64_t>& idk)
+    : full_(full), hasFull_(true)
+{
+    shortid_.idk = idk;
+    shortid_.id = GetShortID(idk.first, idk.second, full);
 }
 
 void ThinTx::merge(const ThinTx& tx) {
@@ -32,92 +39,63 @@ void ThinTx::merge(const ThinTx& tx) {
 
     if (tx.hasFull()) {
         full_ = tx.full();
-        cheap_ = tx.cheap();
         return;
     }
 
     if (!hasCheap() && tx.hasCheap())
         cheap_ = tx.cheap();
 
-    if (hasObfuscated())
+    if (hasShortid())
         return;
 
-    if (!tx.hasObfuscated())
+    if (!tx.hasShortid())
         return;
 
-    obfuscated_ = tx.obfuscated_;
+    shortid_ = tx.shortid_;
 }
 
-bool ThinTx::hasFull() const {
-    return !full_.IsNull();
-}
-
-const uint256& ThinTx::full() const {
-    if (!hasFull())
-        throw std::runtime_error("full hash not available");
-    return full_;
-}
-
-const uint64_t& ThinTx::cheap() const {
-    if (cheap_ == 0)
-        throw std::runtime_error("cheap hash not available");
+uint64_t ThinTx::cheap() const {
+    if (cheap_ == 0 && hasFull())
+        cheap_ = full_.GetCheapHash();
 
     return cheap_;
 }
 
-uint64_t ThinTx::obfuscated() const {
-    if (obfuscated_.id == 0)
-        throw std::runtime_error("obfuscated hash not available");
-    return obfuscated_.id;
-}
-
-bool ThinTx::hasObfuscated() const {
-    return obfuscated_.id != 0;
-}
-
+// Returns false if transactions don't match OR if it's indeterminate.
 bool ThinTx::equals(const ThinTx& b) const {
+    const ThinTx& a = *this;
+    const bool a_hasShortid = a.hasShortid();
+    const bool b_hasShortid = b.hasShortid();
 
-    const bool indeterminate = false; //< can't know if txs equal or not
-
-    if (isNull() && b.isNull())
-        return true;
-
-    if (isNull() || b.isNull())
-        return false;
-
-    if (hasFull() && b.hasFull())
-        return full() == b.full();
-
-    if (hasCheap() && b.hasCheap())
-        return cheap() == b.cheap();
-
-    if (hasObfuscated() && b.hasFull())
-        return obfuscated_.id == GetShortID(
-                obfuscated_.idk0, obfuscated_.idk1, b.full());
-
-    if (hasFull() && b.hasObfuscated())
-        return b.obfuscated_.id == GetShortID(
-                b.obfuscated_.idk0, b.obfuscated_.idk1, full());
-
-    if (hasObfuscated() && b.hasObfuscated()) {
-
-        if (obfuscated_.idk0 != b.obfuscated_.idk0)
-            return indeterminate;
-
-        if (obfuscated_.idk1 != b.obfuscated_.idk1)
-            return indeterminate;
-
-        return obfuscated_.id == b.obfuscated_.id;
+    if (a_hasShortid && b_hasShortid) {
+        if (a.shortid_.idk != b.shortid_.idk)
+        {
+            // different salt, indeterminate, continue to try other comparisons.
+        }
+        else {
+            return shortid_.id == b.shortid_.id;
+        }
     }
 
-    if (hasObfuscated() || b.hasObfuscated())
-        return indeterminate;
+    const bool a_hasFull = a.hasFull();
+    if (a_hasFull && b_hasShortid)
+        return b.shortid_.id == GetShortID(b.shortid_.idk, a.full_);
 
-    assert(!"ThinTx::equals");
-}
+    const bool b_hasFull = b.hasFull();
+    if (a_hasShortid && b_hasFull)
+        return a.shortid_.id == GetShortID(a.shortid_.idk, b.full_);
 
-bool ThinTx::equals(const uint256& b) const {
-    return equals(ThinTx(b));
+    if (a_hasFull && b_hasFull)
+        return a.full_ == b.full_;
+
+    const bool a_hasCheap = a_hasFull || a.hasCheap();
+    const bool b_hasCheap = b_hasFull || b.hasCheap();
+
+    if (a_hasCheap && b_hasCheap)
+        return cheap() == b.cheap();
+
+    // same as a.isNull() && b.isNull()
+    return !(a_hasFull | b_hasFull | a_hasCheap | b_hasCheap | a_hasShortid | b_hasShortid);
 }
 
 ThinBlockWorker::ThinBlockWorker(ThinBlockManager& m, NodeId n) :

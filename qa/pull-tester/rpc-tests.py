@@ -146,7 +146,8 @@ testScriptsExt = [
     'rawtransactions.py',
     'p2p-acceptblock.py',
     'p2p-compactblocks.py',
-    'mempool_packages.py'
+    'mempool_packages.py',
+    'p2p-compactblocks-limits.py',
 ]
 
 

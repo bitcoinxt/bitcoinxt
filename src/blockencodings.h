@@ -16,13 +16,17 @@ uint64_t GetShortID(
         const uint64_t& shorttxidk1,
         const uint256& txhash);
 
+uint64_t GetShortID(
+        const std::pair<uint64_t, uint64_t>& shorttxidk,
+        const uint256& txhash);
+
 class CTxMemPool;
 
 class CompactReRequest {
 public:
     // A CompactReRequest message
     uint256 blockhash;
-    std::vector<uint16_t> indexes;
+    std::vector<uint32_t> indexes;
 
     ADD_SERIALIZE_METHODS;
 
@@ -38,16 +42,16 @@ public:
                 for (; i < indexes.size(); i++) {
                     uint64_t index = 0;
                     READWRITE(COMPACTSIZE(index));
-                    if (index > std::numeric_limits<uint16_t>::max())
-                        throw std::ios_base::failure("index overflowed 16 bits");
+                    if (index > std::numeric_limits<uint32_t>::max())
+                        throw std::ios_base::failure("index overflowed 32 bits");
                     indexes[i] = index;
                 }
             }
 
-            uint16_t offset = 0;
+            uint32_t offset = 0;
             for (size_t i = 0; i < indexes.size(); i++) {
-                if (uint64_t(indexes[i]) + uint64_t(offset) > std::numeric_limits<uint16_t>::max())
-                    throw std::ios_base::failure("indexes overflowed 16 bits");
+                if (uint64_t(indexes[i]) + uint64_t(offset) > std::numeric_limits<uint32_t>::max())
+                    throw std::ios_base::failure("indexes overflowed 32 bits");
                 indexes[i] = indexes[i] + offset;
                 offset = indexes[i] + 1;
             }
@@ -69,11 +73,11 @@ public:
     CompactReReqResponse(const CompactReRequest& req) :
         blockhash(req.blockhash), txn(req.indexes.size()) {}
 
-    CompactReReqResponse(const CBlock& block, const std::vector<uint16_t>& indexes) {
+    CompactReReqResponse(const CBlock& block, const std::vector<uint32_t>& indexes) {
         blockhash = block.GetHash();
         if (indexes.size() > block.vtx.size())
             throw std::invalid_argument("request more transactions than are in a block");
-        for (uint16_t i : indexes) {
+        for (uint32_t i : indexes) {
             if (i >= block.vtx.size())
                 throw std::invalid_argument("out of bound tx in rerequest");
             txn.push_back(block.vtx.at(i));

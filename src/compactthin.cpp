@@ -3,9 +3,11 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "compactthin.h"
-#include "protocol.h"
+#include "blockencodings.h"
 #include "net.h"
+#include "protocol.h"
 #include "util.h"
+
 #include <sstream>
 
 CompactWorker::CompactWorker(ThinBlockManager& m, NodeId n) :
@@ -83,7 +85,7 @@ std::vector<ThinTx> CompactStub::allTransactions() const {
             ++offset;
 
         all.at(i + offset) = ThinTx(block.shorttxids.at(i),
-                    block.shorttxidk0, block.shorttxidk1);
+			{ block.shorttxidk0, block.shorttxidk1 });
     }
 
     for (size_t i = 0; i < all.size(); ++i) {

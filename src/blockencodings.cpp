@@ -4,15 +4,15 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "blockencodings.h"
+#include "chainparams.h"
 #include "consensus/consensus.h"
 #include "consensus/validation.h"
-#include "chainparams.h"
 #include "hash.h"
+#include "main.h"
 #include "maxblocksize.h"
 #include "random.h"
 #include "streams.h"
 #include "txmempool.h"
-#include "main.h"
 #include "util.h"
 
 #include <unordered_map>
@@ -24,6 +24,12 @@ uint64_t GetShortID(
 {
     static_assert(CompactBlock::SHORTTXIDS_LENGTH == 6, "shorttxids calculation assumes 6-byte shorttxids");
     return SipHashUint256(shorttxidk0, shorttxidk1, txhash) & 0xffffffffffffL;
+}
+
+uint64_t GetShortID(
+        const std::pair<uint64_t, uint64_t>& idk, const uint256& txhash)
+{
+    return GetShortID(idk.first, idk.second, txhash);
 }
 
 CompactBlock::CompactBlock(const CBlock& block, const CompactPrefiller& prefiller) :
@@ -83,16 +89,16 @@ void validateCompactBlock(const CompactBlock& cmpctblock, uint64_t currMaxBlockS
 
     validateNumTxs(cmpctblock.shorttxids.size() + cmpctblock.prefilledtxn.size(), currMaxBlockSize);
 
-    int32_t lastprefilledindex = -1;
+    int64_t lastprefilledindex = -1;
     for (size_t i = 0; i < cmpctblock.prefilledtxn.size(); i++) {
         if (cmpctblock.prefilledtxn[i].tx.IsNull())
             throw std::invalid_argument("null tx in compact block");
 
-        lastprefilledindex += cmpctblock.prefilledtxn[i].index + 1; //index is a uint16_t, so cant overflow here
-        if (lastprefilledindex > std::numeric_limits<uint16_t>::max())
+        lastprefilledindex += static_cast<uint64_t>(cmpctblock.prefilledtxn[i].index) + 1; //index is a uint32_t, so cant overflow here
+        if (lastprefilledindex > std::numeric_limits<uint32_t>::max())
             throw std::invalid_argument("tx index overflows");
 
-        if (static_cast<uint32_t>(lastprefilledindex) > cmpctblock.shorttxids.size() + i) {
+        if (static_cast<uint64_t>(lastprefilledindex) > cmpctblock.shorttxids.size() + i) {
             // If we are inserting a tx at an index greater than our full list of shorttxids
             // plus the number of prefilled txn we've inserted, then we have txn for which we
             // have neither a prefilled txn or a shorttxid!

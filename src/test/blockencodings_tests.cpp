@@ -7,6 +7,7 @@
 #include "chainparams.h"
 #include "random.h"
 #include "pow.h"
+#include "maxblocksize.h"
 
 #include "test/test_bitcoin.h"
 #include "test/thinblockutil.h"
@@ -41,10 +42,19 @@ BOOST_AUTO_TEST_CASE(TransactionsRequestSerializationTest) {
     BOOST_CHECK_EQUAL(req1.indexes[3], req2.indexes[3]);
 }
 
+// Predicate for checking exception message contains string
+std::function<bool(const std::invalid_argument&)>
+errorContains(const std::string& str) {
+    return [str](const std::invalid_argument& err) {
+        return std::string(err.what()).find(str) != std::string::npos;
+    };
+}
+
 BOOST_AUTO_TEST_CASE(validate_compact_block) {
     CBlock block = TestBlock1(); // valid block
     CompactBlock a(block, CoinbaseOnlyPrefiller{});
-    uint64_t currMaxBlockSize = 1000000; // 1MB
+    const uint64_t currMaxBlockSize = UAHF_INITIAL_MAX_BLOCK_SIZE;
+    const uint64_t nextMaxBlockSize = NextBlockRaiseCap(currMaxBlockSize);
     BOOST_CHECK_NO_THROW(validateCompactBlock(a, currMaxBlockSize));
 
     // invalid header
@@ -60,13 +70,18 @@ BOOST_AUTO_TEST_CASE(validate_compact_block) {
 
     // overflowing index
     CompactBlock d = a;
-    d.prefilledtxn.at(0).index = std::numeric_limits<uint16_t>::max();
-    BOOST_CHECK_THROW(validateCompactBlock(d, currMaxBlockSize), std::invalid_argument);
+    d.prefilledtxn.push_back(d.prefilledtxn[0]);
+    assert(d.prefilledtxn.size() == size_t(2));
+    d.prefilledtxn.at(0).index = 1;
+    d.prefilledtxn.at(1).index = std::numeric_limits<uint32_t>::max();
+    BOOST_CHECK_EXCEPTION(validateCompactBlock(d, currMaxBlockSize),
+                      std::invalid_argument, errorContains("index overflows"));
 
     // too high index
     CompactBlock e = a;
-    e.prefilledtxn.at(0).index = std::numeric_limits<uint16_t>::max() / 2;
-    BOOST_CHECK_THROW(validateCompactBlock(e, currMaxBlockSize), std::invalid_argument);
+    e.prefilledtxn.at(0).index = std::numeric_limits<uint32_t>::max() / 2;
+    BOOST_CHECK_EXCEPTION(validateCompactBlock(e, currMaxBlockSize),
+                          std::invalid_argument, errorContains("invalid index"));
 
     // no transactions
     CompactBlock f = a;
@@ -76,13 +91,11 @@ BOOST_AUTO_TEST_CASE(validate_compact_block) {
 
     // too big
     CompactBlock g = a;
-    currMaxBlockSize = 1000 * 100; // 100kb (for faster unittest)
-    size_t tooManyTx = std::ceil(currMaxBlockSize * 1.05 / minTxSize()) + 1;
+    size_t tooManyTx = std::ceil(nextMaxBlockSize / minTxSize()) + 1;
     g.prefilledtxn.resize(tooManyTx, g.prefilledtxn.at(0));
     BOOST_CHECK_THROW(validateCompactBlock(g, currMaxBlockSize), std::invalid_argument);
 
     // not too big
-    uint64_t nextMaxBlockSize = currMaxBlockSize * 105 / 100;
     uint64_t nextMaxPrefilled = (nextMaxBlockSize / minTxSize()) - g.shorttxids.size();
     g.prefilledtxn.resize(nextMaxPrefilled);
     BOOST_CHECK_NO_THROW(validateCompactBlock(g, currMaxBlockSize));

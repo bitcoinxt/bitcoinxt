@@ -3,11 +3,26 @@
 
 #include "thinblock.h"
 #include "primitives/block.h"
-#include <boost/shared_ptr.hpp>
+#include "random.h"
+
+#include <unordered_set>
+#include <unordered_map>
+#include <vector>
 
 class CTransaction;
 class CMerkleBlock;
 class XThinBlock;
+
+class IdkHasher {
+    public:
+        IdkHasher() : nonce(GetRand(std::numeric_limits<uint64_t>::max())) { }
+        size_t operator()(const std::pair<uint64_t, uint64_t>& h) const {
+            return h.first ^ h.second ^ nonce;
+        }
+
+    private:
+        uint64_t nonce;
+};
 
 // Assembles a block from it's merkle block and the individual transactions.
 class ThinBlockBuilder {
@@ -39,8 +54,12 @@ class ThinBlockBuilder {
 
     private:
         CBlock thinBlock;
-        std::vector<ThinTx> wantedTxs;
+        std::vector<ThinTx> wanted;
+        std::unordered_set<std::pair<uint64_t, uint64_t>, IdkHasher> wantedIdks;
+        std::unordered_map<uint64_t, std::vector<ThinTx>::iterator> wantedIndex;
         size_t missing;
+
+        void updateWantedIndex();
 };
 
 #endif
