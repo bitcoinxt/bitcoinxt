@@ -40,6 +40,7 @@
 
 #include <algorithm>
 #include <fcntl.h>
+#include <sched.h>
 #include <sys/resource.h>
 #include <sys/stat.h>
 
@@ -853,4 +854,18 @@ void SetThreadPriority(int nPriority)
 int GetNumCores()
 {
     return std::thread::hardware_concurrency();
+}
+
+int ScheduleBatchPriority(void)
+{
+#ifdef SCHED_BATCH
+    const static sched_param param{.sched_priority = 0};
+    if (int ret = pthread_setschedparam(0, SCHED_BATCH, &param)) {
+        LogPrintf("Failed to pthread_setschedparam: %s\n", strerror(errno));
+        return ret;
+    }
+    return 0;
+#else
+    return 1;
+#endif
 }
