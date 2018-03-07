@@ -3500,13 +3500,26 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
     // not process unrequested blocks.
     bool fTooFarAhead = (pindex->nHeight > int(chainActive.Height() + MIN_BLOCKS_TO_KEEP));
 
-    // TODO: deal better with return value and error conditions for duplicate
-    // and unrequested blocks.
-    if (fAlreadyHave) return true;
+    if (fAlreadyHave) {
+        LogPrint("block", "%s: Already have block %s\n", __func__, block.GetHash().ToString());
+        return true;
+    }
     if (!fRequested) {  // If we didn't ask for it:
-        if (pindex->nTx != 0) return true;  // This is a previously-processed block that was pruned
-        if (!fHasMoreWork) return true;     // Don't process less-work chains
-        if (fTooFarAhead) return true;      // Block height is too high
+        if (pindex->nTx != 0) {
+            LogPrint("block", "%s: Block %s was not requested and is a previously-processed block that was pruned\n",
+                     __func__, block.GetHash().ToString());
+            return true;
+        }
+        if (!fHasMoreWork) {
+            LogPrint("block", "%s: Block %s was not requested and is in a less-work chain\n",
+                     __func__, block.GetHash().ToString());
+            return true;
+        }
+        if (fTooFarAhead) {
+            LogPrint("block", "%s: Block %s was not requested and block height is too high\n",
+                     __func__, block.GetHash().ToString());
+            return true;
+        }
     }
 
     if ((!CheckBlock(block, state)) || !ContextualCheckBlock(block, state, pindex->pprev)) {
