@@ -232,6 +232,9 @@ BOOST_AUTO_TEST_CASE(next_block_raise_cap_btc) {
 }
 
 BOOST_AUTO_TEST_CASE(third_hf_bump) {
+    auto arg = new DummyArgGetter; // TODO: Remove in final HF code
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg)); // TODO: Remove in final HF code
+    arg->Set("-thirdhftime", 1526400000); // TODO: Remove in final HF code
 
     auto params = Params(CBaseChainParams::MAIN).GetConsensus();
 

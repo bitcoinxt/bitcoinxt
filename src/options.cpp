@@ -96,7 +96,7 @@ int64_t Opt::ThirdHFTime() const {
         return 0;
 
     // Default to Tuesday, May 15, 2018 4:00:00 PM
-    const int64_t MTP_ACTIVATION = 1526400000;
+    const int64_t MTP_ACTIVATION = 0; // TODO: Set to 1526400000 in the final HF code
     return Args->GetArg("-thirdhftime", MTP_ACTIVATION);
 }
 

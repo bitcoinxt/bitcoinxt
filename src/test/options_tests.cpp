@@ -51,6 +51,8 @@ BOOST_AUTO_TEST_CASE(thirdhftime_ignored_for_btc) {
     auto arg = new DummyArgGetter;
     auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
 
+    arg->Set("-thirdhftime", 1526400000); // TODO: Remove in final HF code
+
     // Enabled by default
     BOOST_CHECK_EQUAL(1526400000, Opt().ThirdHFTime());
 
