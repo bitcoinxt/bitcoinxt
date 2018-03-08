@@ -2,14 +2,17 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
-#include <boost/test/unit_test.hpp>
 #include "maxblocksize.h"
 #include "chain.h"
 #include "chainparams.h"
 #include "options.h"
+#include "test/test_bitcoin.h"
+
+#include <boost/test/unit_test.hpp>
+
 #include <algorithm>
 
-BOOST_AUTO_TEST_SUITE(maxblocksize_tests);
+BOOST_FIXTURE_TEST_SUITE(maxblocksize_tests, BasicTestingSetup)
 
 void fillBlockIndex(
         Consensus::Params& params, std::vector<CBlockIndex>& blockIndexes,
@@ -205,9 +208,55 @@ BOOST_AUTO_TEST_CASE(get_max_blocksize_vote_no_vote) {
     BOOST_CHECK_EQUAL(0u, GetMaxBlockSizeVote(coinbase, 47));
 }
 
-BOOST_AUTO_TEST_CASE(next_block_raise_cap) {
-    BOOST_CHECK_EQUAL(UAHF_INITIAL_MAX_BLOCK_SIZE, NextBlockRaiseCap(MAX_BLOCK_SIZE));
-    BOOST_CHECK_EQUAL(MAX_BLOCK_SIZE * 10 * 1.05, NextBlockRaiseCap(MAX_BLOCK_SIZE * 10));
+BOOST_AUTO_TEST_CASE(next_block_raise_cap_bch) {
+
+    const uint64_t newmax = THIRD_HF_INITIAL_MAX_BLOCK_SIZE;
+
+    BOOST_CHECK_EQUAL(newmax, NextBlockRaiseCap(MAX_BLOCK_SIZE));
+    BOOST_CHECK_EQUAL(newmax, NextBlockRaiseCap(UAHF_INITIAL_MAX_BLOCK_SIZE));
+    BOOST_CHECK_EQUAL(newmax * 105 / 100, NextBlockRaiseCap(newmax));
+    BOOST_CHECK_EQUAL(newmax *  10 * 105 / 100, NextBlockRaiseCap(newmax * 10));
+
+    BOOST_CHECK_THROW(NextBlockRaiseCap(MAX_BLOCK_SIZE - 1),
+                      std::invalid_argument);
+}
+
+BOOST_AUTO_TEST_CASE(next_block_raise_cap_btc) {
+    auto arg = new DummyArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+
+    arg->Set("-uahftime", 0);
+
+    BOOST_CHECK_EQUAL(MAX_BLOCK_SIZE * 105 / 100, NextBlockRaiseCap(MAX_BLOCK_SIZE));
+    BOOST_CHECK_THROW(NextBlockRaiseCap(MAX_BLOCK_SIZE - 1), std::invalid_argument);
+}
+
+BOOST_AUTO_TEST_CASE(third_hf_bump) {
+    auto arg = new DummyArgGetter; // TODO: Remove in final HF code
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg)); // TODO: Remove in final HF code
+    arg->Set("-thirdhftime", 1526400000); // TODO: Remove in final HF code
+
+    auto params = Params(CBaseChainParams::MAIN).GetConsensus();
+
+    uint64_t currMax = UAHF_INITIAL_MAX_BLOCK_SIZE;
+
+    std::vector<CBlockIndex> blocks(5);
+    fillBlockIndex(params, blocks, false, currMax);
+    blocks[2].nTime = Opt().ThirdHFTime();
+    blocks[3].nTime = blocks[2].nTime + 1;
+    blocks[4].nTime = blocks[3].nTime + 1;
+
+    for (size_t i = 1; i < blocks.size(); ++i) {
+        blocks[i].nMaxBlockSize = GetNextMaxBlockSize(&blocks[i - 1], params);
+    }
+
+    BOOST_CHECK_EQUAL(currMax, GetNextMaxBlockSize(&blocks[0], params));
+    BOOST_CHECK_EQUAL(currMax, GetNextMaxBlockSize(&blocks[1], params));
+    // block is at HF time, but MTP isn't.
+    BOOST_CHECK_EQUAL(currMax, GetNextMaxBlockSize(&blocks[2], params));
+    // MTP passes fork point
+    BOOST_CHECK_EQUAL(THIRD_HF_INITIAL_MAX_BLOCK_SIZE, GetNextMaxBlockSize(&blocks[3], params));
+    BOOST_CHECK_EQUAL(THIRD_HF_INITIAL_MAX_BLOCK_SIZE, GetNextMaxBlockSize(&blocks[4], params));
 }
 
 BOOST_AUTO_TEST_SUITE_END();

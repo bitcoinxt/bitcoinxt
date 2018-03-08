@@ -21,6 +21,7 @@ class Opt {
         int UAHFProtectSunset();
         int64_t RespendRelayLimit() const;
 	bool UseCashAddr() const;
+	int64_t ThirdHFTime() const;
 
         // Thin block options
         bool UsingThinBlocks();

@@ -124,6 +124,7 @@ testScripts = [
 ]
 
 testScriptsExt = [
+    '32mb-bump.py',
     'bip100-sizelimit.py',
     'bip9-softforks.py',
     'bip65-cltv-p2p.py',

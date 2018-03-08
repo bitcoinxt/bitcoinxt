@@ -19,8 +19,8 @@ uint64_t GetNextMaxBlockSize(const CBlockIndex* pindexLast, const Consensus::Par
 
 uint64_t GetMaxBlockSizeVote(const CScript &coinbase, int32_t nHeight);
 
-// Max potential size for next block.
-// Accounts for UAHF and BIP100 adjustment.
+// Max potential size for next block. This function gives reliable lower bound,
+// but may overshoot drastically.
 uint64_t NextBlockRaiseCap(uint64_t maxCurrBlock);
 
 #endif // BITCOIN_MAXBLOCKSIZE_H
