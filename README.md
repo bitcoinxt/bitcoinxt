@@ -1,7 +1,7 @@
 Bitcoin XT
 ==========
 
-Bitcoin XT is an implementation of a Bitcoin Cash (BCH) full node that embraces Bitcoin's original vision of simple, reliable, low-cost transactions for everyone in the world. Bitcoin XT originated as a series of patches on top of Bitcoin Core and is now a independently maintained software fork. See our notable [features](https://bitcoinxt.software/patches.html).
+Bitcoin XT is an implementation of a Bitcoin Cash (BCH) full node that embraces Bitcoin's original vision of simple, reliable, low-cost transactions for everyone in the world. Bitcoin XT originated as a series of patches on top of Bitcoin Core and is now a independently maintained software fork. See some selected [features](https://bitcoinxt.software/patches.html).
 
 Bitcoin XT downloads are code signed and are [built reproducibly using gitian](https://github.com/bitcoinxt/gitian.sigs). Discussion can be found at the [XT Gitter](https://gitter.im/bitcoinxt/Lobby).
 
