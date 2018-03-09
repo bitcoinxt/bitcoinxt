@@ -8,7 +8,7 @@ Bitcoin XT downloads are code signed and are [built reproducibly using gitian](h
 Data Directory Compatibility
 ============================
 
-If using a data directory from a different BCH or BTC full node, specify `-reindex` on first launch (reason: UTXO database format).
+If using a data directory from a different BCH or BTC full node, specify `-reindex` on first launch.
 
 Set aside `wallet.dat` from Bitcoin Core or Bitcoin ABC (reason: HD wallet not yet supported). Also delete `fee_estimates.dat` from these clients.
  
