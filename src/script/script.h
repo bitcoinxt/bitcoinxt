@@ -218,6 +218,10 @@ public:
         const std::vector<uint8_t> &vch,
         const size_t nMaxNumSize = CScriptNum::MAXIMUM_ELEMENT_SIZE);
 
+     // Returns false if input was minially encoded already, false if input
+     // encoding was modified.
+    static bool MinimallyEncode(std::vector<uint8_t> &data);
+
     inline bool operator==(const int64_t& rhs) const    { return m_value == rhs; }
     inline bool operator!=(const int64_t& rhs) const    { return m_value != rhs; }
     inline bool operator<=(const int64_t& rhs) const    { return m_value <= rhs; }
