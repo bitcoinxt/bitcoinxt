@@ -4298,7 +4298,7 @@ void static ProcessGetData(CNode* pfrom, CConnman* connman)
 
 // 8 bytes + sizeof(CTxOut)
 struct CCoin {
-    uint32_t nTxVer;   // Don't call this nVersion, that name has a special meaning inside IMPLEMENT_SERIALIZE
+    uint32_t nTxVer; // DEPRECATED. Dummy for keeping backward compatibility.
     uint32_t nHeight;
     CTxOut out;
 
@@ -4369,7 +4369,7 @@ bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, ve
                     // Safe to index into vout here because IsAvailable checked if it's off the end of the array, or if
                     // n is valid but points to an already spent output (IsNull).
                     CCoin coin;
-                    coin.nTxVer = coins.nVersion;
+                    coin.nTxVer = 0; // DEPRECATED. Dummy value only.
                     coin.nHeight = coins.nHeight;
                     coin.out = coins.vout.at(vOutPoints[i].n);
                     assert(!coin.out.IsNull());
