@@ -262,14 +262,15 @@ bool static CheckMinimalPush(const valtype& data, opcodetype opcode) {
 
 static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
     switch (opcode) {
+        case OP_AND:
+        case OP_OR:
+	case OP_XOR:
+            return !(flags & SCRIPT_ENABLE_MONOLITH_OPCODES);
         case OP_CAT:
         case OP_SPLIT:
         case OP_BIN2NUM:
         case OP_NUM2BIN:
         case OP_INVERT:
-        case OP_AND:
-        case OP_OR:
-        case OP_XOR:
         case OP_2MUL:
         case OP_2DIV:
         case OP_MUL:
@@ -731,6 +732,48 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                 //
                 // Bitwise logic
                 //
+                case OP_AND:
+                case OP_OR:
+                case OP_XOR: {
+                    // (x1 x2 - out)
+                    if (stack.size() < 2) {
+                        return set_error(
+                                serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    }
+                    valtype &vch1 = stacktop(-2);
+                    valtype &vch2 = stacktop(-1);
+
+                    // Inputs must be the same size
+                    if (vch1.size() != vch2.size()) {
+                        return set_error(serror,
+                                        SCRIPT_ERR_INVALID_OPERAND_SIZE);
+                    }
+
+                    // To avoid allocating, we modify vch1 in place.
+                    switch (opcode) {
+                    case OP_AND:
+                        for (size_t i = 0; i < vch1.size(); ++i) {
+                            vch1[i] &= vch2[i];
+                        }
+                        break;
+                    case OP_OR:
+                        for (size_t i = 0; i < vch1.size(); ++i) {
+                            vch1[i] |= vch2[i];
+                        }
+                        break;
+                    case OP_XOR:
+                        for (size_t i = 0; i < vch1.size(); ++i) {
+                            vch1[i] ^= vch2[i];
+                        }
+                        break;
+                    default:
+                        break;
+                    }
+
+                    // And pop vch2.
+                    popstack(stack);
+                } break;
+
                 case OP_EQUAL:
                 case OP_EQUALVERIFY:
                 //case OP_NOTEQUAL: // use OP_NUMNOTEQUAL
