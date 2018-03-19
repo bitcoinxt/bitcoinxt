@@ -42,7 +42,7 @@ class XThinBlock {
 
         template <typename Stream, typename Operation>
         inline void SerializationOp(Stream& s,
-                Operation ser_action, int nType, int nVersion)
+                Operation ser_action)
         {
             READWRITE(header);
             READWRITE(txHashes);
@@ -112,7 +112,7 @@ public:
 
     template <typename Stream, typename Operation>
         inline void SerializationOp(Stream& s,
-                Operation ser_action, int nType, int nVersion)
+                Operation ser_action)
     {
         READWRITE(block);
         READWRITE(txRequesting);
@@ -132,7 +132,7 @@ struct XThinReReqResponse {
 
     template <typename Stream, typename Operation>
         inline void SerializationOp(Stream& s,
-                Operation ser_action, int nType, int nVersion)
+                Operation ser_action)
     {
         READWRITE(block);
         READWRITE(txRequested);
