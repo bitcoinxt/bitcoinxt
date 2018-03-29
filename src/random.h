@@ -39,6 +39,12 @@ public:
         return (Rw << 16) + Rz;
     }
 
+    uint64_t rand64() {
+        uint64_t a = rand32();
+        uint64_t b = rand32();
+        return (b << 32) + a;
+    }
+
     uint32_t Rz;
     uint32_t Rw;
 };
