@@ -46,10 +46,11 @@ BITCOIN_TESTS =\
   test/base64_tests.cpp \
   test/bip32_tests.cpp \
   test/blockannounce_tests.cpp \
+  test/blockencodings_tests.cpp \
   test/blockheaderprocessor_tests.cpp \
   test/blocksender_tests.cpp \
-  test/blockencodings_tests.cpp \
   test/bloom_tests.cpp \
+  test/bswap_tests.cpp \
   test/chainparams_tests.cpp \
   test/checkblock_tests.cpp \
   test/Checkpoints_tests.cpp \
