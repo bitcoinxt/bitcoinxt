@@ -176,7 +176,6 @@ class WalletTest (BitcoinTestFramework):
 
         #do some -walletbroadcast tests
         stop_nodes(self.nodes)
-        wait_bitcoinds()
         self.nodes = start_nodes(3, self.options.tmpdir, [["-walletbroadcast=0"],["-walletbroadcast=0"],["-walletbroadcast=0"]])
         connect_nodes_bi(self.nodes,0,1)
         connect_nodes_bi(self.nodes,1,2)
@@ -202,7 +201,6 @@ class WalletTest (BitcoinTestFramework):
 
         #restart the nodes with -walletbroadcast=1
         stop_nodes(self.nodes)
-        wait_bitcoinds()
         self.nodes = start_nodes(3, self.options.tmpdir)
         connect_nodes_bi(self.nodes,0,1)
         connect_nodes_bi(self.nodes,1,2)
@@ -290,7 +288,6 @@ class WalletTest (BitcoinTestFramework):
         for m in maintenance:
             print("check %s" % m)
             stop_nodes(self.nodes)
-            wait_bitcoinds()
             self.nodes = start_nodes(3, self.options.tmpdir, [[m]] * 3)
             assert_equal(balance_nodes, [self.nodes[i].getbalance() for i in range(3)])
 
