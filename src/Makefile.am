@@ -137,6 +137,7 @@ BITCOIN_CORE_H = \
   noui.h \
   options.h \
   policy/fees.h \
+  policy/policy.h \
   pow.h \
   primitives/block.h \
   primitives/transaction.h \
@@ -240,6 +241,7 @@ libbitcoin_server_a_SOURCES = \
   noui.cpp \
   options.cpp \
   policy/fees.cpp \
+  policy/policy.cpp \
   pow.cpp \
   process_xthinblock.cpp \
   rest.cpp \

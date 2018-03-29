@@ -13,6 +13,7 @@
 #include "main.h"
 #include "net.h"
 #include "options.h"
+#include "policy/policy.h"
 #include "script/script.h"
 #include "script/sign.h"
 #include "timedata.h"
