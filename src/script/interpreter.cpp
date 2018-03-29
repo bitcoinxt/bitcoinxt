@@ -262,13 +262,14 @@ bool static CheckMinimalPush(const valtype& data, opcodetype opcode) {
 
 static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
     switch (opcode) {
+        case OP_CAT:
         case OP_AND:
         case OP_OR:
         case OP_XOR:
         case OP_NUM2BIN:
         case OP_BIN2NUM:
             return !(flags & SCRIPT_ENABLE_MONOLITH_OPCODES);
-        case OP_CAT:
+
         case OP_SPLIT:
         case OP_INVERT:
         case OP_2MUL:
@@ -1085,6 +1086,25 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                     }
                 }
                 break;
+
+                //
+                // Byte string operations
+                //
+                case OP_CAT: {
+                    // (x1 x2 -- out)
+                    if (stack.size() < 2) {
+                        return set_error(
+                            serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    }
+                    valtype &vch1 = stacktop(-2);
+                    valtype &vch2 = stacktop(-1);
+                    if (vch1.size() + vch2.size() >
+                        MAX_SCRIPT_ELEMENT_SIZE) {
+                        return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                    }
+                    vch1.insert(vch1.end(), vch2.begin(), vch2.end());
+                    popstack(stack);
+                } break;
 
                 //
                 // Conversion operations
