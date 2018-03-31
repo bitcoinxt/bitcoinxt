@@ -269,14 +269,14 @@ static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
         case OP_XOR:
         case OP_NUM2BIN:
         case OP_BIN2NUM:
+        case OP_DIV:
+        case OP_MOD:
             return !(flags & SCRIPT_ENABLE_MONOLITH_OPCODES);
 
         case OP_INVERT:
         case OP_2MUL:
         case OP_2DIV:
         case OP_MUL:
-        case OP_DIV:
-        case OP_MOD:
         case OP_LSHIFT:
         case OP_RSHIFT:
             return true;
@@ -835,6 +835,8 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
 
                 case OP_ADD:
                 case OP_SUB:
+                case OP_DIV:
+                case OP_MOD:
                 case OP_BOOLAND:
                 case OP_BOOLOR:
                 case OP_NUMEQUAL:
@@ -861,6 +863,24 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
 
                     case OP_SUB:
                         bn = bn1 - bn2;
+                        break;
+
+                    case OP_DIV:
+                        // denominator must not be 0
+                        if (bn2 == 0) {
+                            return set_error(serror,
+                                             SCRIPT_ERR_DIV_BY_ZERO);
+                        }
+                        bn = bn1 / bn2;
+                        break;
+
+                    case OP_MOD:
+                        // divisor must not be 0
+                        if (bn2 == 0) {
+                            return set_error(serror,
+                                             SCRIPT_ERR_MOD_BY_ZERO);
+                        }
+                        bn = bn1 % bn2;
                         break;
 
                     case OP_BOOLAND:             bn = (bn1 != bnZero && bn2 != bnZero); break;
