@@ -14,6 +14,8 @@ ThinBlockManager::ThinBlockManager(
 { }
 
 void ThinBlockManager::addWorker(const uint256& block, ThinBlockWorker& w) {
+    LogPrint(Log::BLOCK, "Thin: Adding worker %d to %s\n",
+             w.nodeID(), block.ToString());
     if (!builders.count(block))
         builders[block] = ThinBlockManager::ActiveBuilder();
     builders[block].workers.insert(&w);
@@ -21,6 +23,8 @@ void ThinBlockManager::addWorker(const uint256& block, ThinBlockWorker& w) {
 
 void ThinBlockManager::delWorker(const uint256& block, ThinBlockWorker& w) {
     assert(builders.count(block));
+    LogPrint(Log::BLOCK, "Thin: Removing worker %d from %s\n",
+             w.nodeID(), block.ToString());
 
     bool ok = builders[block].workers.erase(&w);
     assert(ok); // worker was working on block.

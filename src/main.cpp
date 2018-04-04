@@ -5019,9 +5019,15 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
                 chainActive, *(mi->second), pindexBestHeader);
 
         try {
-            if (canSend)
+            if (canSend) {
                 bs.sendReReqReponse(*pfrom, *(mi->second), req,
                         chainActive.Height());
+            }
+            else {
+                LogPrint(Log::BLOCK,
+                         "Can't respond to compact re-request for %s\n",
+                         req.blockhash.ToString());
+            }
         }
         catch (const std::exception& e) {
             LogPrintf("error in re-request from peer=%d: %s\n",

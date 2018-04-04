@@ -36,8 +36,10 @@ bool BlockSender::canSend(const CChain& activeChain, const CBlockIndex& block,
 {
     // Pruned nodes may have deleted the block, so check whether
     // it's available before trying to send.
-    if (!(block.nStatus & BLOCK_HAVE_DATA))
+    if (!(block.nStatus & BLOCK_HAVE_DATA)) {
+        LogPrint(Log::BLOCK, "Cannot send %s, block is pruned\n", block.GetBlockHash().ToString());
         return false;
+    }
 
     if (activeChain.Contains(&block))
         return true;
@@ -49,8 +51,10 @@ bool BlockSender::canSend(const CChain& activeChain, const CBlockIndex& block,
     bool send = block.IsValid(BLOCK_VALID_SCRIPTS) && (pindexBestHeader != NULL) &&
         (pindexBestHeader->GetBlockTime() - block.GetBlockTime() < nOneMonth) &&
         (GetBlockProofEquivalentTime(*pindexBestHeader, block, *pindexBestHeader, Params().GetConsensus()) < nOneMonth);
-    if (!send)
-        LogPrintf("ignoring request for old block that isn't in the main chain\n");
+    if (!send) {
+        LogPrint(Log::BLOCK, "Cannot send %s, it's an old block that isn't in the main chain\n",
+                 block.GetBlockHash().ToString());
+    }
 
     return send;
 }
