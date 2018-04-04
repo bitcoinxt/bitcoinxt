@@ -5011,9 +5011,9 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         LogPrint(Log::BLOCK, "peer=%d is compactthin re-requesting %d transactions for %s\n",
                 pfrom->id, req.indexes.size(), req.blockhash.ToString());
 
+        LOCK(cs_main);
         auto mi = mapBlockIndex.find(req.blockhash);
         bool haveBlock = mi != mapBlockIndex.end();
-        LOCK(cs_main);
         BlockSender bs;
         bool canSend = haveBlock && bs.canSend(
                 chainActive, *(mi->second), pindexBestHeader);
