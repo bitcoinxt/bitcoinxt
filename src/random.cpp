@@ -72,7 +72,7 @@ void RandAddSeedPerfmon()
     if (ret == ERROR_SUCCESS) {
         RAND_add(begin_ptr(vData), nSize, nSize / 100.0);
         memory_cleanse(begin_ptr(vData), nSize);
-        LogPrint("rand", "%s: %lu bytes\n", __func__, nSize);
+        LogPrint(Log::RAND, "%s: %lu bytes\n", __func__, nSize);
     } else {
         static bool warned = false; // Warn only once
         if (!warned) {
@@ -135,4 +135,3 @@ FastRandomContext::FastRandomContext(bool fDeterministic)
         Rw = tmp;
     }
 }
-

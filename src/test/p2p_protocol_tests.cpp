@@ -68,11 +68,11 @@ BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
     s << (uint8_t)0x10;
     s << std::string(111, 'a');
     BOOST_CHECK_EQUAL(size_t(126), s.size());
-    bool temp = fDebug;
-    fDebug = true;
+    auto temp = logCategories.load();
+    logCategories |= Log::NET;
     CConnman dummy;
     BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, &dummy));
-    fDebug = temp;
+    logCategories.store(temp);
 }
 
 BOOST_AUTO_TEST_CASE(MaxSizeValidRejectMessage)
@@ -85,11 +85,11 @@ BOOST_AUTO_TEST_CASE(MaxSizeValidRejectMessage)
     s << std::string(111, 'a');
     s << uint256();
     BOOST_CHECK_EQUAL(size_t(151), s.size());
-    bool temp = fDebug;
-    fDebug = true;
+    auto temp = logCategories.load();
+    logCategories |= Log::NET;
     CConnman dummy;
     BOOST_CHECK(ProcessMessage(&n, "reject", s, 0, &dummy));
-    fDebug = temp;
+    logCategories.store(temp);
 }
 
 BOOST_AUTO_TEST_CASE(OverMaxSizeWeirdRejectMessage)
@@ -101,11 +101,11 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeWeirdRejectMessage)
     s << (uint8_t)0x10;
     s << std::string(111, 'a');
     BOOST_CHECK_EQUAL(size_t(127), s.size());
-    bool temp = fDebug;
-    fDebug = true;
+    auto temp = logCategories.load();
+    logCategories |= Log::NET;
     CConnman dummy;
     BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, &dummy)); // check this way since the reject message processing swallows the exception
-    fDebug = temp;
+    logCategories.store(temp);
 }
 
 BOOST_AUTO_TEST_CASE(OverMaxSizeValidRejectMessage)
@@ -118,11 +118,11 @@ BOOST_AUTO_TEST_CASE(OverMaxSizeValidRejectMessage)
     s << std::string(112, 'a'); // invalid, max is 111
     s << uint256();
     BOOST_CHECK_EQUAL(size_t(152), s.size());
-    bool temp = fDebug;
-    fDebug = true;
+    auto temp = logCategories.load();
+    logCategories |= Log::NET;
     CConnman dummy;
     BOOST_CHECK(!ProcessMessage(&n, "reject", s, 0, &dummy)); // check this way since the reject message processing swallows the exception
-    fDebug = temp;
+    logCategories.store(temp);
 }
 
 BOOST_AUTO_TEST_SUITE_END()

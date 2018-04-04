@@ -32,7 +32,7 @@ ThinBlockBuilder::ThinBlockBuilder(const CBlockHeader& header,
         thinBlock.vtx.push_back(tx);
     }
     updateWantedIndex();
-    LogPrint("thin", "%d out of %d txs missing\n", missing, wanted.size());
+    LogPrint(Log::BLOCK, "%d out of %d txs missing\n", missing, wanted.size());
 }
 
 void ThinBlockBuilder::updateWantedIndex()

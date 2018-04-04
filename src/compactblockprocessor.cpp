@@ -24,7 +24,7 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
         validateCompactBlock(block, currMaxBlockSize);
     }
     catch (const std::exception& e) {
-        LogPrint("thin", "Invalid compact block %s\n", e.what());
+        LogPrint(Log::BLOCK, "Invalid compact block %s\n", e.what());
         rejectBlock(hash, e.what(), 20);
         return;
     }
@@ -71,7 +71,7 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
     for (auto& t : missing)
         req.indexes.push_back(t.first /* index in block */);
 
-    LogPrint("thin", "re-requesting %d compact txs for %s peer=%d\n",
+    LogPrint(Log::BLOCK, "re-requesting %d compact txs for %s peer=%d\n",
             req.indexes.size(), hash.ToString(), from.id);
     from.PushMessage("getblocktxn", req);
 }

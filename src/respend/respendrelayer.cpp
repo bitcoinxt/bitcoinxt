@@ -28,11 +28,11 @@ class RelayLimiter {
             std::lock_guard<std::mutex> lock(cs);
             int64_t limit = Opt().RespendRelayLimit();
             if (RateLimitExceeded(respendCount, lastRespendTime, limit, size)) {
-                LogPrint("respend", "respend: Double-spend relay rejected by rate limiter\n");
+                LogPrint(Log::RESPEND, "respend: Double-spend relay rejected by rate limiter\n");
                 return true;
             }
 
-            LogPrint("respend", "respend: Double-spend relay rate limiter: %g => %g\n",
+            LogPrint(Log::RESPEND, "respend: Double-spend relay rate limiter: %g => %g\n",
                      respendCount, respendCount + size);
             return false;
         }

@@ -37,7 +37,7 @@ void RespendLogger::Trigger() {
     const std::string msg = "respend: Tx %s conflicts with %s"
         " (new conflict: %s, equivalent %s, valid %s)\n";
 
-    LogPrint("respend", msg.c_str(), orig, respend,
+    LogPrint(Log::RESPEND, msg.c_str(), orig, respend,
               newConflict ? "yes" : "no",
               equivalent ? "yes" : "no", valid);
 }

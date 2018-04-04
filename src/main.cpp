@@ -552,7 +552,7 @@ void InFlightEraserImpl::operator()(NodeId node, const uint256& hash) {
 
     int64_t getdataTime = q->nTime;
     int64_t now = GetTimeMicros();
-    LogPrint("relayperf", "Received block %s %.2f seconds after requesting it from peer %d\n",
+    LogPrint(Log::BLOCK, "Block no longer in flight %s %.2f seconds after requesting it peer=%d\n",
             hash.ToString(), (now - getdataTime) / 1000000.0, (node));
 }
 
@@ -629,7 +629,7 @@ bool AddOrphanTx(const CTransaction& tx, NodeId peer)
     unsigned int sz = GetSerializeSize(tx, SER_NETWORK, CTransaction::CURRENT_VERSION);
     if (sz > 5000)
     {
-        LogPrint("mempool", "ignoring large orphan tx (size: %u, hash: %s)\n", sz, hash.ToString());
+        LogPrint(Log::MEMPOOL, "ignoring large orphan tx (size: %u, hash: %s)\n", sz, hash.ToString());
         return false;
     }
 
@@ -638,7 +638,7 @@ bool AddOrphanTx(const CTransaction& tx, NodeId peer)
     BOOST_FOREACH(const CTxIn& txin, tx.vin)
         mapOrphanTransactionsByPrev[txin.prevout.hash].insert(hash);
 
-    LogPrint("mempool", "stored orphan tx %s (mapsz %u prevsz %u)\n", hash.ToString(),
+    LogPrint(Log::MEMPOOL, "stored orphan tx %s (mapsz %u prevsz %u)\n", hash.ToString(),
              mapOrphanTransactions.size(), mapOrphanTransactionsByPrev.size());
     return true;
 }
@@ -673,7 +673,7 @@ void EraseOrphansFor(NodeId peer)
             ++nErased;
         }
     }
-    if (nErased > 0) LogPrint("mempool", "Erased %d orphan tx from peer %d\n", nErased, peer);
+    if (nErased > 0) LogPrint(Log::MEMPOOL, "Erased %d orphan tx from peer %d\n", nErased, peer);
 }
 
 
@@ -1215,7 +1215,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                 return state.DoS(0, error("AcceptToMemoryPool : free transaction rejected by rate limiter"),
                                  REJECT_INSUFFICIENTFEE, "rate limited free transaction");
 
-            LogPrint("mempool", "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount+nSize);
+            LogPrint(Log::MEMPOOL, "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount+nSize);
         }
 
         if (fRejectAbsurdFee && nFees > ::minRelayTxFee.GetFee(nSize) * 10000)
@@ -1274,7 +1274,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             // Expire
             int expired = pool.Expire(GetTime() - GetArg("-mempoolexpiry", DEFAULT_MEMPOOL_EXPIRY) * 60 * 60);
             if (expired != 0)
-                LogPrint("mempool", "Expired %i transactions from the memory pool\n", expired);
+                LogPrint(Log::MEMPOOL, "Expired %i transactions from the memory pool\n", expired);
 
             // Trim
             pool.TrimToSize(GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000);
@@ -2021,8 +2021,8 @@ int PartitionCheck(bool (*initialDownloadCheck)(), CCriticalSection& cs, const C
     // How likely is it to find at most that few by chance?
     double pLow = boost::math::cdf(poisson, nBlocks);
 
-    LogPrint("partitioncheck", "%s: Found %d blocks in the last %d seconds\n", __func__, nBlocks, SPAN_SECONDS);
-    LogPrint("partitioncheck", "%s: likelihood that many: %g, that few: %g\n", __func__, pHigh, pLow);
+    LogPrint(Log::PARTITIONCHECK, "%s: Found %d blocks in the last %d seconds\n", __func__, nBlocks, SPAN_SECONDS);
+    LogPrint(Log::PARTITIONCHECK, "%s: likelihood that many: %g, that few: %g\n", __func__, pHigh, pLow);
 
     if (pLow <= alertThreshold)
     {
@@ -2284,7 +2284,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
     }
     int64_t nTime1 = GetTimeMicros(); nTimeConnect += nTime1 - nTimeStart;
-    LogPrint("bench", "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(), 0.001 * (nTime1 - nTimeStart), 0.001 * (nTime1 - nTimeStart) / block.vtx.size(), nInputs <= 1 ? 0 : 0.001 * (nTime1 - nTimeStart) / (nInputs-1), nTimeConnect * 0.000001);
+    LogPrint(Log::BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(), 0.001 * (nTime1 - nTimeStart), 0.001 * (nTime1 - nTimeStart) / block.vtx.size(), nInputs <= 1 ? 0 : 0.001 * (nTime1 - nTimeStart) / (nInputs-1), nTimeConnect * 0.000001);
 
     CAmount blockReward = nFees + GetBlockSubsidy(pindex->nHeight, chainparams.GetConsensus());
     if (block.vtx[0].GetValueOut() > blockReward)
@@ -2296,7 +2296,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (!control.Wait())
         return state.DoS(100, false);
     int64_t nTime2 = GetTimeMicros(); nTimeVerify += nTime2 - nTimeStart;
-    LogPrint("bench", "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs]\n", nInputs - 1, 0.001 * (nTime2 - nTimeStart), nInputs <= 1 ? 0 : 0.001 * (nTime2 - nTimeStart) / (nInputs-1), nTimeVerify * 0.000001);
+    LogPrint(Log::BENCH, "    - Verify %u txins: %.2fms (%.3fms/txin) [%.2fs]\n", nInputs - 1, 0.001 * (nTime2 - nTimeStart), nInputs <= 1 ? 0 : 0.001 * (nTime2 - nTimeStart) / (nInputs-1), nTimeVerify * 0.000001);
 
     if (fJustCheck)
         return true;
@@ -2328,7 +2328,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     view.SetBestBlock(pindex->GetBlockHash());
 
     int64_t nTime3 = GetTimeMicros(); nTimeIndex += nTime3 - nTime2;
-    LogPrint("bench", "    - Index writing: %.2fms [%.2fs]\n", 0.001 * (nTime3 - nTime2), nTimeIndex * 0.000001);
+    LogPrint(Log::BENCH, "    - Index writing: %.2fms [%.2fs]\n", 0.001 * (nTime3 - nTime2), nTimeIndex * 0.000001);
 
     // Watch for changes to the previous coinbase transaction.
     static uint256 hashPrevBestCoinBase;
@@ -2336,7 +2336,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     hashPrevBestCoinBase = block.vtx[0].GetHash();
 
     int64_t nTime4 = GetTimeMicros(); nTimeCallbacks += nTime4 - nTime3;
-    LogPrint("bench", "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime4 - nTime3), nTimeCallbacks * 0.000001);
+    LogPrint(Log::BENCH, "    - Callbacks: %.2fms [%.2fs]\n", 0.001 * (nTime4 - nTime3), nTimeCallbacks * 0.000001);
 
     return true;
 }
@@ -2535,7 +2535,7 @@ bool static DisconnectTip(CValidationState &state) {
             return error("DisconnectTip(): DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString());
         assert(view.Flush());
     }
-    LogPrint("bench", "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
+    LogPrint(Log::BENCH, "- Disconnect block: %.2fms\n", (GetTimeMicros() - nStart) * 0.001);
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
@@ -2592,7 +2592,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew,
     // Apply the block atomically to the chain state.
     int64_t nTime2 = GetTimeMicros(); nTimeReadFromDisk += nTime2 - nTime1;
     int64_t nTime3;
-    LogPrint("bench", "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
+    LogPrint(Log::BENCH, "  - Load block from disk: %.2fms [%.2fs]\n", (nTime2 - nTime1) * 0.001, nTimeReadFromDisk * 0.000001);
     {
         CCoinsViewCache view(pcoinsTip);
         CInv inv(MSG_BLOCK, pindexNew->GetBlockHash());
@@ -2604,16 +2604,16 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew,
             return error("ConnectTip(): ConnectBlock %s failed", pindexNew->GetBlockHash().ToString());
         }
         nTime3 = GetTimeMicros(); nTimeConnectTotal += nTime3 - nTime2;
-        LogPrint("bench", "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
+        LogPrint(Log::BENCH, "  - Connect total: %.2fms [%.2fs]\n", (nTime3 - nTime2) * 0.001, nTimeConnectTotal * 0.000001);
         assert(view.Flush());
     }
     int64_t nTime4 = GetTimeMicros(); nTimeFlush += nTime4 - nTime3;
-    LogPrint("bench", "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
+    LogPrint(Log::BENCH, "  - Flush: %.2fms [%.2fs]\n", (nTime4 - nTime3) * 0.001, nTimeFlush * 0.000001);
     // Write the chain state to disk, if necessary.
     if (!FlushStateToDisk(state, FLUSH_STATE_IF_NEEDED))
         return false;
     int64_t nTime5 = GetTimeMicros(); nTimeChainState += nTime5 - nTime4;
-    LogPrint("bench", "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
+    LogPrint(Log::BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
     // If we just activated the UAHF, clear the pool to be sure it doesn't contain tx invalid after the fork
     if (IsUAHFActivatingBlock(pindexNew->GetMedianTimePast(), pindexNew->pprev)) {
         mempool.clear();
@@ -2634,8 +2634,8 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew,
     }
 
     int64_t nTime6 = GetTimeMicros(); nTimePostConnect += nTime6 - nTime5; nTimeTotal += nTime6 - nTime1;
-    LogPrint("bench", "  - Connect postprocess: %.2fms [%.2fs]\n", (nTime6 - nTime5) * 0.001, nTimePostConnect * 0.000001);
-    LogPrint("bench", "- Connect block: %.2fms [%.2fs]\n", (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
+    LogPrint(Log::BENCH, "  - Connect postprocess: %.2fms [%.2fs]\n", (nTime6 - nTime5) * 0.001, nTimePostConnect * 0.000001);
+    LogPrint(Log::BENCH, "- Connect block: %.2fms [%.2fs]\n", (nTime6 - nTime1) * 0.001, nTimeTotal * 0.000001);
     return true;
 }
 
@@ -3374,22 +3374,22 @@ bool AcceptBlock(CBlock& block, CValidationState& state, CBlockIndex** ppindex, 
     bool fTooFarAhead = (pindex->nHeight > int(chainActive.Height() + MIN_BLOCKS_TO_KEEP));
 
     if (fAlreadyHave) {
-        LogPrint("block", "%s: Already have block %s\n", __func__, block.GetHash().ToString());
+        LogPrint(Log::BLOCK, "%s: Already have block %s\n", __func__, block.GetHash().ToString());
         return true;
     }
     if (!fRequested) {  // If we didn't ask for it:
         if (pindex->nTx != 0) {
-            LogPrint("block", "%s: Block %s was not requested and is a previously-processed block that was pruned\n",
+            LogPrint(Log::BLOCK, "%s: Block %s was not requested and is a previously-processed block that was pruned\n",
                      __func__, block.GetHash().ToString());
             return true;
         }
         if (!fHasMoreWork) {
-            LogPrint("block", "%s: Block %s was not requested and is in a less-work chain\n",
+            LogPrint(Log::BLOCK, "%s: Block %s was not requested and is in a less-work chain\n",
                      __func__, block.GetHash().ToString());
             return true;
         }
         if (fTooFarAhead) {
-            LogPrint("block", "%s: Block %s was not requested and block height is too high\n",
+            LogPrint(Log::BLOCK, "%s: Block %s was not requested and block height is too high\n",
                      __func__, block.GetHash().ToString());
             return true;
         }
@@ -3593,7 +3593,7 @@ void FindFilesToPrune(std::set<int>& setFilesToPrune)
         }
     }
 
-    LogPrint("prune", "Prune: target=%dMiB actual=%dMiB diff=%dMiB max_prune_height=%d removed %d blk/rev pairs\n",
+    LogPrint(Log::PRUNE, "Prune: target=%dMiB actual=%dMiB diff=%dMiB max_prune_height=%d removed %d blk/rev pairs\n",
            nPruneTarget/1024/1024, nCurrentUsage/1024/1024,
            ((int64_t)nPruneTarget - (int64_t)nCurrentUsage)/1024/1024,
            nLastBlockWeCanPrune, count);
@@ -3789,7 +3789,7 @@ bool static LoadBlockIndexDB(bool* fRebuildRequired)
                     return false;
                 }
             }
-            LogPrint("reindex", "%s: Updating block index entry at height %d for BIP100\n", __func__, pindex->nHeight);
+            LogPrint(Log::REINDEX, "%s: Updating block index entry at height %d for BIP100\n", __func__, pindex->nHeight);
             setDirtyBlockIndex.insert(pindex);
         }
     }
@@ -4042,7 +4042,7 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
                 // detect out of order blocks, and store them for later
                 uint256 hash = block.GetHash();
                 if (hash != chainparams.GetConsensus().hashGenesisBlock && mapBlockIndex.find(block.hashPrevBlock) == mapBlockIndex.end()) {
-                    LogPrint("reindex", "%s: Out of order block %s, parent %s not known\n", __func__, hash.ToString(),
+                    LogPrint(Log::REINDEX, "%s: Out of order block %s, parent %s not known\n", __func__, hash.ToString(),
                             block.hashPrevBlock.ToString());
                     if (dbp)
                         mapBlocksUnknownParent.insert(std::make_pair(block.hashPrevBlock, *dbp));
@@ -4058,7 +4058,7 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
                     if (state.IsError())
                         break;
                 } else if (hash != chainparams.GetConsensus().hashGenesisBlock && mapBlockIndex[hash]->nHeight % 1000 == 0) {
-                    LogPrint("reindex", "Block Import: already had block %s at height %d\n", hash.ToString(), mapBlockIndex[hash]->nHeight);
+                    LogPrint(Log::REINDEX, "Block Import: already had block %s at height %d\n", hash.ToString(), mapBlockIndex[hash]->nHeight);
                 }
 
                 // Recursively process earlier encountered successors of this block
@@ -4072,7 +4072,7 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
                         std::multimap<uint256, CDiskBlockPos>::iterator it = range.first;
                         if (ReadBlockFromDisk(block, it->second))
                         {
-                            LogPrint("reindex", "%s: Processing out of order child %s of %s\n", __func__, block.GetHash().ToString(),
+                            LogPrint(Log::REINDEX, "%s: Processing out of order child %s of %s\n", __func__, block.GetHash().ToString(),
                                     head.ToString());
                             LOCK(cs_main);
                             CValidationState dummy;
@@ -4348,7 +4348,7 @@ bool static SanityCheckMessage(CNode* peer, const CNetMessage& msg)
     uint64_t nMaxMessageSize = NextBlockRaiseCap(GetMaxBlockSize());
     if (msg.hdr.nMessageSize > nMaxMessageSize ||
         (maxMessageSizes.count(strCommand) && msg.hdr.nMessageSize > maxMessageSizes[strCommand])) {
-        LogPrint("net", "Oversized %s message from peer=%i (%d bytes)\n",
+        LogPrint(Log::NET, "Oversized %s message from peer=%i (%d bytes)\n",
                  SanitizeString(strCommand), peer->GetId(), msg.hdr.nMessageSize);
         Misbehaving(peer->GetId(), 20, "oversized message");
         return msg.hdr.nMessageSize <= nMaxMessageSize;
@@ -4557,7 +4557,7 @@ bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, ve
     if (vOutPoints.size() > MAX_INV_SZ)
         return error("message getutxos size() = %u", vOutPoints.size());
 
-    LogPrint("net", "getutxos for %d queries %s mempool\n", vOutPoints.size(), fCheckMemPool ? "with" : "without");
+    LogPrint(Log::NET, "getutxos for %d queries %s mempool\n", vOutPoints.size(), fCheckMemPool ? "with" : "without");
 
     // Due to the above check max space the bitmap can use is 50,000 / 8 == 6250 bytes.
     size_t bytes_used = vOutPoints.size() / 8;
@@ -4621,7 +4621,7 @@ struct TxFinderImpl : public TxFinder {
             FindTransactionInRelayMap(h, tx);
         }
         catch (const std::ios_base::failure& e) {
-            LogPrint("Exception '%s' in FindTransactionInRelayMap ignored\n", e.what());
+            LogPrintf("Exception '%s' in FindTransactionInRelayMap ignored\n", e.what());
             return CTransaction();
         }
 
@@ -4694,7 +4694,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
     RandAddSeedPerfmon();
     unsigned int nMaxSendBufferSize = connman->GetSendBufferSize();
 
-    LogPrint("net", "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
+    LogPrint(Log::NET, "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
     if (mapArgs.count("-dropmessagestest") && GetRand(atoi(mapArgs["-dropmessagestest"])) == 0)
     {
         LogPrintf("dropmessagestest DROPPING RECV MESSAGE\n");
@@ -4968,12 +4968,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             // prevents a peer from constantly promising to deliver an item that it never does,
             // thus blinding us to new transactions and blocks.
             if (!Opt().IsStealthMode() && !pfrom->AddInventoryKnown(inv) && !pfrom->fWhitelisted) {
-                LogPrint("net", "ignoring inv: %s peer=%d\n", inv.ToString(), pfrom->id);
+                LogPrint(Log::NET, "ignoring inv: %s peer=%d\n", inv.ToString(), pfrom->id);
                 continue;
             }
 
             bool fAlreadyHave = AlreadyHave(inv);
-            LogPrint("net", "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
+            LogPrint(Log::NET, "got inv: %s  %s peer=%d\n", inv.ToString(), fAlreadyHave ? "have" : "new", pfrom->id);
 
             if (!fAlreadyHave && !fImporting && !fReindex && inv.type != MSG_BLOCK && !IsInitialBlockDownload())
                 pfrom->AskFor(inv);
@@ -5008,7 +5008,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         CompactReRequest req;
         vRecv >> req;
 
-        LogPrint("thin", "peer=%d is compactthin re-requesting %d transactions for %s\n",
+        LogPrint(Log::BLOCK, "peer=%d is compactthin re-requesting %d transactions for %s\n",
                 pfrom->id, req.indexes.size(), req.blockhash.ToString());
 
         auto mi = mapBlockIndex.find(req.blockhash);
@@ -5039,11 +5039,11 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             return error("message getdata size() = %u", vInv.size());
         }
 
-        if (fDebug || (vInv.size() != 1))
-            LogPrint("net", "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
+        if (LogAcceptCategory(Log::NET) || (vInv.size() != 1))
+            LogPrint(Log::NET, "received getdata (%u invsz) peer=%d\n", vInv.size(), pfrom->id);
 
-        if ((fDebug && vInv.size() > 0) || (vInv.size() == 1))
-            LogPrint("net", "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
+        if ((LogAcceptCategory(Log::NET) && vInv.size() > 0) || (vInv.size() == 1))
+            LogPrint(Log::NET, "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
 
         pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
         ProcessGetData(pfrom, connman);
@@ -5065,12 +5065,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         if (pindex)
             pindex = chainActive.Next(pindex);
         int nLimit = 500;
-        LogPrint("net", "getblocks %d to %s limit %d from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop.IsNull() ? "end" : hashStop.ToString(), nLimit, pfrom->id);
+        LogPrint(Log::NET, "getblocks %d to %s limit %d from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop.IsNull() ? "end" : hashStop.ToString(), nLimit, pfrom->id);
         for (; pindex; pindex = chainActive.Next(pindex))
         {
             if (pindex->GetBlockHash() == hashStop)
             {
-                LogPrint("net", "  getblocks stopping at %d %s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
+                LogPrint(Log::NET, "  getblocks stopping at %d %s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
                 break;
             }
             // If pruning, don't inv blocks unless we have on disk and are likely to still have
@@ -5078,7 +5078,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             const int nPrunedBlocksLikelyToHave = MIN_BLOCKS_TO_KEEP - 3600 / Params().GetConsensus().nPowTargetSpacing;
             if (fPruneMode && (!(pindex->nStatus & BLOCK_HAVE_DATA) || pindex->nHeight <= chainActive.Tip()->nHeight - nPrunedBlocksLikelyToHave))
             {
-                LogPrint("net", " getblocks stopping, pruned or too old block at %d %s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
+                LogPrint(Log::NET, " getblocks stopping, pruned or too old block at %d %s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
                 break;
             }
             pfrom->PushInventory(CInv(MSG_BLOCK, pindex->GetBlockHash()));
@@ -5086,7 +5086,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             {
                 // When this block is requested, we'll send an inv that'll
                 // trigger the peer to getblocks the next batch of inventory.
-                LogPrint("net", "  getblocks stopping at limit %d %s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
+                LogPrint(Log::NET, "  getblocks stopping at limit %d %s\n", pindex->nHeight, pindex->GetBlockHash().ToString());
                 pfrom->hashContinue = pindex->GetBlockHash();
                 break;
             }
@@ -5125,7 +5125,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         // we must use CBlocks, as CBlockHeaders won't include the 0x00 nTx count at the end
         vector<CBlock> vHeaders;
         int nLimit = MAX_HEADERS_RESULTS;
-        LogPrint("net", "getheaders %d to %s from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop.ToString(), pfrom->id);
+        LogPrint(Log::NET, "getheaders %d to %s from peer=%d\n", (pindex ? pindex->nHeight : -1), hashStop.ToString(), pfrom->id);
         for (; pindex; pindex = chainActive.Next(pindex))
         {
             vHeaders.push_back(pindex->GetBlockHeader());
@@ -5186,7 +5186,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             connman->RelayTransaction(tx, vAncestors);
             vWorkQueue.push_back(inv.hash);
 
-            LogPrint("mempool", "AcceptToMemoryPool: peer=%d %s: accepted %s (poolsz %u)\n",
+            LogPrint(Log::MEMPOOL, "AcceptToMemoryPool: peer=%d %s: accepted %s (poolsz %u)\n",
                 pfrom->id, pfrom->cleanSubVer,
                 tx.GetHash().ToString(),
                 mempool.size());
@@ -5216,7 +5216,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
                         continue;
                     if (AcceptToMemoryPool(mempool, stateDummy, orphanTx, true, &fMissingInputs2, connman))
                     {
-                        LogPrint("mempool", "   accepted orphan tx %s\n", orphanHash.ToString());
+                        LogPrint(Log::MEMPOOL, "   accepted orphan tx %s\n", orphanHash.ToString());
                         std::vector<uint256> vAncestors;
                         mempool.queryAncestors(orphanTx.GetHash(), vAncestors, connman->GetLocalServices());
                         connman->RelayTransaction(orphanTx, vAncestors);
@@ -5231,11 +5231,11 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
                             // Punish peer that gave us an invalid orphan tx
                             Misbehaving(fromPeer, nDos, "invalid orphan tx");
                             setMisbehaving.insert(fromPeer);
-                            LogPrint("mempool", "   invalid orphan tx %s\n", orphanHash.ToString());
+                            LogPrint(Log::MEMPOOL, "   invalid orphan tx %s\n", orphanHash.ToString());
                         }
                         // Has inputs but not accepted to mempool
                         // Probably non-standard or insufficient fee/priority
-                        LogPrint("mempool", "   removed orphan tx %s\n", orphanHash.ToString());
+                        LogPrint(Log::MEMPOOL, "   removed orphan tx %s\n", orphanHash.ToString());
                         vEraseQueue.push_back(orphanHash);
                         assert(recentRejects);
                         recentRejects->insert(orphanHash);
@@ -5254,7 +5254,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             unsigned int nMaxOrphanTx = (unsigned int)std::max((int64_t)0, GetArg("-maxorphantx", DEFAULT_MAX_ORPHAN_TRANSACTIONS));
             unsigned int nEvicted = LimitOrphanTxSize(nMaxOrphanTx);
             if (nEvicted > 0)
-                LogPrint("mempool", "mapOrphan overflow, removed %u tx\n", nEvicted);
+                LogPrint(Log::MEMPOOL, "mapOrphan overflow, removed %u tx\n", nEvicted);
         } else {
             assert(recentRejects);
             recentRejects->insert(tx.GetHash());
@@ -5275,7 +5275,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         int nDoS = 0;
         if (state.IsInvalid(nDoS))
         {
-            LogPrint("mempool", "%s from peer=%d %s was not accepted into the memory pool: %s\n", tx.GetHash().ToString(),
+            LogPrint(Log::MEMPOOL, "%s from peer=%d %s was not accepted into the memory pool: %s\n", tx.GetHash().ToString(),
                 pfrom->id, pfrom->cleanSubVer,
                 state.GetRejectReason());
             pfrom->PushMessage("reject", strCommand, state.GetRejectCode(),
@@ -5423,7 +5423,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
         XThinReRequest req;
         vRecv >> req;
-        LogPrint("thin", "peer=%d is xthin re-requesting %d transactions for %s\n",
+        LogPrint(Log::BLOCK, "peer=%d is xthin re-requesting %d transactions for %s\n",
                 pfrom->id, req.txRequesting.size(), req.block.ToString());
 
         BlockMap::iterator mi = mapBlockIndex.find(req.block);
@@ -5451,7 +5451,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
         XThinReReqResponse resp;
         vRecv >> resp;
-        LogPrint("thin", "recieved re-request response from peer=%d with %d txs for %s\n",
+        LogPrint(Log::BLOCK, "recieved re-request response from peer=%d with %d txs for %s\n",
             pfrom->id, resp.txRequested.size(), resp.block.ToString());
 
         LOCK(cs_main);
@@ -5468,7 +5468,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
         CompactReReqResponse resp;
         vRecv >> resp;
-        LogPrint("thin", "recieved re-request response from peer=%d with %d txs for %s\n",
+        LogPrint(Log::BLOCK, "recieved re-request response from peer=%d with %d txs for %s\n",
             pfrom->id, resp.txn.size(), resp.blockhash.ToString());
 
         LOCK(cs_main);
@@ -5487,7 +5487,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         // Only send one GetAddr response per connection to reduce resource waste
         //  and discourage addr stamping of INV announcements.
         if (pfrom->fSentAddr) {
-            LogPrint("net", "Ignoring repeated \"getaddr\". peer=%d\n", pfrom->id);
+            LogPrint(Log::NET, "Ignoring repeated \"getaddr\". peer=%d\n", pfrom->id);
             return true;
         }
         pfrom->fSentAddr = true;
@@ -5602,7 +5602,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         }
 
         if (!(sProblem.empty())) {
-            LogPrint("net", "pong peer=%d %s: %s, %x expected, %x received, %u bytes\n",
+            LogPrint(Log::NET, "pong peer=%d %s: %s, %x expected, %x received, %u bytes\n",
                 pfrom->id,
                 pfrom->cleanSubVer,
                 sProblem,
@@ -5666,7 +5666,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
     else if (strCommand == "reject")
     {
-        if (fDebug) {
+        if (LogAcceptCategory(Log::NET)) {
             try {
                 string strMsg; unsigned char ccode; string strReason;
                 vRecv >> LIMITED_STRING(strMsg, CMessageHeader::COMMAND_SIZE) >> ccode >> LIMITED_STRING(strReason, MAX_REJECT_MESSAGE_LENGTH);
@@ -5680,10 +5680,10 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
                     vRecv >> hash;
                     ss << ": hash " << hash.ToString();
                 }
-                LogPrint("net", "Reject %s\n", SanitizeString(ss.str()));
+                LogPrint(Log::NET, "Reject %s\n", SanitizeString(ss.str()));
             } catch (const std::ios_base::failure&) {
                 // Avoid feedback loops by preventing reject messages from triggering a new reject message.
-                LogPrint("net", "Unparseable reject message received\n");
+                LogPrint(Log::NET, "Unparseable reject message received\n");
                 return false;
             }
         }
@@ -5692,7 +5692,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
     else
     {
         // Ignore unknown commands for extensibility
-        LogPrint("net", "Unknown command \"%s\" from peer=%d\n", SanitizeString(strCommand), pfrom->id);
+        LogPrint(Log::NET, "Unknown command \"%s\" from peer=%d\n", SanitizeString(strCommand), pfrom->id);
     }
 
 
@@ -5814,7 +5814,7 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman)
         }
 
         if (!fRet)
-            LogPrint("net", "%s(%s, %u bytes) FAILED peer=%d\n", __func__, SanitizeString(strCommand), nMessageSize, pfrom->id);
+            LogPrint(Log::NET, "%s(%s, %u bytes) FAILED peer=%d\n", __func__, SanitizeString(strCommand), nMessageSize, pfrom->id);
 
         break;
     }
@@ -5951,7 +5951,7 @@ bool SendMessages(CNode* pto, CConnman* connman)
                 statePtr->fSyncStarted = true;
                 nSyncStarted++;
                 CBlockIndex *pindexStart = pindexBestHeader->pprev ? pindexBestHeader->pprev : pindexBestHeader;
-                LogPrint("net", "initial getheaders (%d) to peer=%d (startheight:%d)\n", pindexStart->nHeight, pto->id, pto->nStartingHeight);
+                LogPrint(Log::NET, "initial getheaders (%d) to peer=%d (startheight:%d)\n", pindexStart->nHeight, pto->id, pto->nStartingHeight);
                 pto->PushMessage("getheaders", chainActive.GetLocator(pindexStart), uint256());
             }
         }
@@ -6043,7 +6043,7 @@ bool SendMessages(CNode* pto, CConnman* connman)
             QueuedBlock &queuedBlock = statePtr->vBlocksInFlight.front();
             int64_t nTimeoutIfRequestedNow = GetBlockTimeout(nNow, nQueuedValidatedHeaders - statePtr->nBlocksInFlightValidHeaders, consensusParams);
             if (queuedBlock.nTimeDisconnect > nTimeoutIfRequestedNow) {
-                LogPrint("net", "Reducing block download timeout for peer=%d block=%s, orig=%d new=%d\n", pto->id, queuedBlock.hash.ToString(), queuedBlock.nTimeDisconnect, nTimeoutIfRequestedNow);
+                LogPrint(Log::NET, "Reducing block download timeout for peer=%d block=%s, orig=%d new=%d\n", pto->id, queuedBlock.hash.ToString(), queuedBlock.nTimeDisconnect, nTimeoutIfRequestedNow);
                 queuedBlock.nTimeDisconnect = nTimeoutIfRequestedNow;
             }
             if (queuedBlock.nTimeDisconnect < nNow) {
@@ -6067,13 +6067,13 @@ bool SendMessages(CNode* pto, CConnman* connman)
                 if (ThinBlocksActive(pto)) {
                     worker.requestBlock(pindex->GetBlockHash(), vGetData, *pto);
                     worker.addWork(pindex->GetBlockHash());
-                    LogPrint("net", "Requesting thin block %s (%d) peer=%d\n",
+                    LogPrint(Log::NET, "Requesting thin block %s (%d) peer=%d\n",
                             pindex->GetBlockHash().ToString(), pindex->nHeight, pto->id);
                 }
                 else
                 {
                     vGetData.push_back(CInv(MSG_BLOCK, pindex->GetBlockHash()));
-                    LogPrint("net", "Requesting full block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
+                    LogPrint(Log::NET, "Requesting full block %s (%d) peer=%d\n", pindex->GetBlockHash().ToString(),
                             pindex->nHeight, pto->id);
 
                 }
@@ -6084,7 +6084,7 @@ bool SendMessages(CNode* pto, CConnman* connman)
                 for (auto_ n = stallers.begin(); n != stallers.end(); ++n) {
                     if (NodeStatePtr(*n)->nStallingSince == 0) {
                         NodeStatePtr(*n)->nStallingSince = nNow;
-                        LogPrint("net", "Stall started peer=%d\n", *n);
+                        LogPrint(Log::NET, "Stall started peer=%d\n", *n);
                     }
                 }
             }
@@ -6098,8 +6098,8 @@ bool SendMessages(CNode* pto, CConnman* connman)
             const CInv& inv = (*pto->mapAskFor.begin()).second;
             if (!AlreadyHave(inv))
             {
-                if (fDebug)
-                    LogPrint("net", "Requesting %s peer=%d\n", inv.ToString(), pto->id);
+                if (LogAcceptCategory(Log::NET))
+                    LogPrint(Log::NET, "Requesting %s peer=%d\n", inv.ToString(), pto->id);
                 vGetData.push_back(inv);
                 if (vGetData.size() >= 1000)
                 {

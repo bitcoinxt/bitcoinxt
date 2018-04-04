@@ -14,7 +14,7 @@
 static void fallbackDownload(CNode& from,
         const uint256& block, BlockInFlightMarker& markInFlight) {
 
-    LogPrint("thin", "Falling back on full block download for %s peer=%d\n",
+    LogPrint(Log::BLOCK, "Falling back on full block download for %s peer=%d\n",
             block.ToString(), from.id);
 
     CInv req(MSG_BLOCK, block);
@@ -25,7 +25,7 @@ static void fallbackDownload(CNode& from,
 static void handleReRequestFailed(ThinBlockWorker& worker, CNode& from, uint256 block,
         BlockInFlightMarker& markInFlight) {
 
-    LogPrint("thin", "Did not provide all missing transactions in a"
+    LogPrint(Log::BLOCK, "Did not provide all missing transactions in a"
             "thin block re-request for %s peer=%d\n",
             block.ToString(), worker.nodeID());
 
@@ -45,7 +45,7 @@ void XThinBlockConcluder::operator()(const XThinReReqResponse& resp,
 
     if (!worker.isWorkingOn(resp.block))
     {
-        LogPrint("thin", "got xthin re-req response for %s, but not "
+        LogPrint(Log::BLOCK, "got xthin re-req response for %s, but not "
                 "working on block peer=%d\n", resp.block.ToString(), pfrom.id);
         return;
     }
@@ -63,7 +63,7 @@ void CompactBlockConcluder::operator()(const CompactReReqResponse& resp,
 
     if (!worker.isWorkingOn(resp.blockhash))
     {
-        LogPrint("thin", "got compact re-req response for %s, but not "
+        LogPrint(Log::BLOCK, "got compact re-req response for %s, but not "
                 "working on block peer=%d\n", resp.blockhash.ToString(), pfrom.id);
         return;
     }

@@ -19,8 +19,9 @@ public:
     // This code is adapted from posix_logger.h, which is why it is using vsprintf.
     // Please do not do this in normal code
     void Logv(const char * format, va_list ap) override {
-            if (!LogAcceptCategory("leveldb"))
+            if (!LogAcceptCategory(Log::LEVELDB)) {
                 return;
+            }
             char buffer[500];
             for (int iter = 0; iter < 2; iter++) {
                 char* base;

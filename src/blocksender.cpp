@@ -148,7 +148,7 @@ void BlockSender::sendBlock(CNode& node,
             node.PushMessage("cmpctblock", cmpct);
         }
         else {
-            LogPrint("net", "cmpctblock outside depth %d, %d peer=%d\n",
+            LogPrint(Log::NET, "cmpctblock outside depth %d, %d peer=%d\n",
                     blockIndex.nHeight, activeChainHeight, node.id);
             node.PushMessage("block", block);
         }

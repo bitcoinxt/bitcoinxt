@@ -121,18 +121,14 @@ bool ThinBlockManager::addTx(const uint256& block, const CTransaction& tx) {
     ThinBlockBuilder::TXAddRes res = b->addTransaction(tx);
 
     if (res == ThinBlockBuilder::TX_UNWANTED) {
-        LogPrint("thin", "tx %s does not belong to block %s\n",
+        LogPrint(Log::BLOCK, "tx %s does not belong to block %s\n",
                 tx.GetHash().ToString(), block.ToString());
         return false;
     }
 
-    else if (res == ThinBlockBuilder::TX_DUP)
-        LogPrint("thin2", "already had tx %s\n",
-                tx.GetHash().ToString());
+    else if (res == ThinBlockBuilder::TX_DUP) { /* ignore */ }
 
-    else if (res == ThinBlockBuilder::TX_ADDED)
-        LogPrint("thin2", "added transaction %s\n",
-                tx.GetHash().ToString());
+    else if (res == ThinBlockBuilder::TX_ADDED) { /* ignore */ }
 
     else { assert(!"unknown addTransaction response"); }
 
@@ -215,5 +211,5 @@ void ThinBlockManager::requestBlockAnnouncements(ThinBlockWorker& w, CNode& node
     // Only request thin block announcements from 3 peers at a time.
     if (announcers.size() > 3)
         announcers.erase(begin(announcers));
-    LogPrint("ann", "Thin block announcers: %d\n", announcers.size());
+    LogPrint(Log::ANN, "Thin block announcers: %d\n", announcers.size());
 }

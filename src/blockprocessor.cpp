@@ -40,7 +40,7 @@ bool BlockProcessor::setToWork(const CBlockHeader& header, int activeChainHeight
     const uint256 hash = header.GetHash();
 
     if (HaveBlockData(hash)) {
-        LogPrint("thin", "already had block %s, "
+        LogPrint(Log::BLOCK, "already had block %s, "
                 "ignoring %s peer=%d\n",
             hash.ToString(), netcmd, from.id);
         worker.stopWork(hash);
@@ -58,7 +58,7 @@ bool BlockProcessor::setToWork(const CBlockHeader& header, int activeChainHeight
 
     if (isAnnouncement && index->nHeight <= activeChainHeight + 2) {
         // Accept block announcement.
-        LogPrint("thin", "received %s %s announcement peer=%d\n",
+        LogPrint(Log::BLOCK, "received %s %s announcement peer=%d\n",
                 netcmd, hash.ToString(), from.id);
         worker.addWork(hash);
         return true;
@@ -67,7 +67,7 @@ bool BlockProcessor::setToWork(const CBlockHeader& header, int activeChainHeight
         // Be conservative about block announcements to protect against DoS.
         // We have processed the header, so the block will be re-downloaded
         // later if we really want it.
-        LogPrint("thin", "ignoring block announcement %s, height %d is too far "
+        LogPrint(Log::BLOCK, "ignoring block announcement %s, height %d is too far "
                 "away from active chain %d peer=%d\n", hash.ToString(),
                 index->nHeight, activeChainHeight, from.id);
         return false;
@@ -84,7 +84,7 @@ bool BlockProcessor::requestConnectHeaders(const CBlockHeader& header, bool bump
     if (needPrevHeaders) {
         // We don't have previous block. We can't connect it to the chain.
         // Ditch it. We will re-request it later if we see that we still want it.
-        LogPrint("thin", "Can't connect block %s. We don't have prev. Ignoring it peer=%d.\n",
+        LogPrint(Log::BLOCK, "Can't connect block %s. We don't have prev. Ignoring it peer=%d.\n",
                 header.GetHash().ToString(), from.id);
 
         worker.stopWork(header.GetHash());

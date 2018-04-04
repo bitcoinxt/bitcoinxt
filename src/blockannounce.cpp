@@ -72,7 +72,7 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
             return DONT_DOWNL;
 
         if (Opt().AvoidFullBlocks()) {
-            LogPrint("thin", "avoiding full blocks, not requesting %s from %d\n",
+            LogPrint(Log::BLOCK, "avoiding full blocks, not requesting %s from %d\n",
                 block.ToString(), from.id);
 
             return DONT_DOWNL;
@@ -86,7 +86,7 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
     NodeStatePtr state(from.id);
 
     if (thinmg.numWorkers(block) >= Opt().ThinBlocksMaxParallel()) {
-        LogPrint("thin", "max parallel thin req reached, not req %s from peer %d\n",
+        LogPrint(Log::BLOCK, "max parallel thin req reached, not req %s from peer %d\n",
                 block.ToString(), from.id);
         return DONT_DOWNL;
     }
@@ -97,7 +97,7 @@ BlockAnnounceReceiver::DownloadStrategy BlockAnnounceReceiver::pickDownloadStrat
 void requestHeaders(CNode& from, const uint256& block) {
 
     from.PushMessage("getheaders", chainActive.GetLocator(pindexBestHeader), block);
-    LogPrint("net", "getheaders (%d) %s to peer=%d\n",
+    LogPrint(Log::NET, "getheaders (%d) %s to peer=%d\n",
             pindexBestHeader->nHeight, block.ToString(), from.id);
 }
 
@@ -121,7 +121,7 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch) {
 
     if (s == DOWNL_THIN_NOW) {
         int numDownloading = thinmg.numWorkers(block);
-        LogPrint("thin", "requesting %s from peer %d (%d of %d parallel)\n",
+        LogPrint(Log::BLOCK, "requesting %s from peer %d (%d of %d parallel)\n",
             block.ToString(), from.id, (numDownloading + 1), Opt().ThinBlocksMaxParallel());
 
         nodestate->thinblock->requestBlock(block, toFetch, from);
@@ -137,7 +137,7 @@ bool BlockAnnounceReceiver::onBlockAnnounced(std::vector<CInv>& toFetch) {
 
     assert(s == DOWNL_FULL_NOW);
 
-    LogPrint("thin", "full block download of %s from %d\n",
+    LogPrint(Log::BLOCK, "full block download of %s from %d\n",
             block.ToString(), from.id);
     toFetch.push_back(CInv(MSG_BLOCK, block));
     return true;
@@ -166,7 +166,7 @@ bool blocksConnect(const std::vector<uint256>& blocksToAnnounce) {
             // be added multiple times to vBlockHashesToAnnounce.
             // Robustly deal with this rare situation by reverting
             // to an inv.
-            LogPrint("ann", "header announce: blocks don't connect: expected %s, is %s\n",
+            LogPrint(Log::ANN, "header announce: blocks don't connect: expected %s, is %s\n",
                     best->GetBlockHash().ToString(),
                     block->pprev->GetBlockHash().ToString());
             return false;
@@ -197,7 +197,7 @@ static bool headerConnectsAtNode(
     int toAnnounce = getHeight(toAnnounceBlock);
 
     if (toAnnounce > (bestSent + 1) && toAnnounce > (bestKnown + 1)) {
-        LogPrint("ann", "ann: skipping header announcement, "
+        LogPrint(Log::ANN, "ann: skipping header announcement, "
                 "guessing that it won't connect. "
                 "heights - announce: %d best sent: %d best known: %d peer=%d\n",
                 toAnnounce, bestSent, bestKnown, id);
@@ -232,7 +232,7 @@ bool BlockAnnounceSender::canAnnounceWithHeaders() const {
             auto block = mi->second;
             if (chainActive[block->nHeight] != block)
             {
-                LogPrint("ann", "bailing out from header to peer=%d ann, reorged away from %s\n",
+                LogPrint(Log::ANN, "bailing out from header to peer=%d ann, reorged away from %s\n",
                         to.id, block->GetBlockHash().ToString());
                 // Bail out if we reorged away from this block
                 return false;
@@ -273,7 +273,7 @@ bool BlockAnnounceSender::announceWithHeaders() {
         }
 
         if (peerHasHeader(block)) {
-            LogPrint("ann", "header ann: peer=%d has header %s\n",
+            LogPrint(Log::ANN, "header ann: peer=%d has header %s\n",
                     to.id, block->GetBlockHash().ToString());
             continue; // keep looking for the first new block
         }
@@ -289,7 +289,7 @@ bool BlockAnnounceSender::announceWithHeaders() {
 
         // Peer doesn't have this header or the prior one -- nothing will
         // connect, so bail out.
-        LogPrint("ann", "header ann to peer=%d, nothing connects\n",
+        LogPrint(Log::ANN, "header ann to peer=%d, nothing connects\n",
                 to.id);
         return false;
     }
@@ -297,7 +297,7 @@ bool BlockAnnounceSender::announceWithHeaders() {
     if (headers.empty())
         return true;
 
-    LogPrint("net", "%s: %u headers, range (%s, %s), to peer=%d\n", __func__,
+    LogPrint(Log::NET, "%s: %u headers, range (%s, %s), to peer=%d\n", __func__,
             headers.size(),
             headers.front().GetHash().ToString(),
             headers.back().GetHash().ToString(), to.id);
@@ -321,7 +321,7 @@ void BlockAnnounceSender::announceWithBlock(BlockSender& sender) {
     sender.sendBlock(to, *block, MSG_CMPCT_BLOCK, block->nHeight);
     UpdateBestHeaderSent(to, block);
 
-    LogPrint("net", "%s: block %s to peer=%d\n",
+    LogPrint(Log::NET, "%s: block %s to peer=%d\n",
             __func__, hash.ToString(), to.id);
 }
 
@@ -332,7 +332,7 @@ void BlockAnnounceSender::announce() {
         return;
 
     NodeStatePtr node(to.id);
-    LogPrint("ann", "Announce for peer=%d, %d blocks, prefersheaders: %d, prefersblocks: %d\n",
+    LogPrint(Log::ANN, "Announce for peer=%d, %d blocks, prefersheaders: %d, prefersblocks: %d\n",
             to.id, to.blocksToAnnounce.size(),
             node->prefersHeaders, node->prefersBlocks);
 
@@ -376,7 +376,7 @@ void BlockAnnounceSender::announceWithInv() {
     // setInventoryKnown to track this.)
     if (!peerHasHeader(pindex)) {
         to.PushInventory(CInv(MSG_BLOCK, hashToAnnounce));
-        LogPrint("net", "%s: sending inv peer=%d hash=%s\n", __func__,
+        LogPrint(Log::NET, "%s: sending inv peer=%d hash=%s\n", __func__,
                 to.id, hashToAnnounce.ToString());
     }
 }

@@ -569,7 +569,7 @@ void CTxMemPool::removeConflicts(const CTransaction &tx, std::list<CTransaction>
 {
     // Remove transactions which depend on inputs of tx, recursively
     std::vector<respend::RespendActionPtr> actions;
-    if (LogAcceptCategory("respend"))
+    if (LogAcceptCategory(Log::RESPEND))
         actions.push_back(respend::RespendActionPtr(new respend::RespendLogger{}));
     actions.push_back(respend::RespendActionPtr(new respend::MempoolRemover{*this, removed}));
 
@@ -632,7 +632,7 @@ void CTxMemPool::check(const CCoinsViewCache *pcoins) const
     if (GetRand(std::numeric_limits<uint32_t>::max()) >= nCheckFrequency)
         return;
 
-    LogPrint("mempool", "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(), (unsigned int)mapNextTx.size());
+    LogPrint(Log::MEMPOOL, "Checking mempool with %u transactions and %u inputs\n", (unsigned int)mapTx.size(), (unsigned int)mapNextTx.size());
 
     uint64_t checkTotal = 0;
     uint64_t innerUsage = 0;
