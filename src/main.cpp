@@ -5011,17 +5011,23 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         LogPrint(Log::BLOCK, "peer=%d is compactthin re-requesting %d transactions for %s\n",
                 pfrom->id, req.indexes.size(), req.blockhash.ToString());
 
+        LOCK(cs_main);
         auto mi = mapBlockIndex.find(req.blockhash);
         bool haveBlock = mi != mapBlockIndex.end();
-        LOCK(cs_main);
         BlockSender bs;
         bool canSend = haveBlock && bs.canSend(
                 chainActive, *(mi->second), pindexBestHeader);
 
         try {
-            if (canSend)
+            if (canSend) {
                 bs.sendReReqReponse(*pfrom, *(mi->second), req,
                         chainActive.Height());
+            }
+            else {
+                LogPrint(Log::BLOCK,
+                         "Can't respond to compact re-request for %s\n",
+                         req.blockhash.ToString());
+            }
         }
         catch (const std::exception& e) {
             LogPrintf("error in re-request from peer=%d: %s\n",
