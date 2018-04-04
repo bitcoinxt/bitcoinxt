@@ -286,6 +286,8 @@ public:
 
     uint256 GetBlockHash() const
     {
+        if (phashBlock == nullptr)
+            throw std::runtime_error("GetBlockHash nullptr");
         return *phashBlock;
     }
 
