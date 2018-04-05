@@ -5,11 +5,16 @@
 #define BITCOIN_UTILFORK_H
 
 #include <cstdint>
+
 class CBlockIndex;
+class CTxMemPool;
 
 bool IsUAHFActivatingBlock(int64_t mtpCurrent, const CBlockIndex* pindexPrev);
 bool IsUAHFActive(uint64_t mtpChainTip);
 bool IsThirdHFActivatingBlock(int64_t mtpCurrent, const CBlockIndex* pindexPrev);
 bool IsThirdHFActive(int64_t mtpChainTip);
+
+void ForkMempoolClearer(CTxMemPool& mempool,
+                        const CBlockIndex* oldTip, const CBlockIndex* newTip);
 
 #endif
