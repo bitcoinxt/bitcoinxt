@@ -37,7 +37,7 @@ BITCOIN_TESTS =\
   respend/test/respenddetector_tests.cpp \
   respend/test/walletnotifier_tests.cpp \
   test/arith_uint256_tests.cpp \
-  test/bignum.h \
+  test/scriptnum10.h \
   test/addrman_tests.cpp \
   test/alert_tests.cpp \
   test/allocator_tests.cpp \
