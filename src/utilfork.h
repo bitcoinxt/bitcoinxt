@@ -7,8 +7,8 @@
 #include <cstdint>
 class CBlockIndex;
 
-bool IsUAHFActivatingBlock(int64_t mtpCurrent, CBlockIndex* pindexPrev);
-bool IsThirdHFActivatingBlock(int64_t mtpCurrent, CBlockIndex* pindexPrev);
+bool IsUAHFActivatingBlock(int64_t mtpCurrent, const CBlockIndex* pindexPrev);
+bool IsThirdHFActivatingBlock(int64_t mtpCurrent, const CBlockIndex* pindexPrev);
 bool IsThirdHFActive(int64_t mtpChainTip);
 
 #endif

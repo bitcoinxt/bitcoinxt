@@ -7,7 +7,7 @@
 #include "options.h"
 
 static bool IsForkActivatingBlock(int64_t mtpActivationTime,
-                                  int64_t mtpCurrent, CBlockIndex* pindexPrev)
+                                  int64_t mtpCurrent, const CBlockIndex* pindexPrev)
 {
     if (!mtpActivationTime)
         return false;
@@ -23,11 +23,11 @@ static bool IsForkActivatingBlock(int64_t mtpActivationTime,
 }
 
 // Check if this block activates UAHF. The next block is fork block and must be > 1MB.
-bool IsUAHFActivatingBlock(int64_t mtpCurrent, CBlockIndex* pindexPrev) {
+bool IsUAHFActivatingBlock(int64_t mtpCurrent, const CBlockIndex* pindexPrev) {
     return IsForkActivatingBlock(Opt().UAHFTime(), mtpCurrent, pindexPrev);
 }
 
-bool IsThirdHFActivatingBlock(int64_t mtpCurrent, CBlockIndex* pindexPrev) {
+bool IsThirdHFActivatingBlock(int64_t mtpCurrent, const CBlockIndex* pindexPrev) {
     return IsForkActivatingBlock(Opt().ThirdHFTime(), mtpCurrent, pindexPrev);
 }
 
