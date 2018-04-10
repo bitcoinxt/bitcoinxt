@@ -1147,7 +1147,7 @@ public:
     }
 };
 
-uint256 GetPrevoutHash(const CTransaction &txTo) {
+uint256 GetPrevoutHash(const CTransaction& txTo) {
     CHashWriter ss(SER_GETHASH, 0);
     for (unsigned int n = 0; n < txTo.vin.size(); n++) {
         ss << txTo.vin[n].prevout;
@@ -1155,7 +1155,7 @@ uint256 GetPrevoutHash(const CTransaction &txTo) {
     return ss.GetHash();
 }
 
-uint256 GetSequenceHash(const CTransaction &txTo) {
+uint256 GetSequenceHash(const CTransaction& txTo) {
     CHashWriter ss(SER_GETHASH, 0);
     for (unsigned int n = 0; n < txTo.vin.size(); n++) {
         ss << txTo.vin[n].nSequence;
@@ -1163,7 +1163,7 @@ uint256 GetSequenceHash(const CTransaction &txTo) {
     return ss.GetHash();
 }
 
-uint256 GetOutputsHash(const CTransaction &txTo) {
+uint256 GetOutputsHash(const CTransaction& txTo) {
     CHashWriter ss(SER_GETHASH, 0);
     for (unsigned int n = 0; n < txTo.vout.size(); n++) {
         ss << txTo.vout[n];
@@ -1173,8 +1173,15 @@ uint256 GetOutputsHash(const CTransaction &txTo) {
 
 } // anon namespace
 
+PrecomputedTransactionData::PrecomputedTransactionData(const CTransaction& txTo)
+{
+    hashPrevouts = GetPrevoutHash(txTo);
+    hashSequence = GetSequenceHash(txTo);
+    hashOutputs = GetOutputsHash(txTo);
+}
+
 uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsigned int nIn, uint32_t nHashType,
-                      const CAmount &amount, unsigned int flags)
+                      const CAmount &amount, unsigned int flags, const PrecomputedTransactionData* cache)
 {
     if ((nHashType & SIGHASH_FORKID) &&
         (flags & SCRIPT_ENABLE_SIGHASH_FORKID)) {
@@ -1183,18 +1190,18 @@ uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsig
         uint256 hashOutputs;
 
         if (!(nHashType & SIGHASH_ANYONECANPAY)) {
-            hashPrevouts = GetPrevoutHash(txTo);
+            hashPrevouts = cache ? cache->hashPrevouts : GetPrevoutHash(txTo);
         }
 
         if (!(nHashType & SIGHASH_ANYONECANPAY) &&
             (nHashType & 0x1f) != SIGHASH_SINGLE &&
             (nHashType & 0x1f) != SIGHASH_NONE) {
-            hashSequence = GetSequenceHash(txTo);
+            hashSequence = cache ? cache->hashSequence : GetSequenceHash(txTo);
         }
 
         if ((nHashType & 0x1f) != SIGHASH_SINGLE &&
             (nHashType & 0x1f) != SIGHASH_NONE) {
-            hashOutputs = GetOutputsHash(txTo);
+            hashOutputs = cache ? cache->hashOutputs : GetOutputsHash(txTo);
         } else if ((nHashType & 0x1f) == SIGHASH_SINGLE &&
                    nIn < txTo.vout.size()) {
             CHashWriter ss(SER_GETHASH, 0);
@@ -1267,7 +1274,7 @@ bool TransactionSignatureChecker::CheckSig(const vector<unsigned char>& vchSigIn
     uint32_t nHashType = GetHashType(vchSig);
     vchSig.pop_back();
 
-    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, flags);
+    uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, flags, this->txdata);
 
     if (!VerifySignature(vchSig, pubkey, sighash))
         return false;
