@@ -1,4 +1,4 @@
-// Copyright (c) 2017 The Bitcoin XT developers
+// Copyright (c) 2017-2018 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #ifndef BITCOIN_UTILFORK_H
@@ -8,6 +8,7 @@
 class CBlockIndex;
 
 bool IsUAHFActivatingBlock(int64_t mtpCurrent, const CBlockIndex* pindexPrev);
+bool IsUAHFActive(uint64_t mtpChainTip);
 bool IsThirdHFActivatingBlock(int64_t mtpCurrent, const CBlockIndex* pindexPrev);
 bool IsThirdHFActive(int64_t mtpChainTip);
 

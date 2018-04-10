@@ -31,8 +31,20 @@ bool IsThirdHFActivatingBlock(int64_t mtpCurrent, const CBlockIndex* pindexPrev)
     return IsForkActivatingBlock(Opt().ThirdHFTime(), mtpCurrent, pindexPrev);
 }
 
+static bool IsForkActive(uint64_t mtpActivation, uint64_t mtpChainTip) {
+    if (!mtpActivation)
+        return false;
+
+    return mtpChainTip >= mtpActivation;
+}
+
+bool IsUAHFActive(uint64_t mtpChainTip) {
+    return IsForkActive(Opt().UAHFTime(), mtpChainTip);
+}
+
 bool IsThirdHFActive(int64_t mtpChainTip) {
-    int64_t mtpHF = Opt().ThirdHFTime();
+    return IsForkActive(Opt().ThirdHFTime(), mtpChainTip);
+}
 
     if (!mtpHF)
         return false;
