@@ -13,6 +13,7 @@
 #include "uint256.h"
 
 #include <vector>
+#include <functional>
 
 static const int BIP100_DBI_VERSION = 0x08000000;
 static const int DISK_BLOCK_INDEX_VERSION = BIP100_DBI_VERSION;
@@ -421,10 +422,14 @@ public:
     }
 };
 
+using OnTipChangeCallb = std::function<void(const CBlockIndex*, const CBlockIndex*)>;
+
 /** An in-memory indexed chain of blocks. */
 class CChain {
 private:
     std::vector<CBlockIndex*> vChain;
+    std::vector<OnTipChangeCallb> tipObservers;
+    void OnTipChanged(const CBlockIndex* oldTip, CBlockIndex* newTip);
 
 public:
     /** Returns the index entry for the genesis block of this chain, or NULL if none. */
@@ -476,6 +481,10 @@ public:
 
     /** Find the last common block between this chain and a block index entry. */
     const CBlockIndex *FindFork(const CBlockIndex *pindex) const;
+
+    void AddTipObserver(OnTipChangeCallb o) {
+        tipObservers.push_back(o);
+    }
 };
 
 #endif // BITCOIN_CHAIN_H

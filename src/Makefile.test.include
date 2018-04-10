@@ -51,6 +51,7 @@ BITCOIN_TESTS =\
   test/blocksender_tests.cpp \
   test/bloom_tests.cpp \
   test/bswap_tests.cpp \
+  test/chain_tests.cpp \
   test/chainparams_tests.cpp \
   test/checkblock_tests.cpp \
   test/Checkpoints_tests.cpp \

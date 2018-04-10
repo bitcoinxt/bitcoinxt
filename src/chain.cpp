@@ -11,8 +11,11 @@ using namespace std;
  * CChain implementation
  */
 void CChain::SetTip(CBlockIndex *pindex) {
-    if (pindex == NULL) {
+    CBlockIndex* oldTip = Tip();
+
+    if (pindex == nullptr) {
         vChain.clear();
+        OnTipChanged(oldTip, Tip());
         return;
     }
     vChain.resize(pindex->nHeight + 1);
@@ -20,6 +23,8 @@ void CChain::SetTip(CBlockIndex *pindex) {
         vChain[pindex->nHeight] = pindex;
         pindex = pindex->pprev;
     }
+
+    OnTipChanged(oldTip, Tip());
 }
 
 CBlockLocator CChain::GetLocator(const CBlockIndex *pindex) const {
@@ -59,6 +64,11 @@ const CBlockIndex *CChain::FindFork(const CBlockIndex *pindex) const {
     while (pindex && !Contains(pindex))
         pindex = pindex->pprev;
     return pindex;
+}
+
+void CChain::OnTipChanged(const CBlockIndex* oldTip, CBlockIndex* newTip) {
+    for (auto& o : tipObservers)
+        o(oldTip, newTip);
 }
 
 /** Turn the lowest '1' bit in the binary representation of a number into a '0'. */
