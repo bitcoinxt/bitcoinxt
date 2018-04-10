@@ -7,7 +7,7 @@ This test checks activation of monolith opcodes
 """
 
 from test_framework.test_framework import ComparisonTestFramework
-from test_framework.util import satoshi_round, assert_equal, assert_raises_rpc_error
+from test_framework.util import satoshi_round, assert_equal, assert_raises_jsonrpc, start_nodes
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.blocktools import *
 from test_framework.script import *
@@ -30,12 +30,17 @@ class PreviousSpendableOutput():
 
 class MonolithActivationTest(ComparisonTestFramework):
 
-    def set_test_params(self):
+    def setup_network(self):
         self.num_nodes = 1
         self.setup_clean_chain = True
         self.extra_args = [['-whitelist=127.0.0.1',
-                            "-monolithactivationtime=%d" % MONOLITH_START_TIME,
-                            "-replayprotectionactivationtime=%d" % (2 * MONOLITH_START_TIME)]]
+                            "-thirdhftime=%d" % MONOLITH_START_TIME]]
+
+        self.nodes = start_nodes(
+            self.num_nodes, self.options.tmpdir,
+            extra_args=self.extra_args * self.num_nodes,
+            binary=[self.options.testbinary] +
+            [self.options.refbinary]*(self.num_nodes-1))
 
     def create_and_tx(self, count):
         node = self.nodes[0]
@@ -91,15 +96,15 @@ class MonolithActivationTest(ComparisonTestFramework):
             return tx
 
         # Check that large opreturn are not accepted yet.
-        self.log.info("Try to use the monolith opcodes before activation")
+        print("Try to use the monolith opcodes before activation")
 
         tx0 = spend_and()
         tx0_hex = ToHex(tx0)
-        assert_raises_rpc_error(-26, RPC_DISABLED_OPCODE_ERROR,
+        assert_raises_jsonrpc(-26, RPC_DISABLED_OPCODE_ERROR,
                                 node.sendrawtransaction, tx0_hex)
 
         # Push MTP forward just before activation.
-        self.log.info("Pushing MTP just before the activation and check again")
+        print("Pushing MTP just before the activation and check again")
         node.setmocktime(MONOLITH_START_TIME)
 
         # returns a test case that asserts that the current tip was accepted
@@ -116,13 +121,14 @@ class MonolithActivationTest(ComparisonTestFramework):
         def next_block(block_time):
             # get block height
             blockchaininfo = node.getblockchaininfo()
-            height = int(blockchaininfo['blocks'])
+            height = int(blockchaininfo['blocks']) + 1
 
             # create the block
-            coinbase = create_coinbase(height)
+            coinbase = create_coinbase(absoluteHeight = height)
             coinbase.rehash()
             block = create_block(
                 int(node.getbestblockhash(), 16), coinbase, block_time)
+            block.nVersion = 4
 
             # Do PoW, which is cheap on regnet
             block.solve()
@@ -135,7 +141,7 @@ class MonolithActivationTest(ComparisonTestFramework):
         # Check again just before the activation time
         assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'],
                      MONOLITH_START_TIME - 1)
-        assert_raises_rpc_error(-26, RPC_DISABLED_OPCODE_ERROR,
+        assert_raises_jsonrpc(-26, RPC_DISABLED_OPCODE_ERROR,
                                 node.sendrawtransaction, tx0_hex)
 
         def add_tx(block, tx):
@@ -147,7 +153,7 @@ class MonolithActivationTest(ComparisonTestFramework):
         add_tx(b, tx0)
         yield rejected(b, RejectResult(16, b'blk-bad-inputs'))
 
-        self.log.info("Activates the new opcodes")
+        print("Activates the new opcodes")
         fork_block = next_block(MONOLITH_START_TIME + 6)
         yield accepted(fork_block)
 
@@ -162,7 +168,7 @@ class MonolithActivationTest(ComparisonTestFramework):
         add_tx(monolithblock, tx0)
         yield accepted(monolithblock)
 
-        self.log.info("Cause a reorg that deactivate the monolith opcodes")
+        print("Cause a reorg that deactivate the monolith opcodes")
 
         # Invalidate the monolith block, ensure tx0 gets back to the mempool.
         assert(tx0id not in set(node.getrawmempool()))
