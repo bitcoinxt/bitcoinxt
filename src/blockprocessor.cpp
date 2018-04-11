@@ -16,7 +16,8 @@ void BlockProcessor::rejectBlock(
     LogPrintf("rejecting %s from peer=%d - %s\n",
         netcmd, from.id, reason);
 
-    from.PushMessage("reject", netcmd, REJECT_MALFORMED, reason, block);
+    from.PushMessage("reject", netcmd, REJECT_MALFORMED,
+                     reason.substr(0, MAX_REJECT_MESSAGE_LENGTH), block);
 
     this->misbehave(misbehave, "block rejected " + reason);
     worker.stopWork(block);
