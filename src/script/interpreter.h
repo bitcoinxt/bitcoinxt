@@ -95,6 +95,10 @@ enum
     // Signature(s) must be empty vector if an CHECK(MULTI)SIG operation failed
     //
     SCRIPT_VERIFY_NULLFAIL = (1U << 14),
+
+    // Enable new opcodes.
+    //
+    SCRIPT_ENABLE_MONOLITH_OPCODES = (1U << 18),
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError* serror);

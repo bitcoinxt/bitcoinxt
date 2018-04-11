@@ -260,6 +260,32 @@ bool static CheckMinimalPush(const valtype& data, opcodetype opcode) {
     return true;
 }
 
+static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
+    switch (opcode) {
+        case OP_CAT:
+        case OP_SPLIT:
+        case OP_BIN2NUM:
+        case OP_NUM2BIN:
+        case OP_INVERT:
+        case OP_AND:
+        case OP_OR:
+        case OP_XOR:
+        case OP_2MUL:
+        case OP_2DIV:
+        case OP_MUL:
+        case OP_DIV:
+        case OP_MOD:
+        case OP_LSHIFT:
+        case OP_RSHIFT:
+            return true;
+
+        default:
+            break;
+    }
+
+    return false;
+}
+
 bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, unsigned int flags, const BaseSignatureChecker& checker, ScriptError* serror)
 {
     static const CScriptNum bnZero(0);
@@ -301,22 +327,9 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
             if (opcode > OP_16 && ++nOpCount > 201)
                 return set_error(serror, SCRIPT_ERR_OP_COUNT);
 
-            if (opcode == OP_CAT ||
-                opcode == OP_SUBSTR ||
-                opcode == OP_LEFT ||
-                opcode == OP_RIGHT ||
-                opcode == OP_INVERT ||
-                opcode == OP_AND ||
-                opcode == OP_OR ||
-                opcode == OP_XOR ||
-                opcode == OP_2MUL ||
-                opcode == OP_2DIV ||
-                opcode == OP_MUL ||
-                opcode == OP_DIV ||
-                opcode == OP_MOD ||
-                opcode == OP_LSHIFT ||
-                opcode == OP_RSHIFT)
-                return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE); // Disabled opcodes.
+            if (IsOpcodeDisabled(opcode, flags)) {
+                return set_error(serror, SCRIPT_ERR_DISABLED_OPCODE);
+            }
 
             if (fExec && 0 <= opcode && opcode <= OP_PUSHDATA4) {
                 if (fRequireMinimal && !CheckMinimalPush(vchPushValue, opcode)) {
