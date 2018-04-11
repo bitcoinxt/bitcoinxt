@@ -8,21 +8,6 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 from decimal import Decimal
 
-def wait_for(criteria):
-    import sys
-    sys.stdout.write("Waiting for tx to get relayed")
-    sys.stdout.flush()
-    for i in range(1, 14):
-        if criteria():
-            print("")
-            return
-
-        sys.stdout.write(".")
-        sys.stdout.flush()
-        time.sleep(0.1 * i**2) # geometric back-off
-
-    raise Exception("Timeout")
-
 class DoubleSpendRelay(BitcoinTestFramework):
 
     def __init__(self):
@@ -91,7 +76,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         # the mempool.
         def txid2_relay():
             return nodes[3].gettransaction(txid1)["respendsobserved"] != []
-        wait_for(txid2_relay)
+        wait_for(txid2_relay, what = "tx relay")
         txid1_info = nodes[3].gettransaction(txid1)
         assert_equal(txid1_info["respendsobserved"], [txid2])
 
@@ -127,7 +112,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         # Wait until txid4 is relayed to nodes[3] (but don't wait forever):
         def txid4_relay():
             return nodes[3].gettransaction(txid1)["respendsobserved"] != [txid2]
-        wait_for(txid4_relay)
+        wait_for(txid4_relay, what = "tx relay")
         txid1_info = nodes[3].gettransaction(txid1)
         assert_equal(sorted(txid1_info["respendsobserved"]), sorted([txid2,txid4]))
 
@@ -149,7 +134,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         def txid5_relay():
             return sorted(nodes[3].gettransaction(txid1)["respendsobserved"]) \
                 != sorted([txid2,txid4])
-        wait_for(txid5_relay)
+        wait_for(txid5_relay, what = "tx relay")
         txid1_info = nodes[3].gettransaction(txid1)
         assert_equal(sorted(txid1_info["respendsobserved"]), sorted([txid2,txid4,txid5]))
 
