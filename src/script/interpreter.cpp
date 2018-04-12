@@ -262,20 +262,21 @@ bool static CheckMinimalPush(const valtype& data, opcodetype opcode) {
 
 static inline bool IsOpcodeDisabled(opcodetype opcode, uint32_t flags) {
     switch (opcode) {
-        case OP_AND:
-        case OP_OR:
-	case OP_XOR:
-            return !(flags & SCRIPT_ENABLE_MONOLITH_OPCODES);
         case OP_CAT:
         case OP_SPLIT:
-        case OP_BIN2NUM:
+        case OP_AND:
+        case OP_OR:
+        case OP_XOR:
         case OP_NUM2BIN:
+        case OP_BIN2NUM:
+        case OP_DIV:
+        case OP_MOD:
+            return !(flags & SCRIPT_ENABLE_MONOLITH_OPCODES);
+
         case OP_INVERT:
         case OP_2MUL:
         case OP_2DIV:
         case OP_MUL:
-        case OP_DIV:
-        case OP_MOD:
         case OP_LSHIFT:
         case OP_RSHIFT:
             return true;
@@ -834,6 +835,8 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
 
                 case OP_ADD:
                 case OP_SUB:
+                case OP_DIV:
+                case OP_MOD:
                 case OP_BOOLAND:
                 case OP_BOOLOR:
                 case OP_NUMEQUAL:
@@ -860,6 +863,24 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
 
                     case OP_SUB:
                         bn = bn1 - bn2;
+                        break;
+
+                    case OP_DIV:
+                        // denominator must not be 0
+                        if (bn2 == 0) {
+                            return set_error(serror,
+                                             SCRIPT_ERR_DIV_BY_ZERO);
+                        }
+                        bn = bn1 / bn2;
+                        break;
+
+                    case OP_MOD:
+                        // divisor must not be 0
+                        if (bn2 == 0) {
+                            return set_error(serror,
+                                             SCRIPT_ERR_MOD_BY_ZERO);
+                        }
+                        bn = bn1 % bn2;
                         break;
 
                     case OP_BOOLAND:             bn = (bn1 != bnZero && bn2 != bnZero); break;
@@ -1082,6 +1103,121 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                             popstack(stack);
                         else
                             return set_error(serror, SCRIPT_ERR_CHECKMULTISIGVERIFY);
+                    }
+                }
+                break;
+
+                //
+                // Byte string operations
+                //
+                case OP_CAT: {
+                    // (x1 x2 -- out)
+                    if (stack.size() < 2) {
+                        return set_error(
+                            serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    }
+                    valtype &vch1 = stacktop(-2);
+                    valtype &vch2 = stacktop(-1);
+                    if (vch1.size() + vch2.size() >
+                        MAX_SCRIPT_ELEMENT_SIZE) {
+                        return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                    }
+                    vch1.insert(vch1.end(), vch2.begin(), vch2.end());
+                    popstack(stack);
+                }
+                break;
+
+                case OP_SPLIT: {
+                    // (in position -- x1 x2)
+                    if (stack.size() < 2) {
+                        return set_error(
+                            serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    }
+
+                    const valtype &data = stacktop(-2);
+
+                    // Make sure the split point is apropriate.
+                    uint64_t position =
+                        CScriptNum(stacktop(-1), fRequireMinimal).getint();
+                    if (position > data.size()) {
+                        return set_error(serror,
+                                         SCRIPT_ERR_INVALID_SPLIT_RANGE);
+                    }
+
+                    // Prepare the results in their own buffer as `data`
+                    // will be invalidated.
+                    valtype n1(data.begin(), data.begin() + position);
+                    valtype n2(data.begin() + position, data.end());
+
+                    // Replace existing stack values by the new values.
+                    stacktop(-2) = std::move(n1);
+                    stacktop(-1) = std::move(n2);
+                }
+                break;
+
+                //
+                // Conversion operations
+                //
+                case OP_NUM2BIN: {
+                    // (in size -- out)
+                    if (stack.size() < 2) {
+                        return set_error(
+                            serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    }
+
+                    uint64_t size =
+                        CScriptNum(stacktop(-1), fRequireMinimal).getint();
+                    if (size > MAX_SCRIPT_ELEMENT_SIZE) {
+                        return set_error(serror, SCRIPT_ERR_PUSH_SIZE);
+                    }
+
+                    popstack(stack);
+                    valtype &rawnum = stacktop(-1);
+
+                    // Try to see if we can fit that number in the number of
+                    // byte requested.
+                    CScriptNum::MinimallyEncode(rawnum);
+                    if (rawnum.size() > size) {
+                        // We definitively cannot.
+                        return set_error(serror,
+                                         SCRIPT_ERR_IMPOSSIBLE_ENCODING);
+                    }
+
+                    // We already have an element of the right size, we
+                    // don't need to do anything.
+                    if (rawnum.size() == size) {
+                        break;
+                    }
+
+                    uint8_t signbit = 0x00;
+                    if (rawnum.size() > 0) {
+                        signbit = rawnum.back() & 0x80;
+                        rawnum[rawnum.size() - 1] &= 0x7f;
+                    }
+
+                    rawnum.reserve(size);
+                    while (rawnum.size() < size - 1) {
+                        rawnum.push_back(0x00);
+                    }
+
+                    rawnum.push_back(signbit);
+                }
+                break;
+
+                case OP_BIN2NUM: {
+                    // (in -- out)
+                    if (stack.size() < 1) {
+                        return set_error(
+                            serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    }
+
+                    valtype &n = stacktop(-1);
+                    CScriptNum::MinimallyEncode(n);
+
+                    // The resulting number must be a valid number.
+                    if (!CScriptNum::IsMinimallyEncoded(n)) {
+                        return set_error(serror,
+                                         SCRIPT_ERR_INVALID_NUMBER_RANGE);
                     }
                 }
                 break;

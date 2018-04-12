@@ -243,6 +243,20 @@ public:
     inline CScriptNum operator+(   const CScriptNum& rhs) const { return operator+(rhs.m_value);   }
     inline CScriptNum operator-(   const CScriptNum& rhs) const { return operator-(rhs.m_value);   }
 
+    inline CScriptNum operator/(const int64_t &rhs) const {
+        return CScriptNum(m_value / rhs);
+    }
+    inline CScriptNum operator/(const CScriptNum &rhs) const {
+        return operator/(rhs.m_value);
+    }
+
+    inline CScriptNum operator%(const int64_t &rhs) const {
+        return CScriptNum(m_value % rhs);
+    }
+    inline CScriptNum operator%(const CScriptNum &rhs) const {
+        return operator%(rhs.m_value);
+    }
+
     inline CScriptNum& operator+=( const CScriptNum& rhs)       { return operator+=(rhs.m_value);  }
     inline CScriptNum& operator-=( const CScriptNum& rhs)       { return operator-=(rhs.m_value);  }
 

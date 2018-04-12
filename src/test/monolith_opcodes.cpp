@@ -12,78 +12,132 @@
 #include <array>
 
 typedef std::vector<uint8_t> valtype;
+typedef std::vector<valtype> stacktype;
 
 std::array<uint32_t, 3> flagset{0, STANDARD_SCRIPT_VERIFY_FLAGS,
                                 MANDATORY_SCRIPT_VERIFY_FLAGS};
 
 BOOST_FIXTURE_TEST_SUITE(monolith_opcodes_tests, BasicTestingSetup)
 
-static void CheckBitwiseOpError(const std::vector<valtype> &original_stack,
-                                opcodetype op, ScriptError expected_error) {
+/**
+ * General utility functions to check for script passing/failing.
+ */
+static void CheckTestResultForAllFlags(const stacktype &original_stack,
+                                       const CScript &script,
+                                       const stacktype &expected) {
     BaseSignatureChecker sigchecker;
 
     for (uint32_t flags : flagset) {
         ScriptError err = SCRIPT_ERR_OK;
-        std::vector<valtype> stack{original_stack};
-        bool r = EvalScript(stack, CScript() << op,
-                            flags | SCRIPT_ENABLE_MONOLITH_OPCODES, sigchecker,
-                            &err);
-        BOOST_CHECK(!r);
-        BOOST_CHECK_EQUAL(err, expected_error);
-
-        // Make sure that if we do not pass the monolith flag, opcodes are still
-        // disabled.
-        err = SCRIPT_ERR_OK;
-        stack = {original_stack};
-        r = EvalScript(stack, CScript() << op, flags, sigchecker, &err);
-        BOOST_CHECK(!r);
-        BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
-    }
-}
-
-static void CheckAllBitwiseOpErrors(const std::vector<valtype> &stack,
-                                    ScriptError expected_error) {
-    // Bitwise ops are commutative, so we check both ways.
-    CheckBitwiseOpError(stack, OP_AND, expected_error);
-    CheckBitwiseOpError(stack, OP_OR, expected_error);
-    CheckBitwiseOpError(stack, OP_XOR, expected_error);
-}
-
-static void CheckBitwiseOp(const valtype &a, const valtype &b, opcodetype op,
-                           const valtype &expected) {
-    BaseSignatureChecker sigchecker;
-
-    for (uint32_t flags : flagset) {
-        ScriptError err = SCRIPT_ERR_OK;
-        std::vector<valtype> stack{a, b};
-        bool r = EvalScript(stack, CScript() << op,
-                            flags | SCRIPT_ENABLE_MONOLITH_OPCODES, sigchecker,
-                            &err);
+        stacktype stack{original_stack};
+        bool r =
+            EvalScript(stack, script, flags | SCRIPT_ENABLE_MONOLITH_OPCODES,
+                       sigchecker, &err);
         BOOST_CHECK(r);
-
-        std::vector<valtype> expected_stack{expected};
-        BOOST_CHECK(stack == expected_stack);
+        BOOST_CHECK(stack == expected);
 
         // Make sure that if we do not pass the monolith flag, opcodes are still
         // disabled.
-        stack = {a, b};
-        r = EvalScript(stack, CScript() << op, flags, sigchecker, &err);
+        stack = original_stack;
+        r = EvalScript(stack, script, flags, sigchecker, &err);
         BOOST_CHECK(!r);
         BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
     }
 }
 
+static void CheckError(uint32_t flags, const stacktype &original_stack,
+                       const CScript &script, ScriptError expected_error) {
+    BaseSignatureChecker sigchecker;
+    ScriptError err = SCRIPT_ERR_OK;
+    stacktype stack{original_stack};
+    bool r = EvalScript(stack, script, flags | SCRIPT_ENABLE_MONOLITH_OPCODES,
+                        sigchecker, &err);
+    BOOST_CHECK(!r);
+    BOOST_CHECK_EQUAL(err, expected_error);
+
+    // Make sure that if we do not pass the monolith flag, opcodes are still
+    // disabled.
+    stack = original_stack;
+    r = EvalScript(stack, script, flags, sigchecker, &err);
+    BOOST_CHECK(!r);
+    BOOST_CHECK_EQUAL(err, SCRIPT_ERR_DISABLED_OPCODE);
+}
+
+static void CheckErrorForAllFlags(const stacktype &original_stack,
+                                  const CScript &script,
+                                  ScriptError expected_error) {
+    for (uint32_t flags : flagset) {
+        CheckError(flags, original_stack, script, expected_error);
+    }
+}
+
+static void CheckOpError(const stacktype &original_stack, opcodetype op,
+                         ScriptError expected_error) {
+    CheckErrorForAllFlags(original_stack, CScript() << op, expected_error);
+}
+
+static void CheckAllBitwiseOpErrors(const stacktype &stack,
+                                    ScriptError expected_error) {
+    CheckOpError(stack, OP_AND, expected_error);
+    CheckOpError(stack, OP_OR, expected_error);
+    CheckOpError(stack, OP_XOR, expected_error);
+}
+
+static void CheckBinaryOp(const valtype &a, const valtype &b, opcodetype op,
+                          const valtype &expected) {
+    CheckTestResultForAllFlags({a, b}, CScript() << op, {expected});
+}
+
+static valtype NegativeValtype(const valtype &v) {
+    valtype r(v);
+    if (r.size() > 0) {
+        r[r.size() - 1] ^= 0x80;
+    }
+    CScriptNum::MinimallyEncode(r);
+    return r;
+}
+
+BOOST_AUTO_TEST_CASE(negative_valtype_test) {
+    // Test zero values
+    BOOST_CHECK(NegativeValtype({}) == valtype{});
+    BOOST_CHECK(NegativeValtype({0x00}) == valtype{});
+    BOOST_CHECK(NegativeValtype({0x80}) == valtype{});
+    BOOST_CHECK(NegativeValtype({0x00, 0x00}) == valtype{});
+    BOOST_CHECK(NegativeValtype({0x00, 0x80}) == valtype{});
+
+    // Non-zero values
+    BOOST_CHECK(NegativeValtype({0x01}) == valtype{0x81});
+    BOOST_CHECK(NegativeValtype({0x81}) == valtype{0x01});
+    BOOST_CHECK(NegativeValtype({0x02, 0x01}) == (valtype{0x02, 0x81}));
+    BOOST_CHECK(NegativeValtype({0x02, 0x81}) == (valtype{0x02, 0x01}));
+    BOOST_CHECK(NegativeValtype({0xff, 0x02, 0x01}) ==
+                (valtype{0xff, 0x02, 0x81}));
+    BOOST_CHECK(NegativeValtype({0xff, 0x02, 0x81}) ==
+                (valtype{0xff, 0x02, 0x01}));
+    BOOST_CHECK(NegativeValtype({0xff, 0xff, 0x02, 0x01}) ==
+                (valtype{0xff, 0xff, 0x02, 0x81}));
+    BOOST_CHECK(NegativeValtype({0xff, 0xff, 0x02, 0x81}) ==
+                (valtype{0xff, 0xff, 0x02, 0x01}));
+
+    // Should not be overly-minimized
+    BOOST_CHECK(NegativeValtype({0xff, 0x80}) == (valtype{0xff, 0x00}));
+    BOOST_CHECK(NegativeValtype({0xff, 0x00}) == (valtype{0xff, 0x80}));
+}
+
+/**
+ * Bitwise Opcodes
+ */
 static void RunTestForAllBitwiseOpcodes(const valtype &a, const valtype &b,
                                         const valtype &expected_and,
                                         const valtype &expected_or,
                                         const valtype &expected_xor) {
     // Bitwise ops are commutative, so we check both ways.
-    CheckBitwiseOp(a, b, OP_AND, expected_and);
-    CheckBitwiseOp(b, a, OP_AND, expected_and);
-    CheckBitwiseOp(a, b, OP_OR, expected_or);
-    CheckBitwiseOp(b, a, OP_OR, expected_or);
-    CheckBitwiseOp(a, b, OP_XOR, expected_xor);
-    CheckBitwiseOp(b, a, OP_XOR, expected_xor);
+    CheckBinaryOp(a, b, OP_AND, expected_and);
+    CheckBinaryOp(b, a, OP_AND, expected_and);
+    CheckBinaryOp(a, b, OP_OR, expected_or);
+    CheckBinaryOp(b, a, OP_OR, expected_or);
+    CheckBinaryOp(a, b, OP_XOR, expected_xor);
+    CheckBinaryOp(b, a, OP_XOR, expected_xor);
 }
 
 static void RunTestForAllBitwiseOpcodesSizes(const valtype &a, const valtype &b,
@@ -138,6 +192,9 @@ BOOST_AUTO_TEST_CASE(bitwise_opcodes_test) {
     // Run all variations of zeros and ones.
     valtype allzeros(MAX_SCRIPT_ELEMENT_SIZE, 0);
     valtype allones(MAX_SCRIPT_ELEMENT_SIZE, 0xff);
+
+    BOOST_CHECK_EQUAL(allzeros.size(), MAX_SCRIPT_ELEMENT_SIZE);
+    BOOST_CHECK_EQUAL(allones.size(), MAX_SCRIPT_ELEMENT_SIZE);
 
     TestBitwiseOpcodes(allzeros, allzeros, allzeros, allzeros);
     TestBitwiseOpcodes(allzeros, allones, allzeros, allones);
@@ -350,6 +407,383 @@ BOOST_AUTO_TEST_CASE(bitwise_opcodes_test) {
                             SCRIPT_ERR_INVALID_OPERAND_SIZE);
     CheckAllBitwiseOpErrors({{}, a}, SCRIPT_ERR_INVALID_OPERAND_SIZE);
     CheckAllBitwiseOpErrors({b, {}}, SCRIPT_ERR_INVALID_OPERAND_SIZE);
+}
+
+/**
+ * String opcodes.
+ */
+static void CheckStringOp(const valtype &a, const valtype &b,
+                          const valtype &n) {
+    CheckBinaryOp(a, b, OP_CAT, n);
+
+    // Check concatenation with empty elements.
+    CheckBinaryOp(a, {}, OP_CAT, a);
+    CheckBinaryOp(b, {}, OP_CAT, b);
+    CheckBinaryOp({}, a, OP_CAT, a);
+    CheckBinaryOp({}, b, OP_CAT, b);
+
+    // Split n into a and b.
+    CheckTestResultForAllFlags({n}, CScript() << a.size() << OP_SPLIT, {a, b});
+
+    // Combine split and cat.
+    CheckTestResultForAllFlags({n}, CScript() << a.size() << OP_SPLIT << OP_CAT,
+                               {n});
+    CheckTestResultForAllFlags(
+        {a, b}, CScript() << OP_CAT << a.size() << OP_SPLIT, {a, b});
+
+    // Split away empty elements.
+    CheckTestResultForAllFlags({a}, CScript() << 0 << OP_SPLIT, {{}, a});
+    CheckTestResultForAllFlags({b}, CScript() << 0 << OP_SPLIT, {{}, b});
+    CheckTestResultForAllFlags({a}, CScript() << a.size() << OP_SPLIT, {a, {}});
+    CheckTestResultForAllFlags({b}, CScript() << b.size() << OP_SPLIT, {b, {}});
+
+    // Out of bound split.
+    CheckErrorForAllFlags({a}, CScript() << (a.size() + 1) << OP_SPLIT,
+                          SCRIPT_ERR_INVALID_SPLIT_RANGE);
+    CheckErrorForAllFlags({b}, CScript() << (b.size() + 1) << OP_SPLIT,
+                          SCRIPT_ERR_INVALID_SPLIT_RANGE);
+    CheckErrorForAllFlags({n}, CScript() << (n.size() + 1) << OP_SPLIT,
+                          SCRIPT_ERR_INVALID_SPLIT_RANGE);
+    CheckErrorForAllFlags({a}, CScript() << (-1) << OP_SPLIT,
+                          SCRIPT_ERR_INVALID_SPLIT_RANGE);
+}
+
+BOOST_AUTO_TEST_CASE(string_opcodes_test) {
+    // Check for empty string.
+    CheckStringOp({}, {}, {});
+
+    // Check for simple concats.
+    CheckStringOp({0x00}, {0x00}, {0x00, 0x00});
+    CheckStringOp({0xab}, {0xcd}, {0xab, 0xcd});
+    CheckStringOp({0xab, 0xcd, 0xef}, {0x12, 0x34, 0x56, 0x78},
+                  {0xab, 0xcd, 0xef, 0x12, 0x34, 0x56, 0x78});
+
+    const valtype n{
+        0x7b, 0x59, 0xf8, 0x07, 0xc6, 0xc0, 0x70, 0xbc, 0x52, 0x7b, 0xf5, 0xaf,
+        0xf5, 0xdd, 0xeb, 0xdc, 0x41, 0xaa, 0x07, 0xf6, 0x80, 0x8d, 0x5d, 0x4d,
+        0xbc, 0x91, 0xcd, 0x0a, 0x14, 0x85, 0xd9, 0x98, 0xb6, 0xab, 0x2e, 0x37,
+        0x76, 0x78, 0x34, 0x8b, 0x2b, 0xfb, 0x59, 0x3b, 0xea, 0x45, 0x46, 0x72,
+        0x64, 0x64, 0x83, 0x73, 0xc3, 0x1d, 0xca, 0x86, 0x03, 0x91, 0xfc, 0xc0,
+        0xc4, 0xdf, 0x17, 0x83, 0x22, 0x5d, 0x50, 0xc5, 0x31, 0x45, 0xaf, 0xbc,
+        0xfd, 0xc8, 0xb9, 0x6a, 0x72, 0x8b, 0x3c, 0x9b, 0x77, 0x02, 0xd6, 0x18,
+        0x62, 0x02, 0xc9, 0x1c, 0x66, 0x29, 0x5c, 0x66, 0xf3, 0x9a, 0x00, 0xc1,
+        0x69, 0x47, 0x35, 0x2f, 0xe8, 0x32, 0x2a, 0xb5, 0xc4, 0x9f, 0x3c, 0xbf,
+        0xc7, 0x1a, 0x2b, 0xb3, 0xa6, 0x9b, 0xde, 0xcf, 0xc5, 0x15, 0x8c, 0xac,
+        0xd0, 0x7c, 0x38, 0xe4, 0x41, 0xe1, 0x81, 0x4e, 0x65, 0xa5, 0x24, 0x08,
+        0x5b, 0xa3, 0x19, 0xf3, 0xc2, 0x80, 0x21, 0x01, 0x33, 0xaf, 0x84, 0x53,
+        0x1a, 0x00, 0x79, 0x7e, 0x1f, 0xd1, 0x62, 0x53, 0x0d, 0x6a, 0x58, 0xde,
+        0x16, 0x23, 0x70, 0x32, 0x81, 0x25, 0xbd, 0xa3, 0x92, 0xae, 0xfd, 0x7f,
+        0x47, 0xa2, 0xf2, 0x34, 0x3d, 0xef, 0xc3, 0x71, 0xb1, 0x33, 0x9a, 0xfd,
+        0x80, 0x4b, 0x96, 0xcb, 0xaa, 0xda, 0x77, 0x50, 0x58, 0xf7, 0x0c, 0xf3,
+        0x75, 0xdf, 0x51, 0x96, 0x75, 0x9a, 0x78, 0xc3, 0xd3, 0xaf, 0xac, 0xee,
+        0xf3, 0xcc, 0x79, 0xfb, 0x3f, 0xda, 0x51, 0x94, 0x8f, 0x59, 0x3d, 0xbc,
+        0xef, 0x17, 0x47, 0xd4, 0x40, 0x80, 0x8a, 0x78, 0x86, 0x6c, 0x9e, 0x38,
+        0xd2, 0x11, 0xaa, 0x94, 0x79, 0x9b, 0x61, 0xf3, 0xaa, 0xcf, 0x66, 0x7e,
+        0xa7, 0x11, 0xe9, 0xad, 0x8a, 0xd4, 0x67, 0x23, 0xf9, 0x62, 0x9f, 0x55,
+        0xc0, 0x5a, 0x0f, 0x0a, 0xfe, 0x28, 0xd8, 0x80, 0xaf, 0x71, 0x97, 0x65,
+        0x49, 0xb1, 0xd3, 0x9c, 0xee, 0x7e, 0x4b, 0xeb, 0x06, 0x3b, 0xe1, 0x66,
+        0xf9, 0xa7, 0x77, 0x4f, 0x6a, 0xd1, 0xa0, 0x16, 0xe0, 0xcf, 0xe3, 0x25,
+        0x65, 0x08, 0x0f, 0x5e, 0x2c, 0x1e, 0x80, 0x35, 0x75, 0x40, 0x9a, 0xd1,
+        0x14, 0xba, 0xaa, 0xa7, 0xfc, 0x3c, 0xf1, 0xeb, 0x16, 0x8d, 0x59, 0xb4,
+        0xcf, 0x16, 0x9a, 0xe3, 0xf1, 0x9d, 0x31, 0x97, 0xe5, 0xa4, 0xcc, 0xae,
+        0x1c, 0xa2, 0xe7, 0x88, 0x44, 0x05, 0x67, 0x28, 0x21, 0x9f, 0x3e, 0xe2,
+        0xfc, 0x25, 0x8c, 0x63, 0x09, 0xde, 0x39, 0xfa, 0xae, 0x26, 0x9b, 0x43,
+        0xdf, 0x06, 0x2f, 0xb7, 0xaf, 0xa2, 0x74, 0x1c, 0x17, 0x96, 0x84, 0x26,
+        0x1a, 0xe2, 0xcd, 0x90, 0xa8, 0xc3, 0xb6, 0xeb, 0x53, 0xee, 0xdd, 0xf9,
+        0x88, 0xc6, 0x05, 0xb5, 0xd4, 0xa3, 0xf0, 0x36, 0xc7, 0xf1, 0xb3, 0x04,
+        0x0c, 0xa5, 0xea, 0x22, 0x5b, 0x56, 0x3d, 0x54, 0x0b, 0x69, 0xc2, 0xe1,
+        0x4f, 0xa8, 0x28, 0x4e, 0xe2, 0x3d, 0x99, 0x9c, 0x3b, 0xdb, 0xf4, 0x92,
+        0x5a, 0xb9, 0xce, 0xeb, 0x33, 0xb5, 0xae, 0x16, 0x58, 0x79, 0x31, 0x8f,
+        0x1e, 0x7a, 0x1a, 0xee, 0xbe, 0x9f, 0xea, 0x89, 0xd6, 0x6c, 0x43, 0x76,
+        0x94, 0x0d, 0x94, 0x50, 0x6d, 0xdd, 0xc2, 0x68, 0x80, 0x3e, 0x38, 0x51,
+        0x51, 0xd1, 0xd5, 0x4e, 0xf7, 0x65, 0xe5, 0x42, 0x3c, 0xa8, 0x28, 0x19,
+        0x02, 0xa7, 0xc9, 0x1c, 0x24, 0xa7, 0x91, 0xfe, 0xa1, 0xbc, 0xb9, 0x15,
+        0xba, 0x49, 0xac, 0xeb, 0x81, 0xf7, 0xc1, 0xfc, 0xf9, 0x51, 0x0d, 0xa1,
+        0xe8, 0x71, 0x2c, 0x4e, 0x59, 0xc1, 0x3a, 0x2a, 0xcc, 0x61, 0xee, 0xe5,
+        0x2a, 0x88, 0xf8, 0xec, 0xbd, 0x90, 0xc0, 0x96, 0xe0, 0x93, 0x1f, 0x78,
+        0xbe, 0x6b, 0xb1, 0x4c, 0x46, 0x2a, 0x86, 0xd9, 0x2d, 0x20, 0x29, 0xb4,
+        0x44, 0x15, 0xb2, 0x7e};
+
+    BOOST_CHECK_EQUAL(n.size(), MAX_SCRIPT_ELEMENT_SIZE);
+
+    for (size_t i = 0; i <= MAX_SCRIPT_ELEMENT_SIZE; i++) {
+        valtype a(n.begin(), n.begin() + i);
+        valtype b(n.begin() + i, n.end());
+
+        CheckStringOp(a, b, n);
+
+        // One more char and we are oversize.
+        valtype extraA = a;
+        extraA.push_back(0xaf);
+
+        valtype extraB = b;
+        extraB.push_back(0xad);
+
+        CheckOpError({extraA, b}, OP_CAT, SCRIPT_ERR_PUSH_SIZE);
+        CheckOpError({a, extraB}, OP_CAT, SCRIPT_ERR_PUSH_SIZE);
+        CheckOpError({extraA, extraB}, OP_CAT, SCRIPT_ERR_PUSH_SIZE);
+    }
+
+    // Check error conditions.
+    CheckOpError({}, OP_CAT, SCRIPT_ERR_INVALID_STACK_OPERATION);
+    CheckOpError({}, OP_SPLIT, SCRIPT_ERR_INVALID_STACK_OPERATION);
+    CheckOpError({{}}, OP_CAT, SCRIPT_ERR_INVALID_STACK_OPERATION);
+    CheckOpError({{}}, OP_SPLIT, SCRIPT_ERR_INVALID_STACK_OPERATION);
+    CheckOpError({{0x00}}, OP_CAT, SCRIPT_ERR_INVALID_STACK_OPERATION);
+    CheckOpError({{0x00}}, OP_SPLIT, SCRIPT_ERR_INVALID_STACK_OPERATION);
+    CheckOpError({{0xab, 0xcd, 0xef}}, OP_CAT,
+                 SCRIPT_ERR_INVALID_STACK_OPERATION);
+    CheckOpError({{0xab, 0xcd, 0xef}}, OP_SPLIT,
+                 SCRIPT_ERR_INVALID_STACK_OPERATION);
+}
+
+/**
+ * Type conversion opcodes.
+ */
+static void CheckTypeConversionOp(const valtype &bin, const valtype &num) {
+    // Check BIN2NUM.
+    CheckTestResultForAllFlags({bin}, CScript() << OP_BIN2NUM, {num});
+
+    // Check NUM2BIN. Negative 0 is rebuilt as regular zero, so we need a tweak.
+    valtype rebuilt_bin{bin};
+    if (num.size() == 0 && bin.size() > 0) {
+        rebuilt_bin[rebuilt_bin.size() - 1] &= 0x7f;
+    }
+
+    CheckTestResultForAllFlags({num}, CScript() << bin.size() << OP_NUM2BIN,
+                               {rebuilt_bin});
+
+    // Check roundtrip with NUM2BIN.
+    CheckTestResultForAllFlags(
+        {bin}, CScript() << OP_BIN2NUM << bin.size() << OP_NUM2BIN,
+        {rebuilt_bin});
+
+    // Grow and shrink back down using NUM2BIN.
+    CheckTestResultForAllFlags({bin},
+                               CScript()
+                                   << MAX_SCRIPT_ELEMENT_SIZE << OP_NUM2BIN
+                                   << bin.size() << OP_NUM2BIN,
+                               {rebuilt_bin});
+    CheckTestResultForAllFlags({num},
+                               CScript()
+                                   << MAX_SCRIPT_ELEMENT_SIZE << OP_NUM2BIN
+                                   << bin.size() << OP_NUM2BIN,
+                               {rebuilt_bin});
+
+    // BIN2NUM is indempotent.
+    CheckTestResultForAllFlags({bin}, CScript() << OP_BIN2NUM << OP_BIN2NUM,
+                               {num});
+}
+
+static void CheckBin2NumError(const stacktype &original_stack,
+                              ScriptError expected_error) {
+    CheckErrorForAllFlags(original_stack, CScript() << OP_BIN2NUM,
+                          expected_error);
+}
+
+static void CheckNum2BinError(const stacktype &original_stack,
+                              ScriptError expected_error) {
+    CheckErrorForAllFlags(original_stack, CScript() << OP_NUM2BIN,
+                          expected_error);
+}
+
+BOOST_AUTO_TEST_CASE(type_conversion_test) {
+    valtype empty;
+    CheckTypeConversionOp(empty, empty);
+
+    valtype paddedzero, paddednegzero;
+    for (size_t i = 0; i < MAX_SCRIPT_ELEMENT_SIZE; i++) {
+        CheckTypeConversionOp(paddedzero, empty);
+        paddedzero.push_back(0x00);
+
+        paddednegzero.push_back(0x80);
+        CheckTypeConversionOp(paddednegzero, empty);
+        paddednegzero[paddednegzero.size() - 1] = 0x00;
+    }
+
+    // Merge leading byte when sign bit isn't used.
+    std::vector<uint8_t> k{0x7f}, negk{0xff};
+    std::vector<uint8_t> kpadded = k, negkpadded = negk;
+    for (size_t i = 0; i < MAX_SCRIPT_ELEMENT_SIZE; i++) {
+        CheckTypeConversionOp(kpadded, k);
+        kpadded.push_back(0x00);
+
+        CheckTypeConversionOp(negkpadded, negk);
+        negkpadded[negkpadded.size() - 1] &= 0x7f;
+        negkpadded.push_back(0x80);
+    }
+
+    // Some known values.
+    CheckTypeConversionOp({0xab, 0xcd, 0xef, 0x00}, {0xab, 0xcd, 0xef, 0x00});
+    CheckTypeConversionOp({0xab, 0xcd, 0x7f, 0x00}, {0xab, 0xcd, 0x7f});
+
+    // Reductions
+    CheckTypeConversionOp({0xab, 0xcd, 0xef, 0x42, 0x80},
+                          {0xab, 0xcd, 0xef, 0xc2});
+    CheckTypeConversionOp({0xab, 0xcd, 0x7f, 0x42, 0x00},
+                          {0xab, 0xcd, 0x7f, 0x42});
+
+    // Empty stack is an error.
+    CheckBin2NumError({}, SCRIPT_ERR_INVALID_STACK_OPERATION);
+    CheckNum2BinError({}, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+    // NUM2BIN require 2 elements on the stack.
+    CheckNum2BinError({{0x00}}, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+    // Values that do not fit in 4 bytes are considered out of range for
+    // BIN2NUM.
+    CheckBin2NumError({{0xab, 0xcd, 0xef, 0xc2, 0x80}},
+                      SCRIPT_ERR_INVALID_NUMBER_RANGE);
+    CheckBin2NumError({{0x00, 0x00, 0x00, 0x80, 0x80}},
+                      SCRIPT_ERR_INVALID_NUMBER_RANGE);
+
+    // NUM2BIN must not generate oversized push.
+    valtype largezero(MAX_SCRIPT_ELEMENT_SIZE, 0);
+    BOOST_CHECK_EQUAL(largezero.size(), MAX_SCRIPT_ELEMENT_SIZE);
+    CheckTypeConversionOp(largezero, {});
+
+    CheckNum2BinError({{}, {0x09, 0x02}}, SCRIPT_ERR_PUSH_SIZE);
+
+    // Check that the requested encoding is possible.
+    CheckNum2BinError({{0xab, 0xcd, 0xef, 0x80}, {0x03}},
+                      SCRIPT_ERR_IMPOSSIBLE_ENCODING);
+}
+
+/**
+ * Arithmetic Opcodes
+ */
+static void CheckDivMod(const valtype &a, const valtype &b,
+                        const valtype &divExpected,
+                        const valtype &modExpected) {
+    // Negative values for division
+    CheckBinaryOp(a, b, OP_DIV, divExpected);
+    CheckBinaryOp(a, NegativeValtype(b), OP_DIV, NegativeValtype(divExpected));
+    CheckBinaryOp(NegativeValtype(a), b, OP_DIV, NegativeValtype(divExpected));
+    CheckBinaryOp(NegativeValtype(a), NegativeValtype(b), OP_DIV, divExpected);
+
+    // Negative values for modulo
+    CheckBinaryOp(a, b, OP_MOD, modExpected);
+    CheckBinaryOp(a, NegativeValtype(b), OP_MOD, modExpected);
+    CheckBinaryOp(NegativeValtype(a), b, OP_MOD, NegativeValtype(modExpected));
+    CheckBinaryOp(NegativeValtype(a), NegativeValtype(b), OP_MOD,
+                  NegativeValtype(modExpected));
+
+    // Div/Mod by zero
+    for (uint32_t flags : flagset) {
+        CheckError(flags, {a, {}}, CScript() << OP_DIV, SCRIPT_ERR_DIV_BY_ZERO);
+        CheckError(flags, {b, {}}, CScript() << OP_DIV, SCRIPT_ERR_DIV_BY_ZERO);
+
+        if (flags & SCRIPT_VERIFY_MINIMALDATA) {
+            CheckError(flags, {a, {0x00}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_UNKNOWN_ERROR);
+            CheckError(flags, {a, {0x80}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_UNKNOWN_ERROR);
+            CheckError(flags, {a, {0x00, 0x00}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_UNKNOWN_ERROR);
+            CheckError(flags, {a, {0x00, 0x80}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_UNKNOWN_ERROR);
+
+            CheckError(flags, {b, {0x00}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_UNKNOWN_ERROR);
+            CheckError(flags, {b, {0x80}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_UNKNOWN_ERROR);
+            CheckError(flags, {b, {0x00, 0x00}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_UNKNOWN_ERROR);
+            CheckError(flags, {b, {0x00, 0x80}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_UNKNOWN_ERROR);
+        } else {
+            CheckError(flags, {a, {0x00}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_DIV_BY_ZERO);
+            CheckError(flags, {a, {0x80}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_DIV_BY_ZERO);
+            CheckError(flags, {a, {0x00, 0x00}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_DIV_BY_ZERO);
+            CheckError(flags, {a, {0x00, 0x80}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_DIV_BY_ZERO);
+
+            CheckError(flags, {b, {0x00}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_DIV_BY_ZERO);
+            CheckError(flags, {b, {0x80}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_DIV_BY_ZERO);
+            CheckError(flags, {b, {0x00, 0x00}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_DIV_BY_ZERO);
+            CheckError(flags, {b, {0x00, 0x80}}, CScript() << OP_DIV,
+                       SCRIPT_ERR_DIV_BY_ZERO);
+        }
+    }
+
+    // Division identities
+    CheckBinaryOp(a, {0x01}, OP_DIV, a);
+    CheckBinaryOp(a, {0x81}, OP_DIV, NegativeValtype(a));
+    CheckBinaryOp(a, a, OP_DIV, {0x01});
+    CheckBinaryOp(a, NegativeValtype(a), OP_DIV, {0x81});
+    CheckBinaryOp(NegativeValtype(a), a, OP_DIV, {0x81});
+
+    CheckBinaryOp(b, {0x01}, OP_DIV, b);
+    CheckBinaryOp(b, {0x81}, OP_DIV, NegativeValtype(b));
+    CheckBinaryOp(b, b, OP_DIV, {0x01});
+    CheckBinaryOp(b, NegativeValtype(b), OP_DIV, {0x81});
+    CheckBinaryOp(NegativeValtype(b), b, OP_DIV, {0x81});
+
+    // Modulo identities
+    // a % b % b = a % b
+    CheckTestResultForAllFlags(
+        {a, b}, CScript() << OP_MOD << CScriptNum(b, true).getint() << OP_MOD,
+        {modExpected});
+}
+
+static void CheckDivModError(const stacktype &original_stack,
+                             ScriptError expected_error) {
+    CheckOpError(original_stack, OP_DIV, expected_error);
+    CheckOpError(original_stack, OP_MOD, expected_error);
+}
+
+BOOST_AUTO_TEST_CASE(div_and_mod_opcode_tests) {
+    CheckDivModError({}, SCRIPT_ERR_INVALID_STACK_OPERATION);
+    CheckDivModError({{}}, SCRIPT_ERR_INVALID_STACK_OPERATION);
+
+    // CheckOps not valid numbers
+    CheckDivModError(
+        {{0x01, 0x02, 0x03, 0x04, 0x05}, {0x01, 0x02, 0x03, 0x04, 0x05}},
+        SCRIPT_ERR_UNKNOWN_ERROR);
+    CheckDivModError({{0x01, 0x02, 0x03, 0x04, 0x05}, {0x01}},
+                     SCRIPT_ERR_UNKNOWN_ERROR);
+    CheckDivModError({{0x01, 0x05}, {0x01, 0x02, 0x03, 0x04, 0x05}},
+                     SCRIPT_ERR_UNKNOWN_ERROR);
+
+    // 0x185377af / 0x85f41b01 = -4
+    // 0x185377af % 0x85f41b01 = 0x00830bab
+    // 408123311 / -99883777 = -4
+    // 408123311 % -99883777 = 8588203
+    CheckDivMod({0xaf, 0x77, 0x53, 0x18}, {0x01, 0x1b, 0xf4, 0x85}, {0x84},
+                {0xab, 0x0b, 0x83, 0x00});
+    // 0x185377af / 0x00001b01 = 0xe69d
+    // 0x185377af % 0x00001b01 = 0x0212
+    // 408123311 / 6913 = 59037
+    // 408123311 % 6913 = 530
+    CheckDivMod({0xaf, 0x77, 0x53, 0x18}, {0x01, 0x1b}, {0x9d, 0xe6, 0x00},
+                {0x12, 0x02});
+
+    // 15/4 = 3 (and negative operands)
+    CheckDivMod({0x0f}, {0x04}, {0x03}, {0x03});
+    // 15000/4 = 3750 (and negative operands)
+    CheckDivMod({0x98, 0x3a}, {0x04}, {0xa6, 0x0e}, {});
+    // 15000/4000 = 3 (and negative operands)
+    CheckDivMod({0x98, 0x3a}, {0xa0, 0x0f}, {0x03}, {0xb8, 0x0b});
+    // 15000000/4000 = 3750 (and negative operands)
+    CheckDivMod({0xc0, 0xe1, 0xe4, 0x00}, {0xa0, 0x0f}, {0xa6, 0x0e}, {});
+    // 15000000/4 = 3750000 (and negative operands)
+    CheckDivMod({0xc0, 0xe1, 0xe4, 0x00}, {0x04}, {0x70, 0x38, 0x39}, {});
+
+    // 56488123 % 321 = 148 (and negative operands)
+    CheckDivMod({0xbb, 0xf0, 0x5d, 0x03}, {0x41, 0x01}, {0x67, 0xaf, 0x02},
+                {0x94, 0x00});
+    // 56488123 % 3 = 1 (and negative operands)
+    CheckDivMod({0xbb, 0xf0, 0x5d, 0x03}, {0x03}, {0x3e, 0x50, 0x1f, 0x01},
+                {0x01});
+    // 56488123 % 564881230 = 56488123 (and negative operands)
+    CheckDivMod({0xbb, 0xf0, 0x5d, 0x03}, {0x4e, 0x67, 0xab, 0x21}, {},
+                {0xbb, 0xf0, 0x5d, 0x03});
 }
 
 BOOST_AUTO_TEST_SUITE_END()
