@@ -5777,8 +5777,9 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman)
         // Scan for message start
         if (memcmp(msg.hdr.pchMessageStart, Params().NetworkMagic(), MESSAGE_START_SIZE) != 0) {
             LogPrintf("PROCESSMESSAGE: INVALID MESSAGESTART %s peer=%d\n", SanitizeString(msg.hdr.GetCommand()), pfrom->id);
-            fOk = false;
-            break;
+            connman->Ban(pfrom->addr);
+            pfrom->fDisconnect = true;
+            return false;
         }
 
         // Read header
