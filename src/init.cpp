@@ -875,6 +875,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     }
     fCheckBlockIndex = GetBoolArg("-checkblockindex", chainparams.DefaultConsistencyChecks());
     fCheckpointsEnabled = GetBoolArg("-checkpoints", true);
+    if (fCheckpointsEnabled && !Opt().UAHFTime()) {
+        InitWarning(_("Warning: checkpoints are not supported on the BTC chain."));
+        fCheckpointsEnabled = false;
+    }
 
     // -mempoollimit limits
     int64_t nMempoolSizeLimit = GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
