@@ -1234,8 +1234,16 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             return state.DoS(0, false, REJECT_NONSTANDARD, "too-long-mempool-chain", false);
         }
 
-        unsigned int forkVerifyFlags = ((Opt().UAHFTime() != 0) && (chainActive.Tip()->GetMedianTimePast() >= Opt().UAHFTime()) ?
-                                        SCRIPT_ENABLE_SIGHASH_FORKID : 0);
+        const int64_t mtpChainTip = chainActive.Tip()->GetMedianTimePast();
+        unsigned int forkVerifyFlags = 0;
+
+        if (IsUAHFActive(mtpChainTip)) {
+            forkVerifyFlags |= SCRIPT_ENABLE_SIGHASH_FORKID;
+        }
+
+        if (IsThirdHFActive(mtpChainTip)) {
+            forkVerifyFlags |= SCRIPT_ENABLE_MONOLITH_OPCODES;
+        }
 
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
@@ -1601,6 +1609,8 @@ void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state
                 continue;
 
             CBlockReject reject = {state.GetRejectCode(), state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH), pindex->GetBlockHash()};
+            LogPrint(Log::BLOCK, "Rejecting block from %d, code %d, reason %s",
+                     id, state.GetRejectCode(), state.GetRejectReason());
             nodeState->rejects.push_back(reject);
             if (blockSource.canMisbehave && nDoS > 0)
                 Misbehaving(id, nDoS, "invalid block: " + state.GetRejectReason());
@@ -1741,15 +1751,29 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                     pvChecks->push_back(CScriptCheck());
                     check.swap(pvChecks->back());
                 } else if (!check()) {
-                    if (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) {
+                    const bool hasNonMandatoryFlags
+                        = (flags & STANDARD_NOT_MANDATORY_VERIFY_FLAGS) != 0;
+                    const bool doesNotHaveMonolith
+                        = (flags & SCRIPT_ENABLE_MONOLITH_OPCODES) == 0;
+
+                    if (hasNonMandatoryFlags || doesNotHaveMonolith) {
                         // Check whether the failure was caused by a
                         // non-mandatory script verification check, such as
                         // non-standard DER encodings or non-null dummy
                         // arguments; if so, don't trigger DoS protection to
                         // avoid splitting the network between upgraded and
                         // non-upgraded nodes.
-                        CScriptCheck check2(*coins, tx, i,
-                                flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS, cacheStore, &txdata);
+                        //
+                        //
+                        // We also check activating the monolith opcodes as it is a
+                        // strictly additive change and we would not like to ban some of
+                        // our peer that are ahead of us and are considering the fork
+                        // as activated.
+                        unsigned int flagsFiltered = (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS)
+                            | SCRIPT_ENABLE_MONOLITH_OPCODES;
+
+                        CScriptCheck check2(*coins, tx, i, flagsFiltered, cacheStore, &txdata);
+
                         if (check2())
                             return state.Invalid(false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
                     }
@@ -2220,6 +2244,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         flags |= SCRIPT_VERIFY_NULLFAIL;
     }
 
+    // Enable more opcodes after the third HD.
+    if (IsThirdHFActive(pindex->pprev->GetMedianTimePast())) {
+        flags |= SCRIPT_ENABLE_MONOLITH_OPCODES;
+    }
+
     CBlockUndo blockundo;
 
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && Opt().ScriptCheckThreads() ? &scriptcheckqueue : NULL);
@@ -2638,10 +2667,6 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew,
         return false;
     int64_t nTime5 = GetTimeMicros(); nTimeChainState += nTime5 - nTime4;
     LogPrint(Log::BENCH, "  - Writing chainstate: %.2fms [%.2fs]\n", (nTime5 - nTime4) * 0.001, nTimeChainState * 0.000001);
-    // If we just activated the UAHF, clear the pool to be sure it doesn't contain tx invalid after the fork
-    if (IsUAHFActivatingBlock(pindexNew->GetMedianTimePast(), pindexNew->pprev)) {
-        mempool.clear();
-    }
     // Remove conflicting transactions from the mempool.
     list<CTransaction> txConflicted;
     mempool.removeForBlock(pblock->vtx, pindexNew->nHeight, txConflicted, !IsInitialBlockDownload());
@@ -2792,13 +2817,6 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
                 }
             }
         }
-    }
-
-    // If we reorged back across the UAHF, clear the pool to be sure it doesn't contain tx invalid before the fork
-    if ((Opt().UAHFTime() != 0) &&
-        pindexOldTip && pindexOldTip->pprev && (pindexOldTip->pprev->GetMedianTimePast() >= Opt().UAHFTime()) &&
-        (chainActive.Tip()->GetMedianTimePast() < Opt().UAHFTime())) {
-        mempool.clear();
     }
 
     if (fBlocksDisconnected) {

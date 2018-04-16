@@ -31,6 +31,7 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "utildebug.h"
+#include "utilfork.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
 #ifdef ENABLE_WALLET
@@ -1526,6 +1527,10 @@ bool AppInit2(boost::thread_group& threadGroup, CScheduler& scheduler)
     LogPrintf("No wallet support compiled in!\n");
 #endif // !ENABLE_WALLET
     // ********************************************************* Step 9: import blocks
+
+    chainActive.AddTipObserver([](const CBlockIndex* oldTip, const CBlockIndex* newTip) {
+            ForkMempoolClearer(mempool, oldTip, newTip);
+        });
 
     if (mapArgs.count("-blocknotify"))
         uiInterface.NotifyBlockTip.connect(BlockNotifyCallback);

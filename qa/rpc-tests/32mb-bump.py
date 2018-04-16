@@ -45,9 +45,6 @@ class HFBumpTest(BitcoinTestFramework):
         super().__init__()
         self.mocktime = 0
 
-    def setup_nodes(self):  # TODO: Remove in final HF code
-        return start_nodes(self.num_nodes, self.options.tmpdir, extra_args=[['-thirdhftime=1526400000'],]*4) # TODO: Remove in final HF code
-
     def generate_one(self):
         assert(self.mocktime > 0)
         self.mocktime = self.mocktime + 600
