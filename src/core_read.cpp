@@ -80,10 +80,8 @@ CScript ParseScript(std::string s)
         {
             // opcode, e.g. OP_ADD or ADD:
             result << mapOpNames[*w];
-        }
-        else
-        {
-            throw runtime_error("script parse error");
+        } else {
+            throw std::runtime_error("Error parsing script: " + s);
         }
     }
 
