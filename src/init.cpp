@@ -18,6 +18,7 @@
 #include "httprpc.h"
 #include "key.h"
 #include "main.h"
+#include "maxblocksize.h"
 #include "miner.h"
 #include "net.h"
 #include "options.h"
@@ -642,7 +643,13 @@ bool AppInitServers(boost::thread_group& threadGroup)
 {
     RPCServer::OnStopped(&OnRPCStopped);
     RPCServer::OnPreCommand(&OnRPCPreCommand);
-    if (!InitHTTPServer())
+
+    auto nextMaxBlockSize = []() {
+        int64_t max = GetNodeSignals().GetMaxBlockSize().get_value_or(MAX_BLOCK_SIZE);
+        return NextBlockRaiseCap(max);
+    };
+
+    if (!InitHTTPServer(nextMaxBlockSize))
         return false;
     if (!StartRPC())
         return false;

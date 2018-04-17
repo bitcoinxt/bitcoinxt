@@ -54,6 +54,7 @@ class HFBumpTest(BitcoinTestFramework):
     def run_test(self):
         self._test_initial_bump()
         self._test_mine_big_block()
+        self._test_submit_big_block()
 
     def _test_initial_bump(self):
         print("Test that max block size limits goes to 32MB at specified time")
@@ -107,6 +108,30 @@ class HFBumpTest(BitcoinTestFramework):
         # All nodes should agree on best block
         sync_blocks(self.nodes)
         print("OK!")
+
+    def _test_submit_big_block(self):
+        print("Test that we can submit big block with RPC interface")
+        # Mine a big block with node 0, then confirm that we can manually submit it to node 1.
+
+        stop_node(self.nodes[1], 1) # To make sure it disconnects from node 0
+        start_node(1, self.options.tmpdir, ["-debug", "-mocktime=%s" % self.mocktime])
+
+        utxo_cache = [ ]
+        too_big_target = 42 * MB
+        mine_block(self.nodes[0], target_bytes = too_big_target, utxos = utxo_cache)
+        assert_chaintip_within(self.nodes[0], 31.9*MB, 32*MB)
+
+        assert(self.nodes[0].getbestblockhash() != self.nodes[1].getbestblockhash())
+
+        while True:
+            node0_tip = self.nodes[0].getblockcount()
+            node1_tip = self.nodes[1].getblockcount()
+            if node1_tip >= node0_tip:
+                break
+            block_hash = self.nodes[0].getblockhash(node1_tip + 1)
+            self.nodes[1].submitblock(self.nodes[0].getblock(block_hash, False))
+
+        assert(self.nodes[0].getbestblockhash() == self.nodes[1].getbestblockhash())
 
 if __name__ == '__main__':
     HFBumpTest().main()

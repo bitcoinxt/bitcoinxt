@@ -246,10 +246,11 @@ ThinBlockManager thinblockmg(
 
 namespace {
 
-int GetMaxBlockSize()
+uint64_t GetMaxBlockSize()
 {
     LOCK(cs_main);
-    return chainActive.Tip()->nMaxBlockSize;
+    const CBlockIndex* tip = chainActive.Tip();
+    return tip == nullptr ? MAX_BLOCK_SIZE : tip->nMaxBlockSize;
 }
 
 void UpdatePreferredDownload(CNode* node, NodeStatePtr& state)
