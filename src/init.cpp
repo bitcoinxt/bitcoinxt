@@ -645,7 +645,7 @@ bool AppInitServers(boost::thread_group& threadGroup)
     RPCServer::OnPreCommand(&OnRPCPreCommand);
 
     auto nextMaxBlockSize = []() {
-        int64_t max = GetNodeSignals().GetMaxBlockSize().get_value_or(MAX_BLOCK_SIZE);
+        int64_t max = GetNodeSignals().GetMaxBlockSizeInsecure().get_value_or(MAX_BLOCK_SIZE);
         return NextBlockRaiseCap(max);
     };
 

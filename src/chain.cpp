@@ -4,12 +4,14 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "chain.h"
+#include "consensus/consensus.h" // for MAX_BLOCK_SIZE
 
 using namespace std;
 
-/**
- * CChain implementation
- */
+CChain::CChain() : tipMaxBlockSize(MAX_BLOCK_SIZE)
+{
+}
+
 void CChain::SetTip(CBlockIndex *pindex) {
     CBlockIndex* oldTip = Tip();
 
@@ -67,6 +69,9 @@ const CBlockIndex *CChain::FindFork(const CBlockIndex *pindex) const {
 }
 
 void CChain::OnTipChanged(const CBlockIndex* oldTip, CBlockIndex* newTip) {
+    tipMaxBlockSize.store(newTip == nullptr
+                          ? MAX_BLOCK_SIZE : newTip->nMaxBlockSize);
+
     for (auto& o : tipObservers)
         o(oldTip, newTip);
 }

@@ -246,11 +246,9 @@ ThinBlockManager thinblockmg(
 
 namespace {
 
-uint64_t GetMaxBlockSize()
+uint64_t GetMaxBlockSizeInsecure()
 {
-    LOCK(cs_main);
-    const CBlockIndex* tip = chainActive.Tip();
-    return tip == nullptr ? MAX_BLOCK_SIZE : tip->nMaxBlockSize;
+    return chainActive.MaxBlockSizeInsecure();
 }
 
 void UpdatePreferredDownload(CNode* node, NodeStatePtr& state)
@@ -578,7 +576,7 @@ void RegisterNodeSignals(CNodeSignals& nodeSignals)
     nodeSignals.SendMessages.connect(&SendMessages);
     nodeSignals.InitializeNode.connect(&InitializeNode);
     nodeSignals.FinalizeNode.connect(&FinalizeNode);
-    nodeSignals.GetMaxBlockSize.connect(&GetMaxBlockSize);
+    nodeSignals.GetMaxBlockSizeInsecure.connect(&GetMaxBlockSizeInsecure);
 }
 
 void UnregisterNodeSignals(CNodeSignals& nodeSignals)
@@ -588,7 +586,7 @@ void UnregisterNodeSignals(CNodeSignals& nodeSignals)
     nodeSignals.SendMessages.disconnect(&SendMessages);
     nodeSignals.InitializeNode.disconnect(&InitializeNode);
     nodeSignals.FinalizeNode.disconnect(&FinalizeNode);
-    nodeSignals.GetMaxBlockSize.disconnect(&GetMaxBlockSize);
+    nodeSignals.GetMaxBlockSizeInsecure.disconnect(&GetMaxBlockSizeInsecure);
 }
 
 CBlockIndex* FindForkInGlobalIndex(const CChain& chain, const CBlockLocator& locator)
@@ -4388,7 +4386,7 @@ static std::map<std::string, size_t> maxMessageSizes = boost::assign::map_list_o
 bool static SanityCheckMessage(CNode* peer, const CNetMessage& msg)
 {
     const std::string& strCommand = msg.hdr.GetCommand();
-    uint64_t nMaxMessageSize = NextBlockRaiseCap(GetMaxBlockSize());
+    uint64_t nMaxMessageSize = NextBlockRaiseCap(GetMaxBlockSizeInsecure());
     if (msg.hdr.nMessageSize > nMaxMessageSize ||
         (maxMessageSizes.count(strCommand) && msg.hdr.nMessageSize > maxMessageSizes[strCommand])) {
         LogPrint(Log::NET, "Oversized %s message from peer=%i (%d bytes)\n",
