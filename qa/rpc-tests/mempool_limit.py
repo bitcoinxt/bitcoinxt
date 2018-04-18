@@ -52,9 +52,8 @@ class MempoolLimitTest(BitcoinTestFramework):
             txids.append([])
             txids[i] = create_lots_of_big_transactions(self.nodes[0], self.txouts, utxos[30*i:30*i+30], 30, base_fee + i*base_fee/10)
 
-        time.sleep(9)
         # txid0 should have been evicted by node 1, but txid1 should have been protected
-        assert(txid0 not in self.nodes[1].getrawmempool())
+        wait_for(lambda: txid0 not in self.nodes[1].getrawmempool(), what = "tx eviction")
         assert(txid1 in self.nodes[1].getrawmempool())
 
 if __name__ == '__main__':

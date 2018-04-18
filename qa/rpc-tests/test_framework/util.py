@@ -690,3 +690,19 @@ def mine_large_block(node, utxos=None):
     fee = 100 * node.getnetworkinfo()["relayfee"]
     create_lots_of_big_transactions(node, txouts, utxos, num, fee=fee)
     node.generate(1)
+
+def wait_for(criteria, what = None):
+    import sys
+    if what != None:
+        sys.stdout.write("Waiting for %s" % what)
+        sys.stdout.flush()
+    for i in range(1, 14):
+        if criteria():
+            print("")
+            return
+
+        sys.stdout.write(".")
+        sys.stdout.flush()
+        time.sleep(0.1 * i**2) # geometric back-off
+
+    raise Exception("Timeout")
