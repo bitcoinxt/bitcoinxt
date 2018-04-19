@@ -367,7 +367,7 @@ struct CNodeSignals
     boost::signals2::signal<bool (CNode*, CConnman*), CombinerAll> SendMessages;
     boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
     boost::signals2::signal<void (NodeId, bool&)> FinalizeNode;
-    boost::signals2::signal<int ()> GetMaxBlockSize;
+    boost::signals2::signal<uint64_t ()> GetMaxBlockSizeInsecure;
 };
 
 

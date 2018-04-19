@@ -4,6 +4,7 @@
 
 #include "chain.h"
 #include "test/test_bitcoin.h"
+#include "consensus/consensus.h" // for MAX_BLOCK_SIZE
 
 #include <boost/test/unit_test.hpp>
 
@@ -44,6 +45,32 @@ BOOST_AUTO_TEST_CASE(chaintip_observer) {
     BOOST_CHECK(oldTip == &c);
     BOOST_CHECK(newTip == nullptr);
     BOOST_CHECK_EQUAL(3, callbacks);
+}
+
+BOOST_AUTO_TEST_CASE(tip_max_blocksize) {
+    CChain chain;
+
+    // no tip set
+    BOOST_CHECK_EQUAL(MAX_BLOCK_SIZE, chain.MaxBlockSizeInsecure());
+
+    // set tips
+    CBlockIndex a;
+    a.nHeight = 0;
+    a.nMaxBlockSize = MAX_BLOCK_SIZE * 1;
+
+    CBlockIndex b;
+    b.nHeight = 1;
+    b.nMaxBlockSize = MAX_BLOCK_SIZE * 2;
+    b.pprev = &a;
+
+    CBlockIndex c;
+    c.nHeight = 0;
+    c.nMaxBlockSize = MAX_BLOCK_SIZE * 3;
+
+    chain.SetTip(&b);
+    BOOST_CHECK_EQUAL(2 * MAX_BLOCK_SIZE, chain.MaxBlockSizeInsecure());
+    chain.SetTip(&c);
+    BOOST_CHECK_EQUAL(3 * MAX_BLOCK_SIZE, chain.MaxBlockSizeInsecure());
 }
 
 BOOST_AUTO_TEST_SUITE_END();

@@ -38,6 +38,12 @@
 /** Maximum size of http request (request line + headers) */
 static const size_t MAX_HEADERS_SIZE = 8192;
 
+/**
+ * Maximum HTTP post body size. Twice the maximum block size is added to this
+ * value in practice.
+ */
+static const size_t MIN_SUPPORTED_BODY_SIZE = 0x02000000;
+
 /** HTTP request work item */
 class HTTPWorkItem : public HTTPClosure
 {
@@ -58,7 +64,8 @@ private:
     HTTPRequestHandler func;
 };
 
-/** Simple work queue for distributing work over multiple threads.
+/**
+ * Simple work queue for distributing work over multiple threads.
  * Work items are simply callable objects.
  */
 template <typename WorkItem>
@@ -181,6 +188,7 @@ static WorkQueue<HTTPClosure>* workQueue = 0;
 std::vector<HTTPPathHandler> pathHandlers;
 //! Bound listening sockets
 std::vector<evhttp_bound_socket *> boundSockets;
+std::function<uint64_t()> nextMaxBlockSize;
 
 /** Check if a network address is allowed to access the HTTP server */
 static bool ClientAllowed(const CNetAddr& netaddr)
@@ -246,7 +254,8 @@ static void http_request_cb(struct evhttp_request* req, void* arg)
     std::unique_ptr<HTTPRequest> hreq(new HTTPRequest(req));
 
     LogPrint(Log::HTTP, "Received a %s request for %s from %s\n",
-             RequestMethodString(hreq->GetRequestMethod()), hreq->GetURI(), hreq->GetPeer().ToString());
+             RequestMethodString(hreq->GetRequestMethod()), hreq->GetURI(),
+             hreq->GetPeer().ToString());
 
     // Early address-based allow check
     if (!ClientAllowed(hreq->GetPeer())) {
@@ -369,8 +378,9 @@ static void libevent_log_cb(int severity, const char *msg)
         LogPrint(Log::LIBEVENT, "libevent: %s\n", msg);
 }
 
-bool InitHTTPServer()
+bool InitHTTPServer(std::function<uint64_t()> nextMaxBlockSizeIn)
 {
+    nextMaxBlockSize = nextMaxBlockSizeIn;
     struct evhttp* http = 0;
     struct event_base* base = 0;
 
@@ -417,7 +427,6 @@ bool InitHTTPServer()
 
     evhttp_set_timeout(http, GetArg("-rpcservertimeout", DEFAULT_HTTP_SERVER_TIMEOUT));
     evhttp_set_max_headers_size(http, MAX_HEADERS_SIZE);
-    evhttp_set_max_body_size(http, MAX_SIZE);
     evhttp_set_gencb(http, http_request_cb, NULL);
 
     if (!HTTPBindAddresses(http)) {
@@ -611,6 +620,9 @@ void HTTPRequest::WriteReply(int nStatus, const std::string& strReply)
 CService HTTPRequest::GetPeer()
 {
     evhttp_connection* con = evhttp_request_get_connection(req);
+    evhttp_connection_set_max_body_size(con,
+            MIN_SUPPORTED_BODY_SIZE + 2 * nextMaxBlockSize());
+
     CService peer;
     if (con) {
         // evhttp retains ownership over returned address string

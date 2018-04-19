@@ -14,6 +14,7 @@
 
 #include <vector>
 #include <functional>
+#include <atomic>
 
 static const int BIP100_DBI_VERSION = 0x08000000;
 static const int DISK_BLOCK_INDEX_VERSION = BIP100_DBI_VERSION;
@@ -429,9 +430,11 @@ class CChain {
 private:
     std::vector<CBlockIndex*> vChain;
     std::vector<OnTipChangeCallb> tipObservers;
+    std::atomic<uint64_t> tipMaxBlockSize;
     void OnTipChanged(const CBlockIndex* oldTip, CBlockIndex* newTip);
 
 public:
+    CChain();
     /** Returns the index entry for the genesis block of this chain, or NULL if none. */
     CBlockIndex *Genesis() const {
         return vChain.size() > 0 ? vChain[0] : NULL;
@@ -484,6 +487,12 @@ public:
 
     void AddTipObserver(OnTipChangeCallb o) {
         tipObservers.push_back(o);
+    }
+
+    // Thread safe, but no guarantees that another thread is not in the process
+    // of setting a new tip. For guarantee, you need to lock cs_main.
+    uint64_t MaxBlockSizeInsecure() {
+        return tipMaxBlockSize.load();
     }
 };
 
