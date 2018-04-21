@@ -7,6 +7,9 @@
 #include "config/bitcoin-config.h"
 #endif
 
+// compat.h must be included first to correctly define FD_SETSIZE
+#include "compat.h"
+
 #include "netbase.h"
 
 #include "hash.h"
