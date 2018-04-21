@@ -7,6 +7,9 @@
 #include "config/bitcoin-config.h"
 #endif
 
+// compat.h must be included first to correctly define FD_SETSIZE
+#include "compat.h"
+
 #include "util.h"
 
 #include "chainparamsbase.h"
@@ -671,7 +674,8 @@ bool TruncateFile(FILE *file, unsigned int length) {
  */
 int RaiseFileDescriptorLimit(int nMinFD) {
 #if defined(WIN32)
-    return 2048;
+    static_assert(FD_SETSIZE > 64, "compat.h needs to be included first, see PR#406");
+    return FD_SETSIZE;
 #else
     struct rlimit limitFD;
     if (getrlimit(RLIMIT_NOFILE, &limitFD) != -1) {
