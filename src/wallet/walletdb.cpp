@@ -13,8 +13,8 @@
 #include "wallet/walletdb.h"
 
 #include "base58.h"
+#include "consensus/tx_verify.h"
 #include "consensus/validation.h"
-#include "main.h"
 #include "dstencode.h"
 #include "protocol.h"
 #include "serialize.h"

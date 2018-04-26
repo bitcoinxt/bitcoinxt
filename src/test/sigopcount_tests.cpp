@@ -3,9 +3,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "consensus/consensus.h"
+#include "consensus/tx_verify.h"
 #include "consensus/validation.h"
 #include "random.h"
-#include "main.h"
 #include "pubkey.h"
 #include "key.h"
 #include "script/script.h"

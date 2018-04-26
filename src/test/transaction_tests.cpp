@@ -8,6 +8,7 @@
 
 #include "clientversion.h"
 #include "checkqueue.h"
+#include "consensus/tx_verify.h"
 #include "consensus/validation.h"
 #include "core_io.h"
 #include "key.h"
