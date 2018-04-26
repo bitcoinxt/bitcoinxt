@@ -5,10 +5,10 @@ Description: Automatically enable and start systemd bitcoinxtd.service?
 
 Template: bitcoinxt/select_network
 Type: select
-Default: Bitcoin Cash (BCC)
-Choices: Bitcoin Cash (BCC), Bitcoin (BTC)
+Default: Bitcoin Cash (BCH)
+Choices: Bitcoin Cash (BCH), Bitcoin (BTC)
 Description: Which network shall Bitcoin XT connect to?
-  Bitcoin XT is configured to use the BCC network by default.
+  Bitcoin XT is configured to use the BCH network by default.
   BTC is selected by adding uahftime=0 to /etc/bitcoinxt/bitcoin.conf.
   If your bitcoin.conf is located at a different location, you must edit it yourself.
   -

@@ -57,8 +57,8 @@ if [ "$RET" = "Bitcoin (BTC)" ]; then
 else
     if grep -q '^uahftime' $BITCOIN_CONF; then
         sed -i 's/^uahftime.*//' $BITCOIN_CONF
-        echo "BCC selected: Removing uahftime from $BITCOIN_CONF"
+        echo "BCH selected: Removing uahftime from $BITCOIN_CONF"
     else
-        echo "BCC selected: No configuration change needed."
+        echo "BCH selected: No configuration change needed."
     fi;
 fi
