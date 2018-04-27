@@ -11,7 +11,7 @@
                 "hex": ""
             },
             "sequence": 4294967295
-        }, 
+        },
         {
             "txid": "bf829c6bcf84579331337659d31f89dfd138f7f7785802d5501c92333145ca7c",
             "vout": 18,
@@ -20,7 +20,7 @@
                 "hex": ""
             },
             "sequence": 4294967295
-        }, 
+        },
         {
             "txid": "22a6f904655d53ae2ff70e701a0bbd90aa3975c0f40bfc6cc996a9049e31cdfc",
             "vout": 1,
@@ -41,10 +41,10 @@
                 "reqSigs": 1,
                 "type": "pubkeyhash",
                 "addresses": [
-                    "13tuJJDR2RgArmgfv6JScSdreahzgc4T6o"
+                    "bitcoincash:qq0uz8eehctjn0uh8fatdfs4efrjn4j9ws47fnc6va"
                 ]
             }
-        }, 
+        },
         {
             "value": 4.00,
             "n": 1,
@@ -54,7 +54,7 @@
                 "reqSigs": 1,
                 "type": "pubkeyhash",
                 "addresses": [
-                    "1P8yWvZW8jVihP1bzHeqfE4aoXNX8AVa46"
+                    "bitcoincash:qredfkegett9qg3xaeyy4cj9qhpgsh93950nk95fta"
                 ]
             }
         }
