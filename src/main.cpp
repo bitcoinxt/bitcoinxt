@@ -1448,7 +1448,6 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txund
                 CTxInUndo& undo = txundo.vprevout.back();
                 undo.nHeight = coins->nHeight;
                 undo.fCoinBase = coins->fCoinBase;
-                undo.nVersion = coins->nVersion;
             }
         }
     }
@@ -1648,7 +1647,6 @@ static int ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const COu
         if (!coins->IsPruned()) fClean = false; // overwriting existing transaction
         coins->fCoinBase = undo.fCoinBase;
         coins->nHeight = undo.nHeight;
-        coins->nVersion = undo.nVersion;
     } else {
         if (coins->IsPruned()) fClean = false; // adding output to missing transaction
     }
@@ -1696,11 +1694,6 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
         outs->ClearUnspendable();
 
         CCoins outsBlock(tx, pindex->nHeight);
-        // The CCoins serialization does not serialize negative numbers.
-        // No network rules currently depend on the version here, so an inconsistency is harmless
-        // but it must be corrected before txout nversion ever influences a network rule.
-        if (outsBlock.nVersion < 0)
-            outs->nVersion = outsBlock.nVersion;
         if (*outs != outsBlock) fClean = false; // transaction mismatch
 
         // remove outputs
@@ -4305,7 +4298,7 @@ void static ProcessGetData(CNode* pfrom, CConnman* connman)
 
 // 8 bytes + sizeof(CTxOut)
 struct CCoin {
-    uint32_t nTxVer;   // Don't call this nVersion, that name has a special meaning inside IMPLEMENT_SERIALIZE
+    uint32_t nTxVer; // DEPRECATED. Dummy for keeping backward compatibility.
     uint32_t nHeight;
     CTxOut out;
 
@@ -4376,7 +4369,7 @@ bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, ve
                     // Safe to index into vout here because IsAvailable checked if it's off the end of the array, or if
                     // n is valid but points to an already spent output (IsNull).
                     CCoin coin;
-                    coin.nTxVer = coins.nVersion;
+                    coin.nTxVer = 0; // DEPRECATED. Dummy value only.
                     coin.nHeight = coins.nHeight;
                     coin.out = coins.vout.at(vOutPoints[i].n);
                     assert(!coin.out.IsNull());
