@@ -22,7 +22,7 @@ static void addCoin(const CAmount& nValue, const CWallet& wallet, vector<COutput
     CWalletTx* wtx = new CWalletTx(&wallet, tx);
 
     int nAge = 6 * 24;
-    COutput output(wtx, nInput, nAge, true, true);
+    COutput output(wtx, nInput, nAge, true);
     vCoins.push_back(output);
 }
 

@@ -19,7 +19,7 @@ static void AddTx(const CTransaction& tx, const CAmount& nFee, CTxMemPool& pool)
     LockPoints lp;
     pool.addUnchecked(tx.GetHash(), CTxMemPoolEntry(
                                         tx, nFee, nTime, dPriority, nHeight, pool.HasNoInputsOf(tx),
-                                        tx.GetValueOut(), spendsCoinbase, sigOpCost, lp));
+                                        spendsCoinbase, lp, sigOpCost));
 }
 
 // Right now this is only testing eviction performance in an extremely small
@@ -108,7 +108,7 @@ static void MempoolEviction(benchmark::State& state)
         AddTx(tx6, 1100LL, pool);
         AddTx(tx7, 9000LL, pool);
         pool.TrimToSize(pool.DynamicMemoryUsage() * 3 / 4);
-        pool.TrimToSize(GetVirtualTransactionSize(tx1));
+        pool.TrimToSize(::GetSerializeSize(tx1, SER_NETWORK, PROTOCOL_VERSION));
     }
 }
 

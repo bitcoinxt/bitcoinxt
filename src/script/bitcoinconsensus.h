@@ -6,6 +6,8 @@
 #ifndef BITCOIN_BITCOINCONSENSUS_H
 #define BITCOIN_BITCOINCONSENSUS_H
 
+#include <stdint.h>
+
 #if defined(BUILD_BITCOIN_INTERNAL) && defined(HAVE_CONFIG_H)
 #include "config/bitcoin-config.h"
   #if defined(_WIN32)
@@ -49,6 +51,12 @@ enum
     bitcoinconsensus_SCRIPT_FLAGS_VERIFY_DERSIG              = (1U << 2), // enforce strict DER (BIP66) compliance
     bitcoinconsensus_SCRIPT_FLAGS_VERIFY_CHECKLOCKTIMEVERIFY = (1U << 9), // enable CHECKLOCKTIMEVERIFY (BIP65)
 };
+
+
+EXPORT_SYMBOL int bitcoinconsensus_verify_script_with_amount(
+        const unsigned char *scriptPubKey, unsigned int scriptPubKeyLen, int64_t amount,
+        const unsigned char *txTo, unsigned int txToLen,
+        unsigned int nIn, unsigned int flags, bitcoinconsensus_error* err);
 
 /// Returns 1 if the input nIn of the serialized transaction pointed to by
 /// txTo correctly spends the scriptPubKey pointed to by scriptPubKey under
