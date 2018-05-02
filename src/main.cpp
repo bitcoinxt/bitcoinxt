@@ -1442,11 +1442,9 @@ void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txund
             if (nPos >= coins->vout.size() || coins->vout[nPos].IsNull())
                 assert(false);
             // mark an outpoint spent, and construct undo information
-            txundo.vprevout.push_back(CTxInUndo(coins->vout[nPos]));
-            coins->Spend(nPos);
-            CTxInUndo& undo = txundo.vprevout.back();
-            undo.nHeight = coins->nHeight;
-            undo.fCoinBase = coins->fCoinBase;
+            txundo.vprevout.emplace_back(coins->vout[nPos], coins->nHeight, coins->fCoinBase);
+            bool ret = coins->Spend(nPos);
+            assert(ret);
         }
     }
 
@@ -1629,13 +1627,13 @@ enum DisconnectResult
 };
 
 /**
- * Apply the undo operation of a CTxInUndo to the given chain state.
- * @param undo The undo object.
+ * Restore the UTXO in a Coin at a given COutPoint
+ * @param undo The Coin to be restored.
  * @param view The coins view to which to apply the changes.
  * @param out The out point that corresponds to the tx input.
  * @return A DisconnectResult as an int
  */
-static int ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const COutPoint& out)
+static int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out)
 {
     bool fClean = true;
 
@@ -1656,7 +1654,7 @@ static int ApplyTxInUndo(const CTxInUndo& undo, CCoinsViewCache& view, const COu
     if (coins->IsAvailable(out.n)) fClean = false; // overwriting existing output
     if (coins->vout.size() < out.n+1)
         coins->vout.resize(out.n+1);
-    coins->vout[out.n] = undo.txout;
+    coins->vout[out.n] = std::move(undo.out);
 
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
@@ -1705,18 +1703,18 @@ static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* 
 
         // restore inputs
         if (i > 0) { // not coinbases
-            const CTxUndo &txundo = blockUndo.vtxundo[i-1];
+            CTxUndo &txundo = blockUndo.vtxundo[i-1];
             if (txundo.vprevout.size() != tx.vin.size()) {
                 error("DisconnectBlock(): transaction and undo data inconsistent");
                 return DISCONNECT_FAILED;
             }
             for (unsigned int j = tx.vin.size(); j-- > 0;) {
                 const COutPoint &out = tx.vin[j].prevout;
-                const CTxInUndo &undo = txundo.vprevout[j];
-                int res = ApplyTxInUndo(undo, view, out);
+                int res = ApplyTxInUndo(std::move(txundo.vprevout[j]), view, out);
                 if (res == DISCONNECT_FAILED) return DISCONNECT_FAILED;
                 fClean = fClean && res != DISCONNECT_UNCLEAN;
             }
+            // At this point, all of txundo.vprevout should have been moved out.
         }
     }
 
