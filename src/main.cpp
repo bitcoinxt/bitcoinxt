@@ -1479,11 +1479,19 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
         if (fScriptChecks) {
             for (unsigned int i = 0; i < tx.vin.size(); i++) {
                 const COutPoint &prevout = tx.vin[i].prevout;
-                const CCoins* coins = inputs.AccessCoins(prevout.hash);
-                assert(coins);
+                const Coin& coin = inputs.AccessCoin(prevout);
+                assert(!coin.IsPruned());
+
+                // We are very carefully only pass in things to CScriptCheck which
+                // are clearly committed to by tx' witness hash. This provides
+                // a sanity check that our caching is not introducing consensus
+                // failures through additional data in, eg, the coins being
+                // spent being checked as a part of CScriptCheck.
+                const CScript& scriptPubKey = coin.out.scriptPubKey;
+                const CAmount amount = coin.out.nValue;
 
                 // Verify signature
-                CScriptCheck check(*coins, tx, i, flags, cacheStore, &txdata);
+                CScriptCheck check(scriptPubKey, amount, tx, i, flags, cacheStore, &txdata);
                 if (pvChecks) {
                     pvChecks->push_back(CScriptCheck());
                     check.swap(pvChecks->back());
@@ -1509,7 +1517,8 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
                         unsigned int flagsFiltered = (flags & ~STANDARD_NOT_MANDATORY_VERIFY_FLAGS)
                             | SCRIPT_ENABLE_MONOLITH_OPCODES;
 
-                        CScriptCheck check2(*coins, tx, i, flagsFiltered, cacheStore, &txdata);
+                        CScriptCheck check2(scriptPubKey, amount, tx, i,
+                                flagsFiltered, cacheStore, &txdata);
 
                         if (check2())
                             return state.Invalid(false, REJECT_NONSTANDARD, strprintf("non-mandatory-script-verify-flag (%s)", ScriptErrorString(check.GetScriptError())));
