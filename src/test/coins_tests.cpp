@@ -1,14 +1,15 @@
-// Copyright (c) 2014 The Bitcoin Core developers
+// Copyright (c) 2014-2016 The Bitcoin Core developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "coins.h"
-#include "test/test_random.h"
 #include "script/standard.h"
 #include "uint256.h"
+#include "undo.h"
 #include "utilstrencodings.h"
 #include "test/test_bitcoin.h"
-#include "main.h"
+#include "test/test_random.h"
+//#include "validation.h"
 #include "consensus/validation.h"
 
 #include <vector>
@@ -16,8 +17,20 @@
 
 #include <boost/test/unit_test.hpp>
 
+int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out);
+void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txundo, int nHeight);
+
 namespace
 {
+//! equality test
+bool operator==(const Coin &a, const Coin &b) {
+    // Empty Coin objects are always equal.
+    if (a.IsPruned() && b.IsPruned()) return true;
+    return a.fCoinBase == b.fCoinBase &&
+           a.nHeight == b.nHeight &&
+           a.out == b.out;
+}
+
 class CCoinsViewTest : public CCoinsView
 {
     uint256 hashBestBlock_;
@@ -68,7 +81,7 @@ public:
 class CCoinsViewCacheTest : public CCoinsViewCache
 {
 public:
-    CCoinsViewCacheTest(CCoinsView* base) : CCoinsViewCache(base) {}
+    CCoinsViewCacheTest(CCoinsView* _base) : CCoinsViewCache(_base) {}
 
     void SelfTest() const
     {
@@ -130,8 +143,9 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
         {
             uint256 txid = txids[insecure_rand() % txids.size()]; // txid we're going to modify in this iteration.
             CCoins& coins = result[txid];
-            CCoinsModifier entry = stack.back()->ModifyCoins(txid);
-            BOOST_CHECK(coins == *entry);
+            const Coin& entry = stack.back()->AccessCoin(COutPoint(txid, 0));
+            BOOST_CHECK((entry.IsPruned() && coins.IsPruned()) || entry == Coin(coins.vout[0], coins.nHeight, coins.fCoinBase));
+
             if (insecure_rand() % 5 == 0 || coins.IsPruned()) {
                 if (coins.IsPruned()) {
                     added_an_entry = true;
@@ -140,11 +154,14 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
                 }
                 coins.vout.resize(1);
                 coins.vout[0].nValue = insecure_rand();
-                *entry = coins;
             } else {
                 coins.Clear();
-                entry->Clear();
                 removed_an_entry = true;
+            }
+            if (coins.IsPruned()) {
+                stack.back()->SpendCoin(COutPoint(txid, 0));
+            } else {
+                stack.back()->AddCoin(COutPoint(txid, 0), Coin(coins.vout[0], coins.nHeight, coins.fCoinBase), true);
             }
         }
 
@@ -212,6 +229,22 @@ BOOST_AUTO_TEST_CASE(coins_cache_simulation_test)
     BOOST_CHECK(missed_an_entry);
 }
 
+typedef std::tuple<CTransaction,CTxUndo,CCoins> TxData;
+// Store of all necessary tx and undo data for next test
+std::map<uint256, TxData> alltxs;
+
+TxData &FindRandomFrom(const std::set<uint256> &txidset) {
+    assert(txidset.size());
+    std::set<uint256>::iterator txIt = txidset.lower_bound(GetRandHash());
+    if (txIt == txidset.end()) {
+        txIt = txidset.begin();
+    }
+    std::map<uint256, TxData>::iterator txdit = alltxs.find(*txIt);
+    assert(txdit != alltxs.end());
+    return txdit->second;
+}
+
+
 // This test is similar to the previous test
 // except the emphasis is on testing the functionality of UpdateCoins
 // random txs are created and UpdateCoins is used to update the cache stack
@@ -228,77 +261,137 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
     std::vector<CCoinsViewCacheTest*> stack; // A stack of CCoinsViewCaches on top.
     stack.push_back(new CCoinsViewCacheTest(&base)); // Start with one cache.
 
-    // Track the txids we've used and whether they have been spent or not
-    std::map<uint256, CAmount> coinbaseids;
-    std::set<uint256> alltxids;
+    // Track the txids we've used in various sets
+    std::set<uint256> coinbaseids;
+    std::set<uint256> disconnectedids;
     std::set<uint256> duplicateids;
+    std::set<uint256> utxoset;
 
     for (unsigned int i = 0; i < NUM_SIMULATION_ITERATIONS; i++) {
-        {
+        uint32_t randiter = insecure_rand();
+
+        // 19/20 txs add a new transaction
+        if (randiter % 20 < 19) {
             CMutableTransaction tx;
             tx.vin.resize(1);
             tx.vout.resize(1);
             tx.vout[0].nValue = i; //Keep txs unique unless intended to duplicate
             unsigned int height = insecure_rand();
+            CCoins oldcoins;
 
-            // 1/10 times create a coinbase
-            if (insecure_rand() % 10 == 0 || coinbaseids.size() < 10) {
-                // 1/100 times create a duplicate coinbase
+            // 2/20 times create a new coinbase
+            if (randiter % 20 < 2 || coinbaseids.size() < 10) {
+                // 1/10 of those times create a duplicate coinbase
                 if (insecure_rand() % 10 == 0 && coinbaseids.size()) {
-                    std::map<uint256, CAmount>::iterator coinbaseIt = coinbaseids.lower_bound(GetRandHash());
-                    if (coinbaseIt == coinbaseids.end()) {
-                        coinbaseIt = coinbaseids.begin();
-                    }
-                    //Use same random value to have same hash and be a true duplicate
-                    tx.vout[0].nValue = coinbaseIt->second;
-                    assert(tx.GetHash() == coinbaseIt->first);
-                    duplicateids.insert(coinbaseIt->first);
+                    TxData &txd = FindRandomFrom(coinbaseids);
+                    // Reuse the exact same coinbase
+                    tx = std::get<0>(txd);
+                    // shouldn't be available for reconnection if its been duplicated
+                    disconnectedids.erase(tx.GetHash());
+
+                    duplicateids.insert(tx.GetHash());
                 }
                 else {
-                    coinbaseids[tx.GetHash()] = tx.vout[0].nValue;
+                    coinbaseids.insert(tx.GetHash());
                 }
                 assert(CTransaction(tx).IsCoinBase());
             }
-            // 9/10 times create a regular tx
+
+            // 17/20 times reconnect previous or add a regular tx
             else {
+
                 uint256 prevouthash;
-                // equally likely to spend coinbase or non coinbase
-                std::set<uint256>::iterator txIt = alltxids.lower_bound(GetRandHash());
-                if (txIt == alltxids.end()) {
-                    txIt = alltxids.begin();
+                // 1/20 times reconnect a previously disconnected tx
+                if (randiter % 20 == 2 && disconnectedids.size()) {
+                    TxData &txd = FindRandomFrom(disconnectedids);
+                    tx = std::get<0>(txd);
+                    prevouthash = tx.vin[0].prevout.hash;
+                    if (!CTransaction(tx).IsCoinBase() && !utxoset.count(prevouthash)) {
+                        disconnectedids.erase(tx.GetHash());
+                        continue;
+                    }
+
+                    // If this tx is already IN the UTXO, then it must be a coinbase, and it must be a duplicate
+                    if (utxoset.count(tx.GetHash())) {
+                        assert(CTransaction(tx).IsCoinBase());
+                        assert(duplicateids.count(tx.GetHash()));
+                    }
+                    disconnectedids.erase(tx.GetHash());
                 }
-                prevouthash = *txIt;
 
-                // Construct the tx to spend the coins of prevouthash
-                tx.vin[0].prevout.hash = prevouthash;
-                tx.vin[0].prevout.n = 0;
+                // 16/20 times create a regular tx
+                else {
+                    TxData &txd = FindRandomFrom(utxoset);
+                    prevouthash = std::get<0>(txd).GetHash();
 
+                    // Construct the tx to spend the coins of prevouthash
+                    tx.vin[0].prevout.hash = prevouthash;
+                    tx.vin[0].prevout.n = 0;
+                    assert(!CTransaction(tx).IsCoinBase());
+                }
+                // In this simple test coins only have two states, spent or unspent, save the unspent state to restore
+                oldcoins = result[prevouthash];
                 // Update the expected result of prevouthash to know these coins are spent
-                CCoins& oldcoins = result[prevouthash];
-                oldcoins.Clear();
+                result[prevouthash].Clear();
 
-                // It is of particular importance here that once we spend a coinbase tx hash
-                // it is no longer available to be duplicated (or spent again)
-                // BIP 34 in conjunction with enforcing BIP 30 (at least until BIP 34 was active)
-                // results in the fact that no coinbases were duplicated after they were already spent
-                alltxids.erase(prevouthash);
-                coinbaseids.erase(prevouthash);
+                utxoset.erase(prevouthash);
 
                 // The test is designed to ensure spending a duplicate coinbase will work properly
                 // if that ever happens and not resurrect the previously overwritten coinbase
-                if (duplicateids.count(prevouthash))
+                if (duplicateids.count(prevouthash)) {
                     spent_a_duplicate_coinbase = true;
+                }
 
-                assert(!CTransaction(tx).IsCoinBase());
             }
-            // Track this tx to possibly spend later
-            alltxids.insert(tx.GetHash());
-
             // Update the expected result to know about the new output coins
-            CCoins &coins = result[tx.GetHash()];
-            coins.FromTx(tx, height);
+            result[tx.GetHash()].FromTx(tx, height);
 
-            UpdateCoins(tx, *(stack.back()), height);
+            // Call UpdateCoins on the top cache
+            CTxUndo undo;
+            UpdateCoins(tx, *(stack.back()), undo, height);
+
+            // Update the utxo set for future spends
+            utxoset.insert(tx.GetHash());
+
+            // Track this tx and undo info to use later
+            alltxs.insert(std::make_pair(tx.GetHash(),std::make_tuple(tx,undo,oldcoins)));
+        } else if (utxoset.size()) {
+            //1/20 times undo a previous transaction
+            TxData &txd = FindRandomFrom(utxoset);
+
+            CTransaction &tx = std::get<0>(txd);
+            CTxUndo &undo = std::get<1>(txd);
+            CCoins &origcoins = std::get<2>(txd);
+
+            uint256 undohash = tx.GetHash();
+
+            // Update the expected result
+            // Remove new outputs
+            result[undohash].Clear();
+            // If not coinbase restore prevout
+            if (!tx.IsCoinBase()) {
+                result[tx.vin[0].prevout.hash] = origcoins;
+            }
+
+            // Disconnect the tx from the current UTXO
+            // See code in DisconnectBlock
+            // remove outputs
+            {
+                stack.back()->SpendCoin(COutPoint(undohash, 0));
+            }
+            // restore inputs
+            if (!tx.IsCoinBase()) {
+                const COutPoint &out = tx.vin[0].prevout;
+                Coin coin = undo.vprevout[0];
+                ApplyTxInUndo(std::move(coin), *(stack.back()), out);
+            }
+            // Store as a candidate for reconnection
+            disconnectedids.insert(undohash);
+
+            // Update the utxoset
+            utxoset.erase(undohash);
+            if (!tx.IsCoinBase())
+                utxoset.insert(tx.vin[0].prevout.hash);
         }
 
         // Once every 1000 iterations and at the end, verify the full cache.
@@ -307,9 +400,9 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
                 const CCoins* coins = stack.back()->AccessCoins(it->first);
                 if (coins) {
                     BOOST_CHECK(*coins == it->second);
-                 } else {
+                } else {
                     BOOST_CHECK(it->second.IsPruned());
-                 }
+                }
             }
         }
 
@@ -333,7 +426,7 @@ BOOST_AUTO_TEST_CASE(updatecoins_simulation_test)
                     tip = stack.back();
                 }
                 stack.push_back(new CCoinsViewCacheTest(tip));
-           }
+            }
         }
     }
 
@@ -414,6 +507,7 @@ BOOST_AUTO_TEST_CASE(ccoins_serialization)
 }
 
 const static uint256 TXID;
+const static COutPoint OUTPOINT = {uint256(), 0};
 const static CAmount PRUNED = -1;
 const static CAmount ABSENT = -2;
 const static CAmount FAIL = -3;
@@ -495,10 +589,10 @@ public:
     CCoinsViewCacheTest cache{&base};
 };
 
-void CheckAccessCoins(CAmount base_value, CAmount cache_value, CAmount expected_value, char cache_flags, char expected_flags)
+void CheckAccessCoin(CAmount base_value, CAmount cache_value, CAmount expected_value, char cache_flags, char expected_flags)
 {
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
-    test.cache.AccessCoins(TXID);
+    test.cache.AccessCoin(OUTPOINT);
     test.cache.SelfTest();
 
     CAmount result_value;
@@ -517,39 +611,39 @@ BOOST_AUTO_TEST_CASE(ccoins_access)
      *               Base    Cache   Result  Cache        Result
      *               Value   Value   Value   Flags        Flags
      */
-    CheckAccessCoins(ABSENT, ABSENT, ABSENT, NO_ENTRY   , NO_ENTRY   );
-    CheckAccessCoins(ABSENT, PRUNED, PRUNED, 0          , 0          );
-    CheckAccessCoins(ABSENT, PRUNED, PRUNED, FRESH      , FRESH      );
-    CheckAccessCoins(ABSENT, PRUNED, PRUNED, DIRTY      , DIRTY      );
-    CheckAccessCoins(ABSENT, PRUNED, PRUNED, DIRTY|FRESH, DIRTY|FRESH);
-    CheckAccessCoins(ABSENT, VALUE2, VALUE2, 0          , 0          );
-    CheckAccessCoins(ABSENT, VALUE2, VALUE2, FRESH      , FRESH      );
-    CheckAccessCoins(ABSENT, VALUE2, VALUE2, DIRTY      , DIRTY      );
-    CheckAccessCoins(ABSENT, VALUE2, VALUE2, DIRTY|FRESH, DIRTY|FRESH);
-    CheckAccessCoins(PRUNED, ABSENT, PRUNED, NO_ENTRY   , FRESH      );
-    CheckAccessCoins(PRUNED, PRUNED, PRUNED, 0          , 0          );
-    CheckAccessCoins(PRUNED, PRUNED, PRUNED, FRESH      , FRESH      );
-    CheckAccessCoins(PRUNED, PRUNED, PRUNED, DIRTY      , DIRTY      );
-    CheckAccessCoins(PRUNED, PRUNED, PRUNED, DIRTY|FRESH, DIRTY|FRESH);
-    CheckAccessCoins(PRUNED, VALUE2, VALUE2, 0          , 0          );
-    CheckAccessCoins(PRUNED, VALUE2, VALUE2, FRESH      , FRESH      );
-    CheckAccessCoins(PRUNED, VALUE2, VALUE2, DIRTY      , DIRTY      );
-    CheckAccessCoins(PRUNED, VALUE2, VALUE2, DIRTY|FRESH, DIRTY|FRESH);
-    CheckAccessCoins(VALUE1, ABSENT, VALUE1, NO_ENTRY   , 0          );
-    CheckAccessCoins(VALUE1, PRUNED, PRUNED, 0          , 0          );
-    CheckAccessCoins(VALUE1, PRUNED, PRUNED, FRESH      , FRESH      );
-    CheckAccessCoins(VALUE1, PRUNED, PRUNED, DIRTY      , DIRTY      );
-    CheckAccessCoins(VALUE1, PRUNED, PRUNED, DIRTY|FRESH, DIRTY|FRESH);
-    CheckAccessCoins(VALUE1, VALUE2, VALUE2, 0          , 0          );
-    CheckAccessCoins(VALUE1, VALUE2, VALUE2, FRESH      , FRESH      );
-    CheckAccessCoins(VALUE1, VALUE2, VALUE2, DIRTY      , DIRTY      );
-    CheckAccessCoins(VALUE1, VALUE2, VALUE2, DIRTY|FRESH, DIRTY|FRESH);
+    CheckAccessCoin(ABSENT, ABSENT, ABSENT, NO_ENTRY   , NO_ENTRY   );
+    CheckAccessCoin(ABSENT, PRUNED, PRUNED, 0          , 0          );
+    CheckAccessCoin(ABSENT, PRUNED, PRUNED, FRESH      , FRESH      );
+    CheckAccessCoin(ABSENT, PRUNED, PRUNED, DIRTY      , DIRTY      );
+    CheckAccessCoin(ABSENT, PRUNED, PRUNED, DIRTY|FRESH, DIRTY|FRESH);
+    CheckAccessCoin(ABSENT, VALUE2, VALUE2, 0          , 0          );
+    CheckAccessCoin(ABSENT, VALUE2, VALUE2, FRESH      , FRESH      );
+    CheckAccessCoin(ABSENT, VALUE2, VALUE2, DIRTY      , DIRTY      );
+    CheckAccessCoin(ABSENT, VALUE2, VALUE2, DIRTY|FRESH, DIRTY|FRESH);
+    CheckAccessCoin(PRUNED, ABSENT, PRUNED, NO_ENTRY   , FRESH      );
+    CheckAccessCoin(PRUNED, PRUNED, PRUNED, 0          , 0          );
+    CheckAccessCoin(PRUNED, PRUNED, PRUNED, FRESH      , FRESH      );
+    CheckAccessCoin(PRUNED, PRUNED, PRUNED, DIRTY      , DIRTY      );
+    CheckAccessCoin(PRUNED, PRUNED, PRUNED, DIRTY|FRESH, DIRTY|FRESH);
+    CheckAccessCoin(PRUNED, VALUE2, VALUE2, 0          , 0          );
+    CheckAccessCoin(PRUNED, VALUE2, VALUE2, FRESH      , FRESH      );
+    CheckAccessCoin(PRUNED, VALUE2, VALUE2, DIRTY      , DIRTY      );
+    CheckAccessCoin(PRUNED, VALUE2, VALUE2, DIRTY|FRESH, DIRTY|FRESH);
+    CheckAccessCoin(VALUE1, ABSENT, VALUE1, NO_ENTRY   , 0          );
+    CheckAccessCoin(VALUE1, PRUNED, PRUNED, 0          , 0          );
+    CheckAccessCoin(VALUE1, PRUNED, PRUNED, FRESH      , FRESH      );
+    CheckAccessCoin(VALUE1, PRUNED, PRUNED, DIRTY      , DIRTY      );
+    CheckAccessCoin(VALUE1, PRUNED, PRUNED, DIRTY|FRESH, DIRTY|FRESH);
+    CheckAccessCoin(VALUE1, VALUE2, VALUE2, 0          , 0          );
+    CheckAccessCoin(VALUE1, VALUE2, VALUE2, FRESH      , FRESH      );
+    CheckAccessCoin(VALUE1, VALUE2, VALUE2, DIRTY      , DIRTY      );
+    CheckAccessCoin(VALUE1, VALUE2, VALUE2, DIRTY|FRESH, DIRTY|FRESH);
 }
 
-void CheckModifyCoins(CAmount base_value, CAmount cache_value, CAmount modify_value, CAmount expected_value, char cache_flags, char expected_flags)
+void CheckSpendCoins(CAmount base_value, CAmount cache_value, CAmount expected_value, char cache_flags, char expected_flags)
 {
     SingleEntryCacheTest test(base_value, cache_value, cache_flags);
-    SetCoinsValue(modify_value, *test.cache.ModifyCoins(TXID));
+    test.cache.SpendCoin(OUTPOINT);
     test.cache.SelfTest();
 
     CAmount result_value;
@@ -559,69 +653,105 @@ void CheckModifyCoins(CAmount base_value, CAmount cache_value, CAmount modify_va
     BOOST_CHECK_EQUAL(result_flags, expected_flags);
 };
 
-BOOST_AUTO_TEST_CASE(ccoins_modify)
+BOOST_AUTO_TEST_CASE(ccoins_spend)
 {
-    /* Check ModifyCoin behavior, requesting a coin from a cache view layered on
-     * top of a base view, writing a modification to the coin, and then checking
+    /* Check SpendCoin behavior, requesting a coin from a cache view layered on
+     * top of a base view, spending, and then checking
      * the resulting entry in the cache after the modification.
      *
-     *               Base    Cache   Write   Result  Cache        Result
-     *               Value   Value   Value   Value   Flags        Flags
+     *              Base    Cache   Result  Cache        Result
+     *              Value   Value   Value   Flags        Flags
      */
-    CheckModifyCoins(ABSENT, ABSENT, PRUNED, ABSENT, NO_ENTRY   , NO_ENTRY   );
-    CheckModifyCoins(ABSENT, ABSENT, VALUE3, VALUE3, NO_ENTRY   , DIRTY|FRESH);
-    CheckModifyCoins(ABSENT, PRUNED, PRUNED, PRUNED, 0          , DIRTY      );
-    CheckModifyCoins(ABSENT, PRUNED, PRUNED, ABSENT, FRESH      , NO_ENTRY   );
-    CheckModifyCoins(ABSENT, PRUNED, PRUNED, PRUNED, DIRTY      , DIRTY      );
-    CheckModifyCoins(ABSENT, PRUNED, PRUNED, ABSENT, DIRTY|FRESH, NO_ENTRY   );
-    CheckModifyCoins(ABSENT, PRUNED, VALUE3, VALUE3, 0          , DIRTY      );
-    CheckModifyCoins(ABSENT, PRUNED, VALUE3, VALUE3, FRESH      , DIRTY|FRESH);
-    CheckModifyCoins(ABSENT, PRUNED, VALUE3, VALUE3, DIRTY      , DIRTY      );
-    CheckModifyCoins(ABSENT, PRUNED, VALUE3, VALUE3, DIRTY|FRESH, DIRTY|FRESH);
-    CheckModifyCoins(ABSENT, VALUE2, PRUNED, PRUNED, 0          , DIRTY      );
-    CheckModifyCoins(ABSENT, VALUE2, PRUNED, ABSENT, FRESH      , NO_ENTRY   );
-    CheckModifyCoins(ABSENT, VALUE2, PRUNED, PRUNED, DIRTY      , DIRTY      );
-    CheckModifyCoins(ABSENT, VALUE2, PRUNED, ABSENT, DIRTY|FRESH, NO_ENTRY   );
-    CheckModifyCoins(ABSENT, VALUE2, VALUE3, VALUE3, 0          , DIRTY      );
-    CheckModifyCoins(ABSENT, VALUE2, VALUE3, VALUE3, FRESH      , DIRTY|FRESH);
-    CheckModifyCoins(ABSENT, VALUE2, VALUE3, VALUE3, DIRTY      , DIRTY      );
-    CheckModifyCoins(ABSENT, VALUE2, VALUE3, VALUE3, DIRTY|FRESH, DIRTY|FRESH);
-    CheckModifyCoins(PRUNED, ABSENT, PRUNED, ABSENT, NO_ENTRY   , NO_ENTRY   );
-    CheckModifyCoins(PRUNED, ABSENT, VALUE3, VALUE3, NO_ENTRY   , DIRTY|FRESH);
-    CheckModifyCoins(PRUNED, PRUNED, PRUNED, PRUNED, 0          , DIRTY      );
-    CheckModifyCoins(PRUNED, PRUNED, PRUNED, ABSENT, FRESH      , NO_ENTRY   );
-    CheckModifyCoins(PRUNED, PRUNED, PRUNED, PRUNED, DIRTY      , DIRTY      );
-    CheckModifyCoins(PRUNED, PRUNED, PRUNED, ABSENT, DIRTY|FRESH, NO_ENTRY   );
-    CheckModifyCoins(PRUNED, PRUNED, VALUE3, VALUE3, 0          , DIRTY      );
-    CheckModifyCoins(PRUNED, PRUNED, VALUE3, VALUE3, FRESH      , DIRTY|FRESH);
-    CheckModifyCoins(PRUNED, PRUNED, VALUE3, VALUE3, DIRTY      , DIRTY      );
-    CheckModifyCoins(PRUNED, PRUNED, VALUE3, VALUE3, DIRTY|FRESH, DIRTY|FRESH);
-    CheckModifyCoins(PRUNED, VALUE2, PRUNED, PRUNED, 0          , DIRTY      );
-    CheckModifyCoins(PRUNED, VALUE2, PRUNED, ABSENT, FRESH      , NO_ENTRY   );
-    CheckModifyCoins(PRUNED, VALUE2, PRUNED, PRUNED, DIRTY      , DIRTY      );
-    CheckModifyCoins(PRUNED, VALUE2, PRUNED, ABSENT, DIRTY|FRESH, NO_ENTRY   );
-    CheckModifyCoins(PRUNED, VALUE2, VALUE3, VALUE3, 0          , DIRTY      );
-    CheckModifyCoins(PRUNED, VALUE2, VALUE3, VALUE3, FRESH      , DIRTY|FRESH);
-    CheckModifyCoins(PRUNED, VALUE2, VALUE3, VALUE3, DIRTY      , DIRTY      );
-    CheckModifyCoins(PRUNED, VALUE2, VALUE3, VALUE3, DIRTY|FRESH, DIRTY|FRESH);
-    CheckModifyCoins(VALUE1, ABSENT, PRUNED, PRUNED, NO_ENTRY   , DIRTY      );
-    CheckModifyCoins(VALUE1, ABSENT, VALUE3, VALUE3, NO_ENTRY   , DIRTY      );
-    CheckModifyCoins(VALUE1, PRUNED, PRUNED, PRUNED, 0          , DIRTY      );
-    CheckModifyCoins(VALUE1, PRUNED, PRUNED, ABSENT, FRESH      , NO_ENTRY   );
-    CheckModifyCoins(VALUE1, PRUNED, PRUNED, PRUNED, DIRTY      , DIRTY      );
-    CheckModifyCoins(VALUE1, PRUNED, PRUNED, ABSENT, DIRTY|FRESH, NO_ENTRY   );
-    CheckModifyCoins(VALUE1, PRUNED, VALUE3, VALUE3, 0          , DIRTY      );
-    CheckModifyCoins(VALUE1, PRUNED, VALUE3, VALUE3, FRESH      , DIRTY|FRESH);
-    CheckModifyCoins(VALUE1, PRUNED, VALUE3, VALUE3, DIRTY      , DIRTY      );
-    CheckModifyCoins(VALUE1, PRUNED, VALUE3, VALUE3, DIRTY|FRESH, DIRTY|FRESH);
-    CheckModifyCoins(VALUE1, VALUE2, PRUNED, PRUNED, 0          , DIRTY      );
-    CheckModifyCoins(VALUE1, VALUE2, PRUNED, ABSENT, FRESH      , NO_ENTRY   );
-    CheckModifyCoins(VALUE1, VALUE2, PRUNED, PRUNED, DIRTY      , DIRTY      );
-    CheckModifyCoins(VALUE1, VALUE2, PRUNED, ABSENT, DIRTY|FRESH, NO_ENTRY   );
-    CheckModifyCoins(VALUE1, VALUE2, VALUE3, VALUE3, 0          , DIRTY      );
-    CheckModifyCoins(VALUE1, VALUE2, VALUE3, VALUE3, FRESH      , DIRTY|FRESH);
-    CheckModifyCoins(VALUE1, VALUE2, VALUE3, VALUE3, DIRTY      , DIRTY      );
-    CheckModifyCoins(VALUE1, VALUE2, VALUE3, VALUE3, DIRTY|FRESH, DIRTY|FRESH);
+    CheckSpendCoins(ABSENT, ABSENT, ABSENT, NO_ENTRY   , NO_ENTRY   );
+    CheckSpendCoins(ABSENT, PRUNED, PRUNED, 0          , DIRTY      );
+    CheckSpendCoins(ABSENT, PRUNED, ABSENT, FRESH      , NO_ENTRY   );
+    CheckSpendCoins(ABSENT, PRUNED, PRUNED, DIRTY      , DIRTY      );
+    CheckSpendCoins(ABSENT, PRUNED, ABSENT, DIRTY|FRESH, NO_ENTRY   );
+    CheckSpendCoins(ABSENT, VALUE2, PRUNED, 0          , DIRTY      );
+    CheckSpendCoins(ABSENT, VALUE2, ABSENT, FRESH      , NO_ENTRY   );
+    CheckSpendCoins(ABSENT, VALUE2, PRUNED, DIRTY      , DIRTY      );
+    CheckSpendCoins(ABSENT, VALUE2, ABSENT, DIRTY|FRESH, NO_ENTRY   );
+    CheckSpendCoins(PRUNED, ABSENT, ABSENT, NO_ENTRY   , NO_ENTRY   );
+    CheckSpendCoins(PRUNED, PRUNED, PRUNED, 0          , DIRTY      );
+    CheckSpendCoins(PRUNED, PRUNED, ABSENT, FRESH      , NO_ENTRY   );
+    CheckSpendCoins(PRUNED, PRUNED, PRUNED, DIRTY      , DIRTY      );
+    CheckSpendCoins(PRUNED, PRUNED, ABSENT, DIRTY|FRESH, NO_ENTRY   );
+    CheckSpendCoins(PRUNED, VALUE2, PRUNED, 0          , DIRTY      );
+    CheckSpendCoins(PRUNED, VALUE2, ABSENT, FRESH      , NO_ENTRY   );
+    CheckSpendCoins(PRUNED, VALUE2, PRUNED, DIRTY      , DIRTY      );
+    CheckSpendCoins(PRUNED, VALUE2, ABSENT, DIRTY|FRESH, NO_ENTRY   );
+    CheckSpendCoins(VALUE1, ABSENT, PRUNED, NO_ENTRY   , DIRTY      );
+    CheckSpendCoins(VALUE1, PRUNED, PRUNED, 0          , DIRTY      );
+    CheckSpendCoins(VALUE1, PRUNED, ABSENT, FRESH      , NO_ENTRY   );
+    CheckSpendCoins(VALUE1, PRUNED, PRUNED, DIRTY      , DIRTY      );
+    CheckSpendCoins(VALUE1, PRUNED, ABSENT, DIRTY|FRESH, NO_ENTRY   );
+    CheckSpendCoins(VALUE1, VALUE2, PRUNED, 0          , DIRTY      );
+    CheckSpendCoins(VALUE1, VALUE2, ABSENT, FRESH      , NO_ENTRY   );
+    CheckSpendCoins(VALUE1, VALUE2, PRUNED, DIRTY      , DIRTY      );
+    CheckSpendCoins(VALUE1, VALUE2, ABSENT, DIRTY|FRESH, NO_ENTRY   );
+}
+
+void CheckAddCoinBase(CAmount base_value, CAmount cache_value, CAmount modify_value, CAmount expected_value, char cache_flags, char expected_flags, bool coinbase)
+{
+    SingleEntryCacheTest test(base_value, cache_value, cache_flags);
+
+    CAmount result_value;
+    char result_flags;
+    try {
+        CTxOut output;
+        output.nValue = modify_value;
+        test.cache.AddCoin(OUTPOINT, Coin(std::move(output), 1, coinbase), coinbase);
+        test.cache.SelfTest();
+        GetCoinsMapEntry(test.cache.map(), result_value, result_flags);
+    } catch (std::logic_error& e) {
+        result_value = FAIL;
+        result_flags = NO_ENTRY;
+    }
+
+    BOOST_CHECK_EQUAL(result_value, expected_value);
+    BOOST_CHECK_EQUAL(result_flags, expected_flags);
+}
+
+// Simple wrapper for CheckAddCoinBase function above that loops through
+// different possible base_values, making sure each one gives the same results.
+// This wrapper lets the coins_add test below be shorter and less repetitive,
+// while still verifying that the CoinsViewCache::AddCoin implementation
+// ignores base values.
+template <typename... Args>
+void CheckAddCoin(Args&&... args)
+{
+    for (CAmount base_value : {ABSENT, PRUNED, VALUE1})
+        CheckAddCoinBase(base_value, std::forward<Args>(args)...);
+}
+
+BOOST_AUTO_TEST_CASE(ccoins_add)
+{
+    /* Check AddCoin behavior, requesting a new coin from a cache view,
+     * writing a modification to the coin, and then checking the resulting
+     * entry in the cache after the modification. Verify behavior with the
+     * with the AddCoin potential_overwrite argument set to false, and to true.
+     *
+     *           Cache   Write   Result  Cache        Result       potential_overwrite
+     *           Value   Value   Value   Flags        Flags
+     */
+    CheckAddCoin(ABSENT, VALUE3, VALUE3, NO_ENTRY   , DIRTY|FRESH, false);
+    CheckAddCoin(ABSENT, VALUE3, VALUE3, NO_ENTRY   , DIRTY      , true );
+    CheckAddCoin(PRUNED, VALUE3, VALUE3, 0          , DIRTY|FRESH, false);
+    CheckAddCoin(PRUNED, VALUE3, VALUE3, 0          , DIRTY      , true );
+    CheckAddCoin(PRUNED, VALUE3, VALUE3, FRESH      , DIRTY|FRESH, false);
+    CheckAddCoin(PRUNED, VALUE3, VALUE3, FRESH      , DIRTY|FRESH, true );
+    CheckAddCoin(PRUNED, VALUE3, VALUE3, DIRTY      , DIRTY      , false);
+    CheckAddCoin(PRUNED, VALUE3, VALUE3, DIRTY      , DIRTY      , true );
+    CheckAddCoin(PRUNED, VALUE3, VALUE3, DIRTY|FRESH, DIRTY|FRESH, false);
+    CheckAddCoin(PRUNED, VALUE3, VALUE3, DIRTY|FRESH, DIRTY|FRESH, true );
+    CheckAddCoin(VALUE2, VALUE3, FAIL  , 0          , NO_ENTRY   , false);
+    CheckAddCoin(VALUE2, VALUE3, VALUE3, 0          , DIRTY      , true );
+    CheckAddCoin(VALUE2, VALUE3, FAIL  , FRESH      , NO_ENTRY   , false);
+    CheckAddCoin(VALUE2, VALUE3, VALUE3, FRESH      , DIRTY|FRESH, true );
+    CheckAddCoin(VALUE2, VALUE3, FAIL  , DIRTY      , NO_ENTRY   , false);
+    CheckAddCoin(VALUE2, VALUE3, VALUE3, DIRTY      , DIRTY      , true );
+    CheckAddCoin(VALUE2, VALUE3, FAIL  , DIRTY|FRESH, NO_ENTRY   , false);
+    CheckAddCoin(VALUE2, VALUE3, VALUE3, DIRTY|FRESH, DIRTY|FRESH, true );
 }
 
 void CheckWriteCoins(CAmount parent_value, CAmount child_value, CAmount expected_value, char parent_flags, char child_flags, char expected_flags)
