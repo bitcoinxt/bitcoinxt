@@ -400,36 +400,10 @@ public:
 };
 
 
-class CCoinsViewCache;
-
-/**
- * A reference to a mutable cache entry. Encapsulating it allows us to run
- *  cleanup code after the modification is finished, and keeping track of
- *  concurrent modifications.
- */
-class CCoinsModifier
-{
-private:
-    CCoinsViewCache& cache;
-    CCoinsMap::iterator it;
-    size_t cachedCoinUsage; // Cached memory usage of the CCoins object before modification
-    CCoinsModifier(CCoinsViewCache& cache_, CCoinsMap::iterator it_, size_t usage);
-
-public:
-    CCoins* operator->() { return &it->second.coins; }
-    CCoins& operator*() { return it->second.coins; }
-    ~CCoinsModifier();
-    friend class CCoinsViewCache;
-};
-
 /** CCoinsView that adds a memory cache for transactions to another CCoinsView */
 class CCoinsViewCache : public CCoinsViewBacked
 {
 protected:
-    /* Whether this cache has an active modifier. */
-    bool hasModifier;
-
-
     /**
      * Make mutable so that we can "fill the cache" even from Get-methods
      * declared as "const".
@@ -442,7 +416,6 @@ protected:
 
 public:
     CCoinsViewCache(CCoinsView *baseIn);
-    ~CCoinsViewCache();
 
     // Standard CCoinsView methods
     bool GetCoins(const uint256 &txid, CCoins &coins) const;
@@ -466,13 +439,6 @@ public:
      * TODO: return a reference to a Coin after changing CCoinsViewCache storage.
      */
     const Coin AccessCoin(const COutPoint &output) const;
-
-    /**
-     * Return a modifiable reference to a CCoins. If no entry with the given
-     * txid exists, a new one is created. Simultaneous modifications are not
-     * allowed.
-     */
-    CCoinsModifier ModifyCoins(const uint256 &txid);
 
     /**
      * Add a coin. Set potential_overwrite to true if a non-pruned version may
@@ -517,8 +483,6 @@ public:
     double GetPriority(const CTransaction &tx, int nHeight) const;
 
     const CTxOut &GetOutputFor(const CTxIn& input) const;
-
-    friend class CCoinsModifier;
 
 private:
     CCoinsMap::iterator FetchCoins(const uint256 &txid) const;
