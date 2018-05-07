@@ -205,6 +205,11 @@ bool CCoinsViewCache::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlockIn
                     itUs->second.coins = std::move(it->second.coins);
                     cachedCoinsUsage += itUs->second.coins.DynamicMemoryUsage();
                     itUs->second.flags |= CCoinsCacheEntry::DIRTY;
+                    // NOTE: It is possible the child has a FRESH flag here in
+                    // the event the entry we found in the parent is pruned. But
+                    // we must not copy that FRESH flag to the parent as that
+                    // pruned state likely still needs to be communicated to the
+                    // grandparent.
                 }
             }
         }
