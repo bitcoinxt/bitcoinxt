@@ -154,6 +154,11 @@ bool CCoinsViewCache::HaveCoins(const COutPoint &outpoint) const {
     return (it != cacheCoins.end() && !it->second.coins.IsPruned());
 }
 
+bool CCoinsViewCache::HaveCoinsInCache(const COutPoint &outpoint) const {
+    CCoinsMap::const_iterator it = cacheCoins.find(outpoint);
+    return it != cacheCoins.end();
+}
+
 uint256 CCoinsViewCache::GetBestBlock() const {
     if (hashBlock.IsNull())
         hashBlock = base->GetBestBlock();
@@ -225,6 +230,15 @@ bool CCoinsViewCache::Flush() {
     cacheCoins.clear();
     cachedCoinsUsage = 0;
     return fOk;
+}
+
+void CCoinsViewCache::Uncache(const COutPoint& hash)
+{
+    CCoinsMap::iterator it = cacheCoins.find(hash);
+    if (it != cacheCoins.end() && it->second.flags == 0) {
+        cachedCoinsUsage -= it->second.coins.DynamicMemoryUsage();
+        cacheCoins.erase(it);
+    }
 }
 
 unsigned int CCoinsViewCache::GetCacheSize() const {
