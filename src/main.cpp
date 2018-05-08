@@ -773,7 +773,7 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp, bool 
         for (size_t txinIndex = 0; txinIndex < tx.vin.size(); txinIndex++) {
             const CTxIn& txin = tx.vin[txinIndex];
             Coin coin;
-            if (!viewMemPool.GetCoins(txin.prevout, coin)) {
+            if (!viewMemPool.GetCoin(txin.prevout, coin)) {
                 return error("%s: Missing input", __func__);
             }
             if (coin.nHeight == MEMPOOL_HEIGHT) {
@@ -924,14 +924,14 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         // do we already have it?
         for (size_t out = 0; out < tx.vout.size(); out++) {
             COutPoint outpoint(hash, out);
-            if (view.HaveCoins(outpoint)) {
+            if (view.HaveCoin(outpoint)) {
                 return false;
             }
         }
 
         // do all inputs exist?
         BOOST_FOREACH(const CTxIn txin, tx.vin) {
-            if (!view.HaveCoins(txin.prevout)) {
+            if (!view.HaveCoin(txin.prevout)) {
                 if (pfMissingInputs) {
                     *pfMissingInputs = true;
                 }
@@ -1139,7 +1139,7 @@ bool GetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock
 
         if (fAllowSlow) { // use coin database to locate block that contains transaction, and scan it
             const Coin& coin = AccessByTxid(*pcoinsTip, hash);
-            if (!coin.IsPruned()) pindexSlow = chainActive[coin.nHeight];
+            if (!coin.IsSpent()) pindexSlow = chainActive[coin.nHeight];
         }
     }
 
@@ -1478,7 +1478,7 @@ bool CheckInputs(const CTransaction& tx, CValidationState &state, const CCoinsVi
             for (unsigned int i = 0; i < tx.vin.size(); i++) {
                 const COutPoint &prevout = tx.vin[i].prevout;
                 const Coin& coin = inputs.AccessCoin(prevout);
-                assert(!coin.IsPruned());
+                assert(!coin.IsSpent());
 
                 // We are very carefully only pass in things to CScriptCheck which
                 // are clearly committed to by tx' witness hash. This provides
@@ -1630,14 +1630,14 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out)
 {
     bool fClean = true;
 
-    if (view.HaveCoins(out)) fClean = false; // overwriting transaction output
+    if (view.HaveCoin(out)) fClean = false; // overwriting transaction output
 
     if (undo.nHeight == 0) {
         // Missing undo metadata (height and coinbase). Older versions included this
         // information only in undo records for the last spend of a transactions'
         // outputs. This implies that it must be present for some other output of the same tx.
         const Coin& alternate = AccessByTxid(view, out.hash);
-        if (!alternate.IsPruned()) {
+        if (!alternate.IsSpent()) {
             undo.nHeight = alternate.nHeight;
             undo.fCoinBase = alternate.fCoinBase;
         } else {
@@ -1933,7 +1933,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     if (fEnforceBIP30) {
         for (const auto& tx : block.vtx) {
             for (size_t o = 0; o < tx.vout.size(); o++) {
-                if (view.HaveCoins(COutPoint(tx.GetHash(), o))) {
+                if (view.HaveCoin(COutPoint(tx.GetHash(), o))) {
                     return state.DoS(100, error("ConnectBlock(): tried to overwrite transaction"),
                                      REJECT_INVALID, "bad-txns-BIP30");
                 }
@@ -4159,8 +4159,8 @@ bool static AlreadyHave(const CInv& inv)
             return recentRejects->contains(inv.hash) ||
                    mempool.exists(inv.hash) ||
                    mapOrphanTransactions.count(inv.hash) ||
-                   pcoinsTip->HaveCoins(COutPoint(inv.hash, 0)) || // Best effort: only try output 0 and 1
-                   pcoinsTip->HaveCoins(COutPoint(inv.hash, 1));
+                   pcoinsTip->HaveCoin(COutPoint(inv.hash, 0)) || // Best effort: only try output 0 and 1
+                   pcoinsTip->HaveCoin(COutPoint(inv.hash, 1));
         }
     case MSG_BLOCK:
         return mapBlockIndex.count(inv.hash);
@@ -4353,7 +4353,7 @@ bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, ve
         {
             bool isSpentMempool = fCheckMemPool && !mempool.isSpent(vOutPoints[i]);
             Coin coin;
-            if (view.GetCoins(vOutPoints[i], coin) && isSpentMempool) {
+            if (view.GetCoin(vOutPoints[i], coin) && isSpentMempool) {
                 hits[i] = true;
                 // Safe to index into vout here because IsAvailable checked if it's off the end of the array, or if
                 // n is valid but points to an already spent output (IsNull).

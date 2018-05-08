@@ -29,10 +29,10 @@ static const char DB_LAST_BLOCK = 'l';
 
 namespace {
 
-struct CoinsEntry {
+struct CoinEntry {
     COutPoint* outpoint;
     char key;
-    CoinsEntry(const COutPoint* ptr) : outpoint(const_cast<COutPoint*>(ptr)), key(DB_COIN)  {}
+    CoinEntry(const COutPoint* ptr) : outpoint(const_cast<COutPoint*>(ptr)), key(DB_COIN)  {}
 
     template<typename Stream>
     void Serialize(Stream &s) const {
@@ -58,12 +58,12 @@ void static BatchWriteHashBestChain(CDBBatch &batch, const uint256 &hash) {
 CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool &isObfuscated, bool fMemory, bool fWipe) : db(GetDataDir() / "chainstate", nCacheSize, isObfuscated, fMemory, fWipe) {
 }
 
-bool CCoinsViewDB::GetCoins(const COutPoint &outpoint, Coin &coin) const {
-    return db.Read(CoinsEntry(&outpoint), coin);
+bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const {
+    return db.Read(CoinEntry(&outpoint), coin);
 }
 
-bool CCoinsViewDB::HaveCoins(const COutPoint &outpoint) const {
-    return db.Exists(CoinsEntry(&outpoint));
+bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const {
+    return db.Exists(CoinEntry(&outpoint));
 }
 
 uint256 CCoinsViewDB::GetBestBlock() const {
@@ -79,8 +79,8 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     size_t changed = 0;
     for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();) {
         if (it->second.flags & CCoinsCacheEntry::DIRTY) {
-            CoinsEntry entry(&it->first);
-            if (it->second.coin.IsPruned())
+            CoinEntry entry(&it->first);
+            if (it->second.coin.IsSpent())
                 batch.Erase(entry);
             else
                 batch.Write(entry, it->second.coin);
@@ -135,7 +135,7 @@ CCoinsViewCursor *CCoinsViewDB::Cursor() const
     i->pcursor->Seek(DB_COIN);
     // Cache key of first record
     if (i->pcursor->Valid()) {
-        CoinsEntry entry(&i->keyTmp.second);
+        CoinEntry entry(&i->keyTmp.second);
         i->pcursor->GetKey(entry);
         i->keyTmp.first = entry.key;
     } else {
@@ -172,7 +172,7 @@ bool CCoinsViewDBCursor::Valid() const
 void CCoinsViewDBCursor::Next()
 {
     pcursor->Next();
-    CoinsEntry entry(&keyTmp.second);
+    CoinEntry entry(&keyTmp.second);
     if (!pcursor->Valid() || !pcursor->GetKey(entry)) {
         keyTmp.first = 0; // Invalidate cached key after last record so that Valid() and GetKey() return false
     } else {
@@ -343,7 +343,7 @@ bool CCoinsViewDB::Upgrade() {
                 if (!old_coins.vout[i].IsNull() && !old_coins.vout[i].scriptPubKey.IsUnspendable()) {
                     Coin newcoin(std::move(old_coins.vout[i]), old_coins.nHeight, old_coins.fCoinBase);
                     outpoint.n = i;
-                    CoinsEntry entry(&outpoint);
+                    CoinEntry entry(&outpoint);
                     batch.Write(entry, newcoin);
                 }
             }
