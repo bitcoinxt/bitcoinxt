@@ -197,7 +197,7 @@ namespace {
     int nQueuedValidatedHeaders = 0;
 
     /** Number of preferable block download peers. */
-    int nPreferredDownload = 0;
+    std::atomic<int> nPreferredDownload(0);
 
     /** Dirty block index entries. */
     set<CBlockIndex*> setDirtyBlockIndex;
