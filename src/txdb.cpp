@@ -29,10 +29,10 @@ static const char DB_LAST_BLOCK = 'l';
 
 namespace {
 
-struct CoinsEntry {
+struct CoinEntry {
     COutPoint* outpoint;
     char key;
-    CoinsEntry(const COutPoint* ptr) : outpoint(const_cast<COutPoint*>(ptr)), key(DB_COIN)  {}
+    CoinEntry(const COutPoint* ptr) : outpoint(const_cast<COutPoint*>(ptr)), key(DB_COIN)  {}
 
     template<typename Stream>
     void Serialize(Stream &s) const {
@@ -58,12 +58,12 @@ void static BatchWriteHashBestChain(CDBBatch &batch, const uint256 &hash) {
 CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool &isObfuscated, bool fMemory, bool fWipe) : db(GetDataDir() / "chainstate", nCacheSize, isObfuscated, fMemory, fWipe) {
 }
 
-bool CCoinsViewDB::GetCoins(const COutPoint &outpoint, Coin &coin) const {
-    return db.Read(CoinsEntry(&outpoint), coin);
+bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const {
+    return db.Read(CoinEntry(&outpoint), coin);
 }
 
-bool CCoinsViewDB::HaveCoins(const COutPoint &outpoint) const {
-    return db.Exists(CoinsEntry(&outpoint));
+bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const {
+    return db.Exists(CoinEntry(&outpoint));
 }
 
 uint256 CCoinsViewDB::GetBestBlock() const {
@@ -79,11 +79,11 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     size_t changed = 0;
     for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();) {
         if (it->second.flags & CCoinsCacheEntry::DIRTY) {
-            CoinsEntry entry(&it->first);
-            if (it->second.coins.IsPruned())
+            CoinEntry entry(&it->first);
+            if (it->second.coin.IsSpent())
                 batch.Erase(entry);
             else
-                batch.Write(entry, it->second.coins);
+                batch.Write(entry, it->second.coin);
             changed++;
         }
         count++;
@@ -135,7 +135,7 @@ CCoinsViewCursor *CCoinsViewDB::Cursor() const
     i->pcursor->Seek(DB_COIN);
     // Cache key of first record
     if (i->pcursor->Valid()) {
-        CoinsEntry entry(&i->keyTmp.second);
+        CoinEntry entry(&i->keyTmp.second);
         i->pcursor->GetKey(entry);
         i->keyTmp.first = entry.key;
     } else {
@@ -172,7 +172,7 @@ bool CCoinsViewDBCursor::Valid() const
 void CCoinsViewDBCursor::Next()
 {
     pcursor->Next();
-    CoinsEntry entry(&keyTmp.second);
+    CoinEntry entry(&keyTmp.second);
     if (!pcursor->Valid() || !pcursor->GetKey(entry)) {
         keyTmp.first = 0; // Invalidate cached key after last record so that Valid() and GetKey() return false
     } else {
@@ -258,5 +258,105 @@ bool CBlockTreeDB::LoadBlockIndexGuts(boost::function<CBlockIndex*(const uint256
         }
     }
 
+    return true;
+}
+
+namespace {
+
+//! Legacy class to deserialize pre-pertxout database entries without reindex.
+class CCoins
+{
+public:
+    //! whether transaction is a coinbase
+    bool fCoinBase;
+
+    //! unspent transaction outputs; spent outputs are .IsNull(); spent outputs at the end of the array are dropped
+    std::vector<CTxOut> vout;
+
+    //! at which height this transaction was included in the active block chain
+    int nHeight;
+
+    //! empty constructor
+    CCoins() : fCoinBase(false), vout(0), nHeight(0) { }
+
+    template<typename Stream>
+    void Unserialize(Stream &s) {
+        unsigned int nCode = 0;
+        // version
+        int nVersionDummy;
+        ::Unserialize(s, VARINT(nVersionDummy));
+        // header code
+        ::Unserialize(s, VARINT(nCode));
+        fCoinBase = nCode & 1;
+        std::vector<bool> vAvail(2, false);
+        vAvail[0] = (nCode & 2) != 0;
+        vAvail[1] = (nCode & 4) != 0;
+        unsigned int nMaskCode = (nCode / 8) + ((nCode & 6) != 0 ? 0 : 1);
+        // spentness bitmask
+        while (nMaskCode > 0) {
+            unsigned char chAvail = 0;
+            ::Unserialize(s, chAvail);
+            for (unsigned int p = 0; p < 8; p++) {
+                bool f = (chAvail & (1 << p)) != 0;
+                vAvail.push_back(f);
+            }
+            if (chAvail != 0)
+                nMaskCode--;
+        }
+        // txouts themself
+        vout.assign(vAvail.size(), CTxOut());
+        for (unsigned int i = 0; i < vAvail.size(); i++) {
+            if (vAvail[i])
+                ::Unserialize(s, REF(CTxOutCompressor(vout[i])));
+        }
+        // coinbase height
+        ::Unserialize(s, VARINT(nHeight));
+    }
+};
+
+}
+
+/** Upgrade the database from older formats.
+ *
+ * Currently implemented: from the per-tx utxo model (0.8..0.14.x) to per-txout.
+ */
+bool CCoinsViewDB::Upgrade() {
+    std::unique_ptr<CDBIterator> pcursor(db.NewIterator());
+    pcursor->Seek(std::make_pair(DB_COINS, uint256()));
+    if (!pcursor->Valid()) {
+        return true;
+    }
+
+    LogPrintf("Upgrading database...\n");
+    size_t batch_size = 1 << 24;
+    CDBBatch batch;
+    while (pcursor->Valid()) {
+        boost::this_thread::interruption_point();
+        std::pair<unsigned char, uint256> key;
+        if (pcursor->GetKey(key) && key.first == DB_COINS) {
+            CCoins old_coins;
+            if (!pcursor->GetValue(old_coins)) {
+                return error("%s: cannot parse CCoins record", __func__);
+            }
+            COutPoint outpoint(key.second, 0);
+            for (size_t i = 0; i < old_coins.vout.size(); ++i) {
+                if (!old_coins.vout[i].IsNull() && !old_coins.vout[i].scriptPubKey.IsUnspendable()) {
+                    Coin newcoin(std::move(old_coins.vout[i]), old_coins.nHeight, old_coins.fCoinBase);
+                    outpoint.n = i;
+                    CoinEntry entry(&outpoint);
+                    batch.Write(entry, newcoin);
+                }
+            }
+            batch.Erase(key);
+            if (batch.SizeEstimate() > batch_size) {
+                db.WriteBatch(batch);
+                batch.Clear();
+            }
+            pcursor->Next();
+        } else {
+            break;
+        }
+    }
+    db.WriteBatch(batch);
     return true;
 }

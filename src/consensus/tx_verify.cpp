@@ -129,7 +129,7 @@ unsigned int GetP2SHSigOpCount(const CTransaction& tx, const CCoinsViewCache& in
     unsigned int nSigOps = 0;
     for (unsigned int i = 0; i < tx.vin.size(); i++)
     {
-        const CTxOut &prevout = inputs.GetOutputFor(tx.vin[i]);
+        const CTxOut &prevout = inputs.AccessCoin(tx.vin[i].prevout).out;
         if (prevout.scriptPubKey.IsPayToScriptHash())
             nSigOps += prevout.scriptPubKey.GetSigOpCount(tx.vin[i].scriptSig);
     }
@@ -211,7 +211,7 @@ bool CheckTxInputs(const CTransaction& tx, CValidationState& state, const CCoins
         {
             const COutPoint &prevout = tx.vin[i].prevout;
             const Coin& coin = inputs.AccessCoin(prevout);
-            assert(!coin.IsPruned());
+            assert(!coin.IsSpent());
 
             // If prev is coinbase, check that it's matured
             if (coin.IsCoinBase()) {
