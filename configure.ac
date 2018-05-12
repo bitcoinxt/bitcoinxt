@@ -337,7 +337,7 @@ case $host in
 
      AX_CHECK_LINK_FLAG([[-Wl,-headerpad_max_install_names]], [LDFLAGS="$LDFLAGS -Wl,-headerpad_max_install_names"])
      CPPFLAGS="$CPPFLAGS -DMAC_OSX"
-     OBJCXXFLAGS="$CXXFLAGS"
+     OBJCXXFLAGS="-std=c++11 $CXXFLAGS"
      ;;
    *linux*)
      TARGET_OS=linux
