@@ -28,6 +28,8 @@ LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE
 
 # far into the past
 UAHF_START_TIME = 30000000
+# far into the future
+MONOLITH_START_TIME = 2000000000
 
 class PreviousSpendableOutput(object):
 
@@ -98,8 +100,8 @@ class FullBlockTest(ComparisonTestFramework):
                             '-limitdescendantsize=9999',
                             '-maxmempool=999',
                             "-uahfstarttime=%d" % UAHF_START_TIME,
-                            "-excessiveblocksize=%d"
-                            % self.excessive_block_size]]
+                            "-excessiveblocksize=%d" % self.excessive_block_size,
+                            "-thirdhftime=%d" % MONOLITH_START_TIME]]
         else:
             self.extra_args = [['-debug',
                             '-relaypriority=0',
@@ -109,7 +111,8 @@ class FullBlockTest(ComparisonTestFramework):
                             '-limitdescendantcount=9999',
                             '-limitdescendantsize=9999',
                             '-maxmempool=999',
-                            "-uahftime=%d" % UAHF_START_TIME]]
+                            "-uahftime=%d" % UAHF_START_TIME,
+                            "-thirdhftime=%d" % MONOLITH_START_TIME]]
 
         self.nodes = start_nodes(self.num_nodes, self.options.tmpdir,
                                  self.extra_args,
