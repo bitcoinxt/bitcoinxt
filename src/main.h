@@ -94,6 +94,9 @@ static const unsigned int AVG_ADDRESS_BROADCAST_INTERVAL = 30;
  *  Blocks, whitelisted receivers, and a random 25% of transactions bypass this. */
 static const unsigned int AVG_INVENTORY_BROADCAST_INTERVAL = 5;
 
+/** Default for -stopatheight */
+static const int DEFAULT_STOPATHEIGHT = 0;
+
 struct BlockHasher
 {
     size_t operator()(const uint256& hash) const { return hash.GetCheapHash(); }

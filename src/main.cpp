@@ -197,7 +197,7 @@ namespace {
     int nQueuedValidatedHeaders = 0;
 
     /** Number of preferable block download peers. */
-    int nPreferredDownload = 0;
+    std::atomic<int> nPreferredDownload(0);
 
     /** Dirty block index entries. */
     set<CBlockIndex*> setDirtyBlockIndex;
@@ -2578,10 +2578,14 @@ static bool ActivateBestChainStep(CValidationState &state, CBlockIndex *pindexMo
  */
 bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSource& blockSource, CConnman* connman) {
     CBlockIndex *pindexMostWork = NULL;
+    CBlockIndex *pindexNewTip = nullptr;
+    int nStopAtHeight = GetArg("-stopatheight", DEFAULT_STOPATHEIGHT);
     const CChainParams& chainParams = Params();
     do {
         boost::this_thread::interruption_point();
-        CBlockIndex *pindexNewTip = nullptr;
+        if (ShutdownRequested())
+            break;
+
         const CBlockIndex *pindexFork;
         bool fInitialDownload;
         int nNewHeight;
@@ -2640,7 +2644,8 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
             if (!hashesToAnnounce.empty())
                 uiInterface.NotifyBlockTip(hashesToAnnounce.front());
         }
-    } while(pindexMostWork != chainActive.Tip());
+        if (nStopAtHeight && pindexNewTip && pindexNewTip->nHeight >= nStopAtHeight) StartShutdown();
+    } while(pindexNewTip != pindexMostWork);
     CheckBlockIndex();
 
     // Write changes periodically to disk, after relay.
