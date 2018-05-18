@@ -502,7 +502,9 @@ void StopHTTPServer()
             LogPrintf("HTTP event loop did not exit within allotted time, sending loopbreak\n");
             event_base_loopbreak(eventBase);
         }
-        threadHTTP.join();
+        if (threadHTTP.joinable()) {
+            threadHTTP.join();
+        }
     }
     if (eventHTTP) {
         evhttp_free(eventHTTP);
