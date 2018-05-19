@@ -127,4 +127,79 @@ BOOST_AUTO_TEST_CASE(is_thirdhf_active) {
     BOOST_CHECK(!IsThirdHFActive(block4.GetMedianTimePast()));
 }
 
+class DummyMempool : public CTxMemPool {
+public:
+    DummyMempool() : CTxMemPool(CFeeRate(0)) { }
+    void clear() override { clearCalls++; }
+    int clearCalls = 0;
+};
+
+BOOST_AUTO_TEST_CASE(forkmempoolclearer_nullptr) {
+    DummyMempool mempool;
+    CBlockIndex tip;
+    ForkMempoolClearer(mempool, nullptr, nullptr);
+    ForkMempoolClearer(mempool, &tip, nullptr);
+    ForkMempoolClearer(mempool, nullptr, &tip);
+    BOOST_CHECK_EQUAL(0, mempool.clearCalls);
+}
+
+BOOST_AUTO_TEST_CASE(forkmempoolclearer_uahf) {
+    CBlockIndex oldTip;
+    CBlockIndex newTip;
+
+    oldTip.nTime = Opt().UAHFTime() - 1;
+    oldTip.nHeight = 0;
+    newTip.nTime = Opt().UAHFTime();
+    newTip.nHeight = 1;
+    newTip.pprev = &oldTip;
+    BOOST_CHECK(IsUAHFActivatingBlock(newTip.GetMedianTimePast(), &oldTip));
+
+    // this fork adds replay protection, so the mempool must be cleared both
+    // going into the fork and rollbacking from it
+
+    DummyMempool mempool;
+    ForkMempoolClearer(mempool, &oldTip, &oldTip);
+    BOOST_CHECK_EQUAL(0, mempool.clearCalls);
+    // fork time
+    ForkMempoolClearer(mempool, &oldTip, &newTip);
+    BOOST_CHECK_EQUAL(1, mempool.clearCalls);
+    // rollback
+    ForkMempoolClearer(mempool, &newTip, &oldTip);
+    BOOST_CHECK_EQUAL(2, mempool.clearCalls);
+    // past fork time
+    oldTip.nTime = Opt().UAHFTime();
+    newTip.nTime = Opt().UAHFTime() + 1;
+    BOOST_CHECK_EQUAL(2, mempool.clearCalls);
+}
+
+BOOST_AUTO_TEST_CASE(forkmempoolclearer_thirdhf) {
+    CBlockIndex oldTip;
+    CBlockIndex newTip;
+
+    oldTip.nTime = Opt().ThirdHFTime() - 1;
+    oldTip.nHeight = 0;
+    newTip.nTime = Opt().ThirdHFTime();
+    newTip.nHeight = 1;
+    newTip.pprev = &oldTip;
+    BOOST_CHECK(IsThirdHFActivatingBlock(newTip.GetMedianTimePast(), &oldTip));
+
+    // this fork adds new op codes, so the mempool can be kept when
+    // going into the fork, but must be cleared when rollbacking from it
+
+    DummyMempool mempool;
+    ForkMempoolClearer(mempool, &oldTip, &oldTip);
+    BOOST_CHECK_EQUAL(0, mempool.clearCalls);
+    // fork time
+    ForkMempoolClearer(mempool, &oldTip, &newTip);
+    BOOST_CHECK_EQUAL(0, mempool.clearCalls);
+    // rollback
+    ForkMempoolClearer(mempool, &newTip, &oldTip);
+    BOOST_CHECK_EQUAL(1, mempool.clearCalls);
+    // past fork time
+    oldTip.nTime = Opt().ThirdHFTime();
+    newTip.nTime = Opt().ThirdHFTime() + 1;
+    BOOST_CHECK_EQUAL(1, mempool.clearCalls);
+}
+
+
 BOOST_AUTO_TEST_SUITE_END()
