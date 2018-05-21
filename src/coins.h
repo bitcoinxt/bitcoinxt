@@ -145,11 +145,13 @@ private:
 class CCoinsView
 {
 public:
-    //! Retrieve the Coin (unspent transaction output) for a given outpoint.
+    /** Retrieve the Coin (unspent transaction output) for a given outpoint.
+     *  Returns true only when an unspent coin was found, which is returned in coin.
+     *  When false is returned, coin's value is unspecified.
+     */
     virtual bool GetCoin(const COutPoint &outpoint, Coin &coin) const;
 
-    //! Just check whether we have data for a given outpoint.
-    //! This may (but cannot always) return true for spent outputs.
+    //! Just check whether a given outpoint is unspent.
     virtual bool HaveCoin(const COutPoint &outpoint) const;
 
     //! Retrieve the block hash whose state this CCoinsView currently represents
@@ -237,7 +239,7 @@ public:
      * If no unspent output exists for the passed outpoint, this call
      * has no effect.
      */
-    void SpendCoin(const COutPoint &outpoint, Coin* moveto = nullptr);
+    bool SpendCoin(const COutPoint &outpoint, Coin* moveto = nullptr);
 
     /**
      * Push the modifications applied to this cache to its base.
@@ -290,6 +292,9 @@ private:
 void AddCoins(CCoinsViewCache& cache, const CTransaction& tx, int nHeight);
 
 //! Utility function to find any unspent output with a given txid.
+// This function can be quite expensive because in the event of a transaction
+// which is not found in the cache, it can cause up to MAX_OUTPUTS_PER_TX
+// lookups to database, so it should be used with care.
 const Coin& AccessByTxid(const CCoinsViewCache& cache, const uint256& txid);
 
 #endif // BITCOIN_COINS_H
