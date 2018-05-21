@@ -476,7 +476,7 @@ public:
     virtual void clear();
     void _clear(); //lock free
     void queryHashes(std::vector<uint256>& vtxid) const;
-    bool isSpent(const COutPoint& outpoint);
+    bool isSpent(const COutPoint& outpoint) const;
     unsigned int GetTransactionsUpdated() const;
     void AddTransactionsUpdated(unsigned int n);
     /**

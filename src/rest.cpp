@@ -15,7 +15,6 @@
 #include "version.h"
 
 #include <boost/algorithm/string.hpp>
-#include <boost/dynamic_bitset.hpp>
 
 #include <univalue.h>
 
@@ -415,7 +414,7 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
     // throw exception in case of a empty request
     std::string strRequestMutable = req->ReadBody();
     if (strRequestMutable.length() == 0 && uriParts.size() == 0)
-        return RESTERR(req, HTTP_INTERNAL_SERVER_ERROR, "Error: empty request");
+        return RESTERR(req, HTTP_BAD_REQUEST, "Error: empty request");
 
     bool fInputParsed = false;
     bool fCheckMemPool = false;
@@ -426,10 +425,8 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
 
     if (uriParts.size() > 0)
     {
-
         //inputs is sent over URI scheme (/rest/getutxos/checkmempool/txid1-n/txid2-n/...)
-        if (uriParts.size() > 0 && uriParts[0] == "checkmempool")
-            fCheckMemPool = true;
+        if (uriParts[0] == "checkmempool") fCheckMemPool = true;
 
         for (size_t i = (fCheckMemPool) ? 1 : 0; i < uriParts.size(); i++)
         {
@@ -439,7 +436,7 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
             std::string strOutput = uriParts[i].substr(uriParts[i].find("-")+1);
 
             if (!ParseInt32(strOutput, &nOutput) || !IsHex(strTxid))
-                return RESTERR(req, HTTP_INTERNAL_SERVER_ERROR, "Parse error");
+                return RESTERR(req, HTTP_BAD_REQUEST, "Parse error");
 
             txid.SetHex(strTxid);
             vOutPoints.push_back(COutPoint(txid, (uint32_t)nOutput));
@@ -448,7 +445,7 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
         if (vOutPoints.size() > 0)
             fInputParsed = true;
         else
-            return RESTERR(req, HTTP_INTERNAL_SERVER_ERROR, "Error: empty request");
+            return RESTERR(req, HTTP_BAD_REQUEST, "Error: empty request");
     }
 
     switch (rf) {
@@ -464,7 +461,7 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
             if (strRequestMutable.size() > 0)
             {
                 if (fInputParsed) //don't allow sending input over URI and HTTP RAW DATA
-                    return RESTERR(req, HTTP_INTERNAL_SERVER_ERROR, "Combination of URI scheme inputs and raw post data is not allowed");
+                    return RESTERR(req, HTTP_BAD_REQUEST, "Combination of URI scheme inputs and raw post data is not allowed");
 
                 CDataStream oss(SER_NETWORK, PROTOCOL_VERSION);
                 oss << strRequestMutable;
@@ -473,14 +470,14 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
             }
         } catch (const std::ios_base::failure& e) {
             // abort in case of unreadable binary data
-            return RESTERR(req, HTTP_INTERNAL_SERVER_ERROR, "Parse error");
+            return RESTERR(req, HTTP_BAD_REQUEST, "Parse error");
         }
         break;
     }
 
     case RF_JSON: {
         if (!fInputParsed)
-            return RESTERR(req, HTTP_INTERNAL_SERVER_ERROR, "Error: empty request");
+            return RESTERR(req, HTTP_BAD_REQUEST, "Error: empty request");
         break;
     }
     default: {
@@ -490,36 +487,41 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
 
     // limit max outpoints
     if (vOutPoints.size() > MAX_GETUTXOS_OUTPOINTS)
-        return RESTERR(req, HTTP_INTERNAL_SERVER_ERROR, strprintf("Error: max outpoints exceeded (max: %d, tried: %d)", MAX_GETUTXOS_OUTPOINTS, vOutPoints.size()));
+        return RESTERR(req, HTTP_BAD_REQUEST, strprintf("Error: max outpoints exceeded (max: %d, tried: %d)", MAX_GETUTXOS_OUTPOINTS, vOutPoints.size()));
 
     // check spentness and form a bitmap (as well as a JSON capable human-readble string representation)
     vector<unsigned char> bitmap;
     vector<CCoin> outs;
     std::string bitmapStringRepresentation;
-    boost::dynamic_bitset<unsigned char> hits(vOutPoints.size());
+    std::vector<bool> hits;
+    bitmap.resize((vOutPoints.size() + 7) / 8);
     {
-        LOCK2(cs_main, mempool.cs);
-
-        CCoinsView viewDummy;
-        CCoinsViewCache view(&viewDummy);
-
-        CCoinsViewCache& viewChain = *pcoinsTip;
-        CCoinsViewMemPool viewMempool(&viewChain, mempool);
-
-        if (fCheckMemPool)
-            view.SetBackend(viewMempool); // switch cache backend to db+mempool in case user likes to query mempool
-
-        for (size_t i = 0; i < vOutPoints.size(); i++) {
-            Coin coin;
-            if (view.GetCoin(vOutPoints[i], coin) && !mempool.isSpent(vOutPoints[i])) {
-                hits[i] = true;
-                outs.emplace_back(std::move(coin));
+        auto process_utxos = [&vOutPoints, &outs, &hits](const CCoinsView& view, const CTxMemPool& mempool) {
+            for (const COutPoint& vOutPoint : vOutPoints) {
+                Coin coin;
+                bool hit = !mempool.isSpent(vOutPoint) && view.GetCoin(vOutPoint, coin);
+                hits.push_back(hit);
+                if (hit) outs.emplace_back(std::move(coin));
             }
+        };
 
-            bitmapStringRepresentation.append(hits[i] ? "1" : "0"); // form a binary string representation (human-readable for json output)
+        if (fCheckMemPool) {
+            // use db+mempool as cache backend in case user likes to query mempool
+            LOCK2(cs_main, mempool.cs);
+            CCoinsViewCache& viewChain = *pcoinsTip;
+            CCoinsViewMemPool viewMempool(&viewChain, mempool);
+            process_utxos(viewMempool, mempool);
+        } else {
+            LOCK(cs_main);  // no need to lock mempool!
+            process_utxos(*pcoinsTip, CTxMemPool(CFeeRate(0)));
+        }
+
+        for (size_t i = 0; i < hits.size(); ++i) {
+            const bool hit = hits[i];
+            bitmapStringRepresentation.append(hit ? "1" : "0"); // form a binary string representation (human-readable for json output)
+            bitmap[i / 8] |= ((uint8_t)hit) << (i % 8);
         }
     }
-    boost::to_block_range(hits, std::back_inserter(bitmap));
 
     switch (rf) {
     case RF_BINARY: {

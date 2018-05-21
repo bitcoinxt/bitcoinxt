@@ -241,6 +241,10 @@ git merge commit are mentioned.
 - #6193 `42746b0` [REST] remove json input for getutxos, limit to query max. 15 outpoints
 - #6226 `5901596` json: fail read_string if string contains trailing garbage
 
+UTXO set query (`GET /rest/getutxos/<checkmempool>/<txid>-<n>/<txid>-<n>/.../<txid>-<n>.<bin|hex|json>`) responses
+were changed to return status code HTTP_BAD_REQUEST (400) instead of HTTP_INTERNAL_SERVER_ERROR (500) when requests
+contain invalid parameters.
+
 ### Configuration and command-line options
 - #5636 `a353ad4` Add option `-allowselfsignedrootcertificate` to allow self signed root certs (for testing payment requests)
 - #5900 `3e8a1f2` Add a consistency check `-checkblockindex` for the block chain data structures

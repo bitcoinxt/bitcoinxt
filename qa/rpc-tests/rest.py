@@ -93,10 +93,10 @@ class RESTTest (BitcoinTestFramework):
                 n = vout['n']
 
 
-        ######################################
-        # GETUTXOS: query a unspent outpoint #
-        ######################################
-        json_request = '/checkmempool/'+txid+'-'+str(n)
+        #######################################
+        # GETUTXOS: query an unspent outpoint #
+        #######################################
+        json_request = '/'+txid+'-'+str(n)
         json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
         json_obj = json.loads(json_string)
 
@@ -108,10 +108,10 @@ class RESTTest (BitcoinTestFramework):
         assert_equal(json_obj['utxos'][0]['value'], 0.1)
 
 
-        ################################################
-        # GETUTXOS: now query a already spent outpoint #
-        ################################################
-        json_request = '/checkmempool/'+vintx+'-0'
+        #################################################
+        # GETUTXOS: now query an already spent outpoint #
+        #################################################
+        json_request = '/'+vintx+'-0'
         json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
         json_obj = json.loads(json_string)
 
@@ -128,7 +128,7 @@ class RESTTest (BitcoinTestFramework):
         ##################################################
         # GETUTXOS: now check both with the same request #
         ##################################################
-        json_request = '/checkmempool/'+txid+'-'+str(n)+'/'+vintx+'-0'
+        json_request = '/'+txid+'-'+str(n)+'/'+vintx+'-0'
         json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
         json_obj = json.loads(json_string)
         assert_equal(len(json_obj['utxos']), 1)
@@ -162,34 +162,59 @@ class RESTTest (BitcoinTestFramework):
         txid = self.nodes[0].sendtoaddress(self.nodes[1].getnewaddress(), 0.1)
         json_string = http_get_call(url.hostname, url.port, '/rest/tx/'+txid+self.FORMAT_SEPARATOR+"json")
         json_obj = json.loads(json_string)
-        vintx = json_obj['vin'][0]['txid'] # get the vin to later check for utxo (should be spent by then)
+        # get the spent output to later check for utxo (should be spent by then)
+        spent = '{}-{}'.format(json_obj['vin'][0]['txid'], json_obj['vin'][0]['vout'])
         # get n of 0.1 outpoint
         n = 0
         for vout in json_obj['vout']:
             if vout['value'] == 0.1:
                 n = vout['n']
+        spending = '{}-{}'.format(txid, n)
 
-        json_request = '/'+txid+'-'+str(n)
+        json_request = '/'+spending
         json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
         json_obj = json.loads(json_string)
-        assert_equal(len(json_obj['utxos']), 0) #there should be a outpoint because it has just added to the mempool
+        assert_equal(len(json_obj['utxos']), 0) #there should be no outpoint because it has just added to the mempool
 
-        json_request = '/checkmempool/'+txid+'-'+str(n)
+        json_request = '/checkmempool/'+spending
         json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
         json_obj = json.loads(json_string)
         assert_equal(len(json_obj['utxos']), 1) #there should be a outpoint because it has just added to the mempool
 
+        json_request = '/'+spent
+        json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
+        json_obj = json.loads(json_string)
+        assert_equal(len(json_obj['utxos']), 1) #there should be an outpoint because its spending tx is not confirmed
+
+        json_request = '/checkmempool/'+spent
+        json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
+        json_obj = json.loads(json_string)
+        assert_equal(len(json_obj['utxos']), 0) #there should be no outpoint because it has just spent (by mempool tx)
+
+        self.nodes[0].generate(1)
+        self.sync_all()
+
+        json_request = '/'+spending
+        json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
+        json_obj = json.loads(json_string)
+        assert_equal(len(json_obj['utxos']), 1) #there should be an outpoint because it was mined
+
+        json_request = '/checkmempool/'+spending
+        json_string = http_get_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json')
+        json_obj = json.loads(json_string)
+        assert_equal(len(json_obj['utxos']), 1) #there should be an outpoint because it was mined
+
         #do some invalid requests
         json_request = '{"checkmempool'
         response = http_post_call(url.hostname, url.port, '/rest/getutxos'+self.FORMAT_SEPARATOR+'json', json_request, True)
-        assert_equal(response.status, 500) #must be a 500 because we send a invalid json request
+        assert_equal(response.status, 400) #must be a 400 because we send a invalid json request
 
         json_request = '{"checkmempool'
         response = http_post_call(url.hostname, url.port, '/rest/getutxos'+self.FORMAT_SEPARATOR+'bin', json_request, True)
-        assert_equal(response.status, 500) #must be a 500 because we send a invalid bin request
+        assert_equal(response.status, 400) #must be a 400 because we send a invalid bin request
 
         response = http_post_call(url.hostname, url.port, '/rest/getutxos/checkmempool'+self.FORMAT_SEPARATOR+'bin', '', True)
-        assert_equal(response.status, 500) #must be a 500 because we send a invalid bin request
+        assert_equal(response.status, 400) #must be a 400 because we send a invalid bin request
 
         #test limits
         json_request = '/checkmempool/'
@@ -197,14 +222,14 @@ class RESTTest (BitcoinTestFramework):
             json_request += txid+'-'+str(n)+'/'
         json_request = json_request.rstrip("/")
         response = http_post_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json', '', True)
-        assert_equal(response.status, 500) #must be a 500 because we exceeding the limits
+        assert_equal(response.status, 400) #must be a 400 because we exceeding the limits
 
         json_request = '/checkmempool/'
         for x in range(0, 15):
             json_request += txid+'-'+str(n)+'/'
         json_request = json_request.rstrip("/");
         response = http_post_call(url.hostname, url.port, '/rest/getutxos'+json_request+self.FORMAT_SEPARATOR+'json', '', True)
-        assert_equal(response.status, 200) #must be a 500 because we exceeding the limits
+        assert_equal(response.status, 200) #must be a 200 because we are within the limits
 
         self.nodes[0].generate(1) #generate block to not affect upcomming tests
         self.sync_all()
