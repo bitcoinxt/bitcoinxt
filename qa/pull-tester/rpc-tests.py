@@ -121,7 +121,8 @@ testScripts = [
     'blockchain.py',
     'disablewallet.py',
     'rpcnamedargs.py',
-    'abc-monolith-activation.py'
+    'abc-monolith-activation.py',
+    'bip64.py'
 ]
 
 testScriptsExt = [
