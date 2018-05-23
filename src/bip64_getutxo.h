@@ -22,6 +22,10 @@ struct CCoin {
     CCoin() : nHeight(0) {}
     CCoin(Coin&& in) : nHeight(in.nHeight), out(std::move(in.out)) {}
 
+    size_t GetSizeOf() {
+        return 8 /* two uint32_t */ + 8 /* out.nValue */ + out.scriptPubKey.size();
+    }
+
     template <typename Stream, typename Operation>
     inline void SerializationOp(Stream& s, Operation ser_action)
     {
@@ -36,7 +40,9 @@ class UTXORetriever {
 public:
     UTXORetriever(const std::vector<COutPoint>& o,
                   CCoinsView& viewChain,
-                  CTxMemPool* mempool);
+                  CTxMemPool* mempool,
+                  //! throws if result objects exceed maxBytes (0 == no limit)
+                  size_t maxBytes = 0);
 
     //! An array of bytes encoding one bit for each outpoint queried. Each bit
     //! indicates whether the queried outpoint was found in the UTXO set or not.
@@ -54,7 +60,7 @@ private:
     std::vector<bool> hits;
     std::vector<CCoin> outs;
 
-    void Process(CCoinsView*, CTxMemPool*);
+    void Process(CCoinsView*, CTxMemPool*, size_t maxBytes);
 };
 
 } // ns bip64

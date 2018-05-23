@@ -7,9 +7,10 @@
 
 #include "addrman.h"
 #include "arith_uint256.h"
+#include "bip64_getutxo.h"
 #include "blockannounce.h"
-#include "blockheaderprocessor.h"
 #include "blockencodings.h"
+#include "blockheaderprocessor.h"
 #include "blocksender.h"
 #include "chainparams.h"
 #include "checkpoints.h"
@@ -4374,30 +4375,10 @@ void static ProcessGetData(CNode* pfrom, CConnman* connman, std::atomic<bool>& i
     }
 }
 
-// 8 bytes + sizeof(CTxOut)
-struct CCoin {
-    uint32_t nTxVer; // DEPRECATED. Dummy for keeping backward compatibility.
-    uint32_t nHeight;
-    CTxOut out;
-
-    ADD_SERIALIZE_METHODS;
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action) {
-        READWRITE(nTxVer);
-        READWRITE(nHeight);
-        READWRITE(out);
-    }
-
-    size_t GetSizeOf() {
-        return 8 /* two uint32_t */ + 8 /* out.nValue */ + out.scriptPubKey.size();
-    }
-};
-
-bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, vector<unsigned char> *result, vector<CCoin> *resultCoins, CConnman* connman)
+static std::tuple<std::vector<uint8_t>, std::vector<bip64::CCoin> > ProcessGetUTXOs(
+        const vector<COutPoint> &vOutPoints, bool fCheckMemPool, size_t maxBytes)
 {
-    if (!connman)
-        throw std::invalid_argument(std::string(__func__ )+ " requires connection manager");
+    AssertLockHeld(cs_main);
     // Defined by BIP 64.
     //
     // Allows a peer to retrieve the CTxOut structures corresponding to the given COutPoints.
@@ -4416,47 +4397,20 @@ bool ProcessGetUTXOs(const vector<COutPoint> &vOutPoints, bool fCheckMemPool, ve
     //
     // IMPORTANT: Clients expect ordering to be preserved!
     if (vOutPoints.size() > MAX_INV_SZ)
-        return error("message getutxos size() = %u", vOutPoints.size());
+        throw std::invalid_argument("too many outpoints requested");
+    // Due to the above check max space the bitmap can use is 50,000 / 8 == 6250 bytes.
 
     LogPrint(Log::NET, "getutxos for %d queries %s mempool\n", vOutPoints.size(), fCheckMemPool ? "with" : "without");
 
-    // Due to the above check max space the bitmap can use is 50,000 / 8 == 6250 bytes.
-    size_t bytes_used = vOutPoints.size() / 8;
-    size_t max_bytes = connman->GetSendBufferSize();
-    boost::dynamic_bitset<unsigned char> hits(vOutPoints.size());
-    {
-        LOCK2(cs_main, mempool.cs);
-        CCoinsViewMemPool cvMemPool(pcoinsTip, mempool);
-        CCoinsView* baseView;
-        if (fCheckMemPool)
-            baseView = &cvMemPool;
-        else
-            baseView = pcoinsTip;
-        CCoinsViewCache view(baseView);
-        for (size_t i = 0; i < vOutPoints.size(); i++)
-        {
-            bool isSpentMempool = fCheckMemPool && !mempool.isSpent(vOutPoints[i]);
-            Coin coin;
-            if (view.GetCoin(vOutPoints[i], coin) && isSpentMempool) {
-                hits[i] = true;
-                // Safe to index into vout here because IsAvailable checked if it's off the end of the array, or if
-                // n is valid but points to an already spent output (IsNull).
-                CCoin out_coin;
-                out_coin.nTxVer = 0; // DEPRECATED. Dummy value only.
-                out_coin.nHeight = coin.nHeight;
-                out_coin.out = coin.out;
-                if (!out_coin.out.IsNull())
-                    throw std::runtime_error("coin.out.IsNull");
-                bytes_used += out_coin.GetSizeOf();
-                if (bytes_used > max_bytes)
-                    return false;
-                resultCoins->push_back(out_coin);
-            }
-        }
+    std::unique_ptr<bip64::UTXORetriever> utxos;
+    if (fCheckMemPool) {
+        LOCK(mempool.cs);
+        utxos.reset(new bip64::UTXORetriever(vOutPoints, *pcoinsTip, &mempool, maxBytes));
     }
-
-    boost::to_block_range(hits, std::back_inserter(*result));
-    return true;
+    else {
+        utxos.reset(new bip64::UTXORetriever(vOutPoints, *pcoinsTip, nullptr, maxBytes));
+    }
+    return { utxos->GetBitmap(), utxos->GetResults() };
 }
 
 
@@ -5003,26 +4957,34 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         NodeStatePtr(pfrom->id)->bestHeaderSent = pindex ? pindex : chainActive.Tip();
         pfrom->PushMessage("headers", vHeaders);
     }
-
-
     else if (strCommand == "getutxos")
     {
-        if (!Opt().IsStealthMode()) {
-            bool fCheckMemPool;
-            vector<COutPoint> vOutPoints;
-            vRecv >> fCheckMemPool;
-            vRecv >> vOutPoints;
+        if (Opt().IsStealthMode())
+            return true;
 
-            vector<unsigned char> bitmap;
-            vector<CCoin> outs;
-            if (ProcessGetUTXOs(vOutPoints, fCheckMemPool, &bitmap, &outs, connman))
-                pfrom->PushMessage("utxos", chainActive.Height(), chainActive.Tip()->GetBlockHash(), bitmap, outs);
-            else
-                Misbehaving(pfrom->GetId(), 20, "getutxos request invalid");
+        bool fCheckMemPool;
+        std::vector<COutPoint> vOutPoints;
+        vRecv >> fCheckMemPool;
+        vRecv >> vOutPoints;
+
+        try {
+            size_t maxBytes = connman->GetSendBufferSize();
+            std::vector<unsigned char> bitmap;
+            std::vector<bip64::CCoin> outs;
+            {
+                LOCK(cs_main);
+                tie(bitmap, outs) = ProcessGetUTXOs(vOutPoints, fCheckMemPool, maxBytes);
+            }
+            pfrom->PushMessage("utxos",
+                               static_cast<uint32_t>(chainActive.Height()),
+                               chainActive.Tip()->GetBlockHash(), bitmap, outs);
+        }
+        catch (const std::exception& e) {
+            pfrom->PushMessage("reject", strCommand, REJECT_INVALID,
+                               std::string(e.what()).substr(0, MAX_REJECT_MESSAGE_LENGTH));
+            Misbehaving(pfrom->GetId(), 20, "getutxos request invalid");
         }
     }
-
-
     else if (strCommand == "tx")
     {
         vector<uint256> vWorkQueue;
