@@ -592,6 +592,9 @@ void ReadConfigFile(map<string, string>& mapSettingsRet,
     }
     // If datadir is changed in .conf file:
     ClearDatadirCache();
+    if (!boost::filesystem::is_directory(GetDataDir(false))) {
+        throw std::runtime_error(strprintf("specified data directory \"%s\" does not exist.", GetArg("-datadir", "").c_str()));
+    }
 }
 
 #ifndef WIN32
