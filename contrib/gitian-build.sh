@@ -1,3 +1,5 @@
+#!/bin/bash
+
 # What to do
 sign=false
 verify=false
