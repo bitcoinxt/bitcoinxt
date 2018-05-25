@@ -159,7 +159,6 @@ void Interrupt()
     InterruptHTTPRPC();
     InterruptRPC();
     InterruptREST();
-    threadGroup.interrupt_all();
 }
 
 void Shutdown()
@@ -187,15 +186,12 @@ void Shutdown()
 #endif
     GenerateBitcoins(false, 0, Params(), nullptr);
     MapPort(false);
+    threadGroup.interrupt_all();
+    threadGroup.join_all();
     if (g_connman) {
         g_connman->Stop();
         g_connman.reset();
     }
-
-    // After everything has been shut down, but before things get flushed, stop the
-    // CScheduler/checkqueue threadGroup
-    threadGroup.interrupt_all();
-    threadGroup.join_all();
 
     UnregisterNodeSignals(GetNodeSignals());
 
