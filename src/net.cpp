@@ -2338,6 +2338,11 @@ void CConnman::AddTestNode(CNode* n) {
     vNodes.push_back(n);
 }
 
+void CConnman::RemoveTestNode(CNode* n) {
+    LOCK(cs_vNodes);
+    vNodes.erase(std::find(begin(vNodes), end(vNodes), n));
+}
+
 bool CNode::SupportsXThinBlocks() const {
     return nServices & NODE_THIN;
 }

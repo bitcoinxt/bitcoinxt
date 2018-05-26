@@ -256,7 +256,8 @@ public:
     int GetBestHeight() const;
 
     // for unittesting
-    void AddTestNode(CNode* n);
+    void AddTestNode(CNode*);
+    void RemoveTestNode(CNode*);
 
 private:
     struct ListenSocket {

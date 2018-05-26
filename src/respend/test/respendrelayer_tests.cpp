@@ -76,6 +76,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
     r.Trigger();
     BOOST_CHECK_EQUAL(size_t(1), node.vInventoryToSend.size());
     BOOST_CHECK(respend.GetHash() == node.vInventoryToSend.at(0).hash);
+    connman.RemoveTestNode(&node);
 }
 
 BOOST_AUTO_TEST_SUITE_END();

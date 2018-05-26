@@ -243,6 +243,7 @@ public:
     }
     ~RpcMineState() {
         fForceInitialBlockDownload = false;
+        g_connman->RemoveTestNode(&dummynode);
         g_connman.reset(globalBackup.release());
     }
     std::unique_ptr<CConnman> globalBackup;
