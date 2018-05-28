@@ -202,5 +202,6 @@ std::string NetworkErrorString(int err);
 bool CloseSocket(SOCKET& hSocket);
 /** Disable or enable blocking-mode for a socket */
 bool SetSocketNonBlocking(SOCKET& hSocket, bool fNonBlocking);
+void InterruptSocks5(bool interrupt);
 
 #endif // BITCOIN_NETBASE_H

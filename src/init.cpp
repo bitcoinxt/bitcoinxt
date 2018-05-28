@@ -159,6 +159,8 @@ void Interrupt()
     InterruptHTTPRPC();
     InterruptRPC();
     InterruptREST();
+    if (g_connman)
+        g_connman->Interrupt();
     threadGroup.interrupt_all();
 }
 
@@ -187,10 +189,7 @@ void Shutdown()
 #endif
     GenerateBitcoins(false, 0, Params(), nullptr);
     MapPort(false);
-    if (g_connman) {
-        g_connman->Stop();
-        g_connman.reset();
-    }
+    g_connman.reset();
 
     // After everything has been shut down, but before things get flushed, stop the
     // CScheduler/checkqueue threadGroup
@@ -1108,7 +1107,7 @@ bool AppInit2()
     // ********************************************************* Step 6: network initialization
 
     assert(!g_connman);
-    g_connman = std::unique_ptr<CConnman>(new CConnman());
+    g_connman = std::unique_ptr<CConnman>(new CConnman(GetRand(std::numeric_limits<uint64_t>::max()), GetRand(std::numeric_limits<uint64_t>::max())));
     CConnman& connman = *g_connman;
 
     RegisterNodeSignals(GetNodeSignals());
@@ -1619,7 +1618,7 @@ bool AppInit2()
     connOptions.nSendBufferMaxSize = 1000*GetArg("-maxsendbuffer", DEFAULT_MAXSENDBUFFER);
     connOptions.nReceiveFloodSize = 1000*GetArg("-maxreceivebuffer", DEFAULT_MAXRECEIVEBUFFER);
 
-    if (!connman.Start(threadGroup, scheduler, strNodeError, connOptions))
+    if (!connman.Start(scheduler, strNodeError, connOptions))
         return InitError(strNodeError);
 
     // Monitor the chain, and alert if we get blocks much quicker or slower than expected

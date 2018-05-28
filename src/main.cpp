@@ -112,6 +112,8 @@ CScript COINBASE_FLAGS;
 
 const string strMessageMagic = "Bitcoin Signed Message:\n";
 
+static const uint64_t RANDOMIZER_ID_ADDRESS_RELAY = 0x3cac0035b5866b90ULL; // SHA256("main address relay")[0:8]
+
 // Internal stuff
 namespace {
 
@@ -4193,11 +4195,9 @@ static void RelayAddress(const CAddress& addr, bool fReachable, CConnman* connma
     // Relay to a limited number of other nodes
     // Use deterministic randomness to send to the same nodes for 24 hours
     // at a time so the addrKnowns of the chosen nodes prevent repeats
-    static const uint64_t salt0 = GetRand(std::numeric_limits<uint64_t>::max());
-    static const uint64_t salt1 = GetRand(std::numeric_limits<uint64_t>::max());
     uint64_t hashAddr = addr.GetHash();
     std::multimap<uint64_t, CNode*> mapMix;
-    const CSipHasher hasher = CSipHasher(salt0, salt1).Write(hashAddr << 32).Write((GetTime() + hashAddr) / (24*60*60));
+    const CSipHasher hasher = connman->GetDeterministicRandomizer(RANDOMIZER_ID_ADDRESS_RELAY).Write(hashAddr << 32).Write((GetTime() + hashAddr) / (24*60*60));
 
     auto sortfunc = [&mapMix, &hasher](CNode* pnode) {
         if (pnode->nVersion >= CADDR_TIME_VERSION) {
@@ -4215,7 +4215,7 @@ static void RelayAddress(const CAddress& addr, bool fReachable, CConnman* connma
     connman->ForEachNodeThen(std::move(sortfunc), std::move(pushfunc));
 }
 
-void static ProcessGetData(CNode* pfrom, CConnman* connman)
+void static ProcessGetData(CNode* pfrom, CConnman* connman, std::atomic<bool>& interruptMsgProc)
 {
     if (!connman)
         throw std::invalid_argument(std::string(__func__ )+ " requires connection manager");
@@ -4234,7 +4234,8 @@ void static ProcessGetData(CNode* pfrom, CConnman* connman)
 
         const CInv &inv = *it;
         {
-            boost::this_thread::interruption_point();
+            if (interruptMsgProc)
+                return;
             it++;
 
             BlockSender blockSender;
@@ -4465,7 +4466,7 @@ void unexpectedThinError(const std::string& cmd, CNode& from, const std::string&
 }
 
 bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
-                    int64_t nTimeReceived, CConnman* connman)
+                    int64_t nTimeReceived, CConnman* connman, std::atomic<bool>& interruptMsgProc)
 {
     if (!connman)
         throw std::invalid_argument(std::string(__func__ )+ " requires connection manager");
@@ -4678,7 +4679,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         int64_t nSince = nNow - 10 * 60;
         BOOST_FOREACH(CAddress& addr, vAddr)
         {
-            boost::this_thread::interruption_point();
+            if (interruptMsgProc)
+                return true;
 
             if (addr.nTime <= 100000000 || addr.nTime > nNow + 10 * 60)
                 addr.nTime = nNow - 5 * 24 * 60 * 60;
@@ -4742,7 +4744,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         {
             const CInv &inv = vInv[nInv];
 
-            boost::this_thread::interruption_point();
+            if (interruptMsgProc)
+                return true;
             // Ignore duplicate advertisements for the same item from the same peer. This check
             // prevents a peer from constantly promising to deliver an item that it never does,
             // thus blinding us to new transactions and blocks.
@@ -4831,7 +4834,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             LogPrint(Log::NET, "received getdata for: %s peer=%d\n", vInv[0].ToString(), pfrom->id);
 
         pfrom->vRecvGetData.insert(pfrom->vRecvGetData.end(), vInv.begin(), vInv.end());
-        ProcessGetData(pfrom, connman);
+        ProcessGetData(pfrom, connman, interruptMsgProc);
     }
 
 
@@ -5196,7 +5199,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
 
             pfrom->vRecvGetData.push_back(inv);
-            ProcessGetData(pfrom, connman);
+            ProcessGetData(pfrom, connman, interruptMsgProc);
         }
 
     }
@@ -5486,7 +5489,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 }
 
 // requires LOCK(cs_vRecvMsg)
-bool ProcessMessages(CNode* pfrom, CConnman* connman)
+bool ProcessMessages(CNode* pfrom, CConnman* connman, std::atomic<bool>& interruptMsgProc)
 {
     unsigned int nMaxSendBufferSize = connman->GetSendBufferSize();
     //if (fDebug)
@@ -5503,7 +5506,7 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman)
     bool fOk = true;
 
     if (!pfrom->vRecvGetData.empty())
-        ProcessGetData(pfrom, connman);
+        ProcessGetData(pfrom, connman, interruptMsgProc);
 
     // this maintains the order of responses
     if (!pfrom->vRecvGetData.empty()) return fOk;
@@ -5551,12 +5554,13 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman)
 
         // Checksum
         CDataStream& vRecv = msg.vRecv;
-        uint256 hash = Hash(vRecv.begin(), vRecv.begin() + nMessageSize);
-        unsigned int nChecksum = ReadLE32((unsigned char*)&hash);
-        if (nChecksum != hdr.nChecksum)
+        const uint256& hash = msg.GetMessageHash();
+        if (memcmp(hash.begin(), hdr.pchChecksum, CMessageHeader::CHECKSUM_SIZE) != 0)
         {
-            LogPrintf("%s(%s, %u bytes): CHECKSUM ERROR nChecksum=%08x hdr.nChecksum=%08x\n", __func__,
-               SanitizeString(strCommand), nMessageSize, nChecksum, hdr.nChecksum);
+            LogPrintf("%s(%s, %u bytes): CHECKSUM ERROR expected %s was %s\n", __func__,
+               SanitizeString(strCommand), nMessageSize,
+               HexStr(hash.begin(), hash.begin()+CMessageHeader::CHECKSUM_SIZE),
+               HexStr(hdr.pchChecksum, hdr.pchChecksum+CMessageHeader::CHECKSUM_SIZE));
             continue;
         }
 
@@ -5564,8 +5568,9 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman)
         bool fRet = false;
         try
         {
-            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime, connman);
-            boost::this_thread::interruption_point();
+            fRet = ProcessMessage(pfrom, strCommand, vRecv, msg.nTime, connman, interruptMsgProc);
+            if (interruptMsgProc)
+                return true;
         }
         catch (const std::ios_base::failure& e)
         {
@@ -5589,9 +5594,6 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman)
             {
                 PrintExceptionContinue(&e, "ProcessMessages()");
             }
-        }
-        catch (const boost::thread_interrupted&) {
-            throw;
         }
         catch (const std::exception& e) {
             PrintExceptionContinue(&e, "ProcessMessages()");
@@ -5633,7 +5635,7 @@ bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
 }
 
 
-bool SendMessages(CNode* pto, CConnman* connman)
+bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsgProc)
 {
     const Consensus::Params& consensusParams = Params().GetConsensus();
     {

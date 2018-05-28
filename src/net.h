@@ -12,19 +12,22 @@
 #include "compat.h"
 #include "hash.h"
 #include "leakybucket.h"
+#include "ipgroups.h"
 #include "limitedmap.h"
 #include "netbase.h"
 #include "protocol.h"
 #include "random.h"
 #include "streams.h"
 #include "sync.h"
+#include "threadinterrupt.h"
 #include "uint256.h"
 #include "utilstrencodings.h"
-#include "ipgroups.h"
 
 #include <deque>
 #include <stdint.h>
+#include <thread>
 #include <memory>
+#include <condition_variable>
 
 #ifndef WIN32
 #include <arpa/inet.h>
@@ -110,10 +113,11 @@ public:
         unsigned int nSendBufferMaxSize = 0;
         unsigned int nReceiveFloodSize = 0;
     };
-    CConnman();
+    CConnman(uint64_t seed0, uint64_t seed1);
     virtual ~CConnman();
-    bool Start(boost::thread_group& threadGroup, CScheduler& scheduler, std::string& strNodeError, Options options);
+    bool Start(CScheduler& scheduler, std::string& strNodeError, Options options);
     void Stop();
+    void Interrupt();
     bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
     bool OpenNetworkConnection(const CAddress& addrConnect, bool fCountFailure, CSemaphoreGrant *grantOutbound = NULL, const char *strDest = NULL, bool fOneShot = false, bool fFeeler = false);
     virtual bool CheckIncomingNonce(uint64_t nonce);
@@ -252,7 +256,11 @@ public:
     int GetBestHeight() const;
 
     // for unittesting
-    void AddTestNode(CNode* n);
+    void AddTestNode(CNode*);
+    void RemoveTestNode(CNode*);
+
+    /** Get a unique deterministic randomizer. */
+    CSipHasher GetDeterministicRandomizer(uint64_t id);
 
 private:
     struct ListenSocket {
@@ -320,7 +328,6 @@ private:
     std::list<CNode*> vNodesDisconnected;
     mutable CCriticalSection cs_vNodes;
     std::atomic<NodeId> nLastNodeId;
-    boost::condition_variable messageHandlerCondition;
 
     /** Services this instance offers */
     uint64_t nLocalServices;
@@ -331,6 +338,20 @@ private:
     int nMaxFeeler;
     std::atomic<int> nBestHeight;
     CClientUIInterface* clientInterface;
+
+    /** SipHasher seeds for deterministic randomness */
+    const uint64_t nSeed0, nSeed1;
+    std::condition_variable condMsgProc;
+    std::mutex mutexMsgProc;
+    std::atomic<bool> flagInterruptMsgProc;
+
+    CThreadInterrupt interruptNet;
+
+    std::thread threadDNSAddressSeed;
+    std::thread threadSocketHandler;
+    std::thread threadOpenAddedConnections;
+    std::thread threadOpenConnections;
+    std::thread threadMessageHandler;
 };
 extern std::unique_ptr<CConnman> g_connman;
 void Discover(boost::thread_group& threadGroup);
@@ -363,8 +384,8 @@ struct CNodeSignals
     // received. Note that the message may not be completely read (so this can be
     // used to prevent DoS attacks using over-size messages).
     boost::signals2::signal<bool (CNode*, const CNetMessage&), CombinerAll> SanityCheckMessages;
-    boost::signals2::signal<bool (CNode*, CConnman*), CombinerAll> ProcessMessages;
-    boost::signals2::signal<bool (CNode*, CConnman*), CombinerAll> SendMessages;
+    boost::signals2::signal<bool (CNode*, CConnman*, std::atomic<bool>&), CombinerAll> ProcessMessages;
+    boost::signals2::signal<bool (CNode*, CConnman*, std::atomic<bool>&), CombinerAll> SendMessages;
     boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
     boost::signals2::signal<void (NodeId, bool&)> FinalizeNode;
     boost::signals2::signal<uint64_t ()> GetMaxBlockSizeInsecure;
@@ -443,6 +464,9 @@ public:
 
 
 class CNetMessage {
+private:
+    mutable CHash256 hasher;
+    mutable uint256 data_hash;
 public:
     bool in_data;                   // parsing header (false) or data (true)
 
@@ -472,6 +496,8 @@ public:
             return false;
         return (hdr.nMessageSize == nDataPos);
     }
+
+    const uint256& GetMessageHash() const;
 
     void SetVersion(int nVersionIn)
     {
@@ -522,7 +548,7 @@ public:
     bool fFeeler; // If true this node is being used as a short lived feeler.
     bool fOneShot;
     bool fClient;
-    bool fInbound;
+    const bool fInbound;
     bool fNetworkNode;
     bool fSuccessfullyConnected;
     bool fDisconnect;
@@ -537,7 +563,7 @@ public:
     CBloomFilter* pfilter;
     std::unique_ptr<CBloomFilter> xthinFilter;
     int nRefCount;
-    NodeId id;
+    const NodeId id;
 
 protected:
     // Basic fuzz-testing
@@ -578,16 +604,16 @@ public:
     // adds connection to ipgroup (for prioritising connection slots)
     std::unique_ptr<IPGroupSlot> ipgroupSlot;
 
-    CNode(NodeId id, uint64_t nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress &addrIn, const std::string &addrNameIn = "", bool fInboundIn = false);
+    CNode(NodeId id, uint64_t nLocalServicesIn, int nMyStartingHeightIn, SOCKET hSocketIn, const CAddress &addrIn, uint64_t nLocalHostNonceIn, const std::string &addrNameIn = "", bool fInboundIn = false);
     virtual ~CNode();
 
 private:
     CNode(const CNode&);
     void operator=(const CNode&);
 
-    uint64_t nLocalHostNonce;
-    uint64_t nLocalServices;
-    int nMyStartingHeight;
+    const uint64_t nLocalHostNonce;
+    const uint64_t nLocalServices;
+    const int nMyStartingHeight;
 public:
 
     NodeId GetId() const {

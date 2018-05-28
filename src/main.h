@@ -215,17 +215,19 @@ bool LoadBlockIndex(bool* fRebuildRequired);
 /** Unload database information */
 void UnloadBlockIndex();
 /** Process protocol messages received from a given node */
-bool ProcessMessages(CNode* pfrom, CConnman* connman);
+bool ProcessMessages(CNode* pfrom, CConnman* connman, std::atomic<bool>& interrupt);
 /** Process a single message from a given node */
 bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv,
-                    int64_t nTimeReceived, CConnman* connman);
+                    int64_t nTimeReceived, CConnman* connman,
+                    std::atomic<bool>& interrupt);
 /**
  * Send queued protocol messages to be sent to a give node.
  *
  * @param[in]   pto             The node which we are sending messages to.
  * @param[in]   connman         The connection manager for that node.
+ * @param[in]   interrupt       Interrupt condition for processing threads
  */
-bool SendMessages(CNode* pto, CConnman* connman);
+bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interrupt);
 /** Run an instance of the script checking thread */
 void ThreadScriptCheck();
 /** Try to detect Partition (network isolation) attacks against us */
