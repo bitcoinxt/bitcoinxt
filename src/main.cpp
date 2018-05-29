@@ -313,7 +313,10 @@ bool MarkBlockAsReceived(const uint256& hash) {
 
 struct MarkBlockAsInFlight : public BlockInFlightMarker {
 
-    void operator()(NodeId nodeid, const uint256& hash, const Consensus::Params& consensusParams, CBlockIndex *pindex = NULL) {
+    void operator()(NodeId nodeid, const uint256& hash,
+                    const Consensus::Params& consensusParams,
+                    const CBlockIndex *pindex = NULL) override
+    {
         AssertLockHeld(cs_main);
 
         NodeStatePtr state(nodeid);
@@ -349,7 +352,7 @@ static void ProcessBlockAvailability(NodeStatePtr& state) {
 
 /** Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
  *  at most count entries. */
-void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex*>& vBlocks, std::set<NodeId>& nodeStaller) {
+void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<const CBlockIndex*>& vBlocks, std::set<NodeId>& nodeStaller) {
     if (count == 0)
         return;
 
@@ -378,8 +381,8 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
     if (state->pindexLastCommonBlock == state->pindexBestKnownBlock)
         return;
 
-    std::vector<CBlockIndex*> vToFetch;
-    CBlockIndex *pindexWalk = state->pindexLastCommonBlock;
+    std::vector<const CBlockIndex*> vToFetch;
+    const CBlockIndex *pindexWalk = state->pindexLastCommonBlock;
     // Never fetch further than the best block we know the peer has, or more than BLOCK_DOWNLOAD_WINDOW + 1 beyond the last
     // linked block we have in common with this peer. The +1 is so we can detect stalling, namely if we would be able to
     // download that next block if the window were 1 larger.
@@ -402,7 +405,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
         // are not yet downloaded and not in flight to vBlocks. In the mean time, update
         // pindexLastCommonBlock as long as all ancestors are already downloaded, or if it's
         // already part of our chain (and therefore don't need it even if pruned).
-        BOOST_FOREACH(CBlockIndex* pindex, vToFetch) {
+        for (const CBlockIndex* pindex : vToFetch) {
             if (!pindex->IsValid(BLOCK_VALID_TREE)) {
                 // We consider the chain that this peer is on invalid.
                 return;
@@ -5827,10 +5830,10 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
         bool fetchData = WillDownloadFromNode(pto, worker);
         vector<CInv> vGetData;
         if (fetchData && !pto->fDisconnect && !pto->fClient && (fFetch || !IsInitialBlockDownload()) && statePtr->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
-            vector<CBlockIndex*> vToDownload;
+            vector<const CBlockIndex*> vToDownload;
             std::set<NodeId> stallers;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - statePtr->nBlocksInFlight, vToDownload, stallers);
-            BOOST_FOREACH(CBlockIndex *pindex, vToDownload) {
+            for (const CBlockIndex *pindex : vToDownload) {
 
                 if (ThinBlocksActive(pto)) {
                     worker.requestBlock(pindex->GetBlockHash(), vGetData, *pto);

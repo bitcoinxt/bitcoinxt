@@ -57,10 +57,10 @@ struct DummyInFlightEraser : public InFlightEraser {
 
 struct DummyMarkAsInFlight : public BlockInFlightMarker {
 
-    virtual void operator()(
+    void operator()(
         NodeId nodeid, const uint256& hash,
         const Consensus::Params& consensusParams,
-        CBlockIndex *pindex)
+        const CBlockIndex *pindex) override
     {
         block = hash;
     }
