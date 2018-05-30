@@ -213,5 +213,5 @@ void BlockSender::sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
 }
 
 bool BlockSender::readBlockFromDisk(CBlock& block, const CBlockIndex* pindex) {
-    return ::ReadBlockFromDisk(block, pindex);
+    return ::ReadBlockFromDisk(block, pindex, Params().GetConsensus());
 }
