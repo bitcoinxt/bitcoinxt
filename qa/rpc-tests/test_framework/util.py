@@ -703,18 +703,24 @@ def mine_large_block(node, utxos=None):
     create_lots_of_big_transactions(node, txouts, utxos, num, fee=fee)
     node.generate(1)
 
-def wait_for(criteria, what = None):
+def wait_for(criteria, what = None, timeout = 60):
     import sys
     if what != None:
         sys.stdout.write("Waiting for %s" % what)
         sys.stdout.flush()
-    for i in range(1, 14):
+
+    start = time.time()
+    i = 1
+    while True:
         if criteria():
             print("")
             return
 
+        if time.time() - start > timeout:
+            raise Exception("Timeout")
+
         sys.stdout.write(".")
         sys.stdout.flush()
         time.sleep(0.1 * i**2) # geometric back-off
+        i += 1
 
-    raise Exception("Timeout")
