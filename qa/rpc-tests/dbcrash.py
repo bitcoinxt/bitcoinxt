@@ -59,12 +59,15 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
         self.node1_args = ["-dbcrashratio=16", "-dbcache=8"] + self.base_args
         self.node2_args = ["-dbcrashratio=24", "-dbcache=16"] + self.base_args
 
-        # Node3 is a normal node with default args, except will mine full blocks
-        self.node3_args = ["-blockmaxweight=4000000"]
+        # Node3 is a normal node with default args
+        self.node3_args = []
         self.extra_args = [self.node0_args, self.node1_args, self.node2_args, self.node3_args]
 
     def setup_network(self):
-        self.setup_nodes()
+        self.nodes = start_nodes(
+            self.num_nodes,
+            self.options.tmpdir,
+            extra_args=self.extra_args)
         # Leave them unconnected, we'll use submitblock directly in this test
 
     def restart_node(self, node_index, expected_tip):
@@ -74,11 +77,14 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
         after 60 seconds. Returns the utxo hash of the given node."""
 
         time_start = time.time()
-        while time.time() - time_start < 60:
+        while time.time() - time_start < 120:
             try:
                 # Any of these RPC calls could throw due to node crash
-                self.nodes[node_index] = self.start_node(node_index, self.options.tmpdir, self.extra_args[node_index])
-                self.nodes[node_index].waitforblock(expected_tip)
+                self.nodes[node_index] = start_node(node_index, self.options.tmpdir, self.extra_args[node_index])
+                def chaintip():
+                    return self.nodes[node_index].getbestblockhash() == expected_tip
+
+                wait_for(chaintip, "correct tip")
                 utxo_hash = self.nodes[node_index].gettxoutsetinfo()['hash_serialized_2']
                 return utxo_hash
             except:
@@ -136,7 +142,7 @@ class ChainstateWriteCrashTest(BitcoinTestFramework):
         # Retrieve all the blocks from node3
         blocks = []
         for block_hash in block_hashes:
-            blocks.append([block_hash, self.nodes[3].getblock(block_hash, 0)])
+            blocks.append([block_hash, self.nodes[3].getblock(block_hash, False)])
 
         # Deliver each block to each other node
         for i in range(3):
