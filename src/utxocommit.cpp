@@ -68,30 +68,3 @@ uint256 CUtxoCommit::GetHash() const {
                                 &multiset);
     return uint256(hash);
 }
-
-bool CUtxoCommit::AddCoinView(CCoinsViewCursor *pcursor) {
-    LogPrintf("Adding existing UTXO set to the UTXO commitment");
-
-    // TODO: Parallelize
-    int n = 0;
-    while (pcursor->Valid()) {
-
-        COutPoint key;
-        Coin coin;
-        if (!pcursor->GetKey(key) || !pcursor->GetValue(coin)) {
-            return error("Failed to retrieve UTXO from cursor");
-        }
-
-        Add(key, coin);
-
-        if ((n % 1000000) == 0) {
-            uint8_t c = *key.hash.begin();
-            LogPrintf("Generating UTXO commitment; progress %d\n",
-                      uint32_t(c) * 100 / 256);
-        }
-        n++;
-
-        pcursor->Next();
-    }
-    return true;
-}

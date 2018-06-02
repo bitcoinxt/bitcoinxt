@@ -187,6 +187,7 @@ BITCOIN_CORE_H = \
   utilmoneystr.h \
   utilprocessmsg.h \
   utiltime.h \
+  utilutxocommit.h \
   utxocommit.h \
   validationinterface.h \
   version.h \
@@ -271,6 +272,7 @@ libbitcoin_server_a_SOURCES = \
   utilfork.cpp \
   utilhash.cpp \
   utilprocessmsg.cpp \
+  utilutxocommit.cpp \
   validationinterface.cpp \
   xthin.cpp \
   versionbits.cpp \
