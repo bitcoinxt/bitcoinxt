@@ -32,6 +32,8 @@
 #include "ui_interface.h"
 #include "util.h"
 #include "utildebug.h"
+#include "utilutxocommit.h"
+#include "utxocommit.h"
 #include "utilfork.h"
 #include "utilmoneystr.h"
 #include "validationinterface.h"
@@ -1439,6 +1441,14 @@ bool AppInit2()
         if (!fReindex) {
             PruneAndFlush();
         }
+    }
+
+    if (GetArg("-buildcommitment", false)) {
+        std::unique_ptr<CCoinsViewCursor> pcursor(pcoinsdbview->Cursor());
+        CUtxoCommit commit = BuildUtxoCommit(pcursor.get(), Opt().ScriptCheckThreads());
+        LogPrintf("utxo commit: %s\n", commit.GetHash().ToString());
+        LogPrintf("Done. Exiting.\n");
+        return false;
     }
 
     // ********************************************************* Step 8: load wallet
