@@ -282,6 +282,8 @@ def initialize_chain_clean(test_dir, num_nodes):
     for i in range(num_nodes):
         datadir=initialize_datadir(test_dir, i)
 
+def wait_for_node_exit(node_index, timeout):
+    bitcoind_processes[node_index].wait(timeout)
 
 def _rpchost_to_args(rpchost):
     '''Convert optional IP:port spec to rpcconnect/rpcport args'''
@@ -607,8 +609,13 @@ def get_bip9_status(node, key):
             return row
     raise IndexError ('key:"%s" not found' % key)
 
+# Helper to create at least "count" utxos
+# Pass in a fee that is sufficient for relay and mining new transactions.
 def create_confirmed_utxos(fee, node, count, age=101):
-    node.generate(int(0.5*count) + age)
+    to_generate = int(0.5*count) + age
+    while to_generate > 0:
+        node.generate(min(25, to_generate))
+        to_generate -= 25
     utxos = node.listunspent()
     iterations = count - len(utxos)
     addr1 = node.getnewaddress()
@@ -696,18 +703,24 @@ def mine_large_block(node, utxos=None):
     create_lots_of_big_transactions(node, txouts, utxos, num, fee=fee)
     node.generate(1)
 
-def wait_for(criteria, what = None):
+def wait_for(criteria, what = None, timeout = 60):
     import sys
     if what != None:
         sys.stdout.write("Waiting for %s" % what)
         sys.stdout.flush()
-    for i in range(1, 14):
+
+    start = time.time()
+    i = 1
+    while True:
         if criteria():
             print("")
             return
 
+        if time.time() - start > timeout:
+            raise Exception("Timeout")
+
         sys.stdout.write(".")
         sys.stdout.flush()
         time.sleep(0.1 * i**2) # geometric back-off
+        i += 1
 
-    raise Exception("Timeout")

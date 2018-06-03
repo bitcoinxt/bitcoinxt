@@ -20,7 +20,7 @@ public:
     virtual void operator()(
         NodeId nodeid, const uint256& hash,
         const Consensus::Params& consensusParams,
-        CBlockIndex* pindex) = 0;
+        const CBlockIndex* pindex) = 0;
 };
 inline BlockInFlightMarker::~BlockInFlightMarker() { }
 

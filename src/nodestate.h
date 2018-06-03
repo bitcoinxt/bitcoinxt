@@ -52,7 +52,7 @@ struct CNodeState {
     //! The hash of the last unknown block this peer has announced.
     uint256 hashLastUnknownBlock;
     //! The last full block we both have.
-    CBlockIndex *pindexLastCommonBlock;
+    const CBlockIndex *pindexLastCommonBlock;
     //! The best header we have sent our peer.
     CBlockIndex *bestHeaderSent;
     //! Length of current-streak of unconnecting headers announcements

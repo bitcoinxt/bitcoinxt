@@ -91,7 +91,8 @@ void GetRandBytes(unsigned char* buf, int num)
     }
 }
 
-uint64_t GetRand(uint64_t nMax)
+template <typename RNG>
+uint64_t GetRand(uint64_t nMax, RNG rng)
 {
     if (nMax == 0)
         return 0;
@@ -101,9 +102,17 @@ uint64_t GetRand(uint64_t nMax)
     uint64_t nRange = (std::numeric_limits<uint64_t>::max() / nMax) * nMax;
     uint64_t nRand = 0;
     do {
-        GetRandBytes((unsigned char*)&nRand, sizeof(nRand));
+        nRand = rng();
     } while (nRand >= nRange);
     return (nRand % nMax);
+}
+
+uint64_t GetRand(uint64_t nMax) {
+    return GetRand(nMax, [](){
+        uint64_t nRand = 0;
+        GetRandBytes((unsigned char*)&nRand, sizeof(nRand));
+        return nRand;
+    });
 }
 
 int GetRandInt(int nMax)
@@ -134,4 +143,10 @@ FastRandomContext::FastRandomContext(bool fDeterministic)
         } while (tmp == 0 || tmp == 0x464fffffU);
         Rw = tmp;
     }
+}
+
+uint64_t FastRandomContext::randrange(uint64_t range) {
+    return GetRand(range, [this](){
+        return this->rand64();
+    });
 }

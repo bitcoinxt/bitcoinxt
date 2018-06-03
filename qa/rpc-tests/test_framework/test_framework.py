@@ -28,6 +28,15 @@ from .util import (
 )
 from .authproxy import JSONRPCException
 
+# Placeholder for better logging framework.
+class Logger:
+    def __getattr__(self, name):
+        def p(*args, **kwargs):
+            print(args[0] % args[1:])
+        return p
+
+    def debug(*args, **kwargs):
+        pass # ignore
 
 class BitcoinTestFramework(object):
 
@@ -35,6 +44,7 @@ class BitcoinTestFramework(object):
         self.num_nodes = 4
         self.setup_clean_chain = False
         self.nodes = None
+        self.log = Logger()
 
     def run_test(self):
         raise NotImplementedError

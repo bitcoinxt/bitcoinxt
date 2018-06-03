@@ -45,6 +45,9 @@ public:
         return (b << 32) + a;
     }
 
+    // random integer in the range [0..range]
+    uint64_t randrange(uint64_t range);
+
     uint32_t Rz;
     uint32_t Rw;
 };

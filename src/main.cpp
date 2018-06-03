@@ -119,7 +119,7 @@ namespace {
 
     struct CBlockIndexWorkComparator
     {
-        bool operator()(CBlockIndex *pa, CBlockIndex *pb) const {
+        bool operator()(const CBlockIndex *pa, const CBlockIndex *pb) const {
             // First sort by most total work, ...
             if (pa->nChainWork > pb->nChainWork) return false;
             if (pa->nChainWork < pb->nChainWork) return true;
@@ -313,7 +313,10 @@ bool MarkBlockAsReceived(const uint256& hash) {
 
 struct MarkBlockAsInFlight : public BlockInFlightMarker {
 
-    void operator()(NodeId nodeid, const uint256& hash, const Consensus::Params& consensusParams, CBlockIndex *pindex = NULL) {
+    void operator()(NodeId nodeid, const uint256& hash,
+                    const Consensus::Params& consensusParams,
+                    const CBlockIndex *pindex = NULL) override
+    {
         AssertLockHeld(cs_main);
 
         NodeStatePtr state(nodeid);
@@ -347,28 +350,9 @@ static void ProcessBlockAvailability(NodeStatePtr& state) {
     }
 }
 
-/** Find the last common ancestor two blocks have.
- *  Both pa and pb must be non-NULL. */
-CBlockIndex* LastCommonAncestor(CBlockIndex* pa, CBlockIndex* pb) {
-    if (pa->nHeight > pb->nHeight) {
-        pa = pa->GetAncestor(pb->nHeight);
-    } else if (pb->nHeight > pa->nHeight) {
-        pb = pb->GetAncestor(pa->nHeight);
-    }
-
-    while (pa != pb && pa && pb) {
-        pa = pa->pprev;
-        pb = pb->pprev;
-    }
-
-    // Eventually all chain branches meet at the genesis block.
-    assert(pa == pb);
-    return pa;
-}
-
 /** Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
  *  at most count entries. */
-void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBlockIndex*>& vBlocks, std::set<NodeId>& nodeStaller) {
+void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<const CBlockIndex*>& vBlocks, std::set<NodeId>& nodeStaller) {
     if (count == 0)
         return;
 
@@ -397,8 +381,8 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
     if (state->pindexLastCommonBlock == state->pindexBestKnownBlock)
         return;
 
-    std::vector<CBlockIndex*> vToFetch;
-    CBlockIndex *pindexWalk = state->pindexLastCommonBlock;
+    std::vector<const CBlockIndex*> vToFetch;
+    const CBlockIndex *pindexWalk = state->pindexLastCommonBlock;
     // Never fetch further than the best block we know the peer has, or more than BLOCK_DOWNLOAD_WINDOW + 1 beyond the last
     // linked block we have in common with this peer. The +1 is so we can detect stalling, namely if we would be able to
     // download that next block if the window were 1 larger.
@@ -421,7 +405,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<CBl
         // are not yet downloaded and not in flight to vBlocks. In the mean time, update
         // pindexLastCommonBlock as long as all ancestors are already downloaded, or if it's
         // already part of our chain (and therefore don't need it even if pruned).
-        BOOST_FOREACH(CBlockIndex* pindex, vToFetch) {
+        for (const CBlockIndex* pindex : vToFetch) {
             if (!pindex->IsValid(BLOCK_VALID_TREE)) {
                 // We consider the chain that this peer is on invalid.
                 return;
@@ -1147,7 +1131,7 @@ bool GetTransaction(const uint256 &hash, CTransaction &txOut, uint256 &hashBlock
 
     if (pindexSlow) {
         CBlock block;
-        if (ReadBlockFromDisk(block, pindexSlow)) {
+        if (ReadBlockFromDisk(block, pindexSlow, Params().GetConsensus())) {
             BOOST_FOREACH(const CTransaction &tx, block.vtx) {
                 if (tx.GetHash() == hash) {
                     txOut = tx;
@@ -1192,7 +1176,7 @@ bool WriteBlockToDisk(CBlock& block, CDiskBlockPos& pos, const CMessageHeader::M
     return true;
 }
 
-bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos)
+bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos, const Consensus::Params& consensusParams)
 {
     block.SetNull();
 
@@ -1210,15 +1194,15 @@ bool ReadBlockFromDisk(CBlock& block, const CDiskBlockPos& pos)
     }
 
     // Check the header
-    if (!CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus()))
+    if (!CheckProofOfWork(block.GetHash(), block.nBits, consensusParams))
         return error("ReadBlockFromDisk: Errors in block header at %s", pos.ToString());
 
     return true;
 }
 
-bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex)
+bool ReadBlockFromDisk(CBlock& block, const CBlockIndex* pindex, const Consensus::Params& consensusParams)
 {
-    if (!ReadBlockFromDisk(block, pindex->GetBlockPos()))
+    if (!ReadBlockFromDisk(block, pindex->GetBlockPos(), consensusParams))
         return false;
     if (block.GetHash() != pindex->GetBlockHash())
         return error("ReadBlockFromDisk(CBlock&, CBlockIndex*): GetHash() doesn't match index for %s at %s",
@@ -1647,17 +1631,19 @@ int ApplyTxInUndo(Coin&& undo, CCoinsViewCache& view, const COutPoint& out)
             return DISCONNECT_FAILED; // adding output for transaction without known metadata
         }
     }
-    view.AddCoin(out, std::move(undo), undo.fCoinBase);
+    // The potential_overwrite parameter to AddCoin is only allowed to be false if we know for
+    // sure that the coin did not already exist in the cache. As we have queried for that above
+    // using HaveCoin, we don't need to guess. When fClean is false, a coin already existed and
+    // it is an overwrite.
+    view.AddCoin(out, std::move(undo), !fClean);
 
     return fClean ? DISCONNECT_OK : DISCONNECT_UNCLEAN;
 }
 
 /** Undo the effects of this block (with given index) on the UTXO set represented by coins.
- *  When UNCLEAN or FAILED is returned, view is left in an indeterminate state. */
+ *  When FAILED is returned, view is left in an indeterminate state. */
 static DisconnectResult DisconnectBlock(const CBlock& block, const CBlockIndex* pindex, CCoinsViewCache& view)
 {
-    assert(pindex->GetBlockHash() == view.GetBestBlock());
-
     bool fClean = true;
 
     CBlockUndo blockUndo;
@@ -2319,12 +2305,13 @@ bool static DisconnectTip(CValidationState &state) {
     assert(pindexDelete);
     // Read block from disk.
     CBlock block;
-    if (!ReadBlockFromDisk(block, pindexDelete))
+    if (!ReadBlockFromDisk(block, pindexDelete, Params().GetConsensus()))
         return AbortNode(state, "Failed to read block");
     // Apply the block atomically to the chain state.
     int64_t nStart = GetTimeMicros();
     {
         CCoinsViewCache view(pcoinsTip);
+        assert(view.GetBestBlock() == pindexDelete->GetBlockHash());
         if (DisconnectBlock(block, pindexDelete, view) != DISCONNECT_OK)
             return error("DisconnectTip(): DisconnectBlock %s failed", pindexDelete->GetBlockHash().ToString());
         assert(view.Flush());
@@ -2379,7 +2366,7 @@ bool static ConnectTip(CValidationState &state, CBlockIndex *pindexNew,
     int64_t nTime1 = GetTimeMicros();
     CBlock block;
     if (!pblock) {
-        if (!ReadBlockFromDisk(block, pindexNew))
+        if (!ReadBlockFromDisk(block, pindexNew, Params().GetConsensus()))
             return AbortNode(state, "Failed to read block");
         pblock = &block;
     }
@@ -2624,6 +2611,9 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
         if(connman)
             connman->SetBestHeight(nNewHeight);
 
+        // Notify external listeners about the new tip.
+        uiInterface.NotifyBlockTip(fInitialDownload, pindexNewTip);
+
         if (connman && !fInitialDownload) {
             std::vector<uint256> hashesToAnnounce
                 = findHeadersToAnnounce(pindexFork, pindexNewTip);
@@ -2645,8 +2635,6 @@ bool ActivateBestChain(CValidationState &state, CBlock *pblock, const BlockSourc
                         pnode->PushBlockHash(h);
                 });
             // Notify external listeners about the new tip.
-            if (!hashesToAnnounce.empty())
-                uiInterface.NotifyBlockTip(hashesToAnnounce.front());
         }
         if (nStopAtHeight && pindexNewTip && pindexNewTip->nHeight >= nStopAtHeight) StartShutdown();
     } while(pindexNewTip != pindexMostWork);
@@ -3566,7 +3554,7 @@ bool static LoadBlockIndexDB(bool* fRebuildRequired)
             pindex->nSerialVersion = DISK_BLOCK_INDEX_VERSION;
             if (pindex->nChainTx) {
                 CBlock block;
-                if (ReadBlockFromDisk(block, pindex)) {
+                if (ReadBlockFromDisk(block, pindex, chainparams.GetConsensus())) {
                     pindex->nMaxBlockSizeVote = GetMaxBlockSizeVote(block.vtx[0].vin[0].scriptSig, pindex->nHeight);
                     pindex->nMaxBlockSize = GetNextMaxBlockSize(pindex->pprev, chainparams.GetConsensus());
                 } else {
@@ -3586,20 +3574,25 @@ bool static LoadBlockIndexDB(bool* fRebuildRequired)
     pblocktree->ReadFlag("txindex", fTxIndex);
     LogPrintf("%s: transaction index %s\n", __func__, fTxIndex ? "enabled" : "disabled");
 
+    return true;
+}
+
+void LoadChainTip(const CChainParams& chainparams)
+{
+    if (chainActive.Tip() && chainActive.Tip()->GetBlockHash() == pcoinsTip->GetBestBlock()) return;
+
     // Load pointer to end of best chain
     BlockMap::iterator it = mapBlockIndex.find(pcoinsTip->GetBestBlock());
     if (it == mapBlockIndex.end())
-        return true;
+        return;
     chainActive.SetTip(it->second);
 
     PruneBlockIndexCandidates();
 
-    LogPrintf("%s: hashBestChain=%s height=%d date=%s progress=%f\n", __func__,
+    LogPrintf("Loaded best chain: hashBestChain=%s height=%d date=%s progress=%f\n",
         chainActive.Tip()->GetBlockHash().ToString(), chainActive.Height(),
         DateTimeStrFormat("%Y-%m-%d %H:%M:%S", chainActive.Tip()->GetBlockTime()),
         Checkpoints::GuessVerificationProgress(chainparams.Checkpoints(), chainActive.Tip()));
-
-    return true;
 }
 
 CVerifyDB::CVerifyDB()
@@ -3638,7 +3631,7 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
             break;
         CBlock block;
         // check level 0: read from disk
-        if (!ReadBlockFromDisk(block, pindex))
+        if (!ReadBlockFromDisk(block, pindex, Params().GetConsensus()))
             return error("VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
         // check level 1: verify block validity
         if (nCheckLevel >= 1 && !CheckBlock(block, state))
@@ -3654,6 +3647,7 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
         }
         // check level 3: check for inconsistencies during memory-only disconnect of tip blocks
         if (nCheckLevel >= 3 && pindex == pindexState && (coins.DynamicMemoryUsage() + pcoinsTip->DynamicMemoryUsage()) <= nCoinCacheUsage) {
+            assert(coins.GetBestBlock() == pindex->GetBlockHash());
             DisconnectResult res = DisconnectBlock(block, pindex, coins);
             if (res == DISCONNECT_FAILED) {
                 return error("VerifyDB(): *** irrecoverable inconsistency in block data at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
@@ -3680,7 +3674,7 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
             uiInterface.ShowProgress(_("Verifying blocks..."), std::max(1, std::min(99, 100 - (int)(((double)(chainActive.Height() - pindex->nHeight)) / (double)nCheckDepth * 50))));
             pindex = chainActive.Next(pindex);
             CBlock block;
-            if (!ReadBlockFromDisk(block, pindex))
+            if (!ReadBlockFromDisk(block, pindex, Params().GetConsensus()))
                 return error("VerifyDB(): *** ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
             if (!ConnectBlock(block, state, pindex, coins))
                 return error("VerifyDB(): *** found unconnectable block at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
@@ -3689,6 +3683,92 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
 
     LogPrintf("No coin database inconsistencies in last %i blocks (%i transactions)\n", chainActive.Height() - pindexState->nHeight, nGoodTransactions);
 
+    return true;
+}
+
+/** Apply the effects of a block on the utxo cache, ignoring that it may already have been applied. */
+static bool RollforwardBlock(const CBlockIndex* pindex, CCoinsViewCache& inputs, const CChainParams& params)
+{
+    // TODO: merge with ConnectBlock
+    CBlock block;
+    if (!ReadBlockFromDisk(block, pindex, params.GetConsensus())) {
+        return error("ReplayBlock(): ReadBlockFromDisk failed at %d, hash=%s", pindex->nHeight, pindex->GetBlockHash().ToString());
+    }
+
+    for (const CTransaction& tx : block.vtx) {
+        if (!tx.IsCoinBase()) {
+            for (const CTxIn &txin : tx.vin) {
+                inputs.SpendCoin(txin.prevout);
+            }
+        }
+        // Pass check = true as every addition may be an overwrite.
+        AddCoins(inputs, tx, pindex->nHeight, true);
+    }
+    return true;
+}
+
+bool ReplayBlocks(const CChainParams& params, CCoinsView* view)
+{
+    LOCK(cs_main);
+
+    CCoinsViewCache cache(view);
+
+    std::vector<uint256> hashHeads = view->GetHeadBlocks();
+    if (hashHeads.empty()) return true; // We're already in a consistent state.
+    if (hashHeads.size() != 2) return error("ReplayBlocks(): unknown inconsistent state");
+
+    uiInterface.ShowProgress(_("Replaying blocks..."), 0);
+    LogPrintf("Replaying blocks\n");
+
+    const CBlockIndex* pindexOld = nullptr;  // Old tip during the interrupted flush.
+    const CBlockIndex* pindexNew;            // New tip during the interrupted flush.
+    const CBlockIndex* pindexFork = nullptr; // Latest block common to both the old and the new tip.
+
+    if (mapBlockIndex.count(hashHeads[0]) == 0) {
+        return error("ReplayBlocks(): reorganization to unknown block requested");
+    }
+    pindexNew = mapBlockIndex[hashHeads[0]];
+
+    if (!hashHeads[1].IsNull()) { // The old tip is allowed to be 0, indicating it's the first flush.
+        if (mapBlockIndex.count(hashHeads[1]) == 0) {
+            return error("ReplayBlocks(): reorganization from unknown block requested");
+        }
+        pindexOld = mapBlockIndex[hashHeads[1]];
+        pindexFork = LastCommonAncestor(pindexOld, pindexNew);
+        assert(pindexFork != nullptr);
+    }
+
+    // Rollback along the old branch.
+    while (pindexOld != pindexFork) {
+        if (pindexOld->nHeight > 0) { // Never disconnect the genesis block.
+            CBlock block;
+            if (!ReadBlockFromDisk(block, pindexOld, params.GetConsensus())) {
+                return error("RollbackBlock(): ReadBlockFromDisk() failed at %d, hash=%s", pindexOld->nHeight, pindexOld->GetBlockHash().ToString());
+            }
+            LogPrintf("Rolling back %s (%i)\n", pindexOld->GetBlockHash().ToString(), pindexOld->nHeight);
+            DisconnectResult res = DisconnectBlock(block, pindexOld, cache);
+            if (res == DISCONNECT_FAILED) {
+                return error("RollbackBlock(): DisconnectBlock failed at %d, hash=%s", pindexOld->nHeight, pindexOld->GetBlockHash().ToString());
+            }
+            // If DISCONNECT_UNCLEAN is returned, it means a non-existing UTXO was deleted, or an existing UTXO was
+            // overwritten. It corresponds to cases where the block-to-be-disconnect never had all its operations
+            // applied to the UTXO set. However, as both writing a UTXO and deleting a UTXO are idempotent operations,
+            // the result is still a version of the UTXO set with the effects of that block undone.
+        }
+        pindexOld = pindexOld->pprev;
+    }
+
+    // Roll forward from the forking point to the new tip.
+    int nForkHeight = pindexFork ? pindexFork->nHeight : 0;
+    for (int nHeight = nForkHeight + 1; nHeight <= pindexNew->nHeight; ++nHeight) {
+        const CBlockIndex* pindex = pindexNew->GetAncestor(nHeight);
+        LogPrintf("Rolling forward %s (%i)\n", pindex->GetBlockHash().ToString(), nHeight);
+        if (!RollforwardBlock(pindex, cache, params)) return false;
+    }
+
+    cache.SetBestBlock(pindexNew->GetBlockHash());
+    cache.Flush();
+    uiInterface.ShowProgress("", 100);
     return true;
 }
 
@@ -3767,10 +3847,6 @@ bool InitBlockIndex() {
             CBlockIndex *pindex = AddToBlockIndex(block);
             if (!ReceivedBlockTransactions(block, state, pindex, blockPos))
                 return error("LoadBlockIndex(): genesis block not accepted");
-            if (!ActivateBestChain(state, &block))
-                return error("LoadBlockIndex(): genesis block cannot be activated");
-            // Force a chainstate write so that when we VerifyDB in a moment, it doesn't check stale data
-            return FlushStateToDisk(state, FLUSH_STATE_ALWAYS);
         } catch (const std::runtime_error& e) {
             return error("LoadBlockIndex(): failed to initialize block database: %s", e.what());
         }
@@ -3858,7 +3934,7 @@ bool LoadExternalBlockFile(FILE* fileIn, CDiskBlockPos *dbp)
                     std::pair<std::multimap<uint256, CDiskBlockPos>::iterator, std::multimap<uint256, CDiskBlockPos>::iterator> range = mapBlocksUnknownParent.equal_range(head);
                     while (range.first != range.second) {
                         std::multimap<uint256, CDiskBlockPos>::iterator it = range.first;
-                        if (ReadBlockFromDisk(block, it->second))
+                        if (ReadBlockFromDisk(block, it->second, chainparams.GetConsensus()))
                         {
                             LogPrint(Log::REINDEX, "%s: Processing out of order child %s of %s\n", __func__, block.GetHash().ToString(),
                                     head.ToString());
@@ -5847,10 +5923,10 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
         bool fetchData = WillDownloadFromNode(pto, worker);
         vector<CInv> vGetData;
         if (fetchData && !pto->fDisconnect && !pto->fClient && (fFetch || !IsInitialBlockDownload()) && statePtr->nBlocksInFlight < MAX_BLOCKS_IN_TRANSIT_PER_PEER) {
-            vector<CBlockIndex*> vToDownload;
+            vector<const CBlockIndex*> vToDownload;
             std::set<NodeId> stallers;
             FindNextBlocksToDownload(pto->GetId(), MAX_BLOCKS_IN_TRANSIT_PER_PEER - statePtr->nBlocksInFlight, vToDownload, stallers);
-            BOOST_FOREACH(CBlockIndex *pindex, vToDownload) {
+            for (const CBlockIndex *pindex : vToDownload) {
 
                 if (ThinBlocksActive(pto)) {
                     worker.requestBlock(pindex->GetBlockHash(), vGetData, *pto);
