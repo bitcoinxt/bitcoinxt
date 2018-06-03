@@ -22,9 +22,13 @@
 /**
  * A UTXO entry.
  *
- * Serialized format:
+ * Serialized format for storage:
  * - VARINT((coinbase ? 1 : 0) | (height << 1))
  * - the non-spent CTxOut (via CTxOutCompressor)
+ *
+ * Serialized format for network is used for UTXO commitment
+ * - CompactSize((coinbase ? 1 : 0) | (height << 1))
+ * - the non-spent CTxOut (uncompressed)
  */
 class Coin
 {
@@ -57,10 +61,16 @@ public:
 
     template<typename Stream>
     void Serialize(Stream &s) const {
-        assert(!IsSpent());
         uint32_t code = nHeight * 2 + fCoinBase;
-        ::Serialize(s, VARINT(code));
-        ::Serialize(s, CTxOutCompressor(REF(out)));
+        // only compress for disk format
+        if (s.GetType() & SER_DISK) {
+            assert(!IsSpent());
+            ::Serialize(s, VARINT(code));
+            ::Serialize(s, CTxOutCompressor(REF(out)));
+        } else {
+            ::WriteCompactSize(s, code);
+            ::Serialize(s, REF(out));
+        }
     }
 
     template<typename Stream>
