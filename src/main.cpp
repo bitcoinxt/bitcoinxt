@@ -1392,20 +1392,27 @@ void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state
     }
 }
 
-void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, CTxUndo &txundo, int nHeight)
+/**
+ * Mark all the coins corresponding to a given transaction inputs as spent.
+ **/
+static void SpendCoins(CCoinsViewCache& view, const CTransaction& tx, CTxUndo &txundo, int nHeight)
 {
     // mark inputs spent
-    if (!tx.IsCoinBase()) {
-        txundo.vprevout.reserve(tx.vin.size());
-        BOOST_FOREACH(const CTxIn &txin, tx.vin) {
-            txundo.vprevout.emplace_back();
-            bool is_spent = inputs.SpendCoin(txin.prevout, &txundo.vprevout.back());
-            assert(is_spent);
-        }
+    if (tx.IsCoinBase()) {
+        return;
     }
 
-    // add outputs
-    AddCoins(inputs, tx, nHeight);
+    txundo.vprevout.reserve(tx.vin.size());
+    for (const CTxIn &txin : tx.vin) {
+        txundo.vprevout.emplace_back();
+        bool is_spent = view.SpendCoin(txin.prevout, &txundo.vprevout.back());
+        assert(is_spent);
+    }
+}
+
+void UpdateCoins(const CTransaction& tx, CCoinsViewCache& view, CTxUndo &txundo, int nHeight) {
+    SpendCoins(view, tx, txundo, nHeight);
+    AddCoins(view, tx, nHeight);
 }
 
 void UpdateCoins(const CTransaction& tx, CCoinsViewCache& inputs, int nHeight)
@@ -2039,7 +2046,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         if (i > 0) {
             blockundo.vtxundo.push_back(CTxUndo());
         }
-        UpdateCoins(tx, view, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
+        SpendCoins(view, tx, i == 0 ? undoDummy : blockundo.vtxundo.back(), pindex->nHeight);
+        AddCoins(view, tx, pindex->nHeight);
 
         vPos.push_back(std::make_pair(tx.GetHash(), pos));
         pos.nTxOffset += ::GetSerializeSize(tx, SER_DISK, CLIENT_VERSION);
@@ -3649,7 +3657,7 @@ bool CVerifyDB::VerifyDB(CCoinsView *coinsview, int nCheckLevel, int nCheckDepth
 }
 
 /** Apply the effects of a block on the utxo cache, ignoring that it may already have been applied. */
-static bool RollforwardBlock(const CBlockIndex* pindex, CCoinsViewCache& inputs, const CChainParams& params)
+static bool RollforwardBlock(const CBlockIndex* pindex, CCoinsViewCache& view, const CChainParams& params)
 {
     // TODO: merge with ConnectBlock
     CBlock block;
@@ -3658,13 +3666,17 @@ static bool RollforwardBlock(const CBlockIndex* pindex, CCoinsViewCache& inputs,
     }
 
     for (const CTransaction& tx : block.vtx) {
-        if (!tx.IsCoinBase()) {
-            for (const CTxIn &txin : tx.vin) {
-                inputs.SpendCoin(txin.prevout);
-            }
+        // pass check = true as every addition may be an override
+        AddCoins(view, tx, pindex->nHeight, true);
+    }
+
+    for (const CTransaction& tx : block.vtx) {
+        if (tx.IsCoinBase()) {
+            continue;
         }
-        // Pass check = true as every addition may be an overwrite.
-        AddCoins(inputs, tx, pindex->nHeight, true);
+        for (const CTxIn& txin : tx.vin) {
+            view.SpendCoin(txin.prevout);
+        }
     }
     return true;
 }
