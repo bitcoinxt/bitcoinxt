@@ -1937,6 +1937,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
     std::vector<std::pair<uint256, CDiskTxPos> > vPos;
     vPos.reserve(block.vtx.size());
     blockundo.vtxundo.reserve(block.vtx.size() - 1);
+
+    const bool anyOrderRule = IsFourthHFActive(pindex->pprev->GetMedianTimePast());
+
     for (const CTransaction& tx : block.vtx) {
 
         nInputs += tx.vin.size();
@@ -1947,6 +1950,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         if (tx.IsCoinBase()) {
             // We've already checked legacy sigop count (non-P2SH) in CheckBlock.
             nSigOps += GetLegacySigOpCount(tx);
+        }
+        if (anyOrderRule || tx.IsCoinBase()) {
             AddCoins(view, tx, pindex->nHeight);
         }
     }
@@ -2005,7 +2010,9 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
         blockundo.vtxundo.push_back(CTxUndo());
         SpendCoins(view, tx, blockundo.vtxundo.back(), pindex->nHeight);
-        AddCoins(view, tx, pindex->nHeight);
+        if (!anyOrderRule) {
+            AddCoins(view, tx, pindex->nHeight);
+        }
     }
     int64_t nTime1 = GetTimeMicros(); nTimeConnect += nTime1 - nTimeStart;
     LogPrint(Log::BENCH, "      - Connect %u transactions: %.2fms (%.3fms/tx, %.3fms/txin) [%.2fs]\n", (unsigned)block.vtx.size(), 0.001 * (nTime1 - nTimeStart), 0.001 * (nTime1 - nTimeStart) / block.vtx.size(), nInputs <= 1 ? 0 : 0.001 * (nTime1 - nTimeStart) / (nInputs-1), nTimeConnect * 0.000001);
