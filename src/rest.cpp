@@ -3,6 +3,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
+#include "bip64_getutxo.h"
 #include "primitives/block.h"
 #include "primitives/transaction.h"
 #include "main.h"
@@ -39,24 +40,6 @@ static const struct {
       {RF_JSON, "json"},
 };
 
-struct CCoin {
-    uint32_t nHeight;
-    CTxOut out;
-
-    ADD_SERIALIZE_METHODS;
-
-    CCoin() : nHeight(0) {}
-    CCoin(Coin&& in) : nHeight(in.nHeight), out(std::move(in.out)) {}
-
-    template <typename Stream, typename Operation>
-    inline void SerializationOp(Stream& s, Operation ser_action)
-    {
-        uint32_t nTxVerDummy = 0;
-        READWRITE(nTxVerDummy);
-        READWRITE(nHeight);
-        READWRITE(out);
-    }
-};
 
 extern void TxToJSON(const CTransaction& tx, const uint256 hashBlock, UniValue& entry);
 extern UniValue blockToJSON(const CBlock& block, const CBlockIndex* blockindex, bool txDetails = false);
@@ -489,37 +472,20 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
     if (vOutPoints.size() > MAX_GETUTXOS_OUTPOINTS)
         return RESTERR(req, HTTP_BAD_REQUEST, strprintf("Error: max outpoints exceeded (max: %d, tried: %d)", MAX_GETUTXOS_OUTPOINTS, vOutPoints.size()));
 
-    // check spentness and form a bitmap (as well as a JSON capable human-readble string representation)
-    vector<unsigned char> bitmap;
-    vector<CCoin> outs;
-    std::string bitmapStringRepresentation;
-    std::vector<bool> hits;
-    bitmap.resize((vOutPoints.size() + 7) / 8);
+    std::unique_ptr<bip64::UTXORetriever> utxos;
+    int tipHeight;
+    uint256 tipHash;
     {
-        auto process_utxos = [&vOutPoints, &outs, &hits](const CCoinsView& view, const CTxMemPool& mempool) {
-            for (const COutPoint& vOutPoint : vOutPoints) {
-                Coin coin;
-                bool hit = !mempool.isSpent(vOutPoint) && view.GetCoin(vOutPoint, coin);
-                hits.push_back(hit);
-                if (hit) outs.emplace_back(std::move(coin));
-            }
-        };
-
+        LOCK(cs_main);
+        tipHeight = chainActive.Height();
+        if (chainActive.Tip() != nullptr)
+            tipHash = chainActive.Tip()->GetBlockHash();
         if (fCheckMemPool) {
-            // use db+mempool as cache backend in case user likes to query mempool
-            LOCK2(cs_main, mempool.cs);
-            CCoinsViewCache& viewChain = *pcoinsTip;
-            CCoinsViewMemPool viewMempool(&viewChain, mempool);
-            process_utxos(viewMempool, mempool);
-        } else {
-            LOCK(cs_main);  // no need to lock mempool!
-            process_utxos(*pcoinsTip, CTxMemPool(CFeeRate(0)));
+            LOCK(mempool.cs);
+            utxos.reset(new bip64::UTXORetriever(vOutPoints, *pcoinsTip, &mempool));
         }
-
-        for (size_t i = 0; i < hits.size(); ++i) {
-            const bool hit = hits[i];
-            bitmapStringRepresentation.append(hit ? "1" : "0"); // form a binary string representation (human-readable for json output)
-            bitmap[i / 8] |= ((uint8_t)hit) << (i % 8);
+        else {
+            utxos.reset(new bip64::UTXORetriever(vOutPoints, *pcoinsTip, nullptr));
         }
     }
 
@@ -528,7 +494,10 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
         // serialize data
         // use exact same output as mentioned in Bip64
         CDataStream ssGetUTXOResponse(SER_NETWORK, PROTOCOL_VERSION);
-        ssGetUTXOResponse << chainActive.Height() << chainActive.Tip()->GetBlockHash() << bitmap << outs;
+        ssGetUTXOResponse
+            << tipHeight << tipHash
+            << utxos->GetBitmap()
+            << utxos->GetResults();
         string ssGetUTXOResponseString = ssGetUTXOResponse.str();
 
         req->WriteHeader("Content-Type", "application/octet-stream");
@@ -538,7 +507,10 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
 
     case RF_HEX: {
         CDataStream ssGetUTXOResponse(SER_NETWORK, PROTOCOL_VERSION);
-        ssGetUTXOResponse << chainActive.Height() << chainActive.Tip()->GetBlockHash() << bitmap << outs;
+        ssGetUTXOResponse
+            << tipHeight << tipHash
+            << utxos->GetBitmap()
+            << utxos->GetResults();
         string strHex = HexStr(ssGetUTXOResponse.begin(), ssGetUTXOResponse.end()) + "\n";
 
         req->WriteHeader("Content-Type", "text/plain");
@@ -551,12 +523,12 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
 
         // pack in some essentials
         // use more or less the same output as mentioned in Bip64
-        objGetUTXOResponse.push_back(Pair("chainHeight", chainActive.Height()));
-        objGetUTXOResponse.push_back(Pair("chaintipHash", chainActive.Tip()->GetBlockHash().GetHex()));
-        objGetUTXOResponse.push_back(Pair("bitmap", bitmapStringRepresentation));
+        objGetUTXOResponse.push_back(Pair("chainHeight", tipHeight));
+        objGetUTXOResponse.push_back(Pair("chaintipHash", tipHash.GetHex()));
+        objGetUTXOResponse.push_back(Pair("bitmap", utxos->GetBitmapStr()));
 
-        UniValue utxos(UniValue::VARR);
-        BOOST_FOREACH (const CCoin& coin, outs) {
+        UniValue utxosRes(UniValue::VARR);
+        for (const bip64::CCoin& coin : utxos->GetResults()) {
             UniValue utxo(UniValue::VOBJ);
             utxo.push_back(Pair("height", (int32_t)coin.nHeight));
             utxo.push_back(Pair("value", ValueFromAmount(coin.out.nValue)));
@@ -565,9 +537,9 @@ static bool rest_getutxos(HTTPRequest* req, const std::string& strURIPart)
             UniValue o(UniValue::VOBJ);
             ScriptPubKeyToJSON(coin.out.scriptPubKey, o, true);
             utxo.push_back(Pair("scriptPubKey", o));
-            utxos.push_back(utxo);
+            utxosRes.push_back(utxo);
         }
-        objGetUTXOResponse.push_back(Pair("utxos", utxos));
+        objGetUTXOResponse.push_back(Pair("utxos", utxosRes));
 
         // return json string
         string strJSON = objGetUTXOResponse.write() + "\n";

@@ -81,9 +81,10 @@ BITCOIN_CORE_H = \
   addrdb.h \
   addrman.h \
   base58.h \
+  bip64_getutxo.h \
   blockannounce.h \
-  blockheaderprocessor.h \
   blockencodings.h \
+  blockheaderprocessor.h \
   blockprocessor.h \
   blocksender.h \
   bloom.h \
@@ -202,6 +203,7 @@ libbitcoin_server_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_server_a_SOURCES = \
   addrdb.cpp \
   addrman.cpp \
+  bip64_getutxo.cpp \
   blockannounce.cpp \
   blockheaderprocessor.cpp \
   blockencodings.cpp \

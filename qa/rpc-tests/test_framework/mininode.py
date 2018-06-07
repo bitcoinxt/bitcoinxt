@@ -1393,7 +1393,9 @@ class NodeConnCB(object):
             "headers": self.on_headers,
             "getheaders": self.on_getheaders,
             "reject": self.on_reject,
-            "mempool": self.on_mempool
+            "mempool": self.on_mempool,
+            "utxos" : self.on_utxos
+
         }
 
     def deliver(self, conn, message):
@@ -1444,6 +1446,7 @@ class NodeConnCB(object):
     def on_cmpctblock(self, conn, message): pass
     def on_getblocktxn(self, conn, message): pass
     def on_blocktxn(self, conn, message): pass
+    def on_utxos(self, conn, message): pass
 
 # More useful callbacks and functions for NodeConnCB's which have a single NodeConn
 class SingleNodeConnCB(NodeConnCB):
@@ -1479,6 +1482,7 @@ class SingleNodeConnCB(NodeConnCB):
 # The actual NodeConn class
 # This class provides an interface for a p2p connection to a specified node
 class NodeConn(asyncore.dispatcher):
+    from test_framework.bip64 import msg_utxos
     messagemap = {
         b"version": msg_version,
         b"verack": msg_verack,
@@ -1501,7 +1505,8 @@ class NodeConn(asyncore.dispatcher):
         b"sendcmpct": msg_sendcmpct,
         b"cmpctblock": msg_cmpctblock,
         b"getblocktxn": msg_getblocktxn,
-        b"blocktxn": msg_blocktxn
+        b"blocktxn": msg_blocktxn,
+        b"utxos": msg_utxos
     }
 
     MAGIC_BYTES = {
