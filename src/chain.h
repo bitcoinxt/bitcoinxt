@@ -204,6 +204,8 @@ public:
 
     //! (memory only) Sequential id assigned to distinguish order in which blocks are received.
     uint32_t nSequenceId;
+    //! (memory only) Time complete data received, assigned with nSequenceId
+    int64_t nTimeDataReceived;
 
     //! Index entry serial format version
     int nSerialVersion;
@@ -228,6 +230,7 @@ public:
         nChainTx = 0;
         nStatus = 0;
         nSequenceId = 0;
+        nTimeDataReceived = 0;
         nSerialVersion = 0;
         nMaxBlockSize = 0;
         nMaxBlockSizeVote = 0;
