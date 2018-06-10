@@ -304,9 +304,14 @@ public:
 class CInv
 {
 public:
+
+    enum RelayService {
+        RELAY_SERVICE_STANDARD = 0,
+        RELAY_SERVICE_IMMEDIATE,
+    };
+
     CInv();
-    CInv(int typeIn, const uint256& hashIn);
-    CInv(const std::string& strType, const uint256& hashIn);
+    CInv(int typeIn, const uint256& hashIn, RelayService serviceIn = RELAY_SERVICE_STANDARD);
 
     ADD_SERIALIZE_METHODS;
 
@@ -315,6 +320,7 @@ public:
     {
         READWRITE(type);
         READWRITE(hash);
+        // The service member is not serialized
     }
 
     friend bool operator<(const CInv& a, const CInv& b);
@@ -327,6 +333,7 @@ public:
 public:
     int type;
     uint256 hash;
+    RelayService service;
 };
 
 enum {

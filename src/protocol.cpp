@@ -169,33 +169,20 @@ CInv::CInv()
 {
     type = 0;
     hash.SetNull();
+    service = RELAY_SERVICE_STANDARD;
 }
 
-CInv::CInv(int typeIn, const uint256& hashIn)
+CInv::CInv(int typeIn, const uint256& hashIn, RelayService serviceIn)
 {
     type = typeIn;
     hash = hashIn;
-}
-
-CInv::CInv(const std::string& strType, const uint256& hashIn)
-{
-    unsigned int i;
-    for (i = 1; i < ARRAYLEN(ppszTypeName); i++)
-    {
-        if (strType == ppszTypeName[i])
-        {
-            type = i;
-            break;
-        }
-    }
-    if (i == ARRAYLEN(ppszTypeName))
-        throw std::out_of_range(strprintf("CInv::CInv(string, uint256): unknown type '%s'", strType));
-    hash = hashIn;
+    service = serviceIn;
 }
 
 bool operator<(const CInv& a, const CInv& b)
 {
     return (a.type < b.type || (a.type == b.type && a.hash < b.hash));
+    // The service member does not influence equivalence
 }
 
 bool CInv::IsKnownType() const
