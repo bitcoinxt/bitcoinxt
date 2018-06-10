@@ -18,6 +18,8 @@ class CCoinsViewCache;
 static const unsigned int DEFAULT_BLOCK_PRIORITY_SIZE = 50000;
 /** The maximum size for transactions we're willing to relay/mine */
 static const unsigned int MAX_STANDARD_TX_SIZE = 100000;
+/** The maximum size for immediate relay and respend relay */
+static const unsigned int MAX_SUPERSTANDARD_TX_SIZE = 2000;
 /** Maximum number of signature check operations in an IsStandard() P2SH script */
 static const unsigned int MAX_P2SH_SIGOPS = 15;
 /** The maximum number of sigops we're willing to relay/mine in a single tx */
@@ -57,5 +59,13 @@ bool IsStandardTx(const CTransaction& tx, std::string& reason);
      * @return True if all inputs (scriptSigs) use only standard transaction forms
      */
 bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs);
+    /**
+     * Check static superstandard immediate criteria. Live/expired status is not checked.
+     * For implementation efficiency, standardness itself is not checked here.
+     * @param[in] hadNoDependencies    Had no mempool dependencies when received
+     * @param[in] nTxSize    Serialized size. If 0, size will be calculated
+     * @return True if all static superstandard immediate criteria are met
+     */
+bool IsSuperStandardImmediateTx(const CTransaction& tx, bool hadNoDependencies, size_t nTxSize = 0);
 
 #endif // BITCOIN_POLICY_H

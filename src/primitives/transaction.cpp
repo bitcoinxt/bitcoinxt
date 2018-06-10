@@ -108,6 +108,16 @@ CAmount CTransaction::GetValueOut() const
     return nValueOut;
 }
 
+bool CTransaction::IsImmediateRelay() const
+{
+    for (auto& input : vin) {
+        if (!(input.nSequence & CTxIn::SEQUENCE_IMMED_RELAY_DISABLE_FLAG)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 std::string CTransaction::ToString() const
 {
     std::string str;

@@ -11,6 +11,7 @@
 #include "consensus/validation.h"
 #include "main.h"
 #include "policy/fees.h"
+#include "policy/policy.h"
 #include "streams.h"
 #include "timedata.h"
 #include "util.h"
@@ -47,6 +48,20 @@ CTxMemPoolEntry::CTxMemPoolEntry(const CTransaction& _tx, const CAmount& _nFee,
 CTxMemPoolEntry::CTxMemPoolEntry(const CTxMemPoolEntry& other)
 {
     *this = other;
+}
+
+bool CTxMemPoolEntry::IsLiveSI() const
+{
+    if (!IsSuperStandardImmediateTx(tx, hadNoDependencies, nTxSize))
+        return false;
+
+    AssertLockHeld(cs_main);
+    const CBlockIndex* secondBlockAfterTx = chainActive[nHeight + 2];
+    if (secondBlockAfterTx == nullptr)
+        return true;
+
+    int64_t expirationTime = secondBlockAfterTx->nTimeDataReceived + 60*60;
+    return (GetTime() <= expirationTime);
 }
 
 void CTxMemPoolEntry::UpdateFeeDelta(int64_t newFeeDelta)

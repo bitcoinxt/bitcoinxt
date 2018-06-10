@@ -106,6 +106,7 @@ public:
     unsigned int GetSigOpCount() const { return sigOpCount; }
     size_t DynamicMemoryUsage() const { return nUsageSize; }
     const LockPoints& GetLockPoints() const { return lockPoints; }
+    bool IsLiveSI() const;
 
     // Adjusts the descendant state, if this entry is not dirty.
     void UpdateDescendantState(int64_t modifySize, CAmount modifyFee, int64_t modifyCount);
