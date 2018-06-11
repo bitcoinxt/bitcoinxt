@@ -36,9 +36,9 @@ class RespendDetector {
         bool IsInteresting() const;
 
     private:
-        std::vector<COutPoint> conflictingOutpoints;
+        CTxMemPool::setEntries conflictingEntries;
 
-        // Outputs we've already seen in valid double spending transactions
+        // SI TXIDs already respent by a later SI transaction
         static std::unique_ptr<CRollingBloomFilter> respentBefore;
         static std::mutex respentBeforeMutex;
         std::vector<RespendActionPtr> actions;

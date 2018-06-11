@@ -16,9 +16,9 @@ class RespendRelayer : public RespendAction {
         RespendRelayer(CConnman*);
 
         bool AddOutpointConflict(
-                const COutPoint&, const CTxMemPool::txiter,
-                const CTransaction& respendTx,
-                bool seenBefore, bool isEquivalent) override;
+                const COutPoint&, const CTxMemPool::txiter mempoolEntry,
+                const CTransaction& respendTx, bool seenBefore,
+                bool isEquivalent, bool isSICandidate) override;
 
         bool IsInteresting() const override;
         void SetValid(bool v) override;

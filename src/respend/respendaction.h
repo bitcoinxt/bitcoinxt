@@ -27,7 +27,9 @@ class RespendAction {
                 // If we've seen a valid tx respending this output before
                 bool seenBefore,
                 // If original and respend tx only differ in script
-                bool isEquivalent) = 0;
+                bool isEquivalent,
+                // If respend tx may be SuperStandardImmediate
+                bool isSICandidate) = 0;
 
         // If this respend is interesting enough to this action to trigger full
         // tx validation.

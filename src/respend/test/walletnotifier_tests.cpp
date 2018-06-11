@@ -20,12 +20,12 @@ BOOST_AUTO_TEST_CASE(not_interesting) {
     bool lookAtMore;
 
     lookAtMore = w.AddOutpointConflict(COutPoint{}, dummy, CTransaction{},
-                                            true /* seen before */, false);
+                                            true /* seen before */, false, true);
     BOOST_CHECK(lookAtMore);
     BOOST_CHECK(!w.IsInteresting());
 
     lookAtMore = w.AddOutpointConflict(COutPoint{}, dummy, CTransaction{},
-                                       false, true /* is equivalent */);
+                                       false, true /* is equivalent */, true);
     BOOST_CHECK(lookAtMore);
     BOOST_CHECK(!w.IsInteresting());
 }
@@ -35,7 +35,7 @@ BOOST_AUTO_TEST_CASE(is_interesting) {
     CTxMemPool::txiter dummy;
     bool lookAtMore;
 
-    lookAtMore = w.AddOutpointConflict(COutPoint{}, dummy, CTransaction{}, false, false);
+    lookAtMore = w.AddOutpointConflict(COutPoint{}, dummy, CTransaction{}, false, false, true);
     BOOST_CHECK(!lookAtMore);
     BOOST_CHECK(w.IsInteresting());
 }
@@ -60,7 +60,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
 
     // Create a "not interesting" respend
     WalletNotifier w;
-    w.AddOutpointConflict(COutPoint{}, dummy, respend, true, false);
+    w.AddOutpointConflict(COutPoint{}, dummy, respend, true, false, true);
     w.Trigger();
     BOOST_CHECK_EQUAL(0, slotCalls);
     w.SetValid(true);
@@ -68,7 +68,7 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
     BOOST_CHECK_EQUAL(0, slotCalls);
 
     // Create an interesting, but invalid respend
-    w.AddOutpointConflict(COutPoint{}, dummy, respend, false, false);
+    w.AddOutpointConflict(COutPoint{}, dummy, respend, false, false, true);
     BOOST_CHECK(w.IsInteresting());
     w.SetValid(false);
     w.Trigger();

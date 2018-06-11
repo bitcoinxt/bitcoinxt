@@ -14,7 +14,7 @@ MempoolRemover::MempoolRemover(CTxMemPool& pool, std::list<CTransaction>& remove
 bool MempoolRemover::AddOutpointConflict(
         const COutPoint&, const CTxMemPool::txiter mempoolEntry,
         const CTransaction& respendTx,
-        bool seenBefore, bool isEquivalent)
+        bool seenBefore, bool isEquivalent, bool isSICandidate)
 {
     tx1s.insert(mempoolEntry);
 

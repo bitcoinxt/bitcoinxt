@@ -28,7 +28,8 @@ class DummyRespendAction : public RespendAction {
                 const CTxMemPool::txiter mempoolEntry,
                 const CTransaction& respendTx,
                 bool respentBefore,
-                bool isEquivalent) override
+                bool isEquivalent,
+                bool isSICandidate) override
         {
             addOutpointCalls++;
             this->respentBefore = respentBefore;

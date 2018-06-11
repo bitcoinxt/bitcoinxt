@@ -9,41 +9,10 @@
 #include "streams.h"
 #include "util.h"
 #include "utilprocessmsg.h"
+#include "policy/policy.h"
 #include <mutex>
 
 namespace respend {
-
-namespace {
-
-// Apply an independent rate limit to double-spend relays
-class RelayLimiter {
-    public:
-        RelayLimiter() : respendCount(0), lastRespendTime(0) { }
-
-        bool HasLimitExceeded(const CTransaction& doubleSpend)
-        {
-            unsigned int size = ::GetSerializeSize(doubleSpend,
-                                                   SER_NETWORK, PROTOCOL_VERSION);
-
-            std::lock_guard<std::mutex> lock(cs);
-            int64_t limit = Opt().RespendRelayLimit();
-            if (RateLimitExceeded(respendCount, lastRespendTime, limit, size)) {
-                LogPrint(Log::RESPEND, "respend: Double-spend relay rejected by rate limiter\n");
-                return true;
-            }
-
-            LogPrint(Log::RESPEND, "respend: Double-spend relay rate limiter: %g => %g\n",
-                     respendCount, respendCount + size);
-            return false;
-        }
-
-    private:
-        double respendCount;
-        int64_t lastRespendTime;
-        std::mutex cs;
-};
-
-} // ns anon
 
 RespendRelayer::RespendRelayer(CConnman* connman) :
     interesting(false), valid(false), connman(connman)
@@ -53,20 +22,19 @@ RespendRelayer::RespendRelayer(CConnman* connman) :
 }
 
 bool RespendRelayer::AddOutpointConflict(
-        const COutPoint&, const CTxMemPool::txiter,
-        const CTransaction& respendTx,
-        bool seenBefore, bool isEquivalent)
+        const COutPoint&, const CTxMemPool::txiter mempoolEntry,
+        const CTransaction& respendTx, bool seenBefore,
+        bool isEquivalent, bool isSICandidate)
 {
-    if (seenBefore || isEquivalent)
+    if (!isSICandidate)
+        return false;
+
+    if (seenBefore || isEquivalent || !mempoolEntry->IsLiveSI())
         return true; // look at more outpoints
 
-    // Is static to hold relay statistics
-    static RelayLimiter limiter;
-
-    if (limiter.HasLimitExceeded(respendTx)) {
-        // we won't relay this tx, so no no need to look at more outputs.
+    // Can the respend be SI? Slightly more expensive checks
+    if (!IsSuperStandardImmediateTx(respendTx, isSICandidate))
         return false;
-    }
 
     respend = respendTx;
     interesting = true;

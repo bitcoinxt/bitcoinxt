@@ -74,23 +74,23 @@ void RespendDetector::CheckForRespend(
         if (spendIter == pool.mapNextTx.end())
             continue;
 
-        conflictingOutpoints.push_back(outpoint);
-
         CTxMemPool::txiter poolIter = pool.mapTx.find(spendIter->second.ptx->GetHash());
         if (poolIter == pool.mapTx.end() || poolIter->GetTx() == tx)
             continue;
 
+        conflictingEntries.insert(poolIter);
+
         bool collectMore = false;
-        bool seen;
+        bool seenBefore;
         {
             std::lock_guard<std::mutex> lock(respentBeforeMutex);
-            seen = respentBefore->contains(outpoint);
+            seenBefore = respentBefore->contains(poolIter->GetTx().GetHash());
         }
         for (auto& a : actions) {
             // Actions can return true if they want to check more
             // outpoints for conflicts.
-            bool m = a->AddOutpointConflict(outpoint, poolIter, tx, seen,
-                                                   tx.IsEquivalentTo(poolIter->GetTx()));
+            bool m = a->AddOutpointConflict(outpoint, poolIter, tx, seenBefore,
+                    tx.IsEquivalentTo(poolIter->GetTx()), pool.HasNoInputsOf(tx));
             collectMore = collectMore || m;
         }
         if (!collectMore)
@@ -101,8 +101,8 @@ void RespendDetector::CheckForRespend(
 void RespendDetector::SetValid(bool valid) {
     if (valid) {
         std::lock_guard<std::mutex> lock(respentBeforeMutex);
-        for (auto& o : conflictingOutpoints) {
-            respentBefore->insert(o);
+        for (auto& it : conflictingEntries) {
+            respentBefore->insert(it->GetTx().GetHash());
         }
     }
     for (auto& a : actions) {
@@ -111,7 +111,7 @@ void RespendDetector::SetValid(bool valid) {
 }
 
 bool RespendDetector::IsRespend() const {
-    return !conflictingOutpoints.empty();
+    return !conflictingEntries.empty();
 }
 
 bool RespendDetector::IsInteresting() const {

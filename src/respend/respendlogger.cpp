@@ -14,12 +14,13 @@ RespendLogger::RespendLogger() :
 
 bool RespendLogger::AddOutpointConflict(
         const COutPoint&, const CTxMemPool::txiter mempoolEntry,
-        const CTransaction& respendTx, bool seen, bool isEquivalent)
+        const CTransaction& respendTx, bool seenBefore,
+        bool isEquivalent, bool isSICandidate)
 {
     orig = mempoolEntry->GetTx().GetHash().ToString();
     respend = respendTx.GetHash().ToString();
     equivalent = isEquivalent;
-    newConflict = newConflict || !seen;
+    newConflict = newConflict || !seenBefore;
 
     // We have enough info for logging purposes.
     return false;

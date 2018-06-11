@@ -13,8 +13,8 @@ WalletNotifier::WalletNotifier() : valid(false), interesting(false)
 
 bool WalletNotifier::AddOutpointConflict(
         const COutPoint&, const CTxMemPool::txiter,
-        const CTransaction& respendTx,
-        bool seenBefore, bool isEquivalent)
+        const CTransaction& respendTx, bool seenBefore,
+        bool isEquivalent, bool isSICandidate)
 {
     if (isEquivalent || seenBefore)
         return true; // look at more outpoints
