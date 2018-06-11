@@ -365,10 +365,10 @@ std::string HelpMessage(HelpMessageMode mode)
     strUsage += HelpMessageOpt("-proxy=<ip:port>", _("Connect through SOCKS5 proxy"));
     strUsage += HelpMessageOpt("-proxyrandomize", strprintf(_("Randomize credentials for every proxy connection. This enables Tor stream isolation (default: %u)"), 1));
     strUsage += HelpMessageOpt("-seednode=<ip>", _("Connect to a node to retrieve peer addresses, and disconnect"));
-    strUsage += HelpMessageOpt("-stealth-mode", _("Make this node act like a Bitcoin Core node from the wire perspective"));
     strUsage += HelpMessageOpt("-timeout=<n>", strprintf(_("Specify connection timeout in milliseconds (minimum: 1, default: %d)"), DEFAULT_CONNECT_TIMEOUT));
     strUsage += HelpMessageOpt("-uacomment", _("Add a comment into the user agent visible to other nodes"));
     strUsage += HelpMessageOpt("-use-thin-blocks", _("Use thin blocks (low bandwidth block relay). (enable: 1, avoid full blocks: 2)"));
+    strUsage += HelpMessageOpt("-useragent", _("Set a custom user agent. This overrides all other user agent options. See BIP14 for format."));
 #ifdef USE_UPNP
 #if USE_UPNP
     strUsage += HelpMessageOpt("-upnp", _("Use UPnP to map the listening port (default: 1 when listening)"));
@@ -1133,7 +1133,10 @@ bool AppInit2()
 
     RegisterNodeSignals(GetNodeSignals());
 
-    try { Opt().UAComment(true /* validate */); }
+    try {
+        Opt().UAComment(true /* validate */);
+        Opt().CheckRemovedOptions();
+    }
     catch (const std::invalid_argument& e) {
         return InitError(e.what());
     }

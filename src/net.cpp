@@ -434,19 +434,9 @@ void CNode::PushVersion()
     else
         LogPrint(Log::NET, "send version message: version %d, blocks=%d, us=%s, peer=%d\n", PROTOCOL_VERSION, nMyStartingHeight, addrMe.ToString(), id);
 
-    // Stealth mode: pretend to be like Bitcoin Core to hide from DoS attackers.
-    if (Opt().IsStealthMode()) {
-        uint64_t services = 0;
-        if (nLocalServices & NODE_NETWORK)
-            services = NODE_NETWORK;
-
-        PushMessage("version", 70002, services, nTime, addrYou, addrMe,
-                nLocalHostNonce, XTSubVersion(0), nMyStartingHeight, true);
-    } else {
-        int nMaxBlockSize = g_signals.GetMaxBlockSizeInsecure().get_value_or(0);
-        PushMessage("version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
-                nLocalHostNonce, XTSubVersion(nMaxBlockSize), nMyStartingHeight, true);
-    }
+    int nMaxBlockSize = g_signals.GetMaxBlockSizeInsecure().get_value_or(0);
+    PushMessage("version", PROTOCOL_VERSION, nLocalServices, nTime, addrYou, addrMe,
+            nLocalHostNonce, XTSubVersion(nMaxBlockSize), nMyStartingHeight, true);
 }
 
 

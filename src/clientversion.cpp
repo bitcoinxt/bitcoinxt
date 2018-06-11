@@ -129,8 +129,8 @@ std::string FormatFullVersion()
     return CLIENT_BUILD;
 }
 
-/** 
- * Format the subversion field according to BIP 14 spec (https://github.com/bitcoin/bips/blob/master/bip-0014.mediawiki) 
+/**
+ * Format the subversion field according to BIP 14 spec (https://github.com/bitcoin/bips/blob/master/bip-0014.mediawiki)
  */
 std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments, const char *releaseCharacter)
 {
@@ -154,10 +154,11 @@ std::string FormatSubVersion(const std::string& name, int nClientVersion, const 
  */
 std::string XTSubVersion(uint64_t nMaxBlockSize)
 {
-    std::vector<std::string> comments = Opt().UAComment();
+    std::string customUserAgent = Opt().UserAgent();
+    if (!customUserAgent.empty())
+        return customUserAgent;
 
-    if (Opt().IsStealthMode())
-        return FormatSubVersion("Satoshi", CLIENT_VERSION, comments, "");
+    std::vector<std::string> comments = Opt().UAComment();
 
     if (!Opt().HidePlatform()) {
         std::vector<std::string> p = GetPlatformDetails();
@@ -171,4 +172,16 @@ std::string XTSubVersion(uint64_t nMaxBlockSize)
     comments.insert(end(comments), ss.str());
 
     return FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, comments, CLIENT_VERSION_XT_SUBVER);
+}
+
+void ValidateUAComments(const std::vector<std::string>& comments) {
+    for (auto& c : comments) {
+        size_t pos = c.find_first_of("/:()");
+        if (pos == std::string::npos)
+            continue;
+        std::stringstream ss;
+        ss << "User agent comment '" << c << "' uses a reserved character."
+           << "Characters reserved: / : ( )";
+        throw std::invalid_argument(ss.str());
+    }
 }

@@ -16,31 +16,33 @@ BOOST_AUTO_TEST_SUITE(clientversion_tests)
 
 struct CVArgGetter : public ArgGetter {
 
-    CVArgGetter() : stealthmode(false), hideplatform(false)
+    CVArgGetter() : hideplatform(false)
     {
     }
 
-    virtual bool GetBool(const std::string& arg, bool def) {
-        if (arg == "-stealth-mode")
-            return stealthmode;
+    bool GetBool(const std::string& arg, bool def) override {
         if (arg == "-hide-platform")
             return hideplatform;
         return def;
     }
 
-    virtual std::vector<std::string> GetMultiArgs(const std::string& arg) {
+    std::vector<std::string> GetMultiArgs(const std::string& arg) override {
         if (arg == "-uacomment")
             return uacomment;
         return std::vector<std::string>();
     }
-    virtual int64_t GetArg(const std::string& strArg, int64_t nDefault) {
+    int64_t GetArg(const std::string& strArg, int64_t nDefault) override {
         assert(false);
     }
-
-
-    bool stealthmode;
+    std::string GetArg(const std::string& arg, const std::string& def) override
+    {
+        if (arg == "-useragent")
+            return useragent;
+        assert(false);
+    }
     bool hideplatform;
     std::vector<std::string> uacomment;
+    std::string useragent;
 };
 
 bool OsInStr(const std::string& version) {
@@ -59,16 +61,16 @@ BOOST_AUTO_TEST_CASE(platform_in_xtsubversion)
     auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(argPtr));
 
     argPtr->hideplatform = true;
-    argPtr->stealthmode = false;
+    argPtr->useragent = "";
     BOOST_CHECK(!OsInStr(XTSubVersion(0)));
 
     argPtr->hideplatform = false;
-    argPtr->stealthmode = true;
+    argPtr->useragent = "/test:1.0/";
     BOOST_CHECK(!OsInStr(XTSubVersion(0)));
 
 #if BOOST_VERSION >= 105500
     argPtr->hideplatform = false;
-    argPtr->stealthmode = false;
+    argPtr->useragent = "";
     BOOST_CHECK(OsInStr(XTSubVersion(0)));
 #endif
 }
@@ -78,10 +80,10 @@ BOOST_AUTO_TEST_CASE(xtsubversion_stealthmode)
     auto argPtr = new CVArgGetter;
     auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(argPtr));
 
-    argPtr->stealthmode = true;
+    argPtr->useragent = "/test:1.0/";
     BOOST_CHECK(XTSubVersion(0).find("XT") == std::string::npos);
 
-    argPtr->stealthmode = false;
+    argPtr->useragent = "";
     BOOST_CHECK(XTSubVersion(0).find("XT") != std::string::npos);
 }
 
@@ -107,9 +109,9 @@ BOOST_AUTO_TEST_CASE(xtsubversion_uacomment)
     BOOST_CHECK(OsInStr(withplatform.substr(withplatform.find("(hello; world; "))));
 #endif
 
-    // allowed in stealth-mode
-    argPtr->stealthmode = true;
-    BOOST_CHECK(XTSubVersion(0).find("(hello; world)") != std::string::npos);
+    // not supported with custom user agent
+    argPtr->useragent = "/test:1.0/";
+    BOOST_CHECK(XTSubVersion(0).find("(hello; world)") == std::string::npos);
 }
 
 BOOST_AUTO_TEST_CASE(xtsubversion_eb)
@@ -118,6 +120,14 @@ BOOST_AUTO_TEST_CASE(xtsubversion_eb)
     BOOST_CHECK(XTSubVersion(1000000).find("EB1)") != std::string::npos);
     // 1GB blocks
     BOOST_CHECK(XTSubVersion(1000 * 1000000).find("EB1000)") != std::string::npos);
+}
+
+BOOST_AUTO_TEST_CASE(xtsubversion_customagent) {
+    auto argPtr = new CVArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(argPtr));
+
+    argPtr->useragent = "/hello world:0.1/";
+    BOOST_CHECK_EQUAL("/hello world:0.1/", XTSubVersion(1000000));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

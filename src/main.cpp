@@ -4779,7 +4779,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             // Ignore duplicate advertisements for the same item from the same peer. This check
             // prevents a peer from constantly promising to deliver an item that it never does,
             // thus blinding us to new transactions and blocks.
-            if (!Opt().IsStealthMode() && !pfrom->AddInventoryKnown(inv) && !pfrom->fWhitelisted) {
+            if (!pfrom->AddInventoryKnown(inv) && !pfrom->fWhitelisted) {
                 LogPrint(Log::NET, "ignoring inv: %s peer=%d\n", inv.ToString(), pfrom->id);
                 continue;
             }
@@ -4959,9 +4959,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
     }
     else if (strCommand == "getutxos")
     {
-        if (Opt().IsStealthMode())
-            return true;
-
         bool fCheckMemPool;
         std::vector<COutPoint> vOutPoints;
         vRecv >> fCheckMemPool;

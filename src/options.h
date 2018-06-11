@@ -8,12 +8,14 @@
 #include <vector>
 
 class Opt {
-    public:
-        Opt();
+public:
+    Opt();
 
-        bool IsStealthMode();
-        bool HidePlatform();
-        std::vector<std::string> UAComment(bool validate = false);
+    // User agent options
+    std::string UserAgent() const;
+    bool HidePlatform();
+    std::vector<std::string> UAComment(bool validate = false) const;
+
         int ScriptCheckThreads();
         int64_t CheckpointDays();
         uint64_t MaxBlockSizeVote();
@@ -28,6 +30,9 @@ class Opt {
         bool AvoidFullBlocks();
         int ThinBlocksMaxParallel();
         bool PreferXThinBlocks() const;
+
+    //! Throws invalid argument on use of options that are no longer supported.
+    void CheckRemovedOptions() const;
 };
 
 /** Maximum number of script-checking threads allowed */
@@ -51,6 +56,8 @@ class ArgGetter {
         virtual bool GetBool(const std::string& arg, bool def) = 0;
         virtual std::vector<std::string> GetMultiArgs(const std::string& arg) = 0;
         virtual int64_t GetArg(const std::string& arg, int64_t def) = 0;
+        virtual std::string GetArg(const std::string& arg,
+                                   const std::string& def) = 0;
 };
 inline ArgGetter::~ArgGetter() { }
 
@@ -72,11 +79,13 @@ class DummyArgGetter : public ArgGetter {
         bool GetBool(const std::string& arg, bool def) override;
         std::vector<std::string> GetMultiArgs(const std::string& arg) override;
         int64_t GetArg(const std::string& str, int64_t def) override;
+        std::string GetArg(const std::string& str, const std::string& def) override;
 
         void Set(const std::string& arg, int64_t val);
+        void Set(const std::string& arg, const std::string& val);
 
     private:
-        std::map<std::string, int64_t> customArgs;
+        std::map<std::string, std::string> customArgs;
 };
 
 #endif
