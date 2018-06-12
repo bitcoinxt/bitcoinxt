@@ -591,6 +591,7 @@ void CleanupBlockRevFiles()
 void ThreadImport(std::vector<boost::filesystem::path> vImportFiles)
 {
     RenameThread("bitcoin-loadblk");
+    ScheduleBatchPriority();
     CImportingNow imp;
 
     // -reindex
