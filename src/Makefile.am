@@ -181,6 +181,7 @@ BITCOIN_CORE_H = \
   utilmoneystr.h \
   utilprocessmsg.h \
   utiltime.h \
+  utxocommit.h \
   validationinterface.h \
   version.h \
   versionbits.h \
@@ -326,8 +327,6 @@ libbitcoin_consensus_a_SOURCES = \
   uint256.h \
   utilstrencodings.cpp \
   utilstrencodings.h \
-  utxocommit.cpp \
-  utxocommit.h \
   version.h
 
 # common: shared between bitcoind, and bitcoin-qt and non-server tools
@@ -352,6 +351,7 @@ libbitcoin_common_a_SOURCES = \
   scheduler.cpp \
   script/sign.cpp \
   script/standard.cpp \
+  utxocommit.cpp \
   $(BITCOIN_CORE_H)
 
 # util: shared between all executables.
