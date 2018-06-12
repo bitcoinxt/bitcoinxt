@@ -4410,7 +4410,7 @@ static std::tuple<std::vector<uint8_t>, std::vector<bip64::CCoin> > ProcessGetUT
     else {
         utxos.reset(new bip64::UTXORetriever(vOutPoints, *pcoinsTip, nullptr, maxBytes));
     }
-    return { utxos->GetBitmap(), utxos->GetResults() };
+    return std::make_tuple(utxos->GetBitmap(), utxos->GetResults());
 }
 
 
