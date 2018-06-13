@@ -8,7 +8,7 @@
 #endif
 
 #include "init.h"
-
+#include "crypto/common.h"
 #include "addrman.h"
 #include "amount.h"
 #include "checkpoints.h"
@@ -1031,6 +1031,10 @@ bool AppInit2()
         nLocalServices |= NODE_BITCOIN_CASH;
 
     // ********************************************************* Step 4: application initialization: dir lock, daemonize, pidfile, debug log
+    // Initialize libsodium
+    if (init_and_check_sodium() == -1) {
+        return false;
+    }
 
     // Initialize elliptic curve code
     ECC_Start();
@@ -1506,8 +1510,6 @@ bool AppInit2()
         if (fFirstRun)
         {
             // Create new keyUser and set as default key
-            RandAddSeedPerfmon();
-
             CPubKey newDefaultKey;
             if (pwalletMain->GetKeyFromPool(newDefaultKey)) {
                 pwalletMain->SetDefaultKey(newDefaultKey);
@@ -1617,8 +1619,6 @@ bool AppInit2()
 
     if (!strErrors.str().empty())
         return InitError(strErrors.str());
-
-    RandAddSeedPerfmon();
 
     //// debug print
     LogPrintf("mapBlockIndex.size() = %u\n",   mapBlockIndex.size());

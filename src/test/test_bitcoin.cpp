@@ -6,8 +6,10 @@
 
 #include "test_bitcoin.h"
 
-
 #include "consensus/validation.h"
+#include "sodium.h"
+#include "crypto/common.h"
+
 #include "key.h"
 #include "main.h"
 #include "options.h"
@@ -33,6 +35,7 @@ extern void noui_connect();
 
 BasicTestingSetup::BasicTestingSetup(const std::string& chainName)
 {
+        assert(init_and_check_sodium() != -1);
         ECC_Start();
         SetupEnvironment();
         fPrintToDebugLog = false; // don't want to write to debug.log file

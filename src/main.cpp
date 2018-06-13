@@ -4501,7 +4501,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
     if (!connman)
         throw std::invalid_argument(std::string(__func__ )+ " requires connection manager");
 
-    RandAddSeedPerfmon();
     unsigned int nMaxSendBufferSize = connman->GetSendBufferSize();
 
     LogPrint(Log::NET, "received: %s (%u bytes) peer=%d\n", SanitizeString(strCommand), vRecv.size(), pfrom->id);
