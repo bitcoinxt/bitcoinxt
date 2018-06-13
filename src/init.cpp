@@ -1143,11 +1143,14 @@ bool AppInit2()
     }
 
     uint64_t hugeBlock = 1000 * MAX_BLOCK_SIZE;
-    if (XTSubVersion(hugeBlock).size() > MAX_SUBVERSION_LENGTH)
+    std::string testUserAgent = XTSubVersion(hugeBlock, Opt().UserAgent(),
+                                             Opt().UAComment(),
+                                             Opt().HidePlatform());
+    if (testUserAgent.size() > MAX_SUBVERSION_LENGTH)
         return InitError(strprintf(
             "Total length of network version string %i exceeds maximum of %i characters. "
             "Reduce size of uacomment or hide platform details.",
-            XTSubVersion(hugeBlock).size(), MAX_SUBVERSION_LENGTH));
+            testUserAgent.size(), MAX_SUBVERSION_LENGTH));
 
     if (mapArgs.count("-onlynet")) {
         std::set<enum Network> nets;

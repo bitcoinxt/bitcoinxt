@@ -285,10 +285,13 @@ void PushNodeVersion(CNode *pnode, CConnman& connman, int64_t nTime)
     CAddress addrMe = CAddress(CService(), nLocalNodeServices);
 
     int nMaxBlockSize = GetMaxBlockSizeInsecure();
+    std::string userAgent = XTSubVersion(nMaxBlockSize, Opt().UserAgent(),
+                                         Opt().UAComment(),
+                                         Opt().HidePlatform());
     connman.PushMessage(pnode, CNetMsgMaker(INIT_PROTO_VERSION).Make(
                                 NetMsgType::VERSION, PROTOCOL_VERSION,
                                 (uint64_t)nLocalNodeServices, nTime, addrYou,
-                                addrMe, nonce, XTSubVersion(nMaxBlockSize),
+                                addrMe, nonce, userAgent,
                                 nNodeStartingHeight, true));
 
     if (fLogIPs)
