@@ -1681,5 +1681,5 @@ bool AppInit2()
 
     std::set_new_handler(new_handler_terminate);
 
-    return !fRequestShutdown;
+    return true;
 }
