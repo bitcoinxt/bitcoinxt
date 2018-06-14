@@ -31,7 +31,7 @@ bool RespendLogger::IsInteresting() const {
     return false;
 }
 
-void RespendLogger::Trigger() {
+void RespendLogger::OnFinishedTrigger() {
     if (respend.empty() || !newConflict)
         return;
 

@@ -40,10 +40,11 @@ class DummyRespendAction : public RespendAction {
         bool IsInteresting() const override {
             return returnInteresting;
         }
-        void SetValid(bool v) override {
+        void OnValidTrigger(bool v, CTxMemPool&,
+                CTxMemPool::setEntries&) override {
             valid = v;
         }
-        void Trigger() override {
+        void OnFinishedTrigger() override {
             triggered = true;
         }
 

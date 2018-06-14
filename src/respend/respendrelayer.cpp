@@ -45,11 +45,12 @@ bool RespendRelayer::IsInteresting() const {
     return interesting;
 }
 
-void RespendRelayer::SetValid(bool v) {
+void RespendRelayer::OnValidTrigger(bool v, CTxMemPool&,
+        CTxMemPool::setEntries&) {
     valid = v;
 }
 
-void RespendRelayer::Trigger() {
+void RespendRelayer::OnFinishedTrigger() {
     if (!valid || !interesting)
         return;
 

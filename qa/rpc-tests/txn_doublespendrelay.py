@@ -8,6 +8,8 @@ from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
 from decimal import Decimal
 
+SEQUENCE_IMMED_RELAY = 0xBFFFFFFF
+
 class DoubleSpendRelay(BitcoinTestFramework):
 
     def __init__(self):
@@ -31,7 +33,7 @@ class DoubleSpendRelay(BitcoinTestFramework):
         self.is_network_split = False
         self.nodes = []
         for i in range(0,4):
-            self.nodes.append(start_node(i, self.options.tmpdir, ["-debug"]))
+            self.nodes.append(start_node(i, self.options.tmpdir, ["-debug", "-replacebysi=1"]))
         connect_nodes(self.nodes[0], 2)
         connect_nodes(self.nodes[1], 2)
         connect_nodes(self.nodes[3], 2)
@@ -46,8 +48,9 @@ class DoubleSpendRelay(BitcoinTestFramework):
         # and will be willing to broadcast a respend
         stop_node(nodes[1], 1)
         # First spend: nodes[0] -> nodes[3]
-        amount = Decimal("144") # We rely on this requiring 3 50-BTC inputs
+        amount = Decimal("49")
         (total_in, tx1_inputs) = gather_inputs(nodes[0], amount+fee)
+        tx1_inputs[0]['sequence'] = SEQUENCE_IMMED_RELAY
         change_outputs = make_change(nodes[0], total_in, amount, fee)
         outputs = dict(change_outputs)
         outputs[nodes[3].getnewaddress()] = amount
@@ -60,11 +63,11 @@ class DoubleSpendRelay(BitcoinTestFramework):
 
         # Test 2: Is double-spend of tx1_inputs[0] relayed?
         # Restart nodes[1]
-        nodes[1] = start_node(1, self.options.tmpdir, ["-debug"])
+        nodes[1] = start_node(1, self.options.tmpdir, ["-debug", "-replacebysi=1"])
         connect_nodes(nodes[1], 2)
         # Second spend: nodes[0] -> nodes[0]
         amount = Decimal("40")
-        total_in = Decimal("50")
+        total_in = Decimal("48")
         inputs2 = [tx1_inputs[0]]
         change_outputs = make_change(nodes[0], total_in, amount, fee)
         outputs = dict(change_outputs)
@@ -95,48 +98,40 @@ class DoubleSpendRelay(BitcoinTestFramework):
         txid1_info = nodes[3].gettransaction(txid1)
         assert_equal(txid1_info["respendsobserved"], [txid2])
 
-        # Test 4: Is double-spend of tx1_inputs[1] relayed when triple-spend of tx1_inputs[0] precedes it?
-        # Clear node1 mempool
+        # Test 4: txid5 respends non-SI txid4
+        # txid5 should be relayed and replace txid4 in mempools
         stop_node(nodes[1], 1)
-        nodes[1] = start_node(1, self.options.tmpdir, ["-debug"])
-        connect_nodes(nodes[1], 2)
-        # Inputs are third spend, second spend
-        amount = Decimal("89")
-        total_in = Decimal("100")
-        inputs4 = [tx1_inputs[0],tx1_inputs[1]]
+
+        # txid4 is a new first-spend. It is non-SI because it has multiple inputs
+        amount = Decimal("99")
+        (total_in, tx4_inputs) = gather_inputs(nodes[0], amount+fee)
+        tx4_inputs[0]['sequence'] = SEQUENCE_IMMED_RELAY
         change_outputs = make_change(nodes[0], total_in, amount, fee)
         outputs = dict(change_outputs)
-        outputs[nodes[0].getnewaddress()] = amount
-        signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(inputs4, outputs))
-        txid4 = nodes[1].sendrawtransaction(signed["hex"], True)
-        # Wait until txid4 is relayed to nodes[3] (but don't wait forever):
-        def txid4_relay():
-            return nodes[3].gettransaction(txid1)["respendsobserved"] != [txid2]
-        wait_for(txid4_relay, what = "tx relay")
-        txid1_info = nodes[3].gettransaction(txid1)
-        assert_equal(sorted(txid1_info["respendsobserved"]), sorted([txid2,txid4]))
+        outputs[nodes[3].getnewaddress()] = amount
+        signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(tx4_inputs, outputs))
+        txid4 = nodes[0].sendrawtransaction(signed["hex"], True)
+        sync_mempools([nodes[0], nodes[3]])
+        assert_equal(set(nodes[2].getrawmempool()), {txid1,txid4})
 
-        # Test 5: Is double-spend of tx1_inputs[2] relayed when triple-spend of tx1_inputs[0] follows it?
-        # Clear node1 mempool
-        stop_node(nodes[1], 1)
-        nodes[1] = start_node(1, self.options.tmpdir, ["-debug"])
+        nodes[1] = start_node(1, self.options.tmpdir, ["-debug", "-replacebysi=1"])
         connect_nodes(nodes[1], 2)
-        # Inputs are second spend, third spend
-        amount = Decimal("88")
-        total_in = Decimal("100")
-        inputs5 = [tx1_inputs[2],tx1_inputs[0]]
+
+        # txid5 respends txid4
+        amount = Decimal("41")
+        total_in = Decimal("49")
+        inputs5 = [tx4_inputs[0]]
         change_outputs = make_change(nodes[0], total_in, amount, fee)
         outputs = dict(change_outputs)
         outputs[nodes[0].getnewaddress()] = amount
         signed = nodes[0].signrawtransaction(nodes[0].createrawtransaction(inputs5, outputs))
         txid5 = nodes[1].sendrawtransaction(signed["hex"], True)
-        # Wait until txid5 is relayed to nodes[3] (but don't wait forever):
         def txid5_relay():
-            return sorted(nodes[3].gettransaction(txid1)["respendsobserved"]) \
-                != sorted([txid2,txid4])
+            return (set(nodes[3].getrawmempool()) != {txid1, txid4})
         wait_for(txid5_relay, what = "tx relay")
-        txid1_info = nodes[3].gettransaction(txid1)
-        assert_equal(sorted(txid1_info["respendsobserved"]), sorted([txid2,txid4,txid5]))
+        txid4_info = nodes[3].gettransaction(txid4)
+        assert_equal(txid4_info["respendsobserved"], [txid5])
+        assert_equal(set(nodes[2].getrawmempool()), {txid1, txid5})
 
 if __name__ == '__main__':
     DoubleSpendRelay().main()

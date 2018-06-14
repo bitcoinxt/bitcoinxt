@@ -41,6 +41,8 @@ BOOST_AUTO_TEST_CASE(is_interesting) {
 }
 
 BOOST_AUTO_TEST_CASE(triggers_correctly) {
+    CTxMemPool mempool(CFeeRate(0));
+    CTxMemPool::setEntries setEntries;
     CTransaction slotTx;
     bool slotRespend = false;
     int slotCalls = 0;
@@ -61,21 +63,21 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
     // Create a "not interesting" respend
     WalletNotifier w;
     w.AddOutpointConflict(COutPoint{}, dummy, respend, true, false, true);
-    w.Trigger();
+    w.OnFinishedTrigger();
     BOOST_CHECK_EQUAL(0, slotCalls);
-    w.SetValid(true);
-    w.Trigger();
+    w.OnValidTrigger(true, mempool, setEntries);
+    w.OnFinishedTrigger();
     BOOST_CHECK_EQUAL(0, slotCalls);
 
     // Create an interesting, but invalid respend
     w.AddOutpointConflict(COutPoint{}, dummy, respend, false, false, true);
     BOOST_CHECK(w.IsInteresting());
-    w.SetValid(false);
-    w.Trigger();
+    w.OnValidTrigger(false, mempool, setEntries);
+    w.OnFinishedTrigger();
     BOOST_CHECK_EQUAL(0, slotCalls);
     // make valid
-    w.SetValid(true);
-    w.Trigger();
+    w.OnValidTrigger(true, mempool, setEntries);
+    w.OnFinishedTrigger();
     BOOST_CHECK_EQUAL(1, slotCalls);
     BOOST_CHECK(slotRespend);
     BOOST_CHECK(CTransaction(respend) == slotTx);

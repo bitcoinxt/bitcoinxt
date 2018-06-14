@@ -70,6 +70,7 @@ BOOST_AUTO_TEST_CASE(is_interesting) {
 
 BOOST_AUTO_TEST_CASE(triggers_correctly) {
     CTxMemPool mempool(CFeeRate(0));
+    CTxMemPool::setEntries setEntries;
     CMutableTransaction tx1 = CreateRandomImmedTx();
     TestMemPoolEntryHelper entry;
     mempool.addUnchecked(tx1.GetHash(), entry.FromTx(tx1, &mempool));
@@ -84,21 +85,21 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
     // Create a "not interesting" respend
     RespendRelayer r(&connman);
     r.AddOutpointConflict(COutPoint{}, tx1Entry, respend, true, false, true);
-    r.Trigger();
+    r.OnFinishedTrigger();
     BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
-    r.SetValid(true);
-    r.Trigger();
+    r.OnValidTrigger(true, mempool, setEntries);
+    r.OnFinishedTrigger();
     BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
 
     // Create an interesting, but invalid respend
     r.AddOutpointConflict(COutPoint{}, tx1Entry, respend, false, false, true);
     BOOST_CHECK(r.IsInteresting());
-    r.SetValid(false);
-    r.Trigger();
+    r.OnValidTrigger(false, mempool, setEntries);
+    r.OnFinishedTrigger();
     BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
     // make valid
-    r.SetValid(true);
-    r.Trigger();
+    r.OnValidTrigger(true, mempool, setEntries);
+    r.OnFinishedTrigger();
     BOOST_CHECK_EQUAL(size_t(1), node.vInventoryToSend.size());
     BOOST_CHECK(respend.GetHash() == node.vInventoryToSend.at(0).hash);
     connman.RemoveTestNode(&node);

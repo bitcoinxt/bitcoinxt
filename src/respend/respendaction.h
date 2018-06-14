@@ -34,10 +34,11 @@ class RespendAction {
         // If this respend is interesting enough to this action to trigger full
         // tx validation.
         virtual bool IsInteresting() const = 0;
-        // Called after tx is validated and only if it's validated.
-        virtual void SetValid(bool) = 0;
-        // Action should do its thing now.
-        virtual void Trigger() = 0;
+        // Called after tx is validated
+        virtual void OnValidTrigger(bool v, CTxMemPool&,
+                CTxMemPool::setEntries&) = 0;
+        // Called just before end of RespendDetector lifetime
+        virtual void OnFinishedTrigger() = 0;
 };
 inline RespendAction::~RespendAction() { }
 

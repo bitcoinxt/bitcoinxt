@@ -33,11 +33,12 @@ bool WalletNotifier::IsInteresting() const {
     return interesting;
 }
 
-void WalletNotifier::SetValid(bool v) {
+void WalletNotifier::OnValidTrigger(bool v, CTxMemPool&,
+        CTxMemPool::setEntries&) {
     valid = v;
 }
 
-void WalletNotifier::Trigger() {
+void WalletNotifier::OnFinishedTrigger() {
     if (!valid || !interesting) {
         return;
     }

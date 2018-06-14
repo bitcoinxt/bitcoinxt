@@ -19,8 +19,9 @@ class WalletNotifier : public RespendAction {
                 bool isEquivalent, bool isSICandidate) override;
 
         bool IsInteresting() const override;
-        void SetValid(bool v) override;
-        void Trigger() override;
+        void OnValidTrigger(bool v, CTxMemPool&,
+                CTxMemPool::setEntries&) override;
+        void OnFinishedTrigger() override;
 
     private:
         CTransaction respendTx;

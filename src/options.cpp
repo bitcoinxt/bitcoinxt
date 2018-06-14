@@ -101,6 +101,10 @@ bool Opt::UseCashAddr() const {
     return Args->GetBool("-usecashaddr", bool(UAHFTime()));
 }
 
+bool Opt::ReplaceBySI() const {
+    return Args->GetBool("-replacebysi", false);
+}
+
 bool Opt::UsingThinBlocks() {
     return Args->GetBool("-use-thin-blocks", true);
 }
