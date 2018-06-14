@@ -156,7 +156,7 @@ class ApplicationBundleInfo(object):
     def __init__(self, path):
         self.path = path
         appName = "Bitcoin-XT"
-        self.binaryPath = os.path.join(path, "Contents", "MacOS", "Bitcoin-Qt")
+        self.binaryPath = os.path.join(path, "Contents", "MacOS", "Bitcoin-XT")
         if not os.path.exists(self.binaryPath):
             raise RuntimeError("Could not find bundle binary for " + path)
         self.resourcesPath = os.path.join(path, "Contents", "Resources")
