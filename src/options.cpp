@@ -1,23 +1,28 @@
-#include "chainparams.h"
 #include "options.h"
+#include "chainparams.h"
+#include "clientversion.h"
 #include "util.h"
-#include <stdexcept>
 #include <boost/thread.hpp>
+#include <stdexcept>
+#include <string>
 
 static std::unique_ptr<ArgGetter> Args;
 
 struct DefaultGetter : public ArgGetter {
-    virtual bool GetBool(const std::string& arg, bool def) {
+    bool GetBool(const std::string& arg, bool def) override {
         return ::GetBoolArg(arg, def);
     }
-    virtual std::vector<std::string> GetMultiArgs(const std::string& arg) {
+    std::vector<std::string> GetMultiArgs(const std::string& arg) override {
         if (!mapMultiArgs.count(arg))
             return std::vector<std::string>();
 
         return mapMultiArgs[arg];
     }
-    virtual int64_t GetArg(const std::string& strArg, int64_t nDefault) {
+    int64_t GetArg(const std::string& strArg, int64_t nDefault) override {
         return ::GetArg(strArg, nDefault);
+    }
+    std::string GetArg(const std::string& strArg, const std::string& strDefault) override {
+        return ::GetArg(strArg, strDefault);
     }
 };
 
@@ -26,30 +31,18 @@ Opt::Opt() {
         Args.reset(new DefaultGetter());
 }
 
-bool Opt::IsStealthMode() {
-    return Args->GetBool("-stealth-mode", false);
+std::string Opt::UserAgent() const {
+    return Args->GetArg("-useragent", "");
 }
 
 bool Opt::HidePlatform() {
     return Args->GetBool("-hide-platform", false);
 }
 
-std::vector<std::string> Opt::UAComment(bool validate) {
+std::vector<std::string> Opt::UAComment(bool validate) const {
     std::vector<std::string> uacomments = Args->GetMultiArgs("-uacomment");
-    if (!validate)
-        return uacomments;
-
-    typedef std::vector<std::string>::const_iterator auto_;
-    for (auto_ c = uacomments.begin(); c != uacomments.end(); ++c) {
-        size_t pos = c->find_first_of("/:()");
-        if (pos == std::string::npos)
-            continue;
-        std::stringstream ss;
-        ss << "-uacomment '" << *c << "' contains the reserved character '"
-            << c->at(pos) << "'.The following characters are reserved: / : ( )";
-        throw std::invalid_argument(ss.str());
-    }
-
+    if (validate)
+        ValidateUAComments(uacomments);
     return uacomments;
 }
 
@@ -109,8 +102,6 @@ bool Opt::UseCashAddr() const {
 }
 
 bool Opt::UsingThinBlocks() {
-    if (IsStealthMode())
-        return false;
     return Args->GetBool("-use-thin-blocks", true);
 }
 
@@ -128,6 +119,13 @@ bool Opt::PreferXThinBlocks() const {
     return Args->GetBool("-prefer-xthin-blocks", false);
 }
 
+void Opt::CheckRemovedOptions() const {
+    const std::string removedIn = "Option was removed in verison 0.11J";
+
+    if (Args->GetBool("-stealth-mode", false))
+        throw std::invalid_argument("invalid option -stealth-mode: " + removedIn);
+}
+
 std::unique_ptr<ArgReset> SetDummyArgGetter(std::unique_ptr<ArgGetter> getter) {
     Args.reset(getter.release());
     return std::unique_ptr<ArgReset>(new ArgReset);
@@ -138,7 +136,7 @@ ArgReset::~ArgReset() {
 }
 
 bool DummyArgGetter::GetBool(const std::string& arg, bool def) {
-    return customArgs.count(arg) ? bool(customArgs[arg]) : def;
+    return customArgs.count(arg) ? bool(std::stoll(customArgs[arg])) : def;
 }
 
 std::vector<std::string> DummyArgGetter::GetMultiArgs(const std::string&) {
@@ -146,9 +144,19 @@ std::vector<std::string> DummyArgGetter::GetMultiArgs(const std::string&) {
 }
 
 int64_t DummyArgGetter::GetArg(const std::string& arg, int64_t def) {
+    return customArgs.count(arg) ? std::stoll(customArgs[arg]) : def;
+}
+
+std::string DummyArgGetter::GetArg(const std::string& arg,
+                                   const std::string& def)
+{
     return customArgs.count(arg) ? customArgs[arg] : def;
 }
 
 void DummyArgGetter::Set(const std::string& arg, int64_t val) {
+    customArgs[arg] = std::to_string(val);
+}
+
+void DummyArgGetter::Set(const std::string& arg, const std::string& val) {
     customArgs[arg] = val;
 }

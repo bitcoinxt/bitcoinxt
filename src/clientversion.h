@@ -67,6 +67,8 @@ std::string FormatSubVersion(const std::string& name, int nClientVersion, const 
 
 std::string XTSubVersion(uint64_t nMaxBlockSize);
 
+void ValidateUAComments(const std::vector<std::string>& uacomments);
+
 #endif // WINDRES_PREPROC
 
 #endif // BITCOIN_CLIENTVERSION_H

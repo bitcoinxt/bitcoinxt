@@ -22,7 +22,7 @@ std::mutex RespendDetector::respentBeforeMutex;
 std::vector<RespendActionPtr> CreateDefaultActions(CConnman* connman) {
     std::vector<RespendActionPtr> actions;
 
-    if (connman && !Opt().IsStealthMode()) {
+    if (connman) {
         actions.push_back(RespendActionPtr(new RespendRelayer{connman}));
     }
     if (LogAcceptCategory(Log::RESPEND)) {
