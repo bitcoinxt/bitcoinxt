@@ -4981,6 +4981,8 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
                                std::string(e.what()).substr(0, MAX_REJECT_MESSAGE_LENGTH));
             Misbehaving(pfrom->GetId(), 20, "getutxos request invalid");
         }
+        CValidationState state;
+        FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
     }
     else if (strCommand == "tx")
     {
@@ -5106,6 +5108,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             if (nDoS > 0)
                 Misbehaving(pfrom->GetId(), nDoS, "tx rejected: " + state.GetRejectReason());
         }
+        FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
     }
     else if (strCommand == "headers" && !fImporting && !fReindex) // Ignore headers received while importing
     {
