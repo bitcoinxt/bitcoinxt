@@ -181,7 +181,6 @@ static const double SUFFICIENT_FEETXS = 1;
 static const double MIN_FEERATE = 10;
 static const double MAX_FEERATE = 1e7;
 static const double INF_FEERATE = MAX_MONEY;
-static const double INF_PRIORITY = 1e9 * MAX_MONEY;
 
 // We have to lump transactions into buckets based on feerate, but we want to be able
 // to give accurate estimates over a large range of potential feerates
@@ -218,9 +217,6 @@ public:
 
     /** Return a feerate estimate */
     CFeeRate estimateFee(int confTarget);
-
-    /** Return a priority estimate */
-    double estimatePriority(int confTarget);
 
     /** Write estimation data to a file */
     void Write(CAutoFile& fileout);

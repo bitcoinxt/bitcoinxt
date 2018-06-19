@@ -92,7 +92,7 @@ CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(CMutableTransaction &tx, CTxMemPo
 CTxMemPoolEntry TestMemPoolEntryHelper::FromTx(CTransaction &txn, CTxMemPool *pool) {
     bool hasNoDependencies = pool ? pool->HasNoInputsOf(txn) : hadNoDependencies;
 
-    return CTxMemPoolEntry(txn, nFee, nTime, dPriority, nHeight,
+    return CTxMemPoolEntry(txn, nFee, nTime, nHeight,
                            hasNoDependencies, spendsCoinbase, lp, sigOpCount);
 }
 
