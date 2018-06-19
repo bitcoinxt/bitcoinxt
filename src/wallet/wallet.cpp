@@ -14,6 +14,7 @@
 #include "net.h"
 #include "options.h"
 #include "policy/policy.h"
+#include "policy/txpriority.h"
 #include "script/script.h"
 #include "script/sign.h"
 #include "timedata.h"
@@ -2104,7 +2105,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                     return false;
                 }
 
-                dPriority = wtxNew.ComputePriority(dPriority, nBytes);
+                dPriority = ComputePriority(wtxNew, dPriority, nBytes);
 
                 // Can we complete this as a free transaction?
                 if (fSendFreeTransactions && nBytes <= MAX_FREE_TRANSACTION_CREATE_SIZE)
