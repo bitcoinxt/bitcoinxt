@@ -925,5 +925,3 @@ void CTxMemPool::TrimToSize(size_t sizelimit) {
         RemoveStaged(stage, false);
     }
 }
-
-SaltedTxidHasher::SaltedTxidHasher() : k0(GetRand(std::numeric_limits<uint64_t>::max())), k1(GetRand(std::numeric_limits<uint64_t>::max())) {}
