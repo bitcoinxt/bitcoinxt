@@ -128,6 +128,7 @@ BITCOIN_CORE_H = \
   limitedmap.h \
   main.h \
   maxblocksize.h \
+  mempoolfeemodifier.h \
   memusage.h \
   merkleblock.h \
   miner.h \
@@ -232,6 +233,7 @@ libbitcoin_server_a_SOURCES = \
   leakybucket.cpp \
   main.cpp \
   maxblocksize.cpp \
+  mempoolfeemodifier.cpp \
   merkleblock.cpp \
   miner.cpp \
   net.cpp \

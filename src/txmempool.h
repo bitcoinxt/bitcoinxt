@@ -11,6 +11,7 @@
 
 #include "amount.h"
 #include "coins.h"
+#include "mempoolfeemodifier.h"
 #include "primitives/transaction.h"
 #include "sync.h"
 #include "utilhash.h"
@@ -413,13 +414,13 @@ private:
 
     typedef std::map<txiter, TxLinks, CompareIteratorByHash> txlinksMap;
     txlinksMap mapLinks;
+    MempoolFeeModifier feemodifier;
 
     void UpdateParent(txiter entry, txiter parent, bool add);
     void UpdateChild(txiter entry, txiter child, bool add);
 
 public:
     std::map<COutPoint, CInPoint> mapNextTx;
-    std::map<uint256, CAmount> mapDeltas;
 
     CTxMemPool(const CFeeRate& _minRelayFee);
     ~CTxMemPool();
@@ -456,11 +457,6 @@ public:
      * the tx is not dependent on other mempool transactions to be included in a block.
      */
     bool HasNoInputsOf(const CTransaction& tx) const;
-
-    /** Affect CreateNewBlock prioritisation of transactions */
-    void PrioritiseTransaction(const uint256& hash, const CAmount& nFeeDelta);
-    void ApplyDeltas(const uint256& hash, CAmount &nFeeDelta);
-    void ClearPrioritisation(const uint256& hash);
 
 public:
     /** Remove a set of transactions from the mempool.
@@ -542,6 +538,9 @@ public:
     bool ReadFeeEstimates(CAutoFile& filein);
 
     size_t DynamicMemoryUsage() const;
+
+    MempoolFeeModifier& GetFeeModifier() { return feemodifier; }
+    const MempoolFeeModifier& GetFeeModifier() const { return feemodifier; }
 
 private:
     /** UpdateForDescendants is used by UpdateTransactionsFromBlock to update

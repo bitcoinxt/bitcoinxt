@@ -420,11 +420,9 @@ bool CTxMemPool::addUnchecked(const uint256& hash, const CTxMemPoolEntry &entry,
     UpdateEntryForAncestors(newit, setAncestors);
 
     // Update transaction's score for any feeDelta created by PrioritiseTransaction
-    std::map<uint256, CAmount>::const_iterator pos = mapDeltas.find(hash);
-    if (pos != mapDeltas.end()) {
-        if (pos->second) {
-            mapTx.modify(newit, update_fee_delta(pos->second));
-        }
+    const CAmount& delta = GetFeeModifier().GetDelta(hash);
+    if (delta != 0) {
+        mapTx.modify(newit, update_fee_delta(delta));
     }
 
     nTransactionsUpdated++;
@@ -576,6 +574,7 @@ void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx, unsigned i
         if (i != mapTx.end())
             entries.push_back(*i);
     }
+    MempoolFeeModifier& modifier = GetFeeModifier();
     BOOST_FOREACH(const CTransaction& tx, vtx)
     {
         txiter it = mapTx.find(tx.GetHash());
@@ -585,7 +584,7 @@ void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx, unsigned i
             RemoveStaged(stage, true);
         }
         removeConflicts(tx, conflicts);
-        ClearPrioritisation(tx.GetHash());
+        modifier.RemoveDelta(tx.GetHash());
     }
     // After the txs in the new block have been removed from the mempool, update policy estimates
     minerPolicyEstimator->processBlock(nBlockHeight, entries, fCurrentEstimate);
@@ -785,30 +784,6 @@ CTxMemPool::ReadFeeEstimates(CAutoFile& filein)
     return true;
 }
 
-void CTxMemPool::PrioritiseTransaction(const uint256& hash, const CAmount& nFeeDelta)
-{
-    LOCK(cs);
-    CAmount& delta = mapDeltas[hash];
-    delta += nFeeDelta;
-    LogPrintf("PrioritiseTransaction: %s fee += %d\n",
-              hash.ToString(), FormatMoney(nFeeDelta));
-}
-
-void CTxMemPool::ApplyDeltas(const uint256& hash, CAmount &nFeeDelta)
-{
-    LOCK(cs);
-    std::map<uint256, CAmount>::iterator pos = mapDeltas.find(hash);
-    if (pos == mapDeltas.end())
-        return;
-    nFeeDelta += pos->second;
-}
-
-void CTxMemPool::ClearPrioritisation(const uint256& hash)
-{
-    LOCK(cs);
-    mapDeltas.erase(hash);
-}
-
 bool CTxMemPool::HasNoInputsOf(const CTransaction &tx) const
 {
     for (unsigned int i = 0; i < tx.vin.size(); i++)
@@ -841,7 +816,7 @@ bool CCoinsViewMemPool::GetCoin(const COutPoint &outpoint, Coin &coin) const {
 size_t CTxMemPool::DynamicMemoryUsage() const {
     LOCK(cs);
     // Estimate the overhead of mapTx to be 12 pointers + an allocation, as no exact formula for boost::multi_index_contained is implemented.
-    return memusage::MallocUsage(sizeof(CTxMemPoolEntry) + 12 * sizeof(void*)) * mapTx.size() + memusage::DynamicUsage(mapNextTx) + memusage::DynamicUsage(mapDeltas) + memusage::DynamicUsage(mapLinks) + cachedInnerUsage;
+    return memusage::MallocUsage(sizeof(CTxMemPoolEntry) + 12 * sizeof(void*)) * mapTx.size() + memusage::DynamicUsage(mapNextTx) + GetFeeModifier().DynamicMemoryUsage() + memusage::DynamicUsage(mapLinks) + cachedInnerUsage;
 }
 
 void CTxMemPool::RemoveStaged(setEntries &stage, bool updateDescendants) {
