@@ -151,9 +151,8 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             const CTransaction& tx = iter->GetTx();
 
             // To allow a free tx to be mined with fSkipFree set, use fee delta to push fees up to minimum
-            double dummy;
             CAmount nFeeDelta = 0;
-            mempool.ApplyDeltas(tx.GetHash(), dummy, nFeeDelta);
+            mempool.ApplyDeltas(tx.GetHash(), nFeeDelta);
             if (fSkipFree && iter->GetFee() + nFeeDelta < ::minRelayTxFee.GetFee(iter->GetTxSize())) {
                 continue;
             }
