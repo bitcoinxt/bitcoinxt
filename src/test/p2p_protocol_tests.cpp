@@ -27,7 +27,7 @@ protected:
 
 BOOST_AUTO_TEST_CASE(MaxSizeVersionMessage)
 {
-    DummyNode n;
+    DummyNode n(1, nullptr, 0);
     n.nVersion = 0;
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     uint64_t nLocalHostNonce = 2;

@@ -1,5 +1,6 @@
 #include <boost/test/unit_test_suite.hpp>
 #include <boost/test/test_tools.hpp>
+#include "test/dummyconnman.h"
 #include "test/thinblockutil.h"
 #include "blockencodings.h"
 #include "chainparams.h"
@@ -33,6 +34,7 @@ struct ConcluderSetup {
     CBlock block;
     CMerkleBlock mblock;
     CDataStream mstream;
+    DummyConnman connman;
     DummyNode pfrom;
     ThinBlockManager tmgr;
     uint64_t nonce;
@@ -64,18 +66,18 @@ BOOST_AUTO_TEST_CASE(xthin_concluder) {
     XThinBlockConcluder conclude;
     // Should ignore since worker is not working
     // on anything.
-    conclude(resp, pfrom, worker, markInFlight);
+    conclude(resp, connman, pfrom, worker, markInFlight);
     BOOST_CHECK(!worker.addTxCalled);
 
     // Should ignore since worker is assigned to a
     // different block.
     worker.addWork(uint256S("0xf00d"));
-    conclude(resp, pfrom, worker, markInFlight);
+    conclude(resp, connman, pfrom, worker, markInFlight);
     BOOST_CHECK(!worker.addTxCalled);
 
     // Should add tx.
     worker.addWork(resp.block);
-    conclude(resp, pfrom, worker, markInFlight);
+    conclude(resp, connman, pfrom, worker, markInFlight);
     BOOST_CHECK(worker.addTxCalled);
 }
 
@@ -101,18 +103,18 @@ BOOST_AUTO_TEST_CASE(compact_concluder) {
     CompactBlockConcluder conclude;
     // Should ignore since worker is not working
     // on anything.
-    conclude(resp, pfrom, worker, markInFlight);
+    conclude(resp, connman, pfrom, worker, markInFlight);
     BOOST_CHECK(!worker.addTxCalled);
 
     // Should ignore since worker is assigned to a
     // different block.
     worker.addWork(uint256S("0xf00d"));
-    conclude(resp, pfrom, worker, markInFlight);
+    conclude(resp, connman, pfrom, worker, markInFlight);
     BOOST_CHECK(!worker.addTxCalled);
 
     // Should add tx.
     worker.addWork(resp.blockhash);
-    conclude(resp, pfrom, worker, markInFlight);
+    conclude(resp, connman, pfrom, worker, markInFlight);
     BOOST_CHECK(worker.addTxCalled);
 };
 

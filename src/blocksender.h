@@ -5,6 +5,7 @@
 #define BITCOIN_BLOCKSENDER_H
 
 class CChain;
+class CConnman;
 class CBlockIndex;
 class CInv;
 class CNode;
@@ -24,24 +25,24 @@ class BlockSender {
         bool canSend(const CChain& activeChain, const CBlockIndex& block,
             CBlockIndex *pindexBestHeader);
 
-        void send(const CChain& activeChain, CNode& node,
+        void send(const CChain& activeChain, CConnman&, CNode& node,
             CBlockIndex& blockIndex, const CInv& inv);
 
-        virtual void sendBlock(CNode& node,
+        virtual void sendBlock(CConnman&, CNode& node,
             const CBlockIndex& blockIndex, int invType, int activeChainHeight);
 
         // Creates a response for a re-request for transactions missing
         // from a thin block.
-        void sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
+        void sendReReqReponse(CConnman&, CNode& node, const CBlockIndex& blockIndex,
             const XThinReRequest& req, int activeChainHeight);
 
         // Creates a response for a re-request for transactions missing
         // from a compact thin block.
-        void sendReReqReponse(CNode& node, const CBlockIndex& blockIndex,
+        void sendReReqReponse(CConnman&, CNode& node, const CBlockIndex& blockIndex,
             const CompactReRequest& req, int activeChainHeight);
 
     protected: // used in unit tests
-        void triggerNextRequest(const CChain& activeChain, const CInv& inv, CNode& node);
+        virtual void triggerNextRequest(const CChain& activeChain, const CInv& inv, CConnman&, CNode& node);
         virtual bool readBlockFromDisk(CBlock& block, const CBlockIndex* pindex);
 };
 

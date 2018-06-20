@@ -8,9 +8,8 @@ class CTxMemPool;
 
 class CompactBlockProcessor : public BlockProcessor {
     public:
-
-        CompactBlockProcessor(CNode& f, ThinBlockWorker& w, BlockHeaderProcessor& h) :
-            BlockProcessor(f, w, "cmpctblock", h)
+        CompactBlockProcessor(CConnman& c, CNode& f, ThinBlockWorker& w, BlockHeaderProcessor& h) :
+            BlockProcessor(c, f, w, "cmpctblock", h)
         {
         }
 

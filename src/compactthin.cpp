@@ -5,6 +5,7 @@
 #include "compactthin.h"
 #include "blockencodings.h"
 #include "net.h"
+#include "netmessagemaker.h"
 #include "protocol.h"
 #include "util.h"
 
@@ -16,19 +17,20 @@ CompactWorker::CompactWorker(ThinBlockManager& m, NodeId n) :
 }
 
 void CompactWorker::requestBlock(const uint256& block,
-        std::vector<CInv>& getDataReq, CNode& node) {
+                                 std::vector<CInv>& getDataReq,
+                                 CConnman&, CNode&) {
 
     getDataReq.push_back(CInv(MSG_CMPCT_BLOCK, block));
 }
 
 class CompactAnn : public BlockAnnHandle {
     public:
-        CompactAnn(CNode& n) : node(&n) {
+        CompactAnn(CConnman& c, CNode& n) : connman(c), node(&n) {
 
             LogPrint(Log::ANN, "requesting compact block announcements "
                     "peer=%d\n", nodeID());
 
-            enableCompactBlocks(*node, true);
+            enableCompactBlocks(connman, *node, true);
 
             finalizeCallb = [=](NodeId id, bool) {
                 if (id != nodeID())
@@ -45,7 +47,7 @@ class CompactAnn : public BlockAnnHandle {
             LogPrint(Log::ANN, "un-requesting compact block announcements "
                     "peer=%d\n", nodeID());
 
-            enableCompactBlocks(*node, false);
+            enableCompactBlocks(connman, *node, false);
         }
 
         void onNodeDestroyed(NodeId id) {
@@ -58,13 +60,14 @@ class CompactAnn : public BlockAnnHandle {
             return node ? node->id : -1;
         }
 
+        CConnman& connman;
         CNode* node;
         std::function<void(NodeId, bool)> finalizeCallb;
         boost::signals2::connection finalizeCallbConn;
 };
 
-std::unique_ptr<BlockAnnHandle> CompactWorker::requestBlockAnnouncements(CNode& n) {
-    return std::unique_ptr<BlockAnnHandle>(new CompactAnn(n));
+std::unique_ptr<BlockAnnHandle> CompactWorker::requestBlockAnnouncements(CConnman& c, CNode& n) {
+    return std::unique_ptr<BlockAnnHandle>(new CompactAnn(c, n));
 }
 
 std::vector<ThinTx> CompactStub::allTransactions() const {
@@ -100,7 +103,7 @@ std::vector<ThinTx> CompactStub::allTransactions() const {
     return all;
 }
 
-void enableCompactBlocks(CNode& node, bool highBandwidth) {
+void enableCompactBlocks(CConnman& connman, CNode& node, bool highBandwidth) {
     uint64_t version = 1;
-    node.PushMessage("sendcmpct", highBandwidth, version);
+    connman.PushMessage(&node, NetMsg(&node, NetMsgType::SENDCMPCT, highBandwidth, version));
 }

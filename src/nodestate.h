@@ -36,7 +36,7 @@ struct CBlockReject {
  */
 struct CNodeState {
     //! The peer's address
-    CService address;
+    const CService address;
     //! Whether we have a fully established connection.
     bool fCurrentlyConnected;
     //! Accumulated misbehaviour score for this peer.
@@ -44,7 +44,7 @@ struct CNodeState {
     //! Whether this peer should be disconnected and banned (unless whitelisted).
     bool fShouldBan;
     //! String name of this peer (debugging/logging purposes).
-    std::string name;
+    const std::string name;
     //! List of asynchronously-determined block rejections to notify this peer about.
     std::vector<CBlockReject> rejects;
     //! The best known block we know this peer has announced.
@@ -77,7 +77,7 @@ struct CNodeState {
     //! the thin block the node is currently providing to us
     std::shared_ptr<ThinBlockWorker> thinblock;
 
-    CNodeState(NodeId id, ThinBlockManager&);
+    CNodeState(NodeId id, ThinBlockManager&, const CService& addr, const std::string& name);
     ~CNodeState();
 };
 

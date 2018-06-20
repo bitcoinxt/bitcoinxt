@@ -3,6 +3,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include <boost/test/unit_test.hpp>
 
+#include "test/dummyconnman.h"
 #include "test/thinblockutil.h"
 #include "bloom.h"
 #include "uint256.h"
@@ -105,16 +106,17 @@ struct NullProvider : public TxHashProvider {
 BOOST_AUTO_TEST_CASE(requestBlock) {
     ThinBlockMgDummy mg;
     DummyNode node;
+    DummyConnman connman;
     XThinWorker w(mg, node.id, std::unique_ptr<TxHashProvider>(new NullProvider));
 
     std::vector<CInv> reqs;
-    w.requestBlock(uint256S("0xfafafa"), reqs, node);
+    w.requestBlock(uint256S("0xfafafa"), reqs, connman, node);
 
     // xthin does not add a generic CInv getdata request
     BOOST_CHECK(reqs.empty());
 
     // ... it pushes its own custom message
-    BOOST_CHECK_EQUAL("get_xthin", node.messages.at(0));
+    BOOST_CHECK(connman.MsgWasSent(node, "get_xthin", 0));
 }
 
 BOOST_AUTO_TEST_CASE(xthin_stub_self_validate) {

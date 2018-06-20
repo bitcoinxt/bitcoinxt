@@ -2,6 +2,7 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include <boost/test/unit_test.hpp>
+#include "test/dummyconnman.h"
 #include "test/thinblockutil.h"
 #include "blockencodings.h"
 #include "blocksender.h"
@@ -32,12 +33,14 @@ BOOST_AUTO_TEST_CASE(trigger_next_request) {
     uint256 block2 = uint256S("0xbeef");
 
     struct BS : public BlockSender {
-        // make method public
-        void triggerNextRequest(const CChain& active, const CInv& inv, CNode& node) {
-            BlockSender::triggerNextRequest(active, inv, node);
+        // inherited to make method public
+        void triggerNextRequest(const CChain& active, const CInv& inv,
+                                CConnman& connman, CNode& node) override {
+            BlockSender::triggerNextRequest(active, inv, connman, node);
         }
     };
 
+    DummyConnman connman;
     DummyNode node1;
     node1.hashContinue = block1;
     DummyNode node2;
@@ -51,12 +54,12 @@ BOOST_AUTO_TEST_CASE(trigger_next_request) {
 
     // should trigger if (and only if) block hash is same as hashContinue
     BS b;
-    b.triggerNextRequest(active, CInv(MSG_BLOCK, block1), node1);
-    BOOST_CHECK_EQUAL("inv", node1.messages.at(0));
+    b.triggerNextRequest(active, CInv(MSG_BLOCK, block1), connman, node1);
+    BOOST_CHECK(connman.MsgWasSent(node1, "inv", 0));
 
     // different hash, should not trigger
-    b.triggerNextRequest(active, CInv(MSG_BLOCK, block2), node2);
-    BOOST_CHECK_EQUAL(size_t(0), node2.ssSend.size());
+    b.triggerNextRequest(active, CInv(MSG_BLOCK, block2), connman, node2);
+    BOOST_CHECK_EQUAL(size_t(0), connman.NumMessagesSent(node2));
 }
 
 BOOST_AUTO_TEST_CASE(can_send) {
@@ -105,10 +108,11 @@ struct BlockSenderDummy : public BlockSender {
 BOOST_AUTO_TEST_CASE(send_msg_block) {
     CBlockIndex index;
     BlockSenderDummy bs;
+    DummyConnman connman;
     DummyNode node;
 
-    bs.sendBlock(node, index, MSG_BLOCK, index.nHeight);
-    BOOST_CHECK_EQUAL("block", node.messages.at(0));
+    bs.sendBlock(connman, node, index, MSG_BLOCK, index.nHeight);
+    BOOST_CHECK(connman.MsgWasSent(node, "block", 0));
 }
 
 // We don't support this message, so we fallback to sending
@@ -116,11 +120,12 @@ BOOST_AUTO_TEST_CASE(send_msg_block) {
 BOOST_AUTO_TEST_CASE(send_msg_thinblock) {
     CBlockIndex index;
     BlockSenderDummy bs;
+    DummyConnman connman;
     DummyNode node;
     NodeStatePtr(node.id)->supportsCompactBlocks = false;
 
-    bs.sendBlock(node, index, MSG_THINBLOCK, index.nHeight);
-    BOOST_CHECK_EQUAL("block", node.messages.at(0));
+    bs.sendBlock(connman, node, index, MSG_THINBLOCK, index.nHeight);
+    BOOST_CHECK(connman.MsgWasSent(node, "block", 0));
 }
 
 BOOST_AUTO_TEST_CASE(send_msg_xthinblock) {
@@ -129,11 +134,12 @@ BOOST_AUTO_TEST_CASE(send_msg_xthinblock) {
 
     // Case 1 - if a thin block is larger than a full block,
     // send full block. This happens for example when there are no filtered transactions
+    DummyConnman connman;
     DummyNode node;
     node.xthinFilter->clear();
     bs.readBlock = TestBlock2(); // "big" block. No transactions filtered!
-    bs.sendBlock(node, index, MSG_XTHINBLOCK, index.nHeight);
-    BOOST_CHECK_EQUAL("block", node.messages.at(0));
+    bs.sendBlock(connman, node, index, MSG_XTHINBLOCK, index.nHeight);
+    BOOST_CHECK(connman.MsgWasSent(node, "block", 0));
 
     // Case 2 - send block with filtered transactions.
     DummyNode node2;
@@ -143,22 +149,24 @@ BOOST_AUTO_TEST_CASE(send_msg_xthinblock) {
     filter->insert(bs.readBlock.vtx[1].GetHash());
     filter->insert(bs.readBlock.vtx[2].GetHash());
     node2.xthinFilter.reset(filter);
-    bs.sendBlock(node2, index, MSG_XTHINBLOCK, index.nHeight);
-    BOOST_CHECK_EQUAL("xthinblock", node2.messages.at(0));
+    bs.sendBlock(connman, node2, index, MSG_XTHINBLOCK, index.nHeight);
+    BOOST_CHECK(connman.MsgWasSent(node2, "xthinblock", 0));
 }
 
 BOOST_AUTO_TEST_CASE(send_msg_filteredblock) {
     CBlockIndex index;
     BlockSenderDummy bs;
     DummyNode node;
-    bs.sendBlock(node, index, MSG_FILTERED_BLOCK, index.nHeight);
-    BOOST_CHECK_EQUAL("merkleblock", node.messages.at(0));
+    DummyConnman connman;
+    bs.sendBlock(connman, node, index, MSG_FILTERED_BLOCK, index.nHeight);
+    BOOST_CHECK(connman.MsgWasSent(node, "merkleblock", 0));
 }
 
 BOOST_AUTO_TEST_CASE(send_msg_xblocktx) {
     CBlockIndex index;
     BlockSenderDummy bs;
     DummyNode node;
+    DummyConnman connman;
     CBlock block = TestBlock1();
 
     std::set<uint64_t> requesting;
@@ -166,8 +174,8 @@ BOOST_AUTO_TEST_CASE(send_msg_xblocktx) {
     requesting.insert(block.vtx[2].GetHash().GetCheapHash());
     XThinReRequest req;
     req.txRequesting = requesting;
-    bs.sendReReqReponse(node, index, req, 1);
-    BOOST_CHECK_EQUAL("xblocktx", node.messages.at(0));
+    bs.sendReReqReponse(connman, node, index, req, 1);
+    BOOST_CHECK(connman.MsgWasSent(node, "xblocktx", 0));
 }
 
 BOOST_AUTO_TEST_CASE(send_msg_cmpct_block) {
@@ -175,10 +183,11 @@ BOOST_AUTO_TEST_CASE(send_msg_cmpct_block) {
     BlockSenderDummy bs;
 
     DummyNode node;
+    DummyConnman connman;
     NodeStatePtr(node.id)->supportsCompactBlocks = true;
     bs.readBlock = TestBlock2();
-    bs.sendBlock(node, index, MSG_CMPCT_BLOCK, index.nHeight);
-    BOOST_CHECK_EQUAL("cmpctblock", node.messages.at(0));
+    bs.sendBlock(connman, node, index, MSG_CMPCT_BLOCK, index.nHeight);
+    BOOST_CHECK(connman.MsgWasSent(node, "cmpctblock", 0));
 };
 
 BOOST_AUTO_TEST_CASE(send_cmpctblock_depth) {
@@ -188,37 +197,40 @@ BOOST_AUTO_TEST_CASE(send_cmpctblock_depth) {
     BlockSenderDummy bs;
 
     DummyNode node;
+    DummyConnman connman;
     NodeStatePtr(node.id)->supportsCompactBlocks = true;
     bs.readBlock = TestBlock2();
     index.nHeight = 100;
 
     // within depth
-    bs.sendBlock(node, index, MSG_CMPCT_BLOCK, index.nHeight + 5);
-    BOOST_CHECK_EQUAL("cmpctblock", node.messages.at(0));
+    bs.sendBlock(connman, node, index, MSG_CMPCT_BLOCK, index.nHeight + 5);
+    BOOST_CHECK(connman.MsgWasSent(node, "cmpctblock", 0));
 
     // outside depth
-    bs.sendBlock(node, index, MSG_CMPCT_BLOCK, index.nHeight + 6);
-    BOOST_CHECK_EQUAL("block", node.messages.at(1));
+    bs.sendBlock(connman, node, index, MSG_CMPCT_BLOCK, index.nHeight + 6);
+    BOOST_CHECK(connman.MsgWasSent(node, "block", 1));
 }
 
 BOOST_AUTO_TEST_CASE(send_xthinblock_depth) {
     BlockSenderDummy bs;
     DummyNode node;
+    DummyConnman connman;
     CBlockIndex index;
     index.nHeight = 100;
 
     // within depth
-    bs.sendBlock(node, index, MSG_XTHINBLOCK, index.nHeight + 5);
-    BOOST_CHECK_EQUAL("xthinblock", node.messages.at(0));
+    bs.sendBlock(connman, node, index, MSG_XTHINBLOCK, index.nHeight + 5);
+    BOOST_CHECK(connman.MsgWasSent(node, "xthinblock", 0));
 
     // outside depth
-    bs.sendBlock(node, index, MSG_XTHINBLOCK, index.nHeight + 6);
-    BOOST_CHECK_EQUAL("block", node.messages.at(1));
+    bs.sendBlock(connman, node, index, MSG_XTHINBLOCK, index.nHeight + 6);
+    BOOST_CHECK(connman.MsgWasSent(node, "block", 1));
 }
 
 BOOST_AUTO_TEST_CASE(send_msg_blocktxn) {
     CBlockIndex index;
     BlockSenderDummy bs;
+    DummyConnman connman;
     DummyNode node;
     CBlock block = TestBlock1();
 
@@ -226,25 +238,26 @@ BOOST_AUTO_TEST_CASE(send_msg_blocktxn) {
     req.indexes.push_back(1);
     req.indexes.push_back(4);
     req.blockhash = block.GetHash();
-    bs.sendReReqReponse(node, index, req, 1);
-    BOOST_CHECK_EQUAL("blocktxn", node.messages.at(0));
+    bs.sendReReqReponse(connman, node, index, req, 1);
+    BOOST_CHECK(connman.MsgWasSent(node, "blocktxn", 0));
 }
 
 template <class T>
 static void checkReReq(T req, const std::string& thinResponse) {
     BlockSenderDummy bs;
+    DummyConnman connman;
     DummyNode node;
 
     CBlockIndex index;
     index.nHeight = 90;
 
     // within depth limit, should respond with thin block reply
-    bs.sendReReqReponse(node, index, req, 100);
-    BOOST_CHECK_EQUAL(thinResponse, node.messages.at(0));
+    bs.sendReReqReponse(connman, node, index, req, 100);
+    BOOST_CHECK(connman.MsgWasSent(node, thinResponse, 0));
 
     // outside depth limit, respond with full block
-    bs.sendReReqReponse(node, index, req, 101);
-    BOOST_CHECK_EQUAL("block", node.messages.at(1));
+    bs.sendReReqReponse(connman, node, index, req, 101);
+    BOOST_CHECK(connman.MsgWasSent(node, "block", 1));
 }
 
 BOOST_AUTO_TEST_CASE(msg_blocktxn_depth) {

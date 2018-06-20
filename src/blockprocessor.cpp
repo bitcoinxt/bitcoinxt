@@ -2,6 +2,7 @@
 #include "blockheaderprocessor.h"
 #include "consensus/validation.h"
 #include "main.h" // Misbehaving
+#include "netmessagemaker.h"
 #include "thinblock.h"
 #include "util.h"
 #include "utilprocessmsg.h"
@@ -16,8 +17,8 @@ void BlockProcessor::rejectBlock(
     LogPrintf("rejecting %s from peer=%d - %s\n",
         netcmd, from.id, reason);
 
-    from.PushMessage("reject", netcmd, REJECT_MALFORMED,
-                     reason.substr(0, MAX_REJECT_MESSAGE_LENGTH), block);
+    connman.PushMessage(&from, NetMsg(&from, NetMsgType::REJECT, netcmd, REJECT_MALFORMED,
+                                      reason.substr(0, MAX_REJECT_MESSAGE_LENGTH), block));
 
     this->misbehave(misbehave, "block rejected " + reason);
     worker.stopWork(block);
@@ -80,7 +81,7 @@ bool BlockProcessor::setToWork(const CBlockHeader& header, int activeChainHeight
 }
 
 bool BlockProcessor::requestConnectHeaders(const CBlockHeader& header, bool bumpUnconnecting) {
-    bool needPrevHeaders = headerProcessor.requestConnectHeaders(header, from, bumpUnconnecting);
+    bool needPrevHeaders = headerProcessor.requestConnectHeaders(header, connman, from, bumpUnconnecting);
 
     if (needPrevHeaders) {
         // We don't have previous block. We can't connect it to the chain.

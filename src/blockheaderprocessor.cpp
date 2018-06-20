@@ -4,6 +4,7 @@
 #include "consensus/validation.h"
 #include "main.h" // Misbehaving, UpdateBlockAvailability
 #include "net.h"
+#include "netmessagemaker.h"
 #include "nodestate.h"
 #include "primitives/block.h"
 #include "util.h"
@@ -22,12 +23,12 @@ bool headerConnects(const CBlockHeader& h) {
     return mapBlockIndex.find(h.hashPrevBlock) != mapBlockIndex.end();
 }
 
-DefaultHeaderProcessor::DefaultHeaderProcessor(CNode* pfrom,
+DefaultHeaderProcessor::DefaultHeaderProcessor(CConnman& connman, CNode* pfrom,
         InFlightIndex& i,
         ThinBlockManager& mg,
         BlockInFlightMarker& inFlight,
         std::function<void()> checkBlockIndex) :
-    pfrom(pfrom), blocksInFlight(i), thinmg(mg), markAsInFlight(inFlight),
+    connman(connman), pfrom(pfrom), blocksInFlight(i), thinmg(mg), markAsInFlight(inFlight),
     checkBlockIndex(checkBlockIndex)
 {
 }
@@ -49,7 +50,8 @@ CBlockIndex* DefaultHeaderProcessor::operator()(const std::vector<CBlockHeader>&
         // TODO: optimize: if pindexLast is an ancestor of chainActive.Tip or pindexBestHeader, continue
         // from there instead.
         LogPrint(Log::NET, "more getheaders (%d) to end to peer=%d (startheight:%d)\n", pindexLast->nHeight, pfrom->id, pfrom->nStartingHeight);
-        pfrom->PushMessage("getheaders", chainActive.GetLocator(pindexLast), uint256());
+        connman.PushMessage(pfrom, NetMsg(pfrom, NetMsgType::GETHEADERS,
+                                          chainActive.GetLocator(pindexLast), uint256()));
     }
 
     if (pindexLast && maybeAnnouncement && hasEqualOrMoreWork(pindexLast)) {
@@ -137,7 +139,7 @@ void DefaultHeaderProcessor::suggestDownload(const std::vector<CBlockIndex*>& to
     for (auto b : boost::adaptors::reverse(toFetch)) {
 
         BlockAnnounceReceiver ann(b->GetBlockHash(),
-                *pfrom, thinmg, blocksInFlight);
+                                  connman, *pfrom, thinmg, blocksInFlight);
 
         // Stop if we don't want to download this block now.
         // Won't want next.
@@ -151,7 +153,7 @@ void DefaultHeaderProcessor::suggestDownload(const std::vector<CBlockIndex*>& to
     if (!toGet.empty()) {
         LogPrint(Log::NET, "Downloading blocks toward %s (%d) via headers direct fetch\n",
                 last->GetBlockHash().ToString(), last->nHeight);
-        pfrom->PushMessage("getdata", toGet);
+        connman.PushMessage(pfrom, NetMsg(pfrom, NetMsgType::GETDATA, toGet));
     }
 }
 
@@ -161,7 +163,7 @@ void DefaultHeaderProcessor::suggestDownload(const std::vector<CBlockIndex*>& to
 // Return: If header request was needed. In this case,
 // the current header cannot be processed.
 bool DefaultHeaderProcessor::requestConnectHeaders(const CBlockHeader& h,
-                                                   CNode& from,
+                                                   CConnman& connman, CNode& from,
                                                    bool bumpUnconnecting)
 {
     if (headerConnects(h))
@@ -173,8 +175,9 @@ bool DefaultHeaderProcessor::requestConnectHeaders(const CBlockHeader& h,
             h.GetHash().ToString(), h.hashPrevBlock.ToString(), from.id);
 
 
-    from.PushMessage("getheaders",
-            chainActive.GetLocator(pindexBestHeader), uint256());
+    connman.PushMessage(&from, NetMsg(&from, NetMsgType::GETHEADERS,
+                                      chainActive.GetLocator(pindexBestHeader),
+                                      uint256()));
 
     if (!bumpUnconnecting)
         return true;

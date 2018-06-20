@@ -65,6 +65,7 @@ BITCOIN_TESTS =\
   test/compactthin_tests.cpp \
   test/compacttxfinder_tests.cpp \
   test/compress_tests.cpp \
+  test/dummyconnman.h \
   test/crypto_tests.cpp \
   test/curl_tests.cpp \
   test/dbwrapper_tests.cpp \
@@ -101,6 +102,7 @@ BITCOIN_TESTS =\
   test/sighash_tests.cpp \
   test/sigopcount_tests.cpp \
   test/skiplist_tests.cpp \
+  test/streams_tests.cpp \
   test/test_bitcoin.cpp \
   test/test_bitcoin.h \
   test/test_random.h \

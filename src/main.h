@@ -112,7 +112,7 @@ extern uint64_t nLastBlockSize;
 extern const std::string strMessageMagic;
 extern CWaitableCriticalSection csBestBlock;
 extern CConditionVariable cvBlockChange;
-extern bool fImporting;
+extern std::atomic_bool fImporting;
 extern bool fReindex;
 extern bool fTxIndex;
 extern bool fIsBareMultisigStd;
@@ -228,6 +228,7 @@ bool ProcessMessage(CNode* pfrom, std::string strCommand, CDataStream& vRecv,
  * @param[in]   pto             The node which we are sending messages to.
  * @param[in]   connman         The connection manager for that node.
  * @param[in]   interrupt       Interrupt condition for processing threads
+ * @return                      True if there is more work to be done
  */
 bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interrupt);
 /** Run an instance of the script checking thread */

@@ -6,6 +6,7 @@
 #include "bloom.h"
 #include "chainparams.h"
 #include "net.h"
+#include "netmessagemaker.h"
 #include "pow.h"
 #include "protocol.h"
 #include "blockencodings.h"
@@ -112,7 +113,8 @@ XThinWorker::XThinWorker(ThinBlockManager& m, NodeId n) : ThinBlockWorker(m, n) 
 }
 
 void XThinWorker::requestBlock(const uint256& block,
-        std::vector<CInv>& getDataReq, CNode& node)
+                               std::vector<CInv>& getDataReq,
+                               CConnman& connman, CNode& node)
 {
     CBloomFilter dontWant = createDontWantFilter(*HashProvider);
 
@@ -120,7 +122,7 @@ void XThinWorker::requestBlock(const uint256& block,
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss << inv;
     ss << dontWant;
-    node.PushMessage("get_xthin", ss);
+    connman.PushMessage(&node, NetMsg(&node, NetMsgType::GET_XTHIN, ss));
 }
 
 

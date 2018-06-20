@@ -91,6 +91,20 @@ class CTransaction;
 class CNodeStats;
 class CClientUIInterface;
 
+struct CSerializedNetMsg
+{
+    CSerializedNetMsg() = default;
+    CSerializedNetMsg(CSerializedNetMsg&&) = default;
+    CSerializedNetMsg& operator=(CSerializedNetMsg&&) = default;
+    // No copying, only moves.
+    CSerializedNetMsg(const CSerializedNetMsg& msg) = delete;
+    CSerializedNetMsg& operator=(const CSerializedNetMsg&) = delete;
+
+    std::vector<unsigned char> data;
+    std::string command;
+};
+
+
 class CConnman
 {
 public:
@@ -124,76 +138,36 @@ public:
 
     bool ForNode(NodeId id, std::function<bool(CNode* pnode)> func);
 
-    template<typename Callable>
-    bool ForEachNodeContinueIf(Callable&& func)
-    {
-        LOCK(cs_vNodes);
-        for (auto&& node : vNodes)
-            if(!func(node))
-                return false;
-        return true;
-    };
-
-    template<typename Callable>
-    bool ForEachNodeContinueIf(Callable&& func) const
-    {
-        LOCK(cs_vNodes);
-        for (const auto& node : vNodes)
-            if(!func(node))
-                return false;
-        return true;
-    };
-
-    template<typename Callable, typename CallableAfter>
-    bool ForEachNodeContinueIfThen(Callable&& pre, CallableAfter&& post)
-    {
-        bool ret = true;
-        LOCK(cs_vNodes);
-        for (auto&& node : vNodes)
-            if(!pre(node)) {
-                ret = false;
-                break;
-            }
-        post();
-        return ret;
-    };
-
-    template<typename Callable, typename CallableAfter>
-    bool ForEachNodeContinueIfThen(Callable&& pre, CallableAfter&& post) const
-    {
-        bool ret = true;
-        LOCK(cs_vNodes);
-        for (const auto& node : vNodes)
-            if(!pre(node)) {
-                ret = false;
-                break;
-            }
-        post();
-        return ret;
-    };
+    virtual void PushMessage(CNode* pnode, CSerializedNetMsg&& msg);
 
     template<typename Callable>
     void ForEachNode(Callable&& func)
     {
         LOCK(cs_vNodes);
-        for (auto&& node : vNodes)
-            func(node);
+        for (auto&& node : vNodes) {
+            if (NodeFullyConnected(node))
+                func(node);
+        }
     };
 
     template<typename Callable>
     void ForEachNode(Callable&& func) const
     {
         LOCK(cs_vNodes);
-        for (const auto& node : vNodes)
-            func(node);
+        for (auto&& node : vNodes) {
+            if (NodeFullyConnected(node))
+                func(node);
+        }
     };
 
     template<typename Callable, typename CallableAfter>
     void ForEachNodeThen(Callable&& pre, CallableAfter&& post)
     {
         LOCK(cs_vNodes);
-        for (auto&& node : vNodes)
-            pre(node);
+        for (auto&& node : vNodes) {
+            if (NodeFullyConnected(node))
+                pre(node);
+        }
         post();
     };
 
@@ -201,8 +175,10 @@ public:
     void ForEachNodeThen(Callable&& pre, CallableAfter&& post) const
     {
         LOCK(cs_vNodes);
-        for (const auto& node : vNodes)
-            pre(node);
+        for (auto&& node : vNodes) {
+            if (NodeFullyConnected(node))
+                pre(node);
+        }
         post();
     };
 
@@ -260,8 +236,11 @@ public:
     void RemoveTestNode(CNode*);
 
     /** Get a unique deterministic randomizer. */
-    CSipHasher GetDeterministicRandomizer(uint64_t id);
+    CSipHasher GetDeterministicRandomizer(uint64_t id) const;
 
+    unsigned int GetReceiveFloodSize() const;
+
+    void WakeMessageHandler();
 private:
     struct ListenSocket {
         SOCKET socket;
@@ -291,13 +270,15 @@ private:
 
     NodeId GetNewNodeId();
 
+    size_t SocketSendData(CNode *pnode) const;
     void DumpAddresses();
-
-    unsigned int GetReceiveFloodSize() const;
 
     // Network stats
     void RecordBytesRecv(uint64_t bytes);
     void RecordBytesSent(uint64_t bytes);
+
+    // Whether the node should be passed out in ForEach* callbacks
+    static bool NodeFullyConnected(const CNode* pnode);
 
     // Network usage totals
     CCriticalSection cs_totalBytesRecv;
@@ -341,6 +322,10 @@ private:
 
     /** SipHasher seeds for deterministic randomness */
     const uint64_t nSeed0, nSeed1;
+
+    /** flag for waking the message processor. */
+    bool fMsgProcWake;
+
     std::condition_variable condMsgProc;
     std::mutex mutexMsgProc;
     std::atomic<bool> flagInterruptMsgProc;
@@ -359,7 +344,6 @@ void InitNetworkShapers();
 void MapPort(bool fUseUPnP);
 unsigned short GetListenPort();
 bool BindListenPort(const CService &bindAddr, std::string& strError, bool fWhitelisted = false);
-size_t SocketSendData(CNode *pnode);
 
 
 struct CombinerAll
@@ -386,7 +370,7 @@ struct CNodeSignals
     boost::signals2::signal<bool (CNode*, const CNetMessage&), CombinerAll> SanityCheckMessages;
     boost::signals2::signal<bool (CNode*, CConnman*, std::atomic<bool>&), CombinerAll> ProcessMessages;
     boost::signals2::signal<bool (CNode*, CConnman*, std::atomic<bool>&), CombinerAll> SendMessages;
-    boost::signals2::signal<void (NodeId, const CNode*)> InitializeNode;
+    boost::signals2::signal<void (CNode*, CConnman&)> InitializeNode;
     boost::signals2::signal<void (NodeId, bool&)> FinalizeNode;
     boost::signals2::signal<uint64_t ()> GetMaxBlockSizeInsecure;
 };
@@ -487,9 +471,6 @@ public:
         nTime = 0;
     }
 
-    // Called by CNode::EndMessage() and unit tests: modify stream to set size/checksum of header
-    static unsigned int FinalizeHeader(CDataStream& s);
-
     bool complete() const
     {
         if (!in_data)
@@ -513,23 +494,27 @@ public:
 /** Information about a peer */
 class CNode
 {
+    friend class CConnman;
 public:
     // socket
     uint64_t nServices;
     SOCKET hSocket;
-    CDataStream ssSend;
     size_t nSendSize; // total size of all vSendMsg entries
     size_t nSendOffset; // offset inside the first vSendMsg already sent
     uint64_t nSendBytes;
-    std::deque<CSerializeData> vSendMsg;
+    std::deque<std::vector<unsigned char>> vSendMsg;
     CCriticalSection cs_vSend;
     CCriticalSection cs_hSocket;
 
+    CCriticalSection cs_vProcessMsg;
+    std::list<CNetMessage> vProcessMsg;
+    size_t nProcessQueueSize;
+
+    CCriticalSection cs_sendProcessing;
+
     std::deque<CInv> vRecvGetData;
-    std::deque<CNetMessage> vRecvMsg;
-    CCriticalSection cs_vRecvMsg;
     uint64_t nRecvBytes;
-    int nRecvVersion;
+    std::atomic<int> nRecvVersion;
 
     int64_t nLastSend;
     int64_t nLastRecv;
@@ -538,7 +523,7 @@ public:
     CAddress addr;
     std::string addrName;
     CService addrLocal;
-    int nVersion;
+    std::atomic<int> nVersion;
     // strSubVer is whatever byte array we read from the wire. However, this field is intended
     // to be printed out, displayed to humans in various forms and so on. So we sanitize it and
     // store the sanitized version in cleanSubVer. The original should be used when dealing with
@@ -549,9 +534,8 @@ public:
     bool fOneShot;
     bool fClient;
     const bool fInbound;
-    bool fNetworkNode;
-    bool fSuccessfullyConnected;
-    bool fDisconnect;
+    std::atomic_bool fSuccessfullyConnected;
+    std::atomic_bool fDisconnect;
     // We use fRelayTxes for two purposes -
     // a) it allows us to not relay tx invs before receiving the peer's version message
     // b) the peer may tell us in its version message that we should not relay tx invs
@@ -565,9 +549,8 @@ public:
     int nRefCount;
     const NodeId id;
 
-protected:
-    // Basic fuzz-testing
-    void Fuzz(int nChance); // modifies ssSend
+    std::atomic_bool fPauseRecv;
+    std::atomic_bool fPauseSend;
 
 public:
     uint256 hashContinue;
@@ -614,6 +597,9 @@ private:
     const uint64_t nLocalHostNonce;
     const uint64_t nLocalServices;
     const int nMyStartingHeight;
+    int nSendVersion;
+public: // for unittest only! consider this private
+    std::list<CNetMessage> vRecvMsg;  // Used only by SocketHandler thread
 public:
 
     NodeId GetId() const {
@@ -624,31 +610,28 @@ public:
       return nLocalHostNonce;
     }
 
+    int GetMyStartingHeight() const {
+      return nMyStartingHeight;
+    }
+
     int GetRefCount()
     {
         assert(nRefCount >= 0);
         return nRefCount;
     }
 
-    // requires LOCK(cs_vRecvMsg)
-    unsigned int GetTotalRecvSize()
-    {
-        unsigned int total = 0;
-        BOOST_FOREACH(const CNetMessage &msg, vRecvMsg)
-            total += msg.vRecv.size() + 24;
-        return total;
-    }
-
-    // requires LOCK(cs_vRecvMsg)
     bool ReceiveMsgBytes(const char *pch, unsigned int nBytes, bool& complete);
 
-    // requires LOCK(cs_vRecvMsg)
     void SetRecvVersion(int nVersionIn)
     {
         nRecvVersion = nVersionIn;
-        BOOST_FOREACH(CNetMessage &msg, vRecvMsg)
-            msg.SetVersion(nVersionIn);
     }
+    int GetRecvVersion()
+    {
+        return nRecvVersion;
+    }
+    void SetSendVersion(int nVersionIn);
+    int GetSendVersion() const;
 
     CNode* AddRef()
     {
@@ -711,176 +694,6 @@ public:
     }
 
     void AskFor(const CInv& inv);
-
-    // TODO: Document the postcondition of this function.  Is cs_vSend locked?
-    virtual void BeginMessage(const char* pszCommand) EXCLUSIVE_LOCK_FUNCTION(cs_vSend);
-
-    // TODO: Document the precondition of this function.  Is cs_vSend locked?
-    void AbortMessage() UNLOCK_FUNCTION(cs_vSend);
-
-    // TODO: Document the precondition of this function.  Is cs_vSend locked?
-    void EndMessage() UNLOCK_FUNCTION(cs_vSend);
-
-    void PushVersion();
-
-
-    void PushMessage(const char* pszCommand)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1>
-    void PushMessage(const char* pszCommand, const T1& a1)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3, typename T4>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3 << a4;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3, typename T4, typename T5>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3 << a4 << a5;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3 << a4 << a5 << a6;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3 << a4 << a5 << a6 << a7;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3 << a4 << a5 << a6 << a7 << a8;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
-
-    template<typename T1, typename T2, typename T3, typename T4, typename T5, typename T6, typename T7, typename T8, typename T9>
-    void PushMessage(const char* pszCommand, const T1& a1, const T2& a2, const T3& a3, const T4& a4, const T5& a5, const T6& a6, const T7& a7, const T8& a8, const T9& a9)
-    {
-        try
-        {
-            BeginMessage(pszCommand);
-            ssSend << a1 << a2 << a3 << a4 << a5 << a6 << a7 << a8 << a9;
-            EndMessage();
-        }
-        catch (...)
-        {
-            AbortMessage();
-            throw;
-        }
-    }
 
     void CloseSocketDisconnect();
 

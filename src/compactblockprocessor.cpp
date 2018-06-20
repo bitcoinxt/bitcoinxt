@@ -5,6 +5,7 @@
 #include "streams.h"
 #include "util.h" // LogPrintf
 #include "net.h"
+#include "netmessagemaker.h"
 #include "utilprocessmsg.h"
 #include "consensus/validation.h"
 #include "compacttxfinder.h"
@@ -49,7 +50,7 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
                 block.shorttxidk0, block.shorttxidk1);
 
         stub.reset(new CompactStub(block));
-        worker.buildStub(*stub, txfinder, from);
+        worker.buildStub(*stub, txfinder, connman, from);
     }
     catch (const thinblock_error& e) {
         rejectBlock(hash, e.what(), 10);
@@ -73,5 +74,5 @@ void CompactBlockProcessor::operator()(CDataStream& vRecv, const CTxMemPool& mem
 
     LogPrint(Log::BLOCK, "re-requesting %d compact txs for %s peer=%d\n",
             req.indexes.size(), hash.ToString(), from.id);
-    from.PushMessage("getblocktxn", req);
+    connman.PushMessage(&from, NetMsg(&from, NetMsgType::GETBLOCKTXN, req));
 }

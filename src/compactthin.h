@@ -8,6 +8,8 @@
 #include "thinblock.h"
 #include "util.h"
 
+class CConnman;
+
 // Core also wanted to make their own thin
 // blocks solution; Compact Blocks (BIP152)
 //
@@ -19,8 +21,10 @@ class CompactWorker : public ThinBlockWorker {
         CompactWorker(ThinBlockManager&, NodeId);
 
         void requestBlock(const uint256& block,
-                std::vector<CInv>& getDataReq, CNode& node) override;
-        std::unique_ptr<BlockAnnHandle> requestBlockAnnouncements(CNode& n) override;
+                          std::vector<CInv>& getDataReq,
+                          CConnman&, CNode& node) override;
+
+        std::unique_ptr<BlockAnnHandle> requestBlockAnnouncements(CConnman&, CNode& n) override;
 };
 
 
@@ -51,6 +55,6 @@ struct CompactStub : public StubData {
         CompactBlock block;
 };
 
-void enableCompactBlocks(CNode& node, bool highBandwidth);
+void enableCompactBlocks(CConnman&, CNode& node, bool highBandwidth);
 
 #endif

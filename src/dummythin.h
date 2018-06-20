@@ -15,13 +15,14 @@ class DummyThinWorker : public ThinBlockWorker {
 
         bool addTx(const uint256&, const CTransaction& tx) override { return false; }
 
-        void buildStub(const StubData&, const TxFinder&, CNode& from) override { }
+        void buildStub(const StubData&, const TxFinder&, CConnman&, CNode&) override { }
         void addWork(const uint256& block) override { }
         void stopWork(const uint256& block) override { }
         void stopAllWork() override { }
 
         void requestBlock(const uint256& block,
-                std::vector<CInv>& getDataReq, CNode& node) override { }
+                          std::vector<CInv>& getDataReq,
+                          CConnman&, CNode& node) override { }
 };
 
 #endif

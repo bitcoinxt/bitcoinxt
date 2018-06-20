@@ -3,16 +3,17 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include <boost/test/unit_test.hpp>
 #include "blockheaderprocessor.h"
-#include "test/thinblockutil.h"
+#include "test/dummyconnman.h"
 #include "test/testutil.h"
+#include "test/thinblockutil.h"
 
 BOOST_AUTO_TEST_SUITE(blockheaderprocessor_tests);
 
 BOOST_AUTO_TEST_CASE(test_connect_chain_req) {
-
     // Header does not connect, should
     // send a getheaders to connect and stop processing headers.
 
+    DummyConnman connman;
     DummyNode from;
 
     // Try to process a header that does not connect
@@ -27,24 +28,24 @@ BOOST_AUTO_TEST_CASE(test_connect_chain_req) {
     DummyMarkAsInFlight markAsInFlight;
     auto checkBlockIndex = []() { };
 
-    DefaultHeaderProcessor p(&from, inFlight, *thinmg, markAsInFlight, checkBlockIndex);
+    DefaultHeaderProcessor p(connman, &from, inFlight, *thinmg, markAsInFlight, checkBlockIndex);
 
-    BOOST_CHECK(p.requestConnectHeaders(header, from, true));
+    BOOST_CHECK(p.requestConnectHeaders(header, connman, from, true));
     BOOST_CHECK_EQUAL(1, NodeStatePtr(from.id)->unconnectingHeaders);
-    BOOST_CHECK_EQUAL(size_t(1), from.messages.size());
-    BOOST_CHECK_EQUAL("getheaders", from.messages.at(0));
+    BOOST_CHECK_EQUAL(size_t(1), connman.NumMessagesSent(from));
+    BOOST_CHECK(connman.MsgWasSent(from, "getheaders", 0));
 
     // Test that unconnecting headers isn't bumped when requested not to
-    BOOST_CHECK(p.requestConnectHeaders(header, from, false));
+    BOOST_CHECK(p.requestConnectHeaders(header, connman, from, false));
     BOOST_CHECK_EQUAL(1 /* no change */, NodeStatePtr(from.id)->unconnectingHeaders);
 
     // Add entry so that header connects. Try again.
 
     DummyBlockIndexEntry e3(header.hashPrevBlock);
 
-    from.messages.clear();
-    BOOST_CHECK(!p.requestConnectHeaders(header, from, true));
-    BOOST_CHECK_EQUAL(size_t(0), from.messages.size());
+    connman.ClearMessages(from);
+    BOOST_CHECK(!p.requestConnectHeaders(header, connman, from, true));
+    BOOST_CHECK_EQUAL(size_t(0), connman.NumMessagesSent(from));
     BOOST_CHECK_EQUAL(1 /* no change */, NodeStatePtr(from.id)->unconnectingHeaders);
 }
 
@@ -52,7 +53,7 @@ namespace {
     class DummyHeaderProcessor : public DefaultHeaderProcessor {
         public:
         DummyHeaderProcessor(std::unique_ptr<ThinBlockManager> mg) :
-            DefaultHeaderProcessor(&node, inFlight, *mg, markAsInFlight, [](){}),
+            DefaultHeaderProcessor(connman, &node, inFlight, *mg, markAsInFlight, [](){}),
             thinmg(std::move(mg))
         {
         }
@@ -61,6 +62,7 @@ namespace {
             return DefaultHeaderProcessor::findMissingBlocks(last);
         }
         private:
+            DummyConnman connman;
             DummyNode node;
             InFlightIndex inFlight;
             DummyMarkAsInFlight markAsInFlight;
