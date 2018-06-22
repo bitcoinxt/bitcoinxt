@@ -99,9 +99,6 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
     // Limit to between 1K and (hard limit - 1K) for sanity:
     nBlockMaxSize = std::max((uint64_t)1000, std::min((hardLimit - 1000),  nBlockMaxSize));
 
-    // Skip free transactions if -relaypriority argument is true
-    bool fSkipFree = GetBoolArg("-relaypriority", true);
-
     // Collect memory pool transactions into the block
     CTxMemPool::setEntries inBlock;
     CTxMemPool::setEntries gotParents;
@@ -150,12 +147,6 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             }
 
             const CTransaction& tx = iter->GetTx();
-
-            // To allow a free tx to be mined with fSkipFree set, use fee delta to push fees up to minimum
-            CAmount nFeeDelta = mempool.GetFeeModifier().GetDelta(tx.GetHash());
-            if (fSkipFree && iter->GetFee() + nFeeDelta < ::minRelayTxFee.GetFee(iter->GetTxSize())) {
-                continue;
-            }
 
             // Our index guarantees that all ancestors are paid for.
             // If it has parents, push this tx, then its parents, onto the stack.
