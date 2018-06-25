@@ -119,11 +119,26 @@ bool Opt::PreferXThinBlocks() const {
     return Args->GetBool("-prefer-xthin-blocks", false);
 }
 
-void Opt::CheckRemovedOptions() const {
-    const std::string removedIn = "Option was removed in verison 0.11J";
+static std::string createErrorStr(const std::vector<std::string>& param) {
+    std::stringstream err;
+    err << "Invalid option '" << param.at(0) << "'. "
+        << "Option was removed in " << param.at(1) << ".";
+    if (!param.at(3).empty())
+        err << " See alternative '" << param.at(3) << "'.";
 
-    if (Args->GetBool("-stealth-mode", false))
-        throw std::invalid_argument("invalid option -stealth-mode: " + removedIn);
+    return err.str();
+}
+
+void Opt::CheckRemovedOptions() const {
+    std::vector<std::vector<std::string>> removed = {
+        {"-blockprioritysize", "0.11G", "-allowfreetx"},
+        {"-stealth-mode", "0.11J", "-useragent"}};
+
+    for (auto& r : removed) {
+        if (!Args->GetBool(r.at(0), false))
+            continue;
+        throw std::invalid_argument(createErrorStr(r));
+    }
 }
 
 std::unique_ptr<ArgReset> SetDummyArgGetter(std::unique_ptr<ArgGetter> getter) {
