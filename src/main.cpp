@@ -25,6 +25,7 @@
 #include "init.h"
 #include "maxblocksize.h"
 #include "merkleblock.h"
+#include "mempoolaccepter.h"
 #include "net.h"
 #include "netmessagemaker.h"
 #include "netbase.h"
@@ -834,32 +835,6 @@ bool CheckSequenceLocks(const CTransaction &tx, int flags, LockPoints* lp, bool 
     return EvaluateSequenceLocks(index, lockPair);
 }
 
-CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowFree)
-{
-    {
-        uint256 hash = tx.GetHash();
-        CAmount nFeeDelta = mempool.GetFeeModifier().GetDelta(hash);
-        if (nFeeDelta > 0)
-            return 0;
-    }
-
-    CAmount nMinFee = ::minRelayTxFee.GetFee(nBytes);
-
-    if (fAllowFree)
-    {
-        // There is a free transaction area in blocks created by most miners,
-        // * If we are relaying we allow transactions up to DEFAULT_BLOCK_PRIORITY_SIZE - 1000
-        //   to be considered to fall into this category. We don't want to encourage sending
-        //   multiple transactions instead of one big transaction to avoid fees.
-        if (nBytes < (DEFAULT_BLOCK_PRIORITY_SIZE - 1000))
-            nMinFee = 0;
-    }
-
-    if (!MoneyRange(nMinFee))
-        nMinFee = MAX_MONEY;
-    return nMinFee;
-}
-
 /** Convert CValidationState to a human-readable message for logging */
 std::string FormatStateMessage(const CValidationState &state)
 {
@@ -1006,39 +981,18 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         }
 
         CTxMemPoolEntry entry(tx, nFees, GetTime(), chainActive.Height(), pool.HasNoInputsOf(tx), fSpendsCoinbase, lp, nSigOps);
-        unsigned int nSize = entry.GetTxSize();
 
         // Don't accept it if it can't get into a block
-        CAmount txMinFee = GetMinRelayFee(tx, nSize, true);
-        if (fLimitFree && nFees < txMinFee)
-            return state.DoS(0, error("AcceptToMemoryPool: not enough fees %s, %d < %d",
-                                      hash.ToString(), nFees, txMinFee),
-                             REJECT_INSUFFICIENTFEE, "insufficient fee");
-
-        // Require that free transactions have sufficient priority to be mined in the next block.
-        if (GetBoolArg("-relaypriority", true) && nFees < ::minRelayTxFee.GetFee(nSize) && !AllowFree(GetPriority(view, tx, chainActive.Height() + 1))) {
-            return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "insufficient priority");
+        if (!fLimitFree) {
+            FeeEvaluator feeEval(Opt().AllowFreeTx(), mempool.GetFeeModifier(), ::minRelayTxFee);
+            auto res = feeEval.HasSufficientFee(view, entry, chainActive.Height());
+            if (res != FeeEvaluator::FEE_OK) {
+                std::string err = FeeEvaluator::ToString(res);
+                return state.DoS(0, false, REJECT_INSUFFICIENTFEE, err);
+            }
         }
 
-        // Continuously rate-limit free (really, very-low-fee) transactions
-        // This mitigates 'penny-flooding' -- sending thousands of free transactions just to
-        // be annoying or make others' transactions take longer to confirm.
-        if (fLimitFree && nFees < ::minRelayTxFee.GetFee(nSize))
-        {
-            static double dFreeCount;
-            static int64_t nLastFreeTime;
-            static int64_t nFreeLimit = GetArg("-limitfreerelay", 15);
-            static CCriticalSection csLimiter;
-            LOCK(csLimiter);
-
-            // At default rate it would take over a month to fill 1GB
-            if (RateLimitExceeded(dFreeCount, nLastFreeTime, nFreeLimit, nSize))
-                return state.DoS(0, error("AcceptToMemoryPool : free transaction rejected by rate limiter"),
-                                 REJECT_INSUFFICIENTFEE, "rate limited free transaction");
-
-            LogPrint(Log::MEMPOOL, "Rate limit dFreeCount: %g => %g\n", dFreeCount, dFreeCount+nSize);
-        }
-
+        unsigned int nSize = entry.GetTxSize();
         if (fRejectAbsurdFee && nFees > ::minRelayTxFee.GetFee(nSize) * 10000)
             return error("AcceptToMemoryPool: absurdly high fees %s, %d > %d",
                          hash.ToString(),
@@ -1916,7 +1870,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         return state.DoS(100, error("%s: size limits failed", __func__), REJECT_INVALID, "bad-vtx-length");
     uint64_t nBlockSize = ::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION);
     if (nBlockSize > pindex->nMaxBlockSize)
-        return state.DoS(100, error("%s: size limits failed", __func__), REJECT_INVALID, "bad-blk-length");
+        return state.DoS(100, error("%s: size limits failed %d > %d", __func__, nBlockSize, pindex->nMaxBlockSize), REJECT_INVALID, "bad-blk-length");
 
     const int64_t timeBarrier = GetTime() - 24 * 3600 * Opt().CheckpointDays();
     // Blocks that have varius days of POW behind them makes them secure in

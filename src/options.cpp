@@ -119,6 +119,10 @@ bool Opt::PreferXThinBlocks() const {
     return Args->GetBool("-prefer-xthin-blocks", false);
 }
 
+bool Opt::AllowFreeTx() const {
+    return Args->GetBool("-allowfreetx", true);
+}
+
 static std::string createErrorStr(const std::vector<std::string>& param) {
     std::stringstream err;
     err << "Invalid option '" << param.at(0) << "'. "
@@ -132,7 +136,8 @@ static std::string createErrorStr(const std::vector<std::string>& param) {
 void Opt::CheckRemovedOptions() const {
     std::vector<std::vector<std::string>> removed = {
         {"-blockprioritysize", "0.11G", "-allowfreetx"},
-        {"-stealth-mode", "0.11J", "-useragent"}};
+        {"-stealth-mode", "0.11J", "-useragent"},
+        {"-relaypriority", "0.11J", "-allowfreetx"}};
 
     for (auto& r : removed) {
         if (!Args->GetBool(r.at(0), false))
