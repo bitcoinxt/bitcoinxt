@@ -99,6 +99,9 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
     // Limit to between 1K and (hard limit - 1K) for sanity:
     nBlockMaxSize = std::max((uint64_t)1000, std::min((hardLimit - 1000),  nBlockMaxSize));
 
+    // For compatibility with bip68-sequence test, set flag to not mine txs with negative fee delta.
+    const bool fSkipNegativeDelta = GetBoolArg("-bip68hack", false);
+
     // Collect memory pool transactions into the block
     CTxMemPool::setEntries inBlock;
     CTxMemPool::setEntries gotParents;
@@ -147,6 +150,10 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             }
 
             const CTransaction& tx = iter->GetTx();
+
+            if (fSkipNegativeDelta && mempool.GetFeeModifier().GetDelta(tx.GetHash()) < 0) {
+                continue;
+            }
 
             // Our index guarantees that all ancestors are paid for.
             // If it has parents, push this tx, then its parents, onto the stack.
