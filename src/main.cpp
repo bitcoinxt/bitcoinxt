@@ -4756,9 +4756,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         }
         pfrom->fSuccessfullyConnected = true;
     }
-
-
-    else if (strCommand == "addr")
+    else if (!pfrom->fSuccessfullyConnected)
+    {
+        Misbehaving(pfrom->GetId(), 1, "must have a verack message before anything else");
+        return false;
+    }
+    else if (strCommand == NetMsgType::ADDR)
     {
         vector<CAddress> vAddr;
         vRecv >> vAddr;
