@@ -48,6 +48,8 @@ public:
     // random integer in the range [0..range]
     uint64_t randrange(uint64_t range);
 
+    std::vector<uint8_t> randbytes(size_t len);
+
     uint32_t Rz;
     uint32_t Rw;
 };

@@ -150,3 +150,11 @@ uint64_t FastRandomContext::randrange(uint64_t range) {
         return this->rand64();
     });
 }
+
+std::vector<uint8_t> FastRandomContext::randbytes(size_t len) {
+    std::vector<uint8_t> bytes(len);
+    for (size_t i = 0; i < len; ++i) {
+        bytes[i] = static_cast<uint8_t>(randrange(std::numeric_limits<uint8_t>::max()));
+    }
+    return bytes;
+}
