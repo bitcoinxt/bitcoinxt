@@ -19,7 +19,7 @@ from test_framework.txtools import bloat_tx
 from collections import deque
 
 # far into the future
-AOR_ACTIVATION_TIME = 2000000000
+LTOR_ACTIVATION_TIME = 2000000000
 
 
 class PreviousSpendableOutput():
@@ -46,7 +46,7 @@ class TransactionOrderingTest(ComparisonTestFramework):
         self.tip = None
         self.blocks = {}
         self.extra_args = [['-whitelist=127.0.0.1',
-                            "-fourthhftime=%d" % AOR_ACTIVATION_TIME ]]
+                            "-fourthhftime=%d" % LTOR_ACTIVATION_TIME ]]
         self.dbg = self.log.debug
 
     def setup_network(self):
@@ -64,7 +64,7 @@ class TransactionOrderingTest(ComparisonTestFramework):
         # knock the node out of IBD
         self.nodes[0].generate(1)
 
-        self.nodes[0].setmocktime(AOR_ACTIVATION_TIME)
+        self.nodes[0].setmocktime(LTOR_ACTIVATION_TIME)
         self.test.run()
 
     def add_transactions_to_block(self, block, tx_list):
@@ -220,7 +220,7 @@ class TransactionOrderingTest(ComparisonTestFramework):
 
         self.dbg("Start moving MTP forward")
         bfork = block(5555)
-        bfork.nTime = AOR_ACTIVATION_TIME - 1
+        bfork.nTime = LTOR_ACTIVATION_TIME - 1
         update_block(5555)
         yield accepted()
 
@@ -232,36 +232,52 @@ class TransactionOrderingTest(ComparisonTestFramework):
 
         self.dbg("Check that the MTP is just before the configured fork point.")
         assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'],
-                     AOR_ACTIVATION_TIME - 1)
+                     LTOR_ACTIVATION_TIME - 1)
 
+        # Before we activate the Nov 15, 2018 HF, transaction order is respected.
         self.dbg("Before we activate the Nov 15, 2018 HF, transaction order is respected.")
-        def out_of_order_block(block_number, spend):
-            b = block(block_number, spend=spend, tx_count=3)
-            b.vtx[1], b.vtx[2] = b.vtx[2], b.vtx[1]
+        def ordered_block(block_number, spend):
+            b = block(block_number, spend=spend, tx_count=16)
+            b.vtx = [b.vtx[0]] + sorted(b.vtx[1:], key=lambda tx: tx.hash)
             update_block(block_number)
             return b
 
-        out_of_order_block(4444, out[16])
+        ordered_block(4444, out[16])
         yield rejected(RejectResult(16, b'bad-txns-inputs-missingorspent'))
 
         # Rewind bad block.
         tip(5104)
 
         self.dbg("Activate the Nov 15, 2018 HF")
-        block(5556)
+        block(5556, out[16], tx_count=16)
         yield accepted()
 
         self.dbg("Now MTP is exactly the fork time.")
         assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'],
-                     AOR_ACTIVATION_TIME)
+                     LTOR_ACTIVATION_TIME)
 
-        self.dbg("Now that the fork activated, we can put transactions out of order in the block.")
-        out_of_order_block(4445, out[16])
+        self.dbg("Block with regular ordering are now rejected.")
+        block(5557, out[17], tx_count=16)
+        yield rejected(RejectResult(16, b'tx-ordering'))
+
+        # Rewind bad block.
+        tip(5556)
+
+        self.dbg("Now that the fork activated, we need to order transaction per txid.")
+        ordered_block(4445, out[17])
         yield accepted()
 
-        oooblockhash = node.getbestblockhash()
-        node.invalidateblock(oooblockhash)
-        assert(node.getbestblockhash() != oooblockhash)
+        self.dbg("Invalidate the best block and make sure we are back at the fork point.")
+        ctorblockhash = node.getbestblockhash()
+        node.invalidateblock(ctorblockhash)
+        forkblockhash = node.getbestblockhash()
+        assert(forkblockhash != ctorblockhash)
+        assert_equal(node.getblockheader(forkblockhash)[
+                     'mediantime'], LTOR_ACTIVATION_TIME)
+
+        node.generate(1)
+        generatedblockhash = node.getbestblockhash()
+        assert(forkblockhash != generatedblockhash)
 
 
 if __name__ == '__main__':

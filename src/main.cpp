@@ -3003,8 +3003,25 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
                               ? nMedianTimePastPrev
                               : block.GetBlockTime();
 
+    const bool isLTOREnabled = IsFourthHFActive(nMedianTimePastPrev);
+
     // Check that all transactions are finalized
-    BOOST_FOREACH(const CTransaction& tx, block.vtx) {
+    const CTransaction *prevTx = nullptr;
+    for (const auto& tx : block.vtx) {
+        if (isLTOREnabled) {
+            if (prevTx && (tx.GetHash() < prevTx->GetHash())) {
+                return state.DoS(
+                    100, false, REJECT_INVALID, "tx-ordering", false,
+                    strprintf("Transaction order is invalid (%s < %s)",
+                              tx.GetHash().ToString(),
+                              prevTx->GetHash().ToString()));
+            }
+
+            if (prevTx || !tx.IsCoinBase()) {
+                prevTx = &tx;
+            }
+        }
+
         if (!ContextualCheckTransaction(tx, state, nHeight, nLockTimeCutoff, nMedianTimePastPrev)) {
             // state set by ContextualCheckTransaction.
             return false;

@@ -20,6 +20,7 @@
 #include "primitives/transaction.h"
 #include "timedata.h"
 #include "util.h"
+#include "utilfork.h"
 #include "utilmoneystr.h"
 #include "options.h"
 #include "validationinterface.h"
@@ -124,12 +125,14 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
     int lastFewTxs = 0;
     CAmount nFees = 0;
 
+    int64_t nMedianTimePast = 0;
+
     {
         LOCK2(cs_main, mempool.cs);
         CBlockIndex* pindexPrev = chainActive.Tip();
         const int nHeight = pindexPrev->nHeight + 1;
         pblock->nTime = GetAdjustedTime();
-        const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
+        nMedianTimePast = pindexPrev->GetMedianTimePast();
 
         pblock->nVersion = ComputeBlockVersion(pindexPrev, chainparams.GetConsensus());
         // -regtest only: allow overriding block.nVersion with
@@ -227,6 +230,16 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             nFees += nTxFees;
 
             inBlock.insert(iter);
+        }
+
+
+        if (IsFourthHFActive(nMedianTimePast)) {
+            // If magnetic anomaly is enabled, we make sure transaction are
+            // lexically ordered.
+            std::sort(std::begin(pblock->vtx) + 1, std::end(pblock->vtx),
+                    [](const CTransaction& a, const CTransaction& b) -> bool {
+                        return a.GetHash() < b.GetHash();
+                    });
         }
 
         nLastBlockTx = nBlockTx;
