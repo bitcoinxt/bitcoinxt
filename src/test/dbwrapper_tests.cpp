@@ -4,8 +4,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "dbwrapper.h"
-#include "uint256.h"
+#include "leveldbwrapper.h"
 #include "random.h"
+#include "uint256.h"
 #include "test/test_bitcoin.h"
 
 #include <boost/assign/std/vector.hpp> // for 'operator+=()'
@@ -32,14 +33,14 @@ BOOST_AUTO_TEST_CASE(dbwrapper)
 {
     path ph = temp_directory_path() / unique_path();
     bool isObfuscated;
-    CDBWrapper dbw(ph, (1 << 20), isObfuscated, true, false);
+    std::unique_ptr<CDBWrapper> dbw(CreateLevelDB(ph, (1 << 20), isObfuscated, true, false));
     char key = 'k';
     uint256 in = GetRandHash();
     uint256 res;
 
     BOOST_CHECK(!isObfuscated);
-    BOOST_CHECK(dbw.Write(key, in));
-    BOOST_CHECK(dbw.Read(key, res));
+    BOOST_CHECK(dbw->Write(key, in));
+    BOOST_CHECK(dbw->Read(key, res));
     BOOST_CHECK_EQUAL(res.ToString(), in.ToString());
 }
 
@@ -48,7 +49,7 @@ BOOST_AUTO_TEST_CASE(dbwrapper_batch)
 {
     path ph = temp_directory_path() / unique_path();
     bool isObfuscated;
-    CDBWrapper dbw(ph, (1 << 20), isObfuscated, true, false);
+    std::unique_ptr<CDBWrapper> dbw(CreateLevelDB(ph, (1 << 20), isObfuscated, true, false));
 
     char key = 'i';
     uint256 in = GetRandHash();
@@ -58,41 +59,41 @@ BOOST_AUTO_TEST_CASE(dbwrapper_batch)
     uint256 in3 = GetRandHash();
 
     uint256 res;
-    CDBBatch batch;
+    std::unique_ptr<CDBBatch> batch(dbw->NewBatch());
 
-    batch.Write(key, in);
-    batch.Write(key2, in2);
-    batch.Write(key3, in3);
+    batch->Write(key, in);
+    batch->Write(key2, in2);
+    batch->Write(key3, in3);
 
     // Remove key3 before it's even been written
-    batch.Erase(key3);
+    batch->Erase(key3);
 
-    dbw.WriteBatch(batch);
+    dbw->WriteBatch(*batch);
 
-    BOOST_CHECK(dbw.Read(key, res));
+    BOOST_CHECK(dbw->Read(key, res));
     BOOST_CHECK_EQUAL(res.ToString(), in.ToString());
-    BOOST_CHECK(dbw.Read(key2, res));
+    BOOST_CHECK(dbw->Read(key2, res));
     BOOST_CHECK_EQUAL(res.ToString(), in2.ToString());
 
     // key3 never should've been written
-    BOOST_CHECK(dbw.Read(key3, res) == false);
+    BOOST_CHECK(dbw->Read(key3, res) == false);
 }
 
 BOOST_AUTO_TEST_CASE(dbwrapper_iterator)
 {
     path ph = temp_directory_path() / unique_path();
     bool isObfuscated;
-    CDBWrapper dbw(ph, (1 << 20), isObfuscated, true, false);
+    std::unique_ptr<CDBWrapper> dbw(CreateLevelDB(ph, (1 << 20), isObfuscated, true, false));
 
     // The two keys are intentionally chosen for ordering
     char key = 'j';
     uint256 in = GetRandHash();
-    BOOST_CHECK(dbw.Write(key, in));
+    BOOST_CHECK(dbw->Write(key, in));
     char key2 = 'k';
     uint256 in2 = GetRandHash();
-    BOOST_CHECK(dbw.Write(key2, in2));
+    BOOST_CHECK(dbw->Write(key2, in2));
 
-    boost::scoped_ptr<CDBIterator> it(const_cast<CDBWrapper*>(&dbw)->NewIterator());
+    boost::scoped_ptr<CDBIterator> it(const_cast<CDBWrapper*>(dbw.get())->NewIterator());
 
     // Be sure to seek past the obfuscation key (if it exists)
     // XT note: We don't support obfuscation keys.
@@ -125,7 +126,7 @@ BOOST_AUTO_TEST_CASE(readwrite_existing_data)
 
     // Set up a non-obfuscated wrapper to write some initial data.
     bool isObfuscated;
-    std::unique_ptr<CDBWrapper> dbw(new CDBWrapper(ph, (1 << 10), isObfuscated, false, false));
+    std::unique_ptr<CDBWrapper> dbw(CreateLevelDB(ph, (1 << 10), isObfuscated, false, false));
     char key = 'k';
     uint256 in = GetRandHash();
     uint256 res;
@@ -138,22 +139,22 @@ BOOST_AUTO_TEST_CASE(readwrite_existing_data)
     dbw.reset();
 
     // Now, set up another wrapper that wants to use the same directory
-    CDBWrapper odbw(ph, (1 << 10), isObfuscated, false, false);
+    std::unique_ptr<CDBWrapper> odbw(CreateLevelDB(ph, (1 << 10), isObfuscated, false, false));
 
     // Check that the key/val we wrote with original wrapper exists and
     // is readable.
     uint256 res2;
-    BOOST_CHECK(odbw.Read(key, res2));
+    BOOST_CHECK(odbw->Read(key, res2));
     BOOST_CHECK_EQUAL(res2.ToString(), in.ToString());
 
-    BOOST_CHECK(!odbw.IsEmpty()); // There should be existing data
+    BOOST_CHECK(!odbw->IsEmpty()); // There should be existing data
 
     uint256 in2 = GetRandHash();
     uint256 res3;
 
     // Check that we can write successfully
-    BOOST_CHECK(odbw.Write(key, in2));
-    BOOST_CHECK(odbw.Read(key, res3));
+    BOOST_CHECK(odbw->Write(key, in2));
+    BOOST_CHECK(odbw->Read(key, res3));
     BOOST_CHECK_EQUAL(res3.ToString(), in2.ToString());
 }
 
@@ -165,7 +166,7 @@ BOOST_AUTO_TEST_CASE(existing_data_reindex)
 
     // Set up a non-obfuscated wrapper to write some initial data.
     bool isObfuscated;
-    std::unique_ptr<CDBWrapper> dbw(new CDBWrapper(ph, (1 << 10), isObfuscated, false, false));
+    std::unique_ptr<CDBWrapper> dbw(CreateLevelDB(ph, (1 << 10), isObfuscated, false, false));
     char key = 'k';
     uint256 in = GetRandHash();
     uint256 res;
@@ -178,18 +179,18 @@ BOOST_AUTO_TEST_CASE(existing_data_reindex)
     dbw.reset();
 
     // Simulate a -reindex by wiping the existing data store
-    CDBWrapper odbw(ph, (1 << 10), isObfuscated, false, true);
+    std::unique_ptr<CDBWrapper> odbw(CreateLevelDB(ph, (1 << 10), isObfuscated, false, true));
 
     // Check that the key/val we wrote previously doesn't exist
     uint256 res2;
-    BOOST_CHECK(!odbw.Read(key, res2));
+    BOOST_CHECK(!odbw->Read(key, res2));
 
     uint256 in2 = GetRandHash();
     uint256 res3;
 
     // Check that we can write successfully
-    BOOST_CHECK(odbw.Write(key, in2));
-    BOOST_CHECK(odbw.Read(key, res3));
+    BOOST_CHECK(odbw->Write(key, in2));
+    BOOST_CHECK(odbw->Read(key, res3));
     BOOST_CHECK_EQUAL(res3.ToString(), in2.ToString());
 }
 

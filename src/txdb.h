@@ -67,7 +67,7 @@ struct CDiskTxPos : public CDiskBlockPos
 class CCoinsViewDB : public CCoinsView
 {
 protected:
-    CDBWrapper db;
+    std::unique_ptr<CDBWrapper> db;
 public:
     CCoinsViewDB(size_t nCacheSize, bool &isObfuscated, bool fMemory = false, bool fWipe = false);
 
@@ -106,11 +106,12 @@ private:
 };
 
 /** Access to the block database (blocks/index/) */
-class CBlockTreeDB : public CDBWrapper
+class CBlockTreeDB
 {
 public:
     CBlockTreeDB(size_t nCacheSize, bool &isObfuscated, bool fMemory = false, bool fWipe = false);
 private:
+    std::unique_ptr<CDBWrapper> db;
     CBlockTreeDB(const CBlockTreeDB&);
     void operator=(const CBlockTreeDB&);
 public:

@@ -7,8 +7,9 @@
 
 #include "chainparams.h"
 #include "hash.h"
-#include "random.h"
+#include "leveldbwrapper.h"
 #include "pow.h"
+#include "random.h"
 #include "uint256.h"
 #include "util.h"
 
@@ -54,34 +55,35 @@ struct CoinEntry {
 
 }
 
-CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool &isObfuscated, bool fMemory, bool fWipe) : db(GetDataDir() / "chainstate", nCacheSize, isObfuscated, fMemory, fWipe) {
+CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool &isObfuscated, bool fMemory, bool fWipe) :
+    db(CreateLevelDB(GetDataDir() / "chainstate", nCacheSize, isObfuscated, fMemory, fWipe)) {
 }
 
 bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const {
-    return db.Read(CoinEntry(&outpoint), coin);
+    return db->Read(CoinEntry(&outpoint), coin);
 }
 
 bool CCoinsViewDB::HaveCoin(const COutPoint &outpoint) const {
-    return db.Exists(CoinEntry(&outpoint));
+    return db->Exists(CoinEntry(&outpoint));
 }
 
 uint256 CCoinsViewDB::GetBestBlock() const {
     uint256 hashBestChain;
-    if (!db.Read(DB_BEST_BLOCK, hashBestChain))
+    if (!db->Read(DB_BEST_BLOCK, hashBestChain))
         return uint256();
     return hashBestChain;
 }
 
 std::vector<uint256> CCoinsViewDB::GetHeadBlocks() const {
     std::vector<uint256> vhashHeadBlocks;
-    if (!db.Read(DB_HEAD_BLOCKS, vhashHeadBlocks)) {
+    if (!db->Read(DB_HEAD_BLOCKS, vhashHeadBlocks)) {
         return std::vector<uint256>();
     }
     return vhashHeadBlocks;
 }
 
 bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
-    CDBBatch batch;
+    std::unique_ptr<CDBBatch> batch = db->NewBatch();
     size_t count = 0;
     size_t changed = 0;
     size_t batch_size = (size_t)GetArg("-dbbatchsize", nDefaultDbBatchSize);
@@ -102,25 +104,25 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     // transition from old_tip to hashBlock.
     // A vector is used for future extensibility, as we may want to support
     // interrupting after partial writes from multiple independent reorgs.
-    batch.Erase(DB_BEST_BLOCK);
-    batch.Write(DB_HEAD_BLOCKS, std::vector<uint256>{hashBlock, old_tip});
+    batch->Erase(DB_BEST_BLOCK);
+    batch->Write(DB_HEAD_BLOCKS, std::vector<uint256>{hashBlock, old_tip});
 
     for (CCoinsMap::iterator it = mapCoins.begin(); it != mapCoins.end();) {
         if (it->second.flags & CCoinsCacheEntry::DIRTY) {
             CoinEntry entry(&it->first);
             if (it->second.coin.IsSpent())
-                batch.Erase(entry);
+                batch->Erase(entry);
             else
-                batch.Write(entry, it->second.coin);
+                batch->Write(entry, it->second.coin);
             changed++;
         }
         count++;
         CCoinsMap::iterator itOld = it++;
         mapCoins.erase(itOld);
-        if (batch.SizeEstimate() > batch_size) {
-            LogPrint(Log::COINDB, "Writing partial batch of %.2f MiB\n", batch.SizeEstimate() * (1.0 / 1048576.0));
-            db.WriteBatch(batch);
-            batch.Clear();
+        if (batch->SizeEstimate() > batch_size) {
+            LogPrint(Log::COINDB, "Writing partial batch of %.2f MiB\n", batch->SizeEstimate() * (1.0 / 1048576.0));
+            db->WriteBatch(*batch);
+            batch->Clear();
             if (crash_simulate) {
                 static FastRandomContext rng;
                 if (rng.randrange(crash_simulate) == 0) {
@@ -132,46 +134,47 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
     }
 
     // In the last batch, mark the database as consistent with hashBlock again.
-    batch.Erase(DB_HEAD_BLOCKS);
-    batch.Write(DB_BEST_BLOCK, hashBlock);
+    batch->Erase(DB_HEAD_BLOCKS);
+    batch->Write(DB_BEST_BLOCK, hashBlock);
 
-    LogPrint(Log::COINDB, "Writing final batch of %.2f MiB\n", batch.SizeEstimate() * (1.0 / 1048576.0));
-    bool ret = db.WriteBatch(batch);
+    LogPrint(Log::COINDB, "Writing final batch of %.2f MiB\n", batch->SizeEstimate() * (1.0 / 1048576.0));
+    bool ret = db->WriteBatch(*batch);
     LogPrint(Log::COINDB, "Committed %u changed transaction outputs (out of %u) to coin database...\n", (unsigned int)changed, (unsigned int)count);
     return ret;
 }
 
 size_t CCoinsViewDB::EstimateSize() const
 {
-    return db.EstimateSize(DB_COIN, (char)(DB_COIN+1));
+    return db->EstimateSize(DB_COIN, (char)(DB_COIN+1));
 }
 
-CBlockTreeDB::CBlockTreeDB(size_t nCacheSize, bool &isObfuscated, bool fMemory, bool fWipe) : CDBWrapper(GetDataDir() / "blocks" / "index", nCacheSize, isObfuscated, fMemory, fWipe) {
+CBlockTreeDB::CBlockTreeDB(size_t nCacheSize, bool &isObfuscated, bool fMemory, bool fWipe) :
+    db(CreateLevelDB(GetDataDir() / "blocks" / "index", nCacheSize, isObfuscated, fMemory, fWipe)) {
 }
 
 bool CBlockTreeDB::ReadBlockFileInfo(int nFile, CBlockFileInfo &info) {
-    return Read(make_pair(DB_BLOCK_FILES, nFile), info);
+    return db->Read(make_pair(DB_BLOCK_FILES, nFile), info);
 }
 
 bool CBlockTreeDB::WriteReindexing(bool fReindexing) {
     if (fReindexing)
-        return Write(DB_REINDEX_FLAG, '1');
+        return db->Write(DB_REINDEX_FLAG, '1');
     else
-        return Erase(DB_REINDEX_FLAG);
+        return db->Erase(DB_REINDEX_FLAG);
 }
 
 bool CBlockTreeDB::ReadReindexing(bool &fReindexing) {
-    fReindexing = Exists(DB_REINDEX_FLAG);
+    fReindexing = db->Exists(DB_REINDEX_FLAG);
     return true;
 }
 
 bool CBlockTreeDB::ReadLastBlockFile(int &nFile) {
-    return Read(DB_LAST_BLOCK, nFile);
+    return db->Read(DB_LAST_BLOCK, nFile);
 }
 
 CCoinsViewCursor *CCoinsViewDB::Cursor() const
 {
-    CCoinsViewDBCursor *i = new CCoinsViewDBCursor(const_cast<CDBWrapper*>(&db)->NewIterator(), GetBestBlock());
+    CCoinsViewDBCursor *i = new CCoinsViewDBCursor(const_cast<CDBWrapper*>(db.get())->NewIterator(), GetBestBlock());
     /* It seems that there are no "const iterators" for LevelDB.  Since we
        only need read operations on it, use a const-cast to get around
        that restriction.  */
@@ -224,35 +227,35 @@ void CCoinsViewDBCursor::Next()
 }
 
 bool CBlockTreeDB::WriteBatchSync(const std::vector<std::pair<int, const CBlockFileInfo*> >& fileInfo, int nLastFile, const std::vector<const CBlockIndex*>& blockinfo) {
-    CDBBatch batch;
+    std::unique_ptr<CDBBatch> batch = db->NewBatch();
     for (std::vector<std::pair<int, const CBlockFileInfo*> >::const_iterator it=fileInfo.begin(); it != fileInfo.end(); it++) {
-        batch.Write(make_pair(DB_BLOCK_FILES, it->first), *it->second);
+        batch->Write(make_pair(DB_BLOCK_FILES, it->first), *it->second);
     }
-    batch.Write(DB_LAST_BLOCK, nLastFile);
+    batch->Write(DB_LAST_BLOCK, nLastFile);
     for (std::vector<const CBlockIndex*>::const_iterator it=blockinfo.begin(); it != blockinfo.end(); it++) {
-        batch.Write(make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()), CDiskBlockIndex(*it));
+        batch->Write(make_pair(DB_BLOCK_INDEX, (*it)->GetBlockHash()), CDiskBlockIndex(*it));
     }
-    return WriteBatch(batch, true);
+    return db->WriteBatch(*batch, true);
 }
 
 bool CBlockTreeDB::ReadTxIndex(const uint256 &txid, CDiskTxPos &pos) {
-    return Read(make_pair(DB_TXINDEX, txid), pos);
+    return db->Read(make_pair(DB_TXINDEX, txid), pos);
 }
 
 bool CBlockTreeDB::WriteTxIndex(const std::vector<std::pair<uint256, CDiskTxPos> >&vect) {
-    CDBBatch batch;
+    std::unique_ptr<CDBBatch> batch = db->NewBatch();
     for (std::vector<std::pair<uint256,CDiskTxPos> >::const_iterator it=vect.begin(); it!=vect.end(); it++)
-        batch.Write(make_pair(DB_TXINDEX, it->first), it->second);
-    return WriteBatch(batch);
+        batch->Write(make_pair(DB_TXINDEX, it->first), it->second);
+    return db->WriteBatch(*batch);
 }
 
 bool CBlockTreeDB::WriteFlag(const std::string &name, bool fValue) {
-    return Write(std::make_pair(DB_FLAG, name), fValue ? '1' : '0');
+    return db->Write(std::make_pair(DB_FLAG, name), fValue ? '1' : '0');
 }
 
 bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
     char ch;
-    if (!Read(std::make_pair(DB_FLAG, name), ch))
+    if (!db->Read(std::make_pair(DB_FLAG, name), ch))
         return false;
     fValue = ch == '1';
     return true;
@@ -260,7 +263,7 @@ bool CBlockTreeDB::ReadFlag(const std::string &name, bool &fValue) {
 
 bool CBlockTreeDB::LoadBlockIndexGuts(boost::function<CBlockIndex*(const uint256&)> insertBlockIndex)
 {
-    std::unique_ptr<CDBIterator> pcursor(NewIterator());
+    std::unique_ptr<CDBIterator> pcursor(db->NewIterator());
 
     pcursor->Seek(make_pair(DB_BLOCK_INDEX, uint256()));
 
@@ -364,7 +367,7 @@ public:
  * Currently implemented: from the per-tx utxo model (0.8..0.14.x) to per-txout.
  */
 bool CCoinsViewDB::Upgrade() {
-    std::unique_ptr<CDBIterator> pcursor(db.NewIterator());
+    std::unique_ptr<CDBIterator> pcursor(db->NewIterator());
     pcursor->Seek(std::make_pair(DB_COINS, uint256()));
     if (!pcursor->Valid()) {
         return true;
@@ -372,7 +375,7 @@ bool CCoinsViewDB::Upgrade() {
 
     LogPrintf("Upgrading database...\n");
     size_t batch_size = 1 << 24;
-    CDBBatch batch;
+    std::unique_ptr<CDBBatch> batch = db->NewBatch();
     while (pcursor->Valid()) {
         boost::this_thread::interruption_point();
         std::pair<unsigned char, uint256> key;
@@ -387,19 +390,19 @@ bool CCoinsViewDB::Upgrade() {
                     Coin newcoin(std::move(old_coins.vout[i]), old_coins.nHeight, old_coins.fCoinBase);
                     outpoint.n = i;
                     CoinEntry entry(&outpoint);
-                    batch.Write(entry, newcoin);
+                    batch->Write(entry, newcoin);
                 }
             }
-            batch.Erase(key);
-            if (batch.SizeEstimate() > batch_size) {
-                db.WriteBatch(batch);
-                batch.Clear();
+            batch->Erase(key);
+            if (batch->SizeEstimate() > batch_size) {
+                db->WriteBatch(*batch);
+                batch->Clear();
             }
             pcursor->Next();
         } else {
             break;
         }
     }
-    db.WriteBatch(batch);
+    db->WriteBatch(*batch);
     return true;
 }
