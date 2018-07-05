@@ -102,6 +102,12 @@ AC_ARG_ENABLE([upnp-default],
   [use_upnp_default=$enableval],
   [use_upnp_default=no])
 
+AC_ARG_WITH([lmdb],
+            [AS_HELP_STRING([--with-lmdb],
+                            [enable LMDB (default is yes if liblmdb is found)])],
+                            [use_lmdb=$withval],
+                            [use_lmdb=auto])
+
 AC_ARG_ENABLE(tests,
     AS_HELP_STRING([--disable-tests],[do not compile tests (default is to compile)]),
     [use_tests=$enableval],
@@ -563,6 +569,14 @@ if test x$use_upnp != xno; then
   )
 fi
 
+dnl Check for liblmdb (optional)
+if test x$use_lmdb != xno; then
+    AC_CHECK_HEADERS([lmdb.h],
+                     [AC_CHECK_LIB([lmdb], [main], [LMDB_LIBS=-llmdb], [have_lmdb=no])],
+                     [have_lmdb=no])
+fi
+
+
 BITCOIN_QT_INIT
 
 dnl sets $bitcoin_enable_qt, $bitcoin_enable_qt_test, $bitcoin_enable_qt_dbus
@@ -821,6 +835,23 @@ else
   fi
 fi
 
+dnl enable lmdb support
+AC_MSG_CHECKING([whether to build with support for lmdb])
+if test x$have_lmdb = xno; then
+  if test x$use_lmdb = xyes; then
+     AC_MSG_ERROR("LMDB requested but cannot be built. use --without-lmdb")
+  fi
+  AC_MSG_RESULT(no)
+else
+  if test x$use_lmdb != xno; then
+    AC_MSG_RESULT(yes)
+    AC_DEFINE([USE_LMDB],[1],[Define if LMDB support should be compiled in])
+    use_lmdb=yes
+  else
+    AC_MSG_RESULT(no)
+  fi
+fi
+
 dnl these are only used when qt is enabled
 BUILD_TEST_QT=""
 if test x$bitcoin_enable_qt != xno; then
@@ -925,6 +956,7 @@ AC_SUBST(TESTDEFS)
 AC_SUBST(LEVELDB_TARGET_FLAGS)
 AC_SUBST(MINIUPNPC_CPPFLAGS)
 AC_SUBST(MINIUPNPC_LIBS)
+AC_SUBST(LMDB_LIBS)
 AC_SUBST(CURL_FLAGS)
 AC_SUBST(CURL_LIBS)
 AC_SUBST(CRYPTO_LIBS)

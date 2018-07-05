@@ -429,7 +429,7 @@ if ENABLE_WALLET
 bitcoind_LDADD += libbitcoin_wallet.a
 endif
 
-bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(CURL_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
+bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(CURL_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(LMDB_LIBS)
 #
 
 # bitcoin-cli binary #
