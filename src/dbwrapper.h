@@ -137,8 +137,6 @@ protected:
     // template helper methods for db specifics
     virtual CDataStream Read(const CDataStream& ssKey) const = 0;
     virtual bool Exists(const CDataStream& ssKey) const = 0;
-    virtual size_t EstimateSize(const CDataStream& ssKeyBegin,
-                                const CDataStream& ssKeyEnd) const = 0;
 public:
     virtual ~CDBWrapper();
 
@@ -198,16 +196,7 @@ public:
      */
     bool IsEmpty();
 
-    template<typename K>
-    size_t EstimateSize(const K& key_begin, const K& key_end) const
-    {
-        CDataStream ssKey1(SER_DISK, CLIENT_VERSION), ssKey2(SER_DISK, CLIENT_VERSION);
-        ssKey1.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
-        ssKey2.reserve(DBWRAPPER_PREALLOC_KEY_SIZE);
-        ssKey1 << key_begin;
-        ssKey2 << key_end;
-        return EstimateSize(ssKey1, ssKey2);
-    }
+    virtual size_t EstimateSize() const = 0;
 };
 
 #endif // BITCOIN_DBWRAPPER_H

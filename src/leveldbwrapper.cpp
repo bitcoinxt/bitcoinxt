@@ -259,16 +259,6 @@ protected:
         }
         return true;
     }
-    size_t EstimateSize(const CDataStream& ssKey1, const CDataStream& ssKey2) const override
-    {
-        leveldb::Slice slKey1(ssKey1.data(), ssKey1.size());
-        leveldb::Slice slKey2(ssKey2.data(), ssKey2.size());
-        uint64_t size = 0;
-        leveldb::Range range(slKey1, slKey2);
-        pdb->GetApproximateSizes(&range, 1, &size);
-        return size;
-    }
-
 public:
     LevelDBWrapper(const boost::filesystem::path& path, size_t nCacheSize,
                    bool &isObfuscated, bool fMemory, bool fWipe)
@@ -349,6 +339,17 @@ public:
         return std::unique_ptr<CDBBatch>(new LevelDBBatch);
     }
 
+    size_t EstimateSize() const override
+    {
+        const char DB_COIN = 'C';
+        const char DB_COIN_END = DB_COIN + 1;
+        leveldb::Slice slKey1(&DB_COIN);
+        leveldb::Slice slKey2(&DB_COIN_END);
+        uint64_t size = 0;
+        leveldb::Range range(slKey1, slKey2);
+        pdb->GetApproximateSizes(&range, 1, &size);
+        return size;
+    }
 };
 const std::string LevelDBWrapper::OBFUSCATE_KEY_KEY("\000obfuscate_key", 14);
 

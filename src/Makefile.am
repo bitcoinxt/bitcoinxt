@@ -127,6 +127,9 @@ BITCOIN_CORE_H = \
   leakybucket.h \
   leveldbwrapper.h \
   limitedmap.h \
+  lmdb/dbresizemanager.h \
+  lmdb/lmdbutil.h \
+  lmdb/lmdbwrapper.h \
   main.h \
   maxblocksize.h \
   memusage.h \
@@ -231,6 +234,9 @@ libbitcoin_server_a_SOURCES = \
   ipgroups.cpp \
   leakybucket.cpp \
   leveldbwrapper.cpp \
+  lmdb/dbresizemanager.cpp \
+  lmdb/lmdbutil.cpp \
+  lmdb/lmdbwrapper.cpp \
   main.cpp \
   maxblocksize.cpp \
   merkleblock.cpp \

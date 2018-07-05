@@ -145,7 +145,7 @@ bool CCoinsViewDB::BatchWrite(CCoinsMap &mapCoins, const uint256 &hashBlock) {
 
 size_t CCoinsViewDB::EstimateSize() const
 {
-    return db->EstimateSize(DB_COIN, (char)(DB_COIN+1));
+    return db->EstimateSize();
 }
 
 CBlockTreeDB::CBlockTreeDB(size_t nCacheSize, bool &isObfuscated, bool fMemory, bool fWipe) :
