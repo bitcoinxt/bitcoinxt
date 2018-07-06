@@ -7,7 +7,7 @@
 
 #include "chainparams.h"
 #include "hash.h"
-#include "leveldbwrapper.h"
+#include "dbwrapper.h"
 #include "pow.h"
 #include "random.h"
 #include "uint256.h"
@@ -55,9 +55,9 @@ struct CoinEntry {
 
 }
 
-CCoinsViewDB::CCoinsViewDB(size_t nCacheSize, bool &isObfuscated, bool fMemory, bool fWipe) :
-    db(CreateLevelDB(GetDataDir() / "chainstate", nCacheSize, isObfuscated, fMemory, fWipe)) {
+CCoinsViewDB::CCoinsViewDB(std::unique_ptr<CDBWrapper> dbIn) : db(std::move(dbIn)) {
 }
+CCoinsViewDB::~CCoinsViewDB() { }
 
 bool CCoinsViewDB::GetCoin(const COutPoint &outpoint, Coin &coin) const {
     return db->Read(CoinEntry(&outpoint), coin);
@@ -148,9 +148,9 @@ size_t CCoinsViewDB::EstimateSize() const
     return db->EstimateSize();
 }
 
-CBlockTreeDB::CBlockTreeDB(size_t nCacheSize, bool &isObfuscated, bool fMemory, bool fWipe) :
-    db(CreateLevelDB(GetDataDir() / "blocks" / "index", nCacheSize, isObfuscated, fMemory, fWipe)) {
+CBlockTreeDB::CBlockTreeDB(std::unique_ptr<CDBWrapper> dbIn) : db(std::move(dbIn)) {
 }
+CBlockTreeDB::~CBlockTreeDB() { }
 
 bool CBlockTreeDB::ReadBlockFileInfo(int nFile, CBlockFileInfo &info) {
     return db->Read(make_pair(DB_BLOCK_FILES, nFile), info);
@@ -188,6 +188,12 @@ CCoinsViewCursor *CCoinsViewDB::Cursor() const
         i->keyTmp.first = 0; // Make sure Valid() and GetKey() return false
     }
     return i;
+}
+
+CCoinsViewDBCursor::~CCoinsViewDBCursor() { }
+CCoinsViewDBCursor::CCoinsViewDBCursor(CDBIterator* pcursorIn, const uint256 &hashBlockIn):
+    CCoinsViewCursor(hashBlockIn), pcursor(pcursorIn)
+{
 }
 
 bool CCoinsViewDBCursor::GetKey(COutPoint &key) const

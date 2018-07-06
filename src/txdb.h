@@ -7,7 +7,6 @@
 #define BITCOIN_TXDB_H
 
 #include "coins.h"
-#include "dbwrapper.h"
 #include "chain.h"
 
 #include <map>
@@ -19,6 +18,8 @@
 
 class CBlockIndex;
 class CCoinsViewDBCursor;
+class CDBIterator;
+class CDBWrapper;
 class uint256;
 
 //! -dbcache default (MiB)
@@ -69,7 +70,8 @@ class CCoinsViewDB : public CCoinsView
 protected:
     std::unique_ptr<CDBWrapper> db;
 public:
-    CCoinsViewDB(size_t nCacheSize, bool &isObfuscated, bool fMemory = false, bool fWipe = false);
+    CCoinsViewDB(std::unique_ptr<CDBWrapper> dbIn);
+    ~CCoinsViewDB();
 
     bool GetCoin(const COutPoint &outpoint, Coin &coin) const override;
     bool HaveCoin(const COutPoint &outpoint) const override;
@@ -87,7 +89,7 @@ public:
 class CCoinsViewDBCursor: public CCoinsViewCursor
 {
 public:
-    ~CCoinsViewDBCursor() {}
+    ~CCoinsViewDBCursor();
 
     bool GetKey(COutPoint &key) const;
     bool GetValue(Coin &coin) const;
@@ -97,8 +99,7 @@ public:
     void Next();
 
 private:
-    CCoinsViewDBCursor(CDBIterator* pcursorIn, const uint256 &hashBlockIn):
-        CCoinsViewCursor(hashBlockIn), pcursor(pcursorIn) {}
+    CCoinsViewDBCursor(CDBIterator* pcursorIn, const uint256 &hashBlockIn);
     std::unique_ptr<CDBIterator> pcursor;
     std::pair<char, COutPoint> keyTmp;
 
@@ -109,7 +110,8 @@ private:
 class CBlockTreeDB
 {
 public:
-    CBlockTreeDB(size_t nCacheSize, bool &isObfuscated, bool fMemory = false, bool fWipe = false);
+    CBlockTreeDB(std::unique_ptr<CDBWrapper> dbIn);
+    ~CBlockTreeDB();
 private:
     std::unique_ptr<CDBWrapper> db;
     CBlockTreeDB(const CBlockTreeDB&);
