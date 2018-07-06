@@ -14,6 +14,7 @@ import tempfile
 import traceback
 
 from .util import (
+    enable_lmdb,
     initialize_chain,
     start_nodes,
     connect_nodes_bi,
@@ -126,6 +127,8 @@ class BitcoinTestFramework(object):
                           help="The seed to use for assigning port numbers (default: current process id)")
         parser.add_option("--coveragedir", dest="coveragedir",
                           help="Write tested RPC commands into this directory")
+        parser.add_option("--lmdb", dest="uselmdb", default=False, action="store_true",
+                          help="Use LMDB (pass db=lmdb to bitcoind config file)")
         self.add_options(parser)
         (self.options, self.args) = parser.parse_args()
 
@@ -136,6 +139,9 @@ class BitcoinTestFramework(object):
 
         if self.options.coveragedir:
             enable_coverage(self.options.coveragedir)
+
+        if self.options.uselmdb:
+            enable_lmdb()
 
         PortSeed.n = self.options.port_seed
 

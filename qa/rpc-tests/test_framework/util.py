@@ -27,6 +27,7 @@ from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
 
 COVERAGE_DIR = None
+LMDB_ENABLED = False
 
 # The maximum number of nodes a single test can spawn
 MAX_NODES = 8
@@ -68,6 +69,9 @@ def enable_coverage(dirname):
     global COVERAGE_DIR
     COVERAGE_DIR = dirname
 
+def enable_lmdb():
+    global LMDB_ENABLED
+    LMDB_ENABLED = True
 
 def get_rpc_proxy(url, node_number, timeout=None):
     """
@@ -163,6 +167,9 @@ def initialize_datadir(dirname, n):
         f.write("rpcpassword=" + rpc_p + "\n")
         f.write("port="+str(p2p_port(n))+"\n")
         f.write("rpcport="+str(rpc_port(n))+"\n")
+        global LMDB_ENABLED
+        if (LMDB_ENABLED):
+            f.write("db=lmdb")
     return datadir
 
 def rpc_auth_pair(n):
