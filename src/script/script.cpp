@@ -129,6 +129,8 @@ const char* GetOpName(opcodetype opcode)
     case OP_CHECKSIGVERIFY         : return "OP_CHECKSIGVERIFY";
     case OP_CHECKMULTISIG          : return "OP_CHECKMULTISIG";
     case OP_CHECKMULTISIGVERIFY    : return "OP_CHECKMULTISIGVERIFY";
+    case OP_CHECKDATASIG           : return "OP_CHECKDATASIG";
+    case OP_CHECKDATASIGVERIFY     : return "OP_CHECKDATASIGVERIFY";
 
     // expanson
     case OP_NOP1                   : return "OP_NOP1";
