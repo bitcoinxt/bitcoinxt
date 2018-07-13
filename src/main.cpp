@@ -18,6 +18,7 @@
 #include "compactblockprocessor.h"
 #include "compactthin.h"
 #include "consensus/consensus.h"
+#include "consensus/merkle.h"
 #include "consensus/tx_verify.h"
 #include "consensus/validation.h"
 #include "inflightindex.h"
@@ -285,10 +286,13 @@ void PushNodeVersion(CNode *pnode, CConnman& connman, int64_t nTime)
     CAddress addrMe = CAddress(CService(), nLocalNodeServices);
 
     int nMaxBlockSize = GetMaxBlockSizeInsecure();
+    std::string userAgent = XTSubVersion(nMaxBlockSize, Opt().UserAgent(),
+                                         Opt().UAComment(),
+                                         Opt().HidePlatform());
     connman.PushMessage(pnode, CNetMsgMaker(INIT_PROTO_VERSION).Make(
                                 NetMsgType::VERSION, PROTOCOL_VERSION,
                                 (uint64_t)nLocalNodeServices, nTime, addrYou,
-                                addrMe, nonce, XTSubVersion(nMaxBlockSize),
+                                addrMe, nonce, userAgent,
                                 nNodeStartingHeight, true));
 
     if (fLogIPs)
@@ -2942,7 +2946,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     // Check the merkle root.
     if (fCheckMerkleRoot) {
         bool mutated;
-        uint256 hashMerkleRoot2 = block.BuildMerkleTree(&mutated);
+        uint256 hashMerkleRoot2 = BlockMerkleRoot(block, &mutated);
         if (block.hashMerkleRoot != hashMerkleRoot2)
             return state.DoS(100, error("CheckBlock(): hashMerkleRoot mismatch"),
                              REJECT_INVALID, "bad-txnmrklroot", true);

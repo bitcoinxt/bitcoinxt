@@ -76,9 +76,6 @@ public:
     // network and disk
     std::vector<CTransaction> vtx;
 
-    // memory only
-    mutable std::vector<uint256> vMerkleTree;
-
     CBlock()
     {
         SetNull();
@@ -102,7 +99,6 @@ public:
     {
         CBlockHeader::SetNull();
         vtx.clear();
-        vMerkleTree.clear();
     }
 
     CBlockHeader GetBlockHeader() const
@@ -117,14 +113,6 @@ public:
         return block;
     }
 
-    // Build the in-memory merkle tree for this block and return the merkle root.
-    // If non-NULL, *mutated is set to whether mutation was detected in the merkle
-    // tree (a duplication of transactions in the block leading to an identical
-    // merkle root).
-    uint256 BuildMerkleTree(bool* mutated = NULL) const;
-
-    std::vector<uint256> GetMerkleBranch(int nIndex) const;
-    static uint256 CheckMerkleBranch(uint256 hash, const std::vector<uint256>& vMerkleBranch, int nIndex);
     std::string ToString() const;
 };
 

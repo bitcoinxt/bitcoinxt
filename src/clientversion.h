@@ -65,7 +65,10 @@ extern const std::string CLIENT_DATE;
 std::string FormatFullVersion();
 std::string FormatSubVersion(const std::string& name, int nClientVersion, const std::vector<std::string>& comments, const char *releaseCharacter = "");
 
-std::string XTSubVersion(uint64_t nMaxBlockSize);
+std::string XTSubVersion(uint64_t nMaxBlockSize,
+                         const std::string& customUserAgent,
+                         std::vector<std::string> uacomments,
+                         bool hidePlatform);
 
 void ValidateUAComments(const std::vector<std::string>& uacomments);
 

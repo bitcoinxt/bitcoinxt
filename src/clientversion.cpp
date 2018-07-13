@@ -5,7 +5,6 @@
 #include "clientversion.h"
 
 #include "tinyformat.h"
-#include "options.h"
 
 #include <string>
 #include <boost/version.hpp>
@@ -152,26 +151,26 @@ std::string FormatSubVersion(const std::string& name, int nClientVersion, const 
 /**
  * The default Bitcoin XT subversion field according to BIP 14 spec
  */
-std::string XTSubVersion(uint64_t nMaxBlockSize)
+std::string XTSubVersion(uint64_t nMaxBlockSize,
+                         const std::string& customUserAgent,
+                         std::vector<std::string> uacomments,
+                         bool hidePlatform)
 {
-    std::string customUserAgent = Opt().UserAgent();
     if (!customUserAgent.empty())
         return customUserAgent;
 
-    std::vector<std::string> comments = Opt().UAComment();
-
-    if (!Opt().HidePlatform()) {
+    if (!hidePlatform) {
         std::vector<std::string> p = GetPlatformDetails();
-        comments.insert(comments.end(), p.begin(), p.end());
+        uacomments.insert(uacomments.end(), p.begin(), p.end());
     }
 
     // Announce our excessive block acceptence.
     std::stringstream ss;
     double dMaxBlockSize = double(nMaxBlockSize)/1000000;
     ss << "EB" << std::setprecision(int(log10(dMaxBlockSize))+7) << dMaxBlockSize;
-    comments.insert(end(comments), ss.str());
+    uacomments.insert(end(uacomments), ss.str());
 
-    return FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, comments, CLIENT_VERSION_XT_SUBVER);
+    return FormatSubVersion(CLIENT_NAME, CLIENT_VERSION, uacomments, CLIENT_VERSION_XT_SUBVER);
 }
 
 void ValidateUAComments(const std::vector<std::string>& comments) {

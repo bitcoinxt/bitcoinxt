@@ -1,7 +1,7 @@
 #include "thinblockbuilder.h"
 #include "thinblock.h"
 #include "util.h"
-#include "merkleblock.h"
+#include "consensus/merkle.h"
 #include "xthin.h"
 #include "uint256.h"
 #include "blockencodings.h"
@@ -124,9 +124,7 @@ CBlock ThinBlockBuilder::finishBlock() {
     for (size_t i = 0; i < thinBlock.vtx.size(); ++i)
         assert(!thinBlock.vtx[i].IsNull());
 
-    bool dummy;
-    const uint256& root = thinBlock.BuildMerkleTree(&dummy);
-
+    const uint256& root = BlockMerkleRoot(thinBlock);
 
     if (root != thinBlock.hashMerkleRoot) {
         std::stringstream ss;
