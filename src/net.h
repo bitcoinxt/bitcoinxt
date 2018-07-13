@@ -651,7 +651,7 @@ public:
         addrKnown.insert(addr.GetKey());
     }
 
-    void PushAddress(const CAddress& _addr, FastRandomContext &insecure_rand)
+    void PushAddress(const CAddress& addr, FastRandomContext &insecure_rand)
     {
         // Known checking here is only to save space from duplicates.
         // SendMessages will filter it again for knowns that were added
