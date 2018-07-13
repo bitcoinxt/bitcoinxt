@@ -538,7 +538,8 @@ void CoinControlDialog::updateLabels(WalletModel *model, QDialog* dialog)
         nBytes = nBytesInputs + ((CoinControlDialog::payAmounts.size() > 0 ? CoinControlDialog::payAmounts.size() + 1 : 2) * 34) + 10; // always assume +1 output for change here
 
         // Priority
-        double mempoolEstimatePriority = mempool.estimatePriority(nTxConfirmTarget);
+        // Using hard coded AllowFreeThreshold assumes blocks aren't consistently full.
+        double mempoolEstimatePriority = AllowFreeThreshold();
         dPriority = dPriorityInputs / (nBytes - nBytesInputs + (nQuantityUncompressed * 29)); // 29 = 180 - 151 (uncompressed public keys are over the limit. max 151 bytes of the input are ignored for priority)
         sPriorityLabel = CoinControlDialog::getPriorityLabel(dPriority, mempoolEstimatePriority);
 
@@ -686,7 +687,8 @@ void CoinControlDialog::updateView()
     QFlags<Qt::ItemFlag> flgTristate = Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsUserCheckable | Qt::ItemIsTristate;
 
     int nDisplayUnit = model->getOptionsModel()->getDisplayUnit();
-    double mempoolEstimatePriority = mempool.estimatePriority(nTxConfirmTarget);
+    // Using hard coded AllowFreeThreshold assumes blocks aren't consistently full.
+    double mempoolEstimatePriority = AllowFreeThreshold();
 
     map<QString, vector<COutput> > mapCoins;
     model->listCoins(mapCoins);
