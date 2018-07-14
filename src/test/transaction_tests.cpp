@@ -53,7 +53,8 @@ static std::map<string, unsigned int> mapFlagNames = boost::assign::map_list_of
     (string("CHECKLOCKTIMEVERIFY"), (unsigned int)SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY)
     (string("CHECKSEQUENCEVERIFY"), (unsigned int)SCRIPT_VERIFY_CHECKSEQUENCEVERIFY)
     (std::string("SIGHASH_FORKID"), (unsigned int)SCRIPT_ENABLE_SIGHASH_FORKID)
-    (std::string("MONOLITH_OPCODES"), static_cast<unsigned int>(SCRIPT_ENABLE_MONOLITH_OPCODES));
+    (std::string("MONOLITH_OPCODES"), static_cast<unsigned int>(SCRIPT_ENABLE_MONOLITH_OPCODES))
+    (std::string("CHECKDATASIG"), static_cast<unsigned int>(SCRIPT_ENABLE_CHECKDATASIG));
 
 unsigned int ParseScriptFlags(string strFlags)
 {
