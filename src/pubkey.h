@@ -10,10 +10,12 @@
 #include "serialize.h"
 #include "uint256.h"
 
+#include <boost/range/adaptor/sliced.hpp>
+
 #include <stdexcept>
 #include <vector>
 
-/** 
+/**
  * secp256k1:
  * const unsigned int PRIVATE_KEY_SIZE = 279;
  * const unsigned int PUBLIC_KEY_SIZE  = 65;
@@ -150,7 +152,7 @@ public:
 
     /*
      * Check syntactic correctness.
-     * 
+     *
      * Note that this is consensus critical as CheckSig() calls it!
      */
     bool IsValid() const
@@ -176,7 +178,11 @@ public:
     /**
      * Check whether a signature is normalized (lower-S).
      */
-    static bool CheckLowS(const std::vector<unsigned char>& vchSig);
+    static bool
+    CheckLowS(const boost::sliced_range<const std::vector<uint8_t>> &vchSig);
+    static bool CheckLowS(const std::vector<uint8_t> &vchSig) {
+        return CheckLowS(vchSig | boost::adaptors::sliced(0, vchSig.size()));
+    }
 
     //! Recover a public key from a compact signature.
     bool RecoverCompact(const uint256& hash, const std::vector<unsigned char>& vchSig);

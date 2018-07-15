@@ -177,14 +177,11 @@ bool static IsValidSignatureEncoding(const std::vector<unsigned char> &sig) {
 }
 
 bool static IsLowDERSignature(const valtype &vchSig, ScriptError* serror) {
-    if (!IsValidSignatureEncoding(vchSig)) {
-        return set_error(serror, SCRIPT_ERR_SIG_DER);
+    assert(vchSig.size() > 0);
+    if (CPubKey::CheckLowS(vchSig | boost::adaptors::sliced(0, vchSig.size() - 1))) {
+        return true;
     }
-    std::vector<unsigned char> vchSigCopy(vchSig.begin(), vchSig.begin() + vchSig.size() - 1);
-    if (!CPubKey::CheckLowS(vchSigCopy)) {
-        return set_error(serror, SCRIPT_ERR_SIG_HIGH_S);
-    }
-    return true;
+    return set_error(serror, SCRIPT_ERR_SIG_HIGH_S);
 }
 
 static SigHashType GetHashType(const valtype &vchSig) {
