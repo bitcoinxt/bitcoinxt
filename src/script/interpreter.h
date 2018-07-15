@@ -110,6 +110,7 @@ enum
 };
 
 bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned int flags, ScriptError* serror);
+bool CheckPubKeyEncoding(const std::vector<unsigned char> &vchPubKey, unsigned int flags, ScriptError *serror);
 
 struct PrecomputedTransactionData
 {
