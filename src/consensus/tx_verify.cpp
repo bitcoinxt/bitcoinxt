@@ -8,6 +8,7 @@
 #include "primitives/transaction.h"
 #include "script/interpreter.h"
 #include "validation.h"
+#include "policy/policy.h"
 
 // TODO remove the following dependencies
 #include "chain.h"
@@ -107,24 +108,25 @@ bool SequenceLocks(const CTransaction &tx, int flags, std::vector<int>* prevHeig
     return EvaluateSequenceLocks(block, CalculateSequenceLocks(tx, flags, prevHeights, block));
 }
 
-unsigned int GetLegacySigOpCount(const CTransaction& tx)
+unsigned int GetLegacySigOpCount(const CTransaction& tx, uint32_t scriptFlags)
 {
     unsigned int nSigOps = 0;
     for (const auto& txin : tx.vin)
     {
-        nSigOps += txin.scriptSig.GetSigOpCount(false);
+        nSigOps += txin.scriptSig.GetSigOpCount(scriptFlags, false);
     }
     for (const auto& txout : tx.vout)
     {
-        nSigOps += txout.scriptPubKey.GetSigOpCount(false);
+        nSigOps += txout.scriptPubKey.GetSigOpCount(scriptFlags, false);
     }
     return nSigOps;
 }
 
-unsigned int GetP2SHSigOpCount(const CTransaction& tx, const CCoinsViewCache& inputs)
+unsigned int GetP2SHSigOpCount(const CTransaction& tx, const CCoinsViewCache& inputs, uint32_t scriptFlags)
 {
-    if (tx.IsCoinBase())
+    if ((scriptFlags & SCRIPT_VERIFY_P2SH) == 0 || tx.IsCoinBase()) {
         return 0;
+    }
 
     unsigned int nSigOps = 0;
     for (unsigned int i = 0; i < tx.vin.size(); i++)
@@ -133,7 +135,7 @@ unsigned int GetP2SHSigOpCount(const CTransaction& tx, const CCoinsViewCache& in
         assert(!coin.IsSpent());
         const CTxOut &prevout = coin.out;
         if (prevout.scriptPubKey.IsPayToScriptHash())
-            nSigOps += prevout.scriptPubKey.GetSigOpCount(tx.vin[i].scriptSig);
+            nSigOps += prevout.scriptPubKey.GetSigOpCount(scriptFlags, tx.vin[i].scriptSig);
     }
     return nSigOps;
 }
@@ -168,7 +170,7 @@ bool CheckTransaction(const CTransaction& tx, CValidationState &state)
                              REJECT_INVALID, "bad-txns-txouttotal-toolarge");
     }
 
-    if (GetLegacySigOpCount(tx) > MAX_TX_SIGOPS_COUNT) {
+    if (GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS) > MAX_TX_SIGOPS_COUNT) {
         return state.DoS(100, error("CheckTransaction(): too many sigops in tx"), REJECT_INVALID, "bad-txn-sigops");
     }
 

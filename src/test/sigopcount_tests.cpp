@@ -6,6 +6,7 @@
 #include "consensus/tx_verify.h"
 #include "consensus/validation.h"
 #include "random.h"
+#include "policy/policy.h" // For STANDARD_CHECKDATASIG_VERIFY_FLAGS.
 #include "pubkey.h"
 #include "key.h"
 #include "script/script.h"
@@ -32,15 +33,23 @@ BOOST_FIXTURE_TEST_SUITE(sigopcount_tests, BasicTestingSetup)
 
 void CheckScriptSigOps(const CScript &script, uint32_t accurate_sigops,
                        uint32_t inaccurate_sigops) {
-    BOOST_CHECK_EQUAL(script.GetSigOpCount(false), inaccurate_sigops);
-    BOOST_CHECK_EQUAL(script.GetSigOpCount(true), accurate_sigops);
+    const uint32_t flags = STANDARD_CHECKDATASIG_VERIFY_FLAGS;
+
+    BOOST_CHECK_EQUAL(script.GetSigOpCount(flags, false), inaccurate_sigops);
+    BOOST_CHECK_EQUAL(script.GetSigOpCount(flags, true), accurate_sigops);
 
     const CScript p2sh = GetScriptForDestination(CScriptID(script));
     const CScript scriptSig = CScript() << OP_0 << Serialize(script);
-    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(scriptSig), accurate_sigops);
+    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(flags, scriptSig), accurate_sigops);
+
+    // Check that GetSigOpCount do not report sigops in the P2SH script when the
+    // P2SH flags isn't passed in.
+    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(SCRIPT_VERIFY_NONE, scriptSig), 0U);
 
     // Check that GetSigOpCount report the exact count when not passed a P2SH.
-    BOOST_CHECK_EQUAL(script.GetSigOpCount(p2sh), accurate_sigops);
+    BOOST_CHECK_EQUAL(script.GetSigOpCount(flags, p2sh), accurate_sigops);
+    BOOST_CHECK_EQUAL(script.GetSigOpCount(SCRIPT_VERIFY_NONE, p2sh),
+                      accurate_sigops);
 }
 
 BOOST_AUTO_TEST_CASE(GetSigOpCount) {
@@ -73,7 +82,9 @@ BOOST_AUTO_TEST_CASE(GetSigOpCount) {
     CScript scriptSig2;
     scriptSig2 << OP_1 << ToByteVector(dummy) << ToByteVector(dummy)
                << Serialize(s3);
-    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(scriptSig2), 3U);
+    BOOST_CHECK_EQUAL(
+        p2sh.GetSigOpCount(STANDARD_CHECKDATASIG_VERIFY_FLAGS, scriptSig2), 3U);
+    BOOST_CHECK_EQUAL(p2sh.GetSigOpCount(SCRIPT_VERIFY_NONE, scriptSig2), 0U);
 }
 
 BOOST_AUTO_TEST_CASE(test_max_sigops_per_tx) {
@@ -185,10 +196,10 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
         // Legacy counting only includes signature operations in scriptSigs and scriptPubKeys
         // of a transaction and does not take the actual executed sig operations into account.
         // spendingTx in itself does not contain a signature operation.
-        BOOST_CHECK(GetLegacySigOpCount(CTransaction(spendingTx)) == 0);
+        BOOST_CHECK(GetLegacySigOpCount(CTransaction(spendingTx), flags) == 0);
         // creationTx contains two signature operations in its scriptPubKey, but legacy counting
         // is not accurate.
-        BOOST_CHECK(GetLegacySigOpCount(CTransaction(creationTx)) == MAX_PUBKEYS_PER_MULTISIG);
+        BOOST_CHECK(GetLegacySigOpCount(CTransaction(creationTx), flags) == MAX_PUBKEYS_PER_MULTISIG);
         // Sanity check: script verification fails because of an invalid signature.
         BOOST_CHECK(VerifyWithFlag(creationTx, spendingTx, flags) == SCRIPT_ERR_CHECKMULTISIGVERIFY);
     }
@@ -200,8 +211,13 @@ BOOST_AUTO_TEST_CASE(GetTxSigOpCost)
         CScript scriptSig = CScript() << OP_0 << OP_0 << ToByteVector(redeemScript);
 
         BuildTxs(spendingTx, coins, creationTx, scriptPubKey, scriptSig);
-        BOOST_CHECK(GetP2SHSigOpCount(CTransaction(spendingTx), coins) == 2);
+        BOOST_CHECK(GetP2SHSigOpCount(CTransaction(spendingTx), coins, flags) == 2);
         BOOST_CHECK(VerifyWithFlag(creationTx, spendingTx, flags) == SCRIPT_ERR_CHECKMULTISIGVERIFY);
+
+        // Make sure P2SH sigops are not counted if the flag for P2SH is not
+        // passed in.
+        BOOST_CHECK_EQUAL(GetP2SHSigOpCount(CTransaction(spendingTx),
+                    coins, SCRIPT_VERIFY_NONE), 0);
     }
 }
 

@@ -258,7 +258,8 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         UpdateTime(pblock, Params().GetConsensus(), pindexPrev);
         pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
         pblock->nNonce         = 0;
-        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
+        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0],
+                                                           STANDARD_CHECKDATASIG_VERIFY_FLAGS);
 
         CValidationState state;
         if (!TestBlockValidity(state, *pblock, pindexPrev, false, false)) {

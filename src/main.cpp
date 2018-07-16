@@ -942,8 +942,8 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
         // itself can contain sigops MAX_STANDARD_TX_SIGOPS is less than
         // MaxBlockSigops(), we still consider this an invalid rather than
         // merely non-standard transaction.
-        unsigned int nSigOps = GetLegacySigOpCount(tx);
-        nSigOps += GetP2SHSigOpCount(tx, view);
+        unsigned int nSigOps = GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
+        nSigOps += GetP2SHSigOpCount(tx, view, STANDARD_SCRIPT_VERIFY_FLAGS);
         if (nSigOps > MAX_STANDARD_TX_SIGOPS)
             return state.DoS(0,
                              error("AcceptToMemoryPool: too many sigops %s, %d > %d",
@@ -1967,7 +1967,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
         if (tx.IsCoinBase()) {
             // We've already checked legacy sigop count (non-P2SH) in CheckBlock.
-            nSigOps += GetLegacySigOpCount(tx);
+            nSigOps += GetLegacySigOpCount(tx, flags);
         }
         if (anyOrderRule || tx.IsCoinBase()) {
             AddCoins(view, tx, pindex->nHeight);
@@ -1996,14 +1996,14 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
                              REJECT_INVALID, "bad-txns-nonfinal");
         }
 
-        unsigned int nTxSigOps = GetLegacySigOpCount(tx);
+        unsigned int nTxSigOps = GetLegacySigOpCount(tx, flags);
         nSigOps += nTxSigOps;
         if (fStrictPayToScriptHash)
         {
             // Add in sigops done by pay-to-script-hash inputs;
             // this is to prevent a "rogue miner" from creating
             // an incredibly-expensive-to-validate block.
-            unsigned int nP2SHSigOps = GetP2SHSigOpCount(tx, view);
+            unsigned int nP2SHSigOps = GetP2SHSigOpCount(tx, view, flags);
             nSigOps += nP2SHSigOps;
             nTxSigOps += nP2SHSigOps;
             if (nSigOps > MaxBlockSigops(nBlockSize))
@@ -2894,7 +2894,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     unsigned int nSigOps = 0;
     BOOST_FOREACH(const CTransaction& tx, block.vtx)
     {
-        nSigOps += GetLegacySigOpCount(tx);
+        nSigOps += GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
     }
     if (nSigOps > MaxBlockSigops(::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)))
         return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"), REJECT_INVALID, "bad-blk-sigops", true);
