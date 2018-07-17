@@ -60,8 +60,9 @@ static bool IsCompressedPubKey(const valtype &vchPubKey)
  *
  * This function is consensus-critical since BIP66.
  */
-bool static IsValidSignatureEncoding(const std::vector<unsigned char> &sig) {
-    // Format: 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S] [sighash]
+static bool
+IsValidSignatureEncoding(const boost::sliced_range<const valtype> &sig) {
+    // Format: 0x30 [total-length] 0x02 [R-length] [R] 0x02 [S-length] [S]
     // * total-length: 1-byte length descriptor of everything that follows,
     //   excluding the sighash byte.
     // * R-length: 1-byte length descriptor of the R value that follows.
@@ -70,11 +71,9 @@ bool static IsValidSignatureEncoding(const std::vector<unsigned char> &sig) {
     //   the start, except a single one when the next byte has its highest bit set).
     // * S-length: 1-byte length descriptor of the S value that follows.
     // * S: arbitrary-length big-endian encoded S value. The same rules apply.
-    // * sighash: 1-byte value indicating what data is hashed (not part of the DER
-    //   signature)
 
     // Minimum and maximum size constraints.
-    if (sig.size() < 9 || sig.size() > 73) {
+    if (sig.size() < 8 || sig.size() > 72) {
         return false;
     }
 
@@ -91,8 +90,7 @@ bool static IsValidSignatureEncoding(const std::vector<unsigned char> &sig) {
     // Remove:
     // * 1 byte for the coupound type.
     // * 1 byte for the length of the signature.
-    // * 1 byte for the sighash type.
-    if (sig[1] != sig.size() - 3) {
+    if (sig[1] != sig.size() - 2) {
         return false;
     }
 
@@ -126,8 +124,7 @@ bool static IsValidSignatureEncoding(const std::vector<unsigned char> &sig) {
     // * 2 bytes for the integer type of R and S.
     // * 2 bytes for the size of R and S.
     // * 1 byte for S itself.
-    // * 1 byte for the sighash type.
-    if (lenR > (sig.size() - 8)) {
+    if (lenR > (sig.size() - 7)) {
         return false;
     }
 
@@ -175,8 +172,7 @@ bool static IsValidSignatureEncoding(const std::vector<unsigned char> &sig) {
     // including metadatas:
     // * 1 byte for the integer type of S.
     // * 1 byte for the size of S.
-    // * 1 byte for the sighash type.
-    if (size_t(startS + lenS + 3) != sig.size()) {
+    if (size_t(startS + lenS + 2) != sig.size()) {
         return false;
     }
 
@@ -220,7 +216,10 @@ bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig, unsigned i
     if (vchSig.size() == 0) {
         return true;
     }
-    if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S | SCRIPT_VERIFY_STRICTENC)) != 0 && !IsValidSignatureEncoding(vchSig)) {
+    if ((flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S |
+                  SCRIPT_VERIFY_STRICTENC)) != 0 &&
+        !IsValidSignatureEncoding(
+            vchSig | boost::adaptors::sliced(0, vchSig.size() - 1))) {
         return set_error(serror, SCRIPT_ERR_SIG_DER);
     }
     if ((flags & SCRIPT_VERIFY_LOW_S) != 0 && !IsLowDERSignature(vchSig, serror)) {
