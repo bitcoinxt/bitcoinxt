@@ -245,22 +245,6 @@ bool CCoinsViewCache::HaveInputs(const CTransaction& tx) const
     return true;
 }
 
-double CCoinsViewCache::GetPriority(const CTransaction &tx, uint32_t nHeight) const
-{
-    if (tx.IsCoinBase())
-        return 0.0;
-    double dResult = 0.0;
-    BOOST_FOREACH(const CTxIn& txin, tx.vin)
-    {
-        const Coin& coin = AccessCoin(txin.prevout);
-        if (coin.IsSpent()) continue;
-        if (coin.nHeight < nHeight) {
-            dResult += coin.out.nValue * (nHeight - coin.nHeight);
-        }
-    }
-    return tx.ComputePriority(dResult);
-}
-
 // TODO: merge with similar definition in undo.h.
 static const size_t MAX_OUTPUTS_PER_TX =
     MAX_TRANSACTION_SIZE / ::GetSerializeSize(CTxOut(), SER_NETWORK, PROTOCOL_VERSION);

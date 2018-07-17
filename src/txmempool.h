@@ -22,18 +22,6 @@
 class CAutoFile;
 class CBlockIndex;
 
-inline double AllowFreeThreshold()
-{
-    return COIN * 144 / 250;
-}
-
-inline bool AllowFree(double dPriority)
-{
-    // Large (in bytes) low-priority (new, small-coin) transactions
-    // need a fee.
-    return dPriority > AllowFreeThreshold();
-}
-
 /** Fake height value used in Coin to signify they are only in the memory pool (since 0.8) */
 static const uint32_t MEMPOOL_HEIGHT = 0x7FFFFFFF;
 
@@ -77,7 +65,6 @@ private:
     CTransaction tx;
     CAmount nFee; //! Cached to avoid expensive parent-transaction lookups
     size_t nTxSize; //! ... and avoid recomputing tx size
-    size_t nModSize; //! ... and modified size for priority
     size_t nUsageSize; //! ... and total memory usage
     int64_t nTime; //! Local time when entering the mempool
     unsigned int nHeight; //! Chain height when entering the mempool
