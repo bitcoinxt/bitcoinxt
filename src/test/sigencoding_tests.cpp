@@ -23,8 +23,11 @@ static valtype SignatureWithHashType(valtype vchSig, SigHashType sigHash) {
 static void
 CheckSignatureErrorForAllSigHashType(const valtype &vchSig, uint32_t flags,
                                      const ScriptError expected_error) {
+    ScriptError err = SCRIPT_ERR_OK;
+    BOOST_CHECK(!CheckDataSignatureEncoding(vchSig, flags, &err));
+    BOOST_CHECK_EQUAL(err, expected_error);
+
     for (int i = 0; i <= 0xff; i++) {
-        ScriptError err = SCRIPT_ERR_OK;
         valtype sig = SignatureWithHashType(vchSig, SigHashType(i));
         BOOST_CHECK(!CheckTransactionSignatureEncoding(sig, flags, &err));
         BOOST_CHECK_EQUAL(err, expected_error);
@@ -33,6 +36,9 @@ CheckSignatureErrorForAllSigHashType(const valtype &vchSig, uint32_t flags,
 
 static void CheckSignatureEncodingWithSigHashType(const valtype &vchSig,
                                                   uint32_t flags) {
+    ScriptError err = SCRIPT_ERR_OK;
+    BOOST_CHECK(CheckDataSignatureEncoding(vchSig, flags, &err));
+
     const bool hasForkId = (flags & SCRIPT_ENABLE_SIGHASH_FORKID) != 0;
     const bool hasStrictEnc = (flags & SCRIPT_VERIFY_STRICTENC) != 0;
 
@@ -46,8 +52,6 @@ static void CheckSignatureEncodingWithSigHashType(const valtype &vchSig,
     }
 
     for (const SigHashType baseSigHash : baseSigHashes) {
-        ScriptError err = SCRIPT_ERR_OK;
-
         // Check the signature with the proper forkid flag.
         SigHashType sigHash = baseSigHash;
         if (hasForkId) {
@@ -180,6 +184,7 @@ BOOST_AUTO_TEST_CASE(checksignatureencoding_test) {
         ScriptError err = SCRIPT_ERR_OK;
 
         // Empty sig is always valid.
+        BOOST_CHECK(CheckDataSignatureEncoding({}, flags, &err));
         BOOST_CHECK(CheckTransactionSignatureEncoding({}, flags, &err));
 
         // Signature are valid as long as the forkid flag is correct.
