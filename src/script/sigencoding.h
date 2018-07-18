@@ -20,7 +20,12 @@ inline SigHashType GetHashType(const std::vector<unsigned char> &vchSig) {
     return SigHashType(vchSig[vchSig.size() - 1]);
 }
 
-bool CheckSignatureEncoding(const std::vector<unsigned char> &vchSig,
-        unsigned int flags, ScriptError* serror);
+/**
+ * Check that the signature provided to authentify a transaction is properly
+ * encoded. Signatures passed to OP_CHECKSIG, OP_CHECKMULTISIG and their verify
+ * variants must be checked using this function.
+ */
+bool CheckTransactionSignatureEncoding(const std::vector<unsigned char> &vchSig, uint32_t flags,
+                                       ScriptError *serror);
 
 #endif

@@ -26,7 +26,7 @@ CheckSignatureErrorForAllSigHashType(const valtype &vchSig, uint32_t flags,
     for (int i = 0; i <= 0xff; i++) {
         ScriptError err = SCRIPT_ERR_OK;
         valtype sig = SignatureWithHashType(vchSig, SigHashType(i));
-        BOOST_CHECK(!CheckSignatureEncoding(sig, flags, &err));
+        BOOST_CHECK(!CheckTransactionSignatureEncoding(sig, flags, &err));
         BOOST_CHECK_EQUAL(err, expected_error);
     }
 }
@@ -54,7 +54,7 @@ static void CheckSignatureEncodingWithSigHashType(const valtype &vchSig,
             sigHash |= SigHashType::FORKID;
         }
         valtype validSig = SignatureWithHashType(vchSig, sigHash);
-        BOOST_CHECK(CheckSignatureEncoding(validSig, flags, &err));
+        BOOST_CHECK(CheckTransactionSignatureEncoding(validSig, flags, &err));
 
         // If we have strict encoding, we prevent the use of undefined flags.
         std::array<SigHashType, 2> undefSigHashes{
@@ -64,8 +64,9 @@ static void CheckSignatureEncodingWithSigHashType(const valtype &vchSig,
 
         for (SigHashType undefSigHash : undefSigHashes) {
             valtype undefSighash = SignatureWithHashType(vchSig, undefSigHash);
-            BOOST_CHECK_EQUAL(CheckSignatureEncoding(undefSighash, flags, &err),
-                              !hasStrictEnc);
+            BOOST_CHECK_EQUAL(
+                CheckTransactionSignatureEncoding(undefSighash, flags, &err),
+                !hasStrictEnc);
             if (hasStrictEnc) {
                 BOOST_CHECK_EQUAL(err, SCRIPT_ERR_SIG_HASHTYPE);
             }
@@ -77,8 +78,9 @@ static void CheckSignatureEncodingWithSigHashType(const valtype &vchSig,
             : baseSigHash | SigHashType::FORKID;
         valtype invalidSig = SignatureWithHashType(vchSig, invalidSigHash);
 
-        BOOST_CHECK_EQUAL(CheckSignatureEncoding(invalidSig, flags, &err),
-                          !hasStrictEnc);
+        BOOST_CHECK_EQUAL(
+            CheckTransactionSignatureEncoding(invalidSig, flags, &err),
+            !hasStrictEnc);
         if (hasStrictEnc) {
             BOOST_CHECK_EQUAL(err,
                               hasForkId ? SCRIPT_ERR_MUST_USE_FORKID
@@ -178,7 +180,7 @@ BOOST_AUTO_TEST_CASE(checksignatureencoding_test) {
         ScriptError err = SCRIPT_ERR_OK;
 
         // Empty sig is always valid.
-        BOOST_CHECK(CheckSignatureEncoding({}, flags, &err));
+        BOOST_CHECK(CheckTransactionSignatureEncoding({}, flags, &err));
 
         // Signature are valid as long as the forkid flag is correct.
         CheckSignatureEncodingWithSigHashType(minimalSig, flags);
