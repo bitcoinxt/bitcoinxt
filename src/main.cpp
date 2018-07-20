@@ -569,9 +569,9 @@ void InFlightEraserImpl::operator()(NodeId node, const uint256& hash) {
         state->nBlocksInFlight--;
         state->nStallingSince = 0;
     }
+    int64_t getdataTime = q->nTime;
     blocksInFlight.erase(q);
 
-    int64_t getdataTime = q->nTime;
     int64_t now = GetTimeMicros();
     LogPrint(Log::BLOCK, "Block no longer in flight %s %.2f seconds after requesting it peer=%d\n",
             hash.ToString(), (now - getdataTime) / 1000000.0, (node));
