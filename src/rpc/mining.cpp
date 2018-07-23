@@ -345,7 +345,7 @@ UniValue prioritisetransaction(const JSONRPCRequest& request)
     uint256 hash = ParseHashStr(request.params[0].get_str(), "txid");
     CAmount nAmount = request.params[1].get_int64();
 
-    mempool.PrioritiseTransaction(hash, nAmount);
+    mempool.GetFeeModifier().AddDelta(hash, nAmount);
     return true;
 }
 

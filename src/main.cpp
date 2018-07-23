@@ -838,8 +838,7 @@ CAmount GetMinRelayFee(const CTransaction& tx, unsigned int nBytes, bool fAllowF
 {
     {
         uint256 hash = tx.GetHash();
-        CAmount nFeeDelta = 0;
-        mempool.ApplyDeltas(hash, nFeeDelta);
+        CAmount nFeeDelta = mempool.GetFeeModifier().GetDelta(hash);
         if (nFeeDelta > 0)
             return 0;
     }
@@ -1097,7 +1096,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
         // Set a fee delta to protect local wallet transactions from mempool size-based eviction
         if (!fLimitFree) {
-            pool.PrioritiseTransaction(hash, 1);
+            pool.GetFeeModifier().AddDelta(hash, 1);
         }
 
         // Store transaction in memory

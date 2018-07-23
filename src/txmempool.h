@@ -11,8 +11,10 @@
 
 #include "amount.h"
 #include "coins.h"
+#include "mempoolfeemodifier.h"
 #include "primitives/transaction.h"
 #include "sync.h"
+#include "utilhash.h"
 
 #undef foreach
 #include "boost/multi_index_container.hpp"
@@ -281,20 +283,6 @@ public:
     size_t DynamicMemoryUsage() const { return 0; }
 };
 
-class SaltedTxidHasher
-{
-private:
-    /** Salt */
-    const uint64_t k0, k1;
-
-public:
-    SaltedTxidHasher();
-
-    size_t operator()(const uint256& txid) const {
-        return SipHashUint256(k0, k1, txid);
-    }
-};
-
 /**
  * CTxMemPool stores valid-according-to-the-current-best-chain
  * transactions that may be included in the next block.
@@ -386,7 +374,7 @@ public:
         CTxMemPoolEntry,
         boost::multi_index::indexed_by<
             // sorted by txid
-            boost::multi_index::hashed_unique<mempoolentry_txid, SaltedTxidHasher>,
+            boost::multi_index::hashed_unique<mempoolentry_txid, SaltedTxIDHasher>,
             // sorted by fee rate
             boost::multi_index::ordered_non_unique<
                 boost::multi_index::identity<CTxMemPoolEntry>,
@@ -426,13 +414,13 @@ private:
 
     typedef std::map<txiter, TxLinks, CompareIteratorByHash> txlinksMap;
     txlinksMap mapLinks;
+    MempoolFeeModifier feemodifier;
 
     void UpdateParent(txiter entry, txiter parent, bool add);
     void UpdateChild(txiter entry, txiter child, bool add);
 
 public:
     std::map<COutPoint, CInPoint> mapNextTx;
-    std::map<uint256, CAmount> mapDeltas;
 
     CTxMemPool(const CFeeRate& _minRelayFee);
     ~CTxMemPool();
@@ -469,11 +457,6 @@ public:
      * the tx is not dependent on other mempool transactions to be included in a block.
      */
     bool HasNoInputsOf(const CTransaction& tx) const;
-
-    /** Affect CreateNewBlock prioritisation of transactions */
-    void PrioritiseTransaction(const uint256& hash, const CAmount& nFeeDelta);
-    void ApplyDeltas(const uint256& hash, CAmount &nFeeDelta);
-    void ClearPrioritisation(const uint256& hash);
 
 public:
     /** Remove a set of transactions from the mempool.
@@ -555,6 +538,9 @@ public:
     bool ReadFeeEstimates(CAutoFile& filein);
 
     size_t DynamicMemoryUsage() const;
+
+    MempoolFeeModifier& GetFeeModifier() { return feemodifier; }
+    const MempoolFeeModifier& GetFeeModifier() const { return feemodifier; }
 
 private:
     /** UpdateForDescendants is used by UpdateTransactionsFromBlock to update
