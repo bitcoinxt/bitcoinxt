@@ -67,6 +67,10 @@ public:
      * disables nLockTime. */
     static const uint32_t SEQUENCE_FINAL = 0xffffffff;
 
+    /* If this flag NOT set, immediate relay of the containing
+     * transaction is requested. */
+    static const uint32_t SEQUENCE_IMMED_RELAY_DISABLE_FLAG = (1 << 30);
+
     /* Below flags apply in the context of BIP 68*/
     /* If this flag set, CTxIn::nSequence is NOT interpreted as a
      * relative lock-time. */
@@ -267,6 +271,8 @@ public:
     {
         return (vin.size() == 1 && vin[0].prevout.IsNull());
     }
+
+    bool IsImmediateRelay() const;
 
     friend bool operator==(const CTransaction& a, const CTransaction& b)
     {

@@ -2025,7 +2025,11 @@ void CConnman::GetNodeStats(std::vector<CNodeStats>& vstats)
 
 void CConnman::RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors)
 {
-    CInv inv(MSG_TX, tx.GetHash());
+    CInv::RelayService service = tx.IsImmediateRelay() ?
+                                 CInv::RELAY_SERVICE_IMMEDIATE :
+                                 CInv::RELAY_SERVICE_STANDARD;
+
+    CInv inv(MSG_TX, tx.GetHash(), service);
     {
         LOCK(cs_mapRelay);
         // Expire old relay messages
@@ -2051,7 +2055,9 @@ void CConnman::RelayTransaction(const CTransaction& tx, const CDataStream& ss, s
                 BOOST_FOREACH(uint256& hashFound, vAncestors) {
                     if (hashFound != tx.GetHash() && pnode->pfilter->WantsAncestors())
                         pnode->pfilter->insert(hashFound);
-                    if (hashFound == tx.GetHash() || pnode->pfilter->WantsAncestors())
+                    if (hashFound == tx.GetHash())
+                        pnode->PushInventory(inv);
+                    if (pnode->pfilter->WantsAncestors())
                         pnode->PushInventory(CInv(MSG_TX, hashFound));
                 }
             }

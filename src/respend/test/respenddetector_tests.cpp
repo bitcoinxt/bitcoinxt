@@ -28,7 +28,8 @@ class DummyRespendAction : public RespendAction {
                 const CTxMemPool::txiter mempoolEntry,
                 const CTransaction& respendTx,
                 bool respentBefore,
-                bool isEquivalent) override
+                bool isEquivalent,
+                bool isSICandidate) override
         {
             addOutpointCalls++;
             this->respentBefore = respentBefore;
@@ -39,10 +40,11 @@ class DummyRespendAction : public RespendAction {
         bool IsInteresting() const override {
             return returnInteresting;
         }
-        void SetValid(bool v) override {
+        void OnValidTrigger(bool v, CTxMemPool&,
+                CTxMemPool::setEntries&) override {
             valid = v;
         }
-        void Trigger() override {
+        void OnFinishedTrigger() override {
             triggered = true;
         }
 

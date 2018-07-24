@@ -15,15 +15,16 @@ class RespendLogger : public RespendAction {
 
         bool AddOutpointConflict(
                 const COutPoint&, const CTxMemPool::txiter mempoolEntry,
-                const CTransaction& respendTx, bool seen, bool isEquivalent) override;
+                const CTransaction& respendTx, bool seenBefore,
+                bool isEquivalent, bool isSICandidate) override;
 
-        virtual bool IsInteresting() const override;
+        bool IsInteresting() const override;
 
-        void Trigger() override;
-
-        void SetValid(bool v) override {
+        void OnValidTrigger(bool v, CTxMemPool&,
+                CTxMemPool::setEntries&) override {
             valid = v ? "yes" : "no";
         }
+        void OnFinishedTrigger() override;
 
     private:
         std::string orig;

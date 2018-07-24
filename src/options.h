@@ -22,8 +22,9 @@ public:
         int64_t UAHFTime() const;
         int UAHFProtectSunset();
         int64_t RespendRelayLimit() const;
-	bool UseCashAddr() const;
-	int64_t ThirdHFTime() const;
+        bool UseCashAddr() const;
+        int64_t ThirdHFTime() const;
+        bool ReplaceBySI() const;
 
         // Thin block options
         bool UsingThinBlocks();

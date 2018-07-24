@@ -178,3 +178,14 @@ bool AreInputsStandard(const CTransaction& tx, const CCoinsViewCache& mapInputs)
 
     return true;
 }
+
+bool IsSuperStandardImmediateTx(const CTransaction& tx, bool hadNoDependencies, size_t nTxSize)
+{
+    if (!hadNoDependencies || tx.vin.size() > 1 || !tx.IsImmediateRelay())
+        return false;
+
+    if (nTxSize == 0)
+        nTxSize = ::GetSerializeSize(tx, SER_NETWORK, PROTOCOL_VERSION);
+
+    return nTxSize <= MAX_SUPERSTANDARD_TX_SIZE;
+}

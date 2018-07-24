@@ -8,6 +8,7 @@
 #include "respend/respendaction.h"
 #include "respend/respendlogger.h"
 #include "respend/respendrelayer.h"
+#include "respend/mempoolremover.h"
 #include "respend/walletnotifier.h"
 #include "util.h"
 
@@ -25,6 +26,10 @@ std::vector<RespendActionPtr> CreateDefaultActions(CConnman* connman) {
     if (connman) {
         actions.push_back(RespendActionPtr(new RespendRelayer{connman}));
     }
+    if (Opt().ReplaceBySI()) {
+        actions.push_back(RespendActionPtr(
+                new MempoolRemover{MempoolRemover::REMOVE_NON_SI}));
+    }
     if (LogAcceptCategory(Log::RESPEND)) {
         actions.push_back(RespendActionPtr(new RespendLogger{}));
     }
@@ -35,8 +40,8 @@ std::vector<RespendActionPtr> CreateDefaultActions(CConnman* connman) {
 }
 
 RespendDetector::RespendDetector(
-        const CTxMemPool& pool, const CTransaction& tx,
-        std::vector<RespendActionPtr> actions) : actions(actions)
+        CTxMemPool& pool, const CTransaction& tx,
+        std::vector<RespendActionPtr> actions) : pool(pool), actions(actions)
 {
     {
         std::lock_guard<std::mutex> lock(respentBeforeMutex);
@@ -44,7 +49,7 @@ RespendDetector::RespendDetector(
             respentBefore.reset(new CRollingBloomFilter(MAX_RESPEND_BLOOM, 0.01));
         }
     }
-    CheckForRespend(pool, tx);
+    CheckForRespend(tx);
 }
 
 RespendDetector::~RespendDetector() {
@@ -52,7 +57,7 @@ RespendDetector::~RespendDetector() {
     // information they've gathered.
     for (auto& a : actions) {
         try {
-            a->Trigger();
+            a->OnFinishedTrigger();
         }
         catch (const std::exception& e) {
             LogPrintf("respend: ERROR - respend action threw: %s\n", e.what());
@@ -60,8 +65,7 @@ RespendDetector::~RespendDetector() {
    }
 }
 
-void RespendDetector::CheckForRespend(
-        const CTxMemPool& pool, const CTransaction& tx) {
+void RespendDetector::CheckForRespend(const CTransaction& tx) {
 
     LOCK(pool.cs); // protect pool.mapNextTx
 
@@ -74,44 +78,44 @@ void RespendDetector::CheckForRespend(
         if (spendIter == pool.mapNextTx.end())
             continue;
 
-        conflictingOutpoints.push_back(outpoint);
-
         CTxMemPool::txiter poolIter = pool.mapTx.find(spendIter->second.ptx->GetHash());
         if (poolIter == pool.mapTx.end() || poolIter->GetTx() == tx)
             continue;
 
+        conflictingEntries.insert(poolIter);
+
         bool collectMore = false;
-        bool seen;
+        bool seenBefore;
         {
             std::lock_guard<std::mutex> lock(respentBeforeMutex);
-            seen = respentBefore->contains(outpoint);
+            seenBefore = respentBefore->contains(poolIter->GetTx().GetHash());
         }
         for (auto& a : actions) {
             // Actions can return true if they want to check more
             // outpoints for conflicts.
-            bool m = a->AddOutpointConflict(outpoint, poolIter, tx, seen,
-                                                   tx.IsEquivalentTo(poolIter->GetTx()));
+            bool m = a->AddOutpointConflict(outpoint, poolIter, tx, seenBefore,
+                    tx.IsEquivalentTo(poolIter->GetTx()), pool.HasNoInputsOf(tx));
             collectMore = collectMore || m;
         }
         if (!collectMore)
-            return;
+            break;
     }
 }
 
 void RespendDetector::SetValid(bool valid) {
+    for (auto& a : actions) {
+        a->OnValidTrigger(valid, pool, conflictingEntries);
+    }
     if (valid) {
         std::lock_guard<std::mutex> lock(respentBeforeMutex);
-        for (auto& o : conflictingOutpoints) {
-            respentBefore->insert(o);
+        for (auto& it : conflictingEntries) {
+            respentBefore->insert(it->GetTx().GetHash());
         }
-    }
-    for (auto& a : actions) {
-        a->SetValid(valid);
     }
 }
 
 bool RespendDetector::IsRespend() const {
-    return !conflictingOutpoints.empty();
+    return !conflictingEntries.empty();
 }
 
 bool RespendDetector::IsInteresting() const {

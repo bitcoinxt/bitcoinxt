@@ -24,11 +24,11 @@ std::vector<RespendActionPtr> CreateDefaultActions(CConnman*);
 class RespendDetector {
     public:
 
-        RespendDetector(const CTxMemPool& pool, const CTransaction& tx,
+        RespendDetector(CTxMemPool&, const CTransaction& tx,
                         std::vector<RespendActionPtr>);
 
         ~RespendDetector();
-        void CheckForRespend(const CTxMemPool& pool, const CTransaction& tx);
+        void CheckForRespend(const CTransaction& tx);
         void SetValid(bool valid);
         bool IsRespend() const;
 
@@ -36,12 +36,14 @@ class RespendDetector {
         bool IsInteresting() const;
 
     private:
-        std::vector<COutPoint> conflictingOutpoints;
+        CTxMemPool& pool;
+        std::vector<RespendActionPtr> actions;
 
-        // Outputs we've already seen in valid double spending transactions
+        CTxMemPool::setEntries conflictingEntries;
+
+        // SI TXIDs already respent by a later SI transaction
         static std::unique_ptr<CRollingBloomFilter> respentBefore;
         static std::mutex respentBeforeMutex;
-        std::vector<RespendActionPtr> actions;
 };
 
 } // ns respend

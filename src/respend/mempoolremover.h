@@ -8,26 +8,33 @@
 
 namespace respend {
 
-// Removes any conflicting txes from the mempool
+// Removes conflicting txes from the mempool
 class MempoolRemover : public RespendAction {
     public:
-        MempoolRemover(CTxMemPool& pool, std::list<CTransaction>& removed);
+
+        enum RemoveWhat {
+            REMOVE_ALL = 0,
+            REMOVE_NON_SI,
+        };
+
+        MempoolRemover(RemoveWhat toRemove = REMOVE_ALL,
+                       std::list<CTransaction>* removed = nullptr);
 
         bool AddOutpointConflict(
                 const COutPoint&, const CTxMemPool::txiter,
-                const CTransaction& respendTx,
-                bool seenBefore, bool isEquivalent) override;
+                const CTransaction& respendTx, bool seenBefore,
+                bool isEquivalent, bool isSICandidate) override;
 
         bool IsInteresting() const override;
-        void SetValid(bool v) override {
-            valid = v;
-        }
-        void Trigger() override;
+        void OnValidTrigger(bool v, CTxMemPool&,
+                CTxMemPool::setEntries&) override;
+        void OnFinishedTrigger() override {}
 
     private:
-        CTxMemPool& pool;
-        std::list<CTransaction>& removed;
-        CTxMemPool::setEntries tx1s;
+        RemoveWhat toRemove;
+        std::list<CTransaction>* removed;
+        std::list<CTransaction> dummy;
+        bool canReplace;
         bool valid;
 };
 

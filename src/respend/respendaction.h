@@ -27,15 +27,18 @@ class RespendAction {
                 // If we've seen a valid tx respending this output before
                 bool seenBefore,
                 // If original and respend tx only differ in script
-                bool isEquivalent) = 0;
+                bool isEquivalent,
+                // If respend tx may be SuperStandardImmediate
+                bool isSICandidate) = 0;
 
         // If this respend is interesting enough to this action to trigger full
         // tx validation.
         virtual bool IsInteresting() const = 0;
-        // Called after tx is validated and only if it's validated.
-        virtual void SetValid(bool) = 0;
-        // Action should do its thing now.
-        virtual void Trigger() = 0;
+        // Called after tx is validated
+        virtual void OnValidTrigger(bool v, CTxMemPool&,
+                CTxMemPool::setEntries&) = 0;
+        // Called just before end of RespendDetector lifetime
+        virtual void OnFinishedTrigger() = 0;
 };
 inline RespendAction::~RespendAction() { }
 

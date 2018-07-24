@@ -13,8 +13,8 @@ WalletNotifier::WalletNotifier() : valid(false), interesting(false)
 
 bool WalletNotifier::AddOutpointConflict(
         const COutPoint&, const CTxMemPool::txiter,
-        const CTransaction& respendTx,
-        bool seenBefore, bool isEquivalent)
+        const CTransaction& respendTx, bool seenBefore,
+        bool isEquivalent, bool isSICandidate)
 {
     if (isEquivalent || seenBefore)
         return true; // look at more outpoints
@@ -33,11 +33,12 @@ bool WalletNotifier::IsInteresting() const {
     return interesting;
 }
 
-void WalletNotifier::SetValid(bool v) {
+void WalletNotifier::OnValidTrigger(bool v, CTxMemPool&,
+        CTxMemPool::setEntries&) {
     valid = v;
 }
 
-void WalletNotifier::Trigger() {
+void WalletNotifier::OnFinishedTrigger() {
     if (!valid || !interesting) {
         return;
     }
