@@ -249,6 +249,11 @@ uint32_t CScript::GetSigOpCount(uint32_t flags, bool fAccurate) const {
             else
                 n += MAX_PUBKEYS_PER_MULTISIG;
         }
+        else if (opcode == OP_CHECKDATASIG || opcode == OP_CHECKDATASIGVERIFY) {
+            if (flags & SCRIPT_ENABLE_CHECKDATASIG) {
+                ++n;
+            }
+        }
         lastOpcode = opcode;
     }
     return n;
