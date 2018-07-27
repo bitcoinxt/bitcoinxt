@@ -2953,6 +2953,15 @@ bool ContextualCheckTransaction(const CTransaction &tx, CValidationState &state,
             }
         }
     }
+    if (IsFourthHFActive(nMedianTimePastPrev)) {
+        const size_t tx_size = ::GetSerializeSize(tx,
+                SER_NETWORK, PROTOCOL_VERSION);
+        if (tx_size < MIN_TRANSACTION_SIZE) {
+            LogPrint(Log::BLOCK, "%s: transaction %s it too small (%d < %d)\n",
+                     __func__, tx.GetHash().ToString(), tx_size, MIN_TRANSACTION_SIZE);
+            return state.DoS(100, false, REJECT_INVALID, "bad-txns-undersize");
+        }
+    }
     return true;
 }
 

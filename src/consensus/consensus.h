@@ -16,6 +16,8 @@ static const unsigned int UAHF_INITIAL_MAX_BLOCK_SIZE = 8000000;
 static const unsigned int THIRD_HF_INITIAL_MAX_BLOCK_SIZE = 32000000;
 /** The maximum allowed size for a serialized transaction, in bytes */
 static const unsigned int MAX_TRANSACTION_SIZE = 1000*1000;
+/** The minimum allowed size for a transaction, in bytes */
+static const uint64_t MIN_TRANSACTION_SIZE = 100;
 /** The maximum allowed number of signature check operations in a block (network rule) */
 inline uint64_t MaxBlockSigops(uint64_t nBlockSize) {
     return ((nBlockSize - 1) / 1000000 + 1) * 1000000 / 50;

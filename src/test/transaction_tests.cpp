@@ -1,4 +1,5 @@
-// Copyright (c) 2011-2014 The Bitcoin Core developers
+// Copyright (c) 2011-2016 The Bitcoin Core developers
+// Copyright (c) 2017-2018 The Bitcoin developers
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
@@ -14,6 +15,7 @@
 #include "key.h"
 #include "keystore.h"
 #include "main.h"
+#include "options.h"
 #include "policy/policy.h"
 #include "script/script.h"
 #include "script/script_error.h"
@@ -522,6 +524,26 @@ BOOST_AUTO_TEST_CASE(test_IsStandard)
     t.vout[0].scriptPubKey = CScript() << OP_RETURN;
     t.vout[1].scriptPubKey = CScript() << OP_RETURN;
     BOOST_CHECK(!IsStandardTx(t, reason));
+}
+
+BOOST_AUTO_TEST_CASE(txsize_activation_test) {
+
+    auto arg = new DummyArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+    arg->Set("-fourthhftime", 1542300000);
+
+    int64_t activation_time = Opt().FourthHFTime();
+
+    // A minimaly sized transction.
+    CTransaction minTx;
+    CValidationState state;
+
+    BOOST_CHECK(ContextualCheckTransaction(minTx, state, 1234, 5678,
+                                           activation_time - 1));
+    BOOST_CHECK(!ContextualCheckTransaction(minTx, state, 1234, 5678,
+                                            activation_time));
+    BOOST_CHECK_EQUAL(state.GetRejectCode(), REJECT_INVALID);
+    BOOST_CHECK_EQUAL(state.GetRejectReason(), "bad-txns-undersize");
 }
 
 BOOST_AUTO_TEST_SUITE_END()

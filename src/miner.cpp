@@ -72,6 +72,17 @@ std::vector<unsigned char> BIP100Str(uint64_t hardLimit) {
     return std::vector<unsigned char>(begin(s), end(s));
 }
 
+// Make sure coinbase is at minimum MIN_TRANSACTION_SIZE
+static void BloatCoinbaseSize(CMutableTransaction& coinbase) {
+    size_t size = ::GetSerializeSize(coinbase, SER_NETWORK, PROTOCOL_VERSION);
+    if (size >= MIN_TRANSACTION_SIZE) {
+        return;
+    }
+    // operator<< prefixes the padding with minimum 1 byte, thus -1
+    size_t padding = MIN_TRANSACTION_SIZE - size - 1;
+    coinbase.vin[0].scriptSig << std::vector<uint8_t>(padding);
+}
+
 CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
 {
     const CChainParams& chainparams = Params();
@@ -225,6 +236,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         // Compute final coinbase transaction.
         txNew.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
         txNew.vin[0].scriptSig = CScript() << nHeight << BIP100Str(hardLimit) << OP_0;
+        BloatCoinbaseSize(txNew);
         pblock->vtx[0] = txNew;
         pblocktemplate->vTxFees[0] = -nFees;
 
