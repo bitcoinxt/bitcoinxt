@@ -822,6 +822,62 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                 }
                 break;
 
+                case OP_CHECKDATASIG:
+                case OP_CHECKDATASIGVERIFY: {
+                    // Make sure this remains an error before activation.
+                    if ((flags & SCRIPT_ENABLE_CHECKDATASIG) == 0) {
+                        return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
+                    }
+
+                    // (sig message pubkey -- bool)
+                    if (stack.size() < 3) {
+                        return set_error(
+                            serror, SCRIPT_ERR_INVALID_STACK_OPERATION);
+                    }
+
+                    valtype &vchSig = stacktop(-3);
+                    valtype &vchMessage = stacktop(-2);
+                    valtype &vchPubKey = stacktop(-1);
+
+                    // The size of the message must be 32 bytes.
+                    if (vchMessage.size() != 32) {
+                        return set_error(serror,
+                                         SCRIPT_ERR_INVALID_OPERAND_SIZE);
+                    }
+
+                    if (!CheckDataSignatureEncoding(vchSig, flags,
+                                                    serror) ||
+                        !CheckPubKeyEncoding(vchPubKey, flags, serror)) {
+                        // serror is set
+                        return false;
+                    }
+
+                    bool fSuccess = false;
+                    if (vchSig.size()) {
+                        uint256 message(vchMessage);
+                        CPubKey pubkey(vchPubKey);
+                        fSuccess = pubkey.Verify(message, vchSig);
+                    }
+
+                    if (!fSuccess && (flags & SCRIPT_VERIFY_NULLFAIL) &&
+                        vchSig.size()) {
+                        return set_error(serror, SCRIPT_ERR_SIG_NULLFAIL);
+                    }
+
+                    popstack(stack);
+                    popstack(stack);
+                    popstack(stack);
+                    stack.push_back(fSuccess ? vchTrue : vchFalse);
+                    if (opcode == OP_CHECKDATASIGVERIFY) {
+                        if (fSuccess) {
+                            popstack(stack);
+                        } else {
+                            return set_error(serror,
+                                             SCRIPT_ERR_CHECKDATASIGVERIFY);
+                        }
+                    }
+                } break;
+
                 case OP_CHECKMULTISIG:
                 case OP_CHECKMULTISIGVERIFY:
                 {
@@ -927,10 +983,6 @@ bool EvalScript(vector<vector<unsigned char> >& stack, const CScript& script, un
                     }
                 }
                 break;
-
-                case OP_CHECKDATASIG:
-                case OP_CHECKDATASIGVERIFY:
-                    return set_error(serror, SCRIPT_ERR_BAD_OPCODE);
 
                 //
                 // Byte string operations
