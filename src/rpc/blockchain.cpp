@@ -968,6 +968,7 @@ UniValue mempoolInfoToJSON()
     ret.push_back(Pair("usage", (int64_t) mempool.DynamicMemoryUsage()));
     size_t maxmempool = GetArg("-maxmempool", DEFAULT_MAX_MEMPOOL_SIZE) * 1000000;
     ret.push_back(Pair("maxmempool", (int64_t) maxmempool));
+    ret.push_back(Pair("tps", std::floor(mempool.TransactionsPerSecond() * 100) / 100));
 
     return ret;
 }
@@ -983,7 +984,8 @@ UniValue getmempoolinfo(const JSONRPCRequest& request)
             "  \"size\": xxxxx,               (numeric) Current tx count\n"
             "  \"bytes\": xxxxx,              (numeric) Sum of all tx sizes\n"
             "  \"usage\": xxxxx,              (numeric) Total memory usage for the mempool\n"
-            "  \"maxmempool\": xxxxx          (numeric) Maximum memory usage for the mempool\n"
+            "  \"maxmempool\": xxxxx,         (numeric) Maximum memory usage for the mempool\n"
+            "  \"tps\": xxxxx                 (numeric) Transactions per second accepted\n"
             "}\n"
             "\nExamples:\n"
             + HelpExampleCli("getmempoolinfo", "")
