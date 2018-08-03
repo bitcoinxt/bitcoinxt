@@ -37,7 +37,7 @@ string FormatScript(const CScript& script)
             } else if ((op >= OP_1 && op <= OP_16) || op == OP_1NEGATE) {
                 ret += strprintf("%i ", op - OP_1NEGATE - 1);
                 continue;
-            } else if (op >= OP_NOP && op <= OP_NOP10) {
+            } else if (op >= OP_NOP && op <= FIRST_UNDEFINED_OP_VALUE) {
                 string str(GetOpName(op));
                 if (str.substr(0, 3) == string("OP_")) {
                     ret += str.substr(3, string::npos) + " ";
@@ -186,7 +186,7 @@ void TxToUniv(const CTransaction& tx, const uint256& hashBlock, UniValue& entry)
 
         UniValue outValue(UniValue::VNUM, FormatMoney(txout.nValue));
         out.pushKV("value", outValue);
-        out.pushKV("n", (int64_t)i);
+        out.pushKV("n", int64_t(i));
 
         UniValue o(UniValue::VOBJ);
         ScriptPubKeyToUniv(txout.scriptPubKey, o, true);
