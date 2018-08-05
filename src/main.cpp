@@ -1933,6 +1933,11 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         flags |= SCRIPT_ENABLE_MONOLITH_OPCODES;
     }
 
+
+    if (IsFourthHFActive(pindex->pprev->GetMedianTimePast())) {
+        flags |= SCRIPT_VERIFY_SIGPUSHONLY;
+    }
+
     CBlockUndo blockundo;
 
     CCheckQueueControl<CScriptCheck> control(fScriptChecks && Opt().ScriptCheckThreads() ? &scriptcheckqueue : NULL);

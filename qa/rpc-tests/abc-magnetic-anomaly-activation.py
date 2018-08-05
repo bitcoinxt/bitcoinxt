@@ -10,7 +10,9 @@ activates properly. More complex features are given their own tests.
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import assert_equal, assert_raises_jsonrpc, start_nodes
 from test_framework.comptool import TestManager, TestInstance, RejectResult
-from test_framework.blocktools import *
+from test_framework.blocktools import create_coinbase, create_block
+from test_framework.mininode import *
+from test_framework.script import *
 from test_framework.cdefs import MIN_TX_SIZE
 from collections import deque
 from test_framework.script import OP_RETURN
@@ -67,9 +69,10 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
         [tx.rehash() for tx in tx_list]
         block.vtx.extend(tx_list)
 
-    def next_block(self, number, spend=None, tx_size=0):
+    def next_block(self, number, spend=None, tx_size=0, pushonly=True):
         if self.tip == None:
             base_block_hash = self.genesis_hash
+            import time
             block_time = int(time.time()) + 1
         else:
             base_block_hash = self.tip.sha256
@@ -95,6 +98,8 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
             # Spend from one of the spendable outputs
             spend = spendable_outputs.popleft()
             tx.vin.append(CTxIn(COutPoint(spend.tx.sha256, spend.n)))
+            if pushonly == False:
+                tx.vin[0].scriptSig = CScript([OP_TRUE, OP_DROP])
             # Add spendable outputs
             for i in range(2):
                 tx.vout.append(CTxOut(0, CScript([OP_TRUE])))
@@ -104,8 +109,19 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
                 tx.vout.append(
                     CTxOut(0, CScript([random.getrandbits(8), OP_RETURN])))
             else:
-                tx.vout.append(
-                    CTxOut(0, CScript([random.getrandbits(8 * (tx_size - 82) - 1), OP_RETURN])))
+                # Create an input to pad the transaction.
+                tx.vout.append(CTxOut(0, CScript([OP_RETURN])))
+
+                # Estimate the size of the padding.
+                push_size = tx_size - len(tx.serialize()) - 2
+
+                # Because several field are of variable size, we grow the push slowly
+                # up to the requested size.
+                while len(tx.serialize()) < tx_size:
+                    tx.vout[2] = CTxOut(0, CScript(
+                        [random.getrandbits(8 * push_size - 1), OP_RETURN]))
+                    push_size += 1
+
                 assert_equal(len(tx.serialize()), tx_size)
 
             # Make it the same format as transaction added for padding and save the size.
@@ -214,10 +230,17 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
         assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'],
                      MAGNETIC_ANOMALY_START_TIME - 1)
 
-        # Check that block with small transactions and blocks with them are still accepted.
-        small_tx_block = block(4444, out[0], MIN_TX_SIZE - 1)
+        # Check that block with small transactions and non push only signatures
+        # are still accepted.
+        small_tx_block = block(4444, out[0], MIN_TX_SIZE - 1, False)
+
+        # Are small txs accepted to mempool?
+        small_tx = copy.deepcopy(small_tx_block.vtx[1])
+        small_tx.vin[0].scriptSig = CScript()
+        small_tx.rehash()
+        node.sendrawtransaction(ToHex(small_tx), True)
+
         assert_equal(len(small_tx_block.vtx[1].serialize()), MIN_TX_SIZE - 1)
-        node.sendrawtransaction(ToHex(small_tx_block.vtx[1]), True)
         yield accepted()
 
         # Now MTP is exactly the fork time. Small transaction are now rejected.
@@ -228,20 +251,25 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
         # small transactions anymore.
         small_tx_block = block(4445, out[1], MIN_TX_SIZE - 1)
         assert_equal(len(small_tx_block.vtx[1].serialize()), MIN_TX_SIZE - 1)
+        assert_raises_jsonrpc(RPC_VERIFY_REJECTED, "bad-txns-undersize",
+                node.sendrawtransaction, ToHex(small_tx_block.vtx[1]), True)
         yield rejected(RejectResult(16, b'bad-txns-undersize'))
 
         # Rewind bad block.
         tip(4444)
 
+        # Now that the for activated, it is not possible to have
+        # non push only transactions.
+        non_pushonly_tx_block = block(4446, out[1], MIN_TX_SIZE, False)
+        yield rejected(RejectResult(16, b'blk-bad-inputs'))
+
+        # Rewind bad block.
+        tip(4444)
+
         # But large transactions are still ok.
-        large_tx_block = block(4446, out[1], MIN_TX_SIZE)
+        large_tx_block = block(3333, out[1], MIN_TX_SIZE)
         assert_equal(len(large_tx_block.vtx[1].serialize()), MIN_TX_SIZE)
         yield accepted()
-
-        # Verfiy that ATMP doesn't accept undersize transactions
-        throwaway_block = block(4447, out[2], MIN_TX_SIZE - 1)
-        assert_raises_jsonrpc(RPC_VERIFY_REJECTED, "bad-txns-undersize",
-                node.sendrawtransaction, ToHex(throwaway_block.vtx[1]), True)
 
 
 if __name__ == '__main__':
