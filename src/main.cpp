@@ -1007,6 +1007,10 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
             forkVerifyFlags |= SCRIPT_ENABLE_MONOLITH_OPCODES;
         }
 
+        if (IsFourthHFActive(mtpChainTip)) {
+            forkVerifyFlags |= SCRIPT_ENABLE_CHECKDATASIG;
+        }
+
         // Check against previous transactions
         // This is done last to help prevent CPU exhaustion denial-of-service attacks.
         PrecomputedTransactionData txdata(tx);
@@ -1935,10 +1939,10 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
         flags |= SCRIPT_ENABLE_MONOLITH_OPCODES;
     }
 
-
     if (IsFourthHFActive(pindex->pprev->GetMedianTimePast())) {
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
         flags |= SCRIPT_VERIFY_CLEANSTACK;
+        flags |= SCRIPT_ENABLE_CHECKDATASIG;
     }
 
     CBlockUndo blockundo;
@@ -2894,7 +2898,7 @@ bool CheckBlock(const CBlock& block, CValidationState& state, bool fCheckPOW, bo
     unsigned int nSigOps = 0;
     BOOST_FOREACH(const CTransaction& tx, block.vtx)
     {
-        nSigOps += GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+        nSigOps += GetLegacySigOpCount(tx, STANDARD_SCRIPT_VERIFY_FLAGS);
     }
     if (nSigOps > MaxBlockSigops(::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)))
         return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"), REJECT_INVALID, "bad-blk-sigops", true);
@@ -3039,6 +3043,17 @@ bool ContextualCheckBlock(const CBlock& block, CValidationState& state, CBlockIn
             !std::equal(expect.begin(), expect.end(), block.vtx[0].vin[0].scriptSig.begin())) {
             return state.DoS(100, error("%s: block height mismatch in coinbase", __func__), REJECT_INVALID, "bad-cb-height");
         }
+    }
+
+    // Enforce CDSV sigop count after fork activation.  TODO: Remove either
+    // this, or sigop counting in CheckBlock after fork is buried.
+    if (IsFourthHFActive(nMedianTimePastPrev)) {
+        uint32_t nSigOps = 0;
+        for (const CTransaction& tx : block.vtx) {
+            nSigOps += GetLegacySigOpCount(tx, STANDARD_CHECKDATASIG_VERIFY_FLAGS);
+        }
+        if (nSigOps > MaxBlockSigops(::GetSerializeSize(block, SER_NETWORK, PROTOCOL_VERSION)))
+            return state.DoS(100, error("CheckBlock(): out-of-bounds SigOpCount"), REJECT_INVALID, "bad-blk-sigops", true);
     }
 
     return true;

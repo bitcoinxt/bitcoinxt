@@ -526,6 +526,10 @@ def assert_raises_jsonrpc(code, message, fun, *args, **kwds):
     else:
         raise AssertionError("No exception raised")
 
+# TODO: Replace this wrapper function with https://github.com/bitcoin/bitcoin/pull/10853
+def assert_raises_rpc_error(*args, **kwargs):
+    return assert_raises_jsonrpc(*args, **kwargs)
+
 def assert_is_hex_string(string):
     try:
         int(string, 16)
