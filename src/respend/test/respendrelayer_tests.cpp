@@ -76,6 +76,19 @@ BOOST_AUTO_TEST_CASE(triggers_correctly) {
     r.Trigger();
     BOOST_CHECK_EQUAL(size_t(1), node.vInventoryToSend.size());
     BOOST_CHECK(respend.GetHash() == node.vInventoryToSend.at(0).hash);
+
+    // Create an interesting and valid respend to an SPV peer.
+    //
+    // As a precation, we *don't* relay respends to SPV nodes. They may not be
+    // tracking the original transaction.
+    node.pfilter.reset(new CBloomFilter(1, .00001, 5, BLOOM_UPDATE_ALL));
+    node.pfilter->insert(respend.GetHash());
+    node.vInventoryToSend.clear();
+    r.SetValid(true);
+    r.Trigger();
+    BOOST_CHECK_EQUAL(size_t(0), node.vInventoryToSend.size());
+    node.pfilter->clear();
+
     connman.RemoveTestNode(&node);
 }
 

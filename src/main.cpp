@@ -5495,8 +5495,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         else
         {
             LOCK(pfrom->cs_filter);
-            delete pfrom->pfilter;
-            pfrom->pfilter = new CBloomFilter(filter);
+            pfrom->pfilter.reset(new CBloomFilter(filter));
             pfrom->pfilter->UpdateEmptyFull();
         }
         pfrom->fRelayTxes = true;
@@ -5526,8 +5525,7 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
     else if (strCommand == "filterclear")
     {
         LOCK(pfrom->cs_filter);
-        delete pfrom->pfilter;
-        pfrom->pfilter = new CBloomFilter();
+        pfrom->pfilter.reset(new CBloomFilter());
         pfrom->fRelayTxes = true;
     }
 

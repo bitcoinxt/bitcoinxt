@@ -2023,7 +2023,7 @@ void CConnman::GetNodeStats(std::vector<CNodeStats>& vstats)
     }
 }
 
-void CConnman::RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors)
+void CConnman::RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors, const bool fRespend)
 {
     CInv inv(MSG_TX, tx.GetHash());
     {
@@ -2044,19 +2044,28 @@ void CConnman::RelayTransaction(const CTransaction& tx, const CDataStream& ss, s
     {
         if(!pnode->fRelayTxes)
             continue;
-        LOCK(pnode->cs_filter);
-        if (pnode->pfilter)
         {
-            if (pnode->pfilter->IsRelevantAndUpdate(tx)) {
-                BOOST_FOREACH(uint256& hashFound, vAncestors) {
-                    if (hashFound != tx.GetHash() && pnode->pfilter->WantsAncestors())
-                        pnode->pfilter->insert(hashFound);
-                    if (hashFound == tx.GetHash() || pnode->pfilter->WantsAncestors())
-                        pnode->PushInventory(CInv(MSG_TX, hashFound));
+            LOCK(pnode->cs_filter);
+            if (fRespend && pnode->IsSPVClient()) {
+                // Don't relay respends to SPV clients. They may not track the
+                // original transaction and thus don't know it's a respend.
+                continue;
+            }
+            if (pnode->pfilter)
+            {
+                if (pnode->pfilter->IsRelevantAndUpdate(tx)) {
+                    BOOST_FOREACH(uint256& hashFound, vAncestors) {
+                        if (hashFound != tx.GetHash() && pnode->pfilter->WantsAncestors())
+                            pnode->pfilter->insert(hashFound);
+                        if (hashFound == tx.GetHash() || pnode->pfilter->WantsAncestors())
+                            pnode->PushInventory(CInv(MSG_TX, hashFound));
+                    }
                 }
             }
-        } else
-            pnode->PushInventory(inv);
+            else {
+                pnode->PushInventory(inv);
+            }
+        }
     }
 }
 
@@ -2071,12 +2080,12 @@ bool FindTransactionInRelayMap(uint256 hash, CTransaction &out) {
     return false;
 }
 
-void CConnman::RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors)
+void CConnman::RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors, const bool fRespend)
 {
     CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
     ss.reserve(10000);
     ss << tx;
-    RelayTransaction(tx, ss, vAncestors);
+    RelayTransaction(tx, ss, vAncestors, fRespend);
 }
 
 
@@ -2162,7 +2171,7 @@ CNode::CNode(NodeId idIn, uint64_t nLocalServicesIn, int nMyStartingHeightIn, SO
     nNextInvSend = 0;
     fRelayTxes = false;
     fSentAddr = false;
-    pfilter = new CBloomFilter();
+    pfilter.reset(new CBloomFilter);
     xthinFilter.reset(new CBloomFilter());
     nPingNonceSent = 0;
     nPingUsecStart = 0;
@@ -2184,9 +2193,6 @@ CNode::CNode(NodeId idIn, uint64_t nLocalServicesIn, int nMyStartingHeightIn, SO
 CNode::~CNode()
 {
     CloseSocket(hSocket);
-
-    if (pfilter)
-        delete pfilter;
 }
 
 void CNode::AskFor(const CInv& inv)
@@ -2293,6 +2299,13 @@ bool CNode::SupportsXThinBlocks() const {
 
 bool CNode::SupportsCompactBlocks() const {
     return nVersion >= SHORT_IDS_BLOCKS_VERSION;
+}
+
+bool CNode::IsSPVClient() {
+    // We assume node is an SPV node if it has sent us a bloom filter. "IsFull"
+    // returns true for nodes that have not sent a filter (default constructed).
+    LOCK(cs_filter);
+    return bool(pfilter) && !pfilter->IsFull();
 }
 
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds) {

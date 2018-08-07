@@ -63,6 +63,8 @@ private:
     friend class CRollingBloomFilter;
 
 public:
+    bool IsEmpty() const { return isEmpty; }
+    bool IsFull() const { return isFull; }
     /**
      * Creates a new bloom filter which will provide the given fp rate when filled with the given number of elements
      * Note that if the given parameters will result in a filter outside the bounds of the protocol limits,
