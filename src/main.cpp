@@ -1936,6 +1936,7 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
 
     if (IsFourthHFActive(pindex->pprev->GetMedianTimePast())) {
         flags |= SCRIPT_VERIFY_SIGPUSHONLY;
+        flags |= SCRIPT_VERIFY_CLEANSTACK;
     }
 
     CBlockUndo blockundo;
