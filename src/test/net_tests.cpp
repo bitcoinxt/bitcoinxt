@@ -192,4 +192,16 @@ BOOST_AUTO_TEST_CASE(ipgroup_assigned) {
     BOOST_CHECK_EQUAL(0, ipgroup.connCount);
 }
 
+BOOST_AUTO_TEST_CASE(is_spv_client) {
+    CNetAddr ip("10.0.0.1");
+    CNode node(42, NODE_NETWORK, 0, INVALID_SOCKET, CAddress(CService(ip, 1234)), 0);
+
+    // node has not sent a bloom filter, so we assume it's not SPV.
+    BOOST_CHECK(!node.IsSPVClient());
+
+    // node sends a bloom filter
+    node.pfilter.reset(new CBloomFilter(1, .00001, 5, BLOOM_UPDATE_ALL));
+    BOOST_CHECK(node.IsSPVClient());
+}
+
 BOOST_AUTO_TEST_SUITE_END()

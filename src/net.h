@@ -182,8 +182,8 @@ public:
         post();
     };
 
-    void RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors);
-    void RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors);
+    void RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors, const bool fRespend = false);
+    void RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors, const bool fRespend = false);
 
     // Addrman functions
     size_t GetAddressCount() const;
@@ -544,7 +544,7 @@ public:
     bool fSentAddr;
     CSemaphoreGrant grantOutbound;
     CCriticalSection cs_filter, cs_xfilter;
-    CBloomFilter* pfilter;
+    std::unique_ptr<CBloomFilter> pfilter;
     std::unique_ptr<CBloomFilter> xthinFilter;
     int nRefCount;
     const NodeId id;
@@ -706,6 +706,9 @@ public:
 
     bool SupportsXThinBlocks() const;
     bool SupportsCompactBlocks() const;
+
+    // Best effort determination if node is an SPV client.
+    bool IsSPVClient();
 };
 
 

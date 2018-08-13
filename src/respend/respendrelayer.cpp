@@ -87,7 +87,7 @@ void RespendRelayer::Trigger() {
 
     std::vector<uint256> vAncestors;
     vAncestors.push_back(respend.GetHash()); // Alert only for the tx itself
-    connman->RelayTransaction(respend, vAncestors);
+    connman->RelayTransaction(respend, vAncestors, true);
 }
 
 } // ns respend
