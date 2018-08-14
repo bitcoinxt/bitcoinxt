@@ -2,6 +2,7 @@
 #include "chain.h"
 #include "main.h" // mapBlockIndex
 #include "net.h"
+#include "netmessagemaker.h"
 #include "nodestate.h"
 #include "options.h"
 #include "utiltime.h"
@@ -44,4 +45,38 @@ bool RateLimitExceeded(double& dCount, int64_t& nLastTime, int64_t nLimit, unsig
         return true;
     dCount += nSize;
     return false;
+}
+
+bool ProcessRejectsAndBans(CConnman* connman, CNode* pnode) {
+    NodeStatePtr statePtr(pnode->GetId());
+    if (connman == nullptr || pnode == nullptr || statePtr.IsNull()) {
+        LogPrint(Log::NET, "%s got invalid argments\n", __func__);
+        return true;
+    }
+
+    for (const CBlockReject& reject : statePtr->rejects) {
+        connman->PushMessage(pnode, CNetMsgMaker(INIT_PROTO_VERSION).Make(
+                    NetMsgType::REJECT, std::string(NetMsgType::BLOCK),
+                    reject.chRejectCode,
+                    reject.strRejectReason, reject.hashBlock));
+    }
+    statePtr->rejects.clear();
+
+    if (!statePtr->fShouldBan)
+        return false;
+
+    statePtr->fShouldBan = false;
+    if (pnode->fWhitelisted) {
+        LogPrintf("Warning: not punishing whitelisted peer %s!\n", pnode->addr.ToString());
+        return false;
+    }
+    pnode->fDisconnect = true;
+    if (pnode->addr.IsLocal()) {
+        LogPrintf("Warning: not banning local peer %s!\n", pnode->addr.ToString());
+    }
+    else {
+        LogPrint(Log::NET, "Banning node %d (%s)\n", pnode->GetId(), pnode->addr.ToString());
+        connman->Ban(pnode->addr);
+    }
+    return true;
 }

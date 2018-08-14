@@ -824,12 +824,13 @@ void CConnman::ThreadSocketHandler()
                 {
                     bool fDelete = false;
                     {
-                        TRY_LOCK(pnode->cs_vSend, lockSend);
-                        if (lockSend)
+                        TRY_LOCK(pnode->cs_inventory, lockInv);
+                        if (lockInv)
                         {
-                                TRY_LOCK(pnode->cs_inventory, lockInv);
-                                if (lockInv)
-                                    fDelete = true;
+                            TRY_LOCK(pnode->cs_vSend, lockSend);
+                            if (lockSend) {
+                                fDelete = true;
+                            }
                         }
                     }
                     if (fDelete)
@@ -1077,6 +1078,11 @@ void CConnman::ThreadSocketHandler()
                 else if (pnode->nPingNonceSent && pnode->nPingUsecStart + TIMEOUT_INTERVAL * 1000000 < GetTimeMicros())
                 {
                     LogPrintf("ping timeout: %fs\n", 0.000001 * (GetTimeMicros() - pnode->nPingUsecStart));
+                    pnode->fDisconnect = true;
+                }
+                else if (!pnode->fSuccessfullyConnected)
+                {
+                    LogPrintf("version handshake timeout from %d\n", pnode->id);
                     pnode->fDisconnect = true;
                 }
             }

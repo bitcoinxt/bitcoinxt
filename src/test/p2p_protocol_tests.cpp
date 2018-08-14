@@ -71,6 +71,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeWeirdRejectMessage)
 {
     DummyNode n;
     n.nVersion = PROTOCOL_VERSION;
+    n.fSuccessfullyConnected = true;
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     s << std::string(12, 'a'); // not a real command, but it uses the max of 12 here.
     s << (uint8_t)0x10;
@@ -88,6 +89,7 @@ BOOST_AUTO_TEST_CASE(MaxSizeValidRejectMessage)
 {
     DummyNode n;
     n.nVersion = PROTOCOL_VERSION;
+    n.fSuccessfullyConnected = true;
     CDataStream s(SER_NETWORK, PROTOCOL_VERSION);
     s << std::string("block"); // does not use the max of 12, but "block" is the longest command that has a defined extension of 32 bytes
     s << (uint8_t)0x10;

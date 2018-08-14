@@ -122,7 +122,8 @@ testScripts = [
     'disablewallet.py',
     'rpcnamedargs.py',
     'abc-monolith-activation.py',
-    'bip64.py'
+    'bip64.py',
+    'p2p-leaktests.py',
 ]
 
 testScriptsExt = [
@@ -151,7 +152,8 @@ testScriptsExt = [
     'p2p-compactblocks.py',
     'mempool_packages.py',
     'p2p-compactblocks-limits.py',
-    'dbcrash.py'
+    'dbcrash.py',
+    'p2p-timeouts.py',
 ]
 
 

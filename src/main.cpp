@@ -4541,7 +4541,31 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
 
 
 
-    if (strCommand == "version")
+    if (strCommand == NetMsgType::REJECT)
+    {
+        if (LogAcceptCategory(Log::NET)) {
+            try {
+                string strMsg; unsigned char ccode; string strReason;
+                vRecv >> LIMITED_STRING(strMsg, CMessageHeader::COMMAND_SIZE) >> ccode >> LIMITED_STRING(strReason, MAX_REJECT_MESSAGE_LENGTH);
+
+                ostringstream ss;
+                ss << strMsg << " code " << itostr(ccode) << ": " << strReason;
+
+                if (strMsg == NetMsgType::BLOCK || strMsg == NetMsgType::TX)
+                {
+                    uint256 hash;
+                    vRecv >> hash;
+                    ss << ": hash " << hash.ToString();
+                }
+                LogPrint(Log::NET, "Reject %s\n", SanitizeString(ss.str()));
+            } catch (const std::ios_base::failure&) {
+                // Avoid feedback loops by preventing reject messages from triggering a new reject message.
+                LogPrint(Log::NET, "Unparseable reject message received\n");
+                return false;
+            }
+        }
+    }
+    else if (strCommand == NetMsgType::VERSION)
     {
         // Each connection can only send one version message
         if (pfrom->nVersion != 0)
@@ -4733,9 +4757,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         }
         pfrom->fSuccessfullyConnected = true;
     }
-
-
-    else if (strCommand == "addr")
+    else if (!pfrom->fSuccessfullyConnected)
+    {
+        Misbehaving(pfrom->GetId(), 1, "must have a verack message before anything else");
+        return false;
+    }
+    else if (strCommand == NetMsgType::ADDR)
     {
         vector<CAddress> vAddr;
         vRecv >> vAddr;
@@ -5528,33 +5555,6 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         pfrom->pfilter.reset(new CBloomFilter());
         pfrom->fRelayTxes = true;
     }
-
-
-    else if (strCommand == "reject")
-    {
-        if (LogAcceptCategory(Log::NET)) {
-            try {
-                string strMsg; unsigned char ccode; string strReason;
-                vRecv >> LIMITED_STRING(strMsg, CMessageHeader::COMMAND_SIZE) >> ccode >> LIMITED_STRING(strReason, MAX_REJECT_MESSAGE_LENGTH);
-
-                ostringstream ss;
-                ss << strMsg << " code " << itostr(ccode) << ": " << strReason;
-
-                if (strMsg == "block" || strMsg == "tx")
-                {
-                    uint256 hash;
-                    vRecv >> hash;
-                    ss << ": hash " << hash.ToString();
-                }
-                LogPrint(Log::NET, "Reject %s\n", SanitizeString(ss.str()));
-            } catch (const std::ios_base::failure&) {
-                // Avoid feedback loops by preventing reject messages from triggering a new reject message.
-                LogPrint(Log::NET, "Unparseable reject message received\n");
-                return false;
-            }
-        }
-    }
-
     else
     {
         // Ignore unknown commands for extensibility
@@ -5675,8 +5675,10 @@ bool ProcessMessages(CNode* pfrom, CConnman* connman, std::atomic<bool>& interru
             PrintExceptionContinue(NULL, "ProcessMessages()");
         }
 
-        if (!fRet)
+        if (!fRet) {
             LogPrint(Log::NET, "%s(%s, %u bytes) FAILED peer=%d\n", __func__, SanitizeString(strCommand), nMessageSize, pfrom->id);
+        }
+        ProcessRejectsAndBans(connman, pfrom);
 
     return fMoreWork;
 }
@@ -5699,44 +5701,6 @@ bool WillDownloadFromNode(CNode* pto, const ThinBlockWorker& worker) {
     // We want to download thin blocks only.
     return pto->SupportsXThinBlocks()
         || NodeStatePtr(pto->id)->supportsCompactBlocks;
-}
-
-/**
- * Handle async rejects and ban flags.
- *
- * Helper function for SendMessages, returns true if parent function should return.
- */
-static bool ProcessRejectsAndBans(CConnman* connman, CNode* pto) {
-    NodeStatePtr statePtr(pto->GetId());
-    if (connman == nullptr || pto == nullptr || statePtr.IsNull()) {
-        LogPrint(Log::NET, "%s got invalid argments\n", __func__);
-        return true;
-    }
-
-    for (const CBlockReject& reject : statePtr->rejects) {
-        connman->PushMessage(pto, NetMsg(pto, NetMsgType::REJECT,
-                                         std::string(NetMsgType::BLOCK),
-                                         reject.chRejectCode,
-                                         reject.strRejectReason, reject.hashBlock));
-    }
-    statePtr->rejects.clear();
-
-    if (!statePtr->fShouldBan)
-        return false;
-
-    statePtr->fShouldBan = false;
-    if (pto->fWhitelisted) {
-        LogPrintf("Warning: not punishing whitelisted peer %s!\n", pto->addr.ToString());
-        return false;
-    }
-    pto->fDisconnect = true;
-    if (pto->addr.IsLocal()) {
-        LogPrintf("Warning: not banning local peer %s!\n", pto->addr.ToString());
-    }
-    else {
-        connman->Ban(pto->addr);
-    }
-    return true;
 }
 
 bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsgProc)
