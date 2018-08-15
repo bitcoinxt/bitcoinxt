@@ -982,21 +982,24 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
 
         CTxMemPoolEntry entry(tx, nFees, GetTime(), chainActive.Height(), pool.HasNoInputsOf(tx), fSpendsCoinbase, lp, nSigOps);
 
-        // Don't accept it if it can't get into a block
+        FeeEvaluator feeEval(Opt().AllowFreeTx(), mempool.GetFeeModifier(),
+                             ::minRelayTxFee);
+        FeeEvaluator::FeeState feestate = feeEval.HasSufficientFee(view, entry,
+                                                                   chainActive.Height());
         if (!fLimitFree) {
-            FeeEvaluator feeEval(Opt().AllowFreeTx(), mempool.GetFeeModifier(), ::minRelayTxFee);
-            auto res = feeEval.HasSufficientFee(view, entry, chainActive.Height());
-            if (res != FeeEvaluator::FEE_OK) {
-                std::string err = FeeEvaluator::ToString(res);
+            // Don't accept it if it can't get into a block
+            bool ok = feestate == FeeEvaluator::FEE_OK
+                || feestate == FeeEvaluator::ABSURD_HIGH_FEE;
+            if (!ok) {
+                std::string err = FeeEvaluator::ToString(feestate);
                 return state.DoS(0, false, REJECT_INSUFFICIENTFEE, err);
             }
         }
-
-        unsigned int nSize = entry.GetTxSize();
-        if (fRejectAbsurdFee && nFees > ::minRelayTxFee.GetFee(nSize) * 10000)
-            return error("AcceptToMemoryPool: absurdly high fees %s, %d > %d",
+        if (fRejectAbsurdFee && feestate == FeeEvaluator::ABSURD_HIGH_FEE) {
+            return error("AcceptToMemoryPool: absurdly high fees %s amount: %d size: %d",
                          hash.ToString(),
-                         nFees, ::minRelayTxFee.GetFee(nSize) * 10000);
+                         nFees, entry.GetTxSize());
+        }
 
         // Calculate in-mempool ancestors, up to a limit.
         CTxMemPool::setEntries setAncestors;

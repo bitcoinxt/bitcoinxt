@@ -44,15 +44,17 @@ FeeEvaluator::FeeState FeeEvaluator::HasSufficientFee(const CCoinsViewCache& vie
     if (chainHeight == -1)
         throw std::invalid_argument("invalid chainheight");
 
+    const size_t& txSize = entry.GetTxSize();
+    const CAmount& minFee = minRelayRate.GetFee(txSize);
+    if (HasAbsurdFee(minFee, entry.GetFee()))
+        return ABSURD_HIGH_FEE;
+
     const CTransaction& tx = entry.GetTx();
     if (feemodifier.GetDelta(tx.GetHash()) > 0) {
         // Any transaction that has had its fee artifically bumped doesn't
         // gets to pass. No need to consider fee/priority.
         return FEE_OK;
     }
-
-    const size_t txSize = entry.GetTxSize();
-    const CAmount& minFee = minRelayRate.GetFee(txSize);
 
     if (entry.GetFee() >= minFee) {
         return FEE_OK;
@@ -90,6 +92,10 @@ bool FeeEvaluator::IsPriorityCandidate(size_t txSize) const {
     return allowFreeTxs && txSize <= MAX_FREE_TX_SIZE;
 }
 
+bool FeeEvaluator::HasAbsurdFee(CAmount minRelayFee, CAmount txFee) const {
+    return txFee >= minRelayFee * ABSURD_FEE_FACTOR;
+}
+
 double FeeEvaluator::GetPriority(const CCoinsViewCache& view,
                                  const CTxMemPoolEntry& entry,
                                  int tipHeight) const
@@ -103,7 +109,8 @@ std::string FeeEvaluator::ToString(FeeState s) {
     case FeeState::INSUFFICIENT_FEE: return "insufficient fee";
     case FeeState::INSUFFICIENT_PRIORITY: return "insufficient priority";
     case FeeState::RATE_LIMITED: return "free tx rejected by rate limiter";
-    case FeeState::FEE_OK: return "";
+    case FeeState::FEE_OK: return "fee ok";
+    case FeeState::ABSURD_HIGH_FEE: return "fee is absurdly high";
     default: return "unknown";
     }
 }

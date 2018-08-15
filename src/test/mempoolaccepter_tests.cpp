@@ -51,10 +51,13 @@ public:
     CCoinsView dummybase;
     CCoinsViewCache view;
 
-    CTxMemPoolEntry CreateTxWithFee()
+    CTxMemPoolEntry CreateTxWithFee(bool absurdFee = false)
     {
         CMutableTransaction tx = CreateDummyTx();
         CAmount fee = minRelayFeeRate.GetFee(TxSize(tx));
+        if (absurdFee) {
+            fee *= ABSURD_FEE_FACTOR;
+        }
         TestMemPoolEntryHelper entry;
         return entry.Fee(fee).Time(GetTime()).Height(0).FromTx(tx, nullptr);
     }
@@ -125,6 +128,24 @@ BOOST_AUTO_TEST_CASE(getminrelayfree_rate_limited) {
     DummyFeeEvaluator eval(allowFreeTxs, feemodifier, minRelayFeeRate, &limit);
     eval.priority = AllowFreeThreshold();
     BOOST_CHECK_EQUAL(FeeEvaluator::RATE_LIMITED, eval.HasSufficientFee(view, freetx, 0));
+}
+
+BOOST_AUTO_TEST_CASE(absurdfee) {
+    bool absurdHighFee = true;
+    CTxMemPoolEntry tx = CreateTxWithFee(absurdHighFee);
+    {
+        allowFreeTxs = true;
+        DummyFeeEvaluator eval(allowFreeTxs, feemodifier, minRelayFeeRate);
+        BOOST_CHECK_EQUAL(FeeEvaluator::ABSURD_HIGH_FEE,
+                          eval.HasSufficientFee(view, tx, 0));
+    }
+    {
+        allowFreeTxs = false;
+        DummyFeeEvaluator eval(allowFreeTxs, feemodifier, minRelayFeeRate);
+        BOOST_CHECK_EQUAL(FeeEvaluator::ABSURD_HIGH_FEE,
+                          eval.HasSufficientFee(view, tx, 0));
+    }
+
 }
 
 BOOST_AUTO_TEST_SUITE_END()

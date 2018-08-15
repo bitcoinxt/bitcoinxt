@@ -9,6 +9,8 @@ class CFeeRate;
 class CTxMemPoolEntry;
 class MempoolFeeModifier;
 
+typedef int64_t CAmount;
+
 /**
  * This was DEFAULT_BLOCK_PRIORITY_SIZE - 1000. The concept of block priority
  * size is gone.
@@ -17,6 +19,11 @@ class MempoolFeeModifier;
  * muiltiple transactions instead of one big transaction for avoiding fees.
  */
 static const uint64_t MAX_FREE_TX_SIZE = 49000;
+/**
+ * Fee is considered absurdly high if it's higher or equal to minimal relay fee
+ * multiplied with this factor.
+ */
+static const int64_t ABSURD_FEE_FACTOR = 10000;
 
 struct RateLimitState {
     RateLimitState(int64_t limit) : count(0), lastTime(0), limit(limit) {
@@ -33,6 +40,7 @@ class FeeEvaluator {
 public:
     enum FeeState {
         FEE_OK,
+        ABSURD_HIGH_FEE,
         INSUFFICIENT_FEE,
         INSUFFICIENT_PRIORITY,
         RATE_LIMITED
@@ -57,6 +65,7 @@ private:
     RateLimitState* ratelimiter;
 
     bool IsPriorityCandidate(size_t txSize) const;
+    bool HasAbsurdFee(CAmount minRelayFee, CAmount txFee) const;
 };
 
 #endif
