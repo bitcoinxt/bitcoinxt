@@ -23,7 +23,7 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
 
     def setup_network(self):
         # Just need one node for this test
-        args = ["-checkmempool", "-debug=mempool", "-relaypriority=0"]
+        args = ["-checkmempool", "-debug=mempool", "-allowfreetx=0"]
         self.nodes = []
         self.nodes.append(start_node(0, self.options.tmpdir, args))
         self.is_network_split = False
@@ -40,9 +40,10 @@ class MempoolCoinbaseTest(BitcoinTestFramework):
         # Mine a new block
         # ... make sure all the transactions are confirmed again.
 
+        fee = get_relay_fee(self.nodes[0])
         b = [ self.nodes[0].getblockhash(n) for n in range(1, 4) ]
         coinbase_txids = [ self.nodes[0].getblock(h)['tx'][0] for h in b ]
-        spends1_raw = [ create_tx(self.nodes[0], txid, node0_address, 50) for txid in coinbase_txids ]
+        spends1_raw = [ create_tx(self.nodes[0], txid, node0_address, 50 - fee) for txid in coinbase_txids ]
         spends1_id = [ self.nodes[0].sendrawtransaction(tx) for tx in spends1_raw ]
 
         blocks = []

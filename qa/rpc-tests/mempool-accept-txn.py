@@ -49,7 +49,7 @@ class FullBlockTest(ComparisonTestFramework):
         self.blocks = {}
 
     def setup_network(self):
-        self.extra_args = [['-norelaypriority']]
+        self.extra_args = [['-allowfreetx=0']]
         self.nodes = start_nodes(self.num_nodes, self.options.tmpdir,
                                  self.extra_args,
                                  binary=[self.options.testbinary])
@@ -220,8 +220,9 @@ class FullBlockTest(ComparisonTestFramework):
 
         # P2SH tests
         # Create a p2sh transaction
+        value = out[0].tx.vout[out[0].n].nValue # absurdly high fee
         p2sh_tx = self.create_and_sign_transaction(
-            out[0].tx, out[0].n, 1, p2sh_script)
+            out[0].tx, out[0].n, value, p2sh_script)
 
         # Add the transaction to the block
         block(1)
@@ -254,7 +255,7 @@ class FullBlockTest(ComparisonTestFramework):
         # A transaction with this output script can get into the mempool
         max_p2sh_sigops_txn = spend_p2sh_tx(p2sh_tx, max_p2sh_sigops_mempool)
         max_p2sh_sigops_txn_id = node.sendrawtransaction(
-            ToHex(max_p2sh_sigops_txn))
+            ToHex(max_p2sh_sigops_txn), True)
         assert_equal(set(node.getrawmempool()), {max_p2sh_sigops_txn_id})
 
         # Mine the transaction

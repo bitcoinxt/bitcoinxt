@@ -21,7 +21,7 @@ class WalletTest (BitcoinTestFramework):
         self.num_nodes = 4
 
     def setup_network(self, split=False):
-        self.nodes = start_nodes(3, self.options.tmpdir, [["-relaypriority=0"],]*3)
+        self.nodes = start_nodes(3, self.options.tmpdir, [["-allowfreetx=1"],]*3)
         connect_nodes_bi(self.nodes,0,1)
         connect_nodes_bi(self.nodes,1,2)
         connect_nodes_bi(self.nodes,0,2)
@@ -74,6 +74,7 @@ class WalletTest (BitcoinTestFramework):
 
         # create both transactions
         txns_to_send = []
+        fee = get_relay_fee(self.nodes[0])
         for utxo in node0utxos:
             inputs = []
             outputs = {}

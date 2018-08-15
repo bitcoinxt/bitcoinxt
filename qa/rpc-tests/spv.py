@@ -90,8 +90,8 @@ class SPVTest(BitcoinTestFramework):
 
     def setup_network(self):
         self.nodes = []
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-relaypriority=0 -debug=mempool"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-relaypriority=0 -debug=mempool"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-allowfreetx=0 -debug=mempool"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-allowfreetx=0 -debug=mempool"]))
         connect_nodes(self.nodes[0], 1)
 
     def run_test(self):

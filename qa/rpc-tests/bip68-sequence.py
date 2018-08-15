@@ -29,7 +29,8 @@ class BIP68Test(BitcoinTestFramework):
 
     def setup_network(self):
         self.nodes = []
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug", "-blockprioritysize=0"]))
+        # -bip68hack makes the node not mine transactions with negative prioritisetransaction delta
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug", "-allowfreetx=0", "-bip68hack"]))
         self.is_network_split = False
         self.relayfee = self.nodes[0].getnetworkinfo()["relayfee"]
 
@@ -37,20 +38,20 @@ class BIP68Test(BitcoinTestFramework):
         # Generate some coins
         self.nodes[0].generate(110)
 
-        print("Running test disable flag")
+        self.log.info("Running test disable flag")
         self.test_disable_flag()
 
-        print("Running test sequence-lock-confirmed-inputs")
+        self.log.print("Running test sequence-lock-confirmed-inputs")
         self.test_sequence_lock_confirmed_inputs()
 
-        print("Running test sequence-lock-unconfirmed-inputs")
+        self.log.print("Running test sequence-lock-unconfirmed-inputs")
         self.test_sequence_lock_unconfirmed_inputs()
 
         # This test needs to change when BIP68 becomes consensus
-        print("Running test BIP68 not consensus")
+        self.log.print("Running test BIP68 not consensus")
         self.test_bip68_not_consensus()
 
-        print("Passed\n")
+        self.log.print("Passed\n")
 
     # Test that BIP68 is not in effect if tx version is 1, or if
     # the first sequence bit is set.
@@ -250,8 +251,9 @@ class BIP68Test(BitcoinTestFramework):
         test_nonzero_locks(tx2, self.nodes[0], self.relayfee, use_height_lock=False)
 
         # Now mine some blocks, but make sure tx2 doesn't get mined.
-        # Use prioritisetransaction to lower the effective feerate to 0
-        self.nodes[0].prioritisetransaction(tx2.hash, int(-self.relayfee*COIN))
+        # Use prioritisetransaction to lower the effective feerate to negative fee
+        # in combination with -bip68hack.
+        self.nodes[0].prioritisetransaction(tx2.hash, -50000)
         cur_time = int(time.time())
         for i in range(10):
             self.nodes[0].setmocktime(cur_time + 600)
@@ -264,7 +266,7 @@ class BIP68Test(BitcoinTestFramework):
         test_nonzero_locks(tx2, self.nodes[0], self.relayfee, use_height_lock=False)
 
         # Mine tx2, and then try again
-        self.nodes[0].prioritisetransaction(tx2.hash, int(self.relayfee*COIN))
+        self.nodes[0].prioritisetransaction(tx2.hash, 60000)
 
         # Advance the time on the node so that we can test timelocks
         self.nodes[0].setmocktime(cur_time+600)

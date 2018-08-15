@@ -21,15 +21,7 @@ from test_framework.script import *
 from test_framework.cdefs import (ONE_MEGABYTE,
                                   MAX_BLOCK_SIGOPS_PER_MB, MAX_TX_SIGOPS_COUNT)
 
-# Test was written for Bitcoin ABC. This enables/disables
-# tweaks that make it compatible with XT.
-XT_TWEAKS = True
 LEGACY_MAX_BLOCK_SIZE = ONE_MEGABYTE
-
-# far into the past
-UAHF_START_TIME = 30000000
-# far into the future
-MONOLITH_START_TIME = 2000000000
 
 class PreviousSpendableOutput(object):
 
@@ -77,10 +69,7 @@ class FullBlockTest(ComparisonTestFramework):
 
     def __init__(self):
         super().__init__()
-        if XT_TWEAKS:
-            self.excessive_block_size = 8 * ONE_MEGABYTE
-        else:
-            self.excessive_block_size = 16 * ONE_MEGABYTE
+        self.excessive_block_size = 32 * ONE_MEGABYTE
         self.num_nodes = 1
         self.block_heights = {}
         self.coinbase_key = CECKey()
@@ -90,29 +79,14 @@ class FullBlockTest(ComparisonTestFramework):
         self.blocks = {}
 
     def setup_network(self):
-        if not XT_TWEAKS:
-            self.extra_args = [['-debug',
-                            '-norelaypriority',
-                            '-whitelist=127.0.0.1',
-                            '-limitancestorcount=9999',
-                            '-limitancestorsize=9999',
-                            '-limitdescendantcount=9999',
-                            '-limitdescendantsize=9999',
-                            '-maxmempool=999',
-                            "-uahfstarttime=%d" % UAHF_START_TIME,
-                            "-excessiveblocksize=%d" % self.excessive_block_size,
-                            "-thirdhftime=%d" % MONOLITH_START_TIME]]
-        else:
-            self.extra_args = [['-debug',
-                            '-relaypriority=0',
-                            '-whitelist=127.0.0.1',
-                            '-limitancestorcount=9999',
-                            '-limitancestorsize=9999',
-                            '-limitdescendantcount=9999',
-                            '-limitdescendantsize=9999',
-                            '-maxmempool=999',
-                            "-uahftime=%d" % UAHF_START_TIME,
-                            "-thirdhftime=%d" % MONOLITH_START_TIME]]
+        self.extra_args = [['-debug',
+                        '-allowfreetx=0',
+                        '-whitelist=127.0.0.1',
+                        '-limitancestorcount=9999',
+                        '-limitancestorsize=9999',
+                        '-limitdescendantcount=9999',
+                        '-limitdescendantsize=9999',
+                        '-maxmempool=999',]]
 
         self.nodes = start_nodes(self.num_nodes, self.options.tmpdir,
                                  self.extra_args,
@@ -128,8 +102,6 @@ class FullBlockTest(ComparisonTestFramework):
         self.test.add_all_connections(self.nodes)
         # Start up network handling in another thread
         NetworkThread().start()
-        if not XT_TWEAKS:
-            self.nodes[0].setexcessiveblock(self.excessive_block_size)
         self.test.run()
 
     def add_transactions_to_block(self, block, tx_list):
@@ -176,12 +148,15 @@ class FullBlockTest(ComparisonTestFramework):
         height = self.block_heights[base_block_hash] + 1
         coinbase = create_coinbase(absoluteHeight = height, pubkey = self.coinbase_pubkey)
         coinbase.vout[0].nValue += additional_coinbase_value
-        if (spend != None):
-            coinbase.vout[0].nValue += spend.tx.vout[
-                spend.n].nValue - 1  # all but one satoshi to fees
         coinbase.rehash()
         block = create_block(base_block_hash, coinbase, block_time)
         spendable_output = None
+
+        def get_value(tx, n):
+            return tx.vout[n].nValue
+        def get_fee_sat(size = 1000):
+            return get_relay_fee(self.nodes[0], size, "sat")
+
         if (spend != None):
             tx = CTransaction()
             # no signature yet
@@ -189,8 +164,9 @@ class FullBlockTest(ComparisonTestFramework):
                 CTxIn(COutPoint(spend.tx.sha256, spend.n), b"", 0xffffffff))
             # We put some random data into the first transaction of the chain
             # to randomize ids
+            value = get_value(spend.tx, spend.n) - get_fee_sat()
             tx.vout.append(
-                CTxOut(0, CScript([random.randint(0, 255), OP_DROP, OP_TRUE])))
+                CTxOut(value, CScript([random.randint(0, 255), OP_DROP, OP_TRUE])))
             if script == None:
                 tx.vout.append(CTxOut(1, CScript([OP_TRUE])))
             else:
@@ -224,7 +200,9 @@ class FullBlockTest(ComparisonTestFramework):
                 script_pad_len = script_length - tx_sigops
                 script_output = CScript(
                     [b'\x00' * script_pad_len] + [OP_CHECKSIG] * tx_sigops)
-                tx.vout.append(CTxOut(0, CScript([OP_TRUE])))
+                value = get_value(spendable_output.tx, spendable_output.n) - get_fee_sat(1000 + script_length)
+                assert(value > 0)
+                tx.vout.append(CTxOut(value, CScript([OP_TRUE])))
                 tx.vout.append(CTxOut(0, script_output))
                 tx.vin.append(
                     CTxIn(COutPoint(spendable_output.tx.sha256, spendable_output.n)))
@@ -291,12 +269,12 @@ class FullBlockTest(ComparisonTestFramework):
         # shorthand for functions
         block = self.next_block
 
-        # Create a new block
+        self.log.info("Create a new block")
         block(0)
         save_spendable_output()
         yield accepted()
 
-        # Now we need that block to mature so we can spend the coinbase.
+        self.log.info("Now we need that block to mature so we can spend the coinbase.")
         test = TestInstance(sync_every_block=False)
         for i in range(99):
             block(5000 + i)
@@ -309,34 +287,32 @@ class FullBlockTest(ComparisonTestFramework):
         for i in range(100):
             out.append(get_spendable_output())
 
-        # Let's build some blocks and test them.
+        self.log.info("Let's build some blocks and test them.")
         for i in range(16):
             n = i + 1
-            if XT_TWEAKS:
-                block(n, spend=out[i], block_size=min(self.excessive_block_size,\
-                        n * ONE_MEGABYTE))
-            else:
-                block(n, spend=out[i], block_size=n * ONE_MEGABYTE)
+            block(n, spend=out[i], block_size=n * ONE_MEGABYTE)
+            self.log.info("%dMB block" % n)
             yield accepted()
 
-        # block of maximal size
+        self.log.info("Block of maximal size")
         block(17, spend=out[16], block_size=self.excessive_block_size)
         yield accepted()
 
-        # Reject oversized blocks with bad-blk-length error
+        self.log.info("Reject oversized blocks with bad-blk-length error")
         block(18, spend=out[17], block_size=self.excessive_block_size + 1)
         yield rejected(RejectResult(16, b'bad-blk-length'))
 
-        # Rewind bad block.
+        self.log.info("Rewind bad block.")
         tip(17)
 
-        # Accept many sigops
+        self.log.info("Accept many sigops")
         lots_of_checksigs = CScript(
             [OP_CHECKSIG] * (MAX_BLOCK_SIGOPS_PER_MB - 1))
         block(
             19, spend=out[17], script=lots_of_checksigs, block_size=ONE_MEGABYTE)
         yield accepted()
 
+        self.log.info("Too many sigops")
         too_many_blk_checksigs = CScript(
             [OP_CHECKSIG] * MAX_BLOCK_SIGOPS_PER_MB)
         block(
@@ -346,17 +322,17 @@ class FullBlockTest(ComparisonTestFramework):
         # Rewind bad block
         tip(19)
 
-        # Accept 40k sigops per block > 1MB and <= 2MB
+        self.log.info("Accept 40k sigops per block > 1MB and <= 2MB")
         block(21, spend=out[18], script=lots_of_checksigs,
               extra_sigops=MAX_BLOCK_SIGOPS_PER_MB, block_size=ONE_MEGABYTE + 1)
         yield accepted()
 
-        # Accept 40k sigops per block > 1MB and <= 2MB
+        self.log.info("Accept 40k sigops per block > 1MB and <= 2MB")
         block(22, spend=out[19], script=lots_of_checksigs,
               extra_sigops=MAX_BLOCK_SIGOPS_PER_MB, block_size=2 * ONE_MEGABYTE)
         yield accepted()
 
-        # Reject more than 40k sigops per block > 1MB and <= 2MB.
+        self.log.info("Reject more than 40k sigops per block > 1MB and <= 2MB.")
         block(23, spend=out[20], script=lots_of_checksigs,
               extra_sigops=MAX_BLOCK_SIGOPS_PER_MB + 1, block_size=ONE_MEGABYTE + 1)
         yield rejected(RejectResult(16, b'bad-blk-sigops'))
@@ -364,7 +340,7 @@ class FullBlockTest(ComparisonTestFramework):
         # Rewind bad block
         tip(22)
 
-        # Reject more than 40k sigops per block > 1MB and <= 2MB.
+        self.log.info("Reject more than 40k sigops per block > 1MB and <= 2MB.")
         block(24, spend=out[20], script=lots_of_checksigs,
               extra_sigops=MAX_BLOCK_SIGOPS_PER_MB + 1, block_size=2 * ONE_MEGABYTE)
         yield rejected(RejectResult(16, b'bad-blk-sigops'))
@@ -372,17 +348,17 @@ class FullBlockTest(ComparisonTestFramework):
         # Rewind bad block
         tip(22)
 
-        # Accept 60k sigops per block > 2MB and <= 3MB
+        self.log.info("Accept 60k sigops per block > 2MB and <= 3MB")
         block(25, spend=out[20], script=lots_of_checksigs, extra_sigops=2 *
               MAX_BLOCK_SIGOPS_PER_MB, block_size=2 * ONE_MEGABYTE + 1)
         yield accepted()
 
-        # Accept 60k sigops per block > 2MB and <= 3MB
+        self.log.info("Accept 60k sigops per block > 2MB and <= 3MB")
         block(26, spend=out[21], script=lots_of_checksigs,
               extra_sigops=2 * MAX_BLOCK_SIGOPS_PER_MB, block_size=3 * ONE_MEGABYTE)
         yield accepted()
 
-        # Reject more than 40k sigops per block > 1MB and <= 2MB.
+        self.log.info("Reject more than 40k sigops per block > 1MB and <= 2MB.")
         block(27, spend=out[22], script=lots_of_checksigs, extra_sigops=2 *
               MAX_BLOCK_SIGOPS_PER_MB + 1, block_size=2 * ONE_MEGABYTE + 1)
         yield rejected(RejectResult(16, b'bad-blk-sigops'))
@@ -390,7 +366,7 @@ class FullBlockTest(ComparisonTestFramework):
         # Rewind bad block
         tip(26)
 
-        # Reject more than 40k sigops per block > 1MB and <= 2MB.
+        self.log.info("Reject more than 40k sigops per block > 1MB and <= 2MB.")
         block(28, spend=out[22], script=lots_of_checksigs, extra_sigops=2 *
               MAX_BLOCK_SIGOPS_PER_MB + 1, block_size=3 * ONE_MEGABYTE)
         yield rejected(RejectResult(16, b'bad-blk-sigops'))
@@ -398,7 +374,7 @@ class FullBlockTest(ComparisonTestFramework):
         # Rewind bad block
         tip(26)
 
-        # Too many sigops in one txn
+        self.log.info("Too many sigops in one txn")
         too_many_tx_checksigs = CScript(
             [OP_CHECKSIG] * (MAX_BLOCK_SIGOPS_PER_MB + 1))
         block(
@@ -408,18 +384,18 @@ class FullBlockTest(ComparisonTestFramework):
         # Rewind bad block
         tip(26)
 
-        # P2SH
-        # Build the redeem script, hash it, use hash to create the p2sh script
+        self.log.info("P2SH")
+        self.log.info("Build the redeem script, hash it, use hash to create the p2sh script")
         redeem_script = CScript([self.coinbase_pubkey] + [
                                 OP_2DUP, OP_CHECKSIGVERIFY] * 5 + [OP_CHECKSIG])
         redeem_script_hash = hash160(redeem_script)
         p2sh_script = CScript([OP_HASH160, redeem_script_hash, OP_EQUAL])
 
-        # Create a p2sh transaction
+        self.log.info("Create a p2sh transaction")
         p2sh_tx = self.create_and_sign_transaction(
             out[22].tx, out[22].n, 1, p2sh_script)
 
-        # Add the transaction to the block
+        self.log.info("Add the transaction to the block")
         block(30)
         update_block(30, [p2sh_tx])
         yield accepted()
@@ -443,7 +419,8 @@ class FullBlockTest(ComparisonTestFramework):
         # Sigops p2sh limit
         p2sh_sigops_limit = MAX_BLOCK_SIGOPS_PER_MB - \
             redeem_script.GetSigOpCount(True)
-        # Too many sigops in one p2sh txn
+
+        self.log.info("Too many sigops in one p2sh txn")
         too_many_p2sh_sigops = CScript([OP_CHECKSIG] * (p2sh_sigops_limit + 1))
         block(31, spend=out[23], block_size=ONE_MEGABYTE + 1)
         update_block(31, [spend_p2sh_tx(too_many_p2sh_sigops)])
@@ -452,13 +429,13 @@ class FullBlockTest(ComparisonTestFramework):
         # Rewind bad block
         tip(30)
 
-        # Max sigops in one p2sh txn
+        self.log.info("Max sigops in one p2sh txn")
         max_p2sh_sigops = CScript([OP_CHECKSIG] * (p2sh_sigops_limit))
         block(32, spend=out[23], block_size=ONE_MEGABYTE + 1)
         update_block(32, [spend_p2sh_tx(max_p2sh_sigops)])
         yield accepted()
 
-        # Check that compact block also work for big blocks
+        self.log.info("Check that compact block also work for big blocks")
         node = self.nodes[0]
         peer = TestNode()
         peer.add_connection(NodeConn('127.0.0.1', p2p_port(0), node, peer))

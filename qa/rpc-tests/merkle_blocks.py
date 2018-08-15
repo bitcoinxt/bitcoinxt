@@ -22,11 +22,11 @@ class MerkleBlockTest(BitcoinTestFramework):
     def setup_network(self):
         self.nodes = []
         # Nodes 0/1 are "wallet" nodes
-        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug", "-relaypriority=0"]))
-        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug", "-relaypriority=0"]))
+        self.nodes.append(start_node(0, self.options.tmpdir, ["-debug", "-allowfreetx=0"]))
+        self.nodes.append(start_node(1, self.options.tmpdir, ["-debug", "-allowfreetx=0"]))
         # Nodes 2/3 are used for testing
-        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug", "-relaypriority=0"]))
-        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug", "-txindex", "-relaypriority=0"]))
+        self.nodes.append(start_node(2, self.options.tmpdir, ["-debug", "-allowfreetx=0"]))
+        self.nodes.append(start_node(3, self.options.tmpdir, ["-debug", "-txindex", "-allowfreetx=0"]))
         connect_nodes(self.nodes[0], 1)
         connect_nodes(self.nodes[0], 2)
         connect_nodes(self.nodes[0], 3)
@@ -44,10 +44,11 @@ class MerkleBlockTest(BitcoinTestFramework):
         assert_equal(self.nodes[1].getbalance(), 0)
         assert_equal(self.nodes[2].getbalance(), 0)
 
+        fee = get_relay_fee(self.nodes[0])
         node0utxos = self.nodes[0].listunspent(1)
-        tx1 = self.nodes[0].createrawtransaction([node0utxos.pop()], {self.nodes[1].getnewaddress(): 50})
+        tx1 = self.nodes[0].createrawtransaction([node0utxos.pop()], {self.nodes[1].getnewaddress(): 50 - fee})
         txid1 = self.nodes[0].sendrawtransaction(self.nodes[0].signrawtransaction(tx1)["hex"])
-        tx2 = self.nodes[0].createrawtransaction([node0utxos.pop()], {self.nodes[1].getnewaddress(): 50})
+        tx2 = self.nodes[0].createrawtransaction([node0utxos.pop()], {self.nodes[1].getnewaddress(): 50 - fee})
         txid2 = self.nodes[0].sendrawtransaction(self.nodes[0].signrawtransaction(tx2)["hex"])
         assert_raises(JSONRPCException, self.nodes[0].gettxoutproof, [txid1])
 
@@ -65,7 +66,7 @@ class MerkleBlockTest(BitcoinTestFramework):
         assert_equal(self.nodes[2].verifytxoutproof(self.nodes[2].gettxoutproof([txid1, txid2], blockhash)), txlist)
 
         txin_spent = self.nodes[1].listunspent(1).pop()
-        tx3 = self.nodes[1].createrawtransaction([txin_spent], {self.nodes[0].getnewaddress(): 50})
+        tx3 = self.nodes[1].createrawtransaction([txin_spent], {self.nodes[0].getnewaddress(): txin_spent["amount"] - fee})
         self.nodes[0].sendrawtransaction(self.nodes[1].signrawtransaction(tx3)["hex"])
         self.nodes[0].generate(1)
         self.sync_all()

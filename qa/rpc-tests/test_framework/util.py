@@ -25,6 +25,7 @@ import errno
 
 from . import coverage
 from .authproxy import AuthServiceProxy, JSONRPCException
+from test_framework.mininode import COIN
 
 COVERAGE_DIR = None
 
@@ -695,3 +696,11 @@ def wait_for(criteria, what = None, timeout = 60):
         time.sleep(0.1 * i**2) # geometric back-off
         i += 1
 
+def get_relay_fee(node, txsize = 500, unit = "bch"):
+    bchrate = node.getnetworkinfo()["relayfee"] * Decimal(txsize / 1000)
+    if (unit == "bch"):
+        return bchrate
+    if (unit == "sat"):
+        return int(bchrate * COIN)
+    else:
+        raise Exception("unsupported unit")

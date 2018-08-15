@@ -31,6 +31,9 @@ public:
         int ThinBlocksMaxParallel();
         bool PreferXThinBlocks() const;
 
+    // Policy
+    bool AllowFreeTx() const;
+
     //! Throws invalid argument on use of options that are no longer supported.
     void CheckRemovedOptions() const;
 };

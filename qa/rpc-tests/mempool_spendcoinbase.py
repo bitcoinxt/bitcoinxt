@@ -28,7 +28,7 @@ class MempoolSpendCoinbaseTest(BitcoinTestFramework):
 
     def setup_network(self):
         # Just need one node for this test
-        args = ["-checkmempool", "-debug=mempool", "-relaypriority=0"]
+        args = ["-checkmempool", "-debug=mempool", "-allowfreetx=0"]
         self.nodes = []
         self.nodes.append(start_node(0, self.options.tmpdir, args))
         self.is_network_split = False
@@ -41,9 +41,10 @@ class MempoolSpendCoinbaseTest(BitcoinTestFramework):
         # Coinbase at height chain_height-100+1 ok in mempool, should
         # get mined. Coinbase at height chain_height-100+2 is
         # is too immature to spend.
+        fee = get_relay_fee(self.nodes[0])
         b = [ self.nodes[0].getblockhash(n) for n in range(101, 103) ]
         coinbase_txids = [ self.nodes[0].getblock(h)['tx'][0] for h in b ]
-        spends_raw = [ create_tx(self.nodes[0], txid, node0_address, 50) for txid in coinbase_txids ]
+        spends_raw = [ create_tx(self.nodes[0], txid, node0_address, 50 - fee) for txid in coinbase_txids ]
 
         spend_101_id = self.nodes[0].sendrawtransaction(spends_raw[0])
 
