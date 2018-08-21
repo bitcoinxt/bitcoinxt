@@ -127,6 +127,44 @@ BOOST_AUTO_TEST_CASE(is_thirdhf_active) {
     BOOST_CHECK(!IsThirdHFActive(block4.GetMedianTimePast()));
 }
 
+BOOST_AUTO_TEST_CASE(is_fourthhf_active) {
+    auto arg = new DummyArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+
+    CBlockIndex genesis;
+    genesis.pprev = nullptr;
+    genesis.nTime = 11;
+
+    CBlockIndex block2;
+    block2.pprev = &genesis;
+    block2.nTime = 42;
+
+    CBlockIndex block3;
+    block3.pprev = &block2;
+    block3.nTime = 50;
+
+    CBlockIndex block4;
+    block4.pprev = &block3;
+    block4.nTime = 100;
+
+    arg->Set("-uahftime", 1);
+    // Activation time is exactly mtp of block2.
+    // In this test block2 and block3 have the same mtp.
+    arg->Set("-fourthhftime", block2.GetMedianTimePast());
+
+    BOOST_CHECK(!IsFourthHFActive(genesis.GetMedianTimePast()));
+    BOOST_CHECK(IsFourthHFActive(block2.GetMedianTimePast()));
+    BOOST_CHECK(IsFourthHFActive(block3.GetMedianTimePast()));
+    BOOST_CHECK(IsFourthHFActive(block4.GetMedianTimePast()));
+
+    // Never active if novemberhf is disabled.
+    arg->Set("-fourthhftime", 0);
+    BOOST_CHECK(!IsFourthHFActive(genesis.GetMedianTimePast()));
+    BOOST_CHECK(!IsFourthHFActive(block2.GetMedianTimePast()));
+    BOOST_CHECK(!IsFourthHFActive(block3.GetMedianTimePast()));
+    BOOST_CHECK(!IsFourthHFActive(block4.GetMedianTimePast()));
+}
+
 class DummyMempool : public CTxMemPool {
 public:
     DummyMempool() : CTxMemPool(CFeeRate(0)) { }
