@@ -240,6 +240,10 @@ BOOST_AUTO_TEST_CASE(forkmempoolclearer_thirdhf) {
 }
 
 BOOST_AUTO_TEST_CASE(forkmempoolclearer_fourthhf) {
+    auto arg = new DummyArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+    arg->Set("-fourthhftime", 1542300000); // TODO: REVERT ME!
+
     CBlockIndex oldTip;
     CBlockIndex newTip;
 

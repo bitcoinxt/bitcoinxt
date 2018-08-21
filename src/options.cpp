@@ -101,7 +101,8 @@ int64_t Opt::FourthHFTime() const {
         return 0;
 
     // Default to 2018-11-15 16:40
-    const int64_t MTP_ACTIVATION = 1542300000;
+    int64_t MTP_ACTIVATION = 1542300000;
+    MTP_ACTIVATION = 0; // REVERT ME!
     return Args->GetArg("-fourthhftime", MTP_ACTIVATION);
 }
 

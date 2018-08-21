@@ -64,6 +64,7 @@ BOOST_AUTO_TEST_CASE(fourthhftime_ignored_for_btc) {
     auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
 
     // Enabled by default
+    arg->Set("-fourthhftime", 1542300000); // TODO: REVERT ME!
     BOOST_CHECK_EQUAL(1542300000, Opt().FourthHFTime());
 
     // Disabled if we're not on Bitcoin Cash chain
