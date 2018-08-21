@@ -239,5 +239,36 @@ BOOST_AUTO_TEST_CASE(forkmempoolclearer_thirdhf) {
     BOOST_CHECK_EQUAL(1, mempool.clearCalls);
 }
 
+BOOST_AUTO_TEST_CASE(forkmempoolclearer_fourthhf) {
+    CBlockIndex oldTip;
+    CBlockIndex newTip;
+
+    oldTip.nTime = Opt().FourthHFTime() - 1;
+    oldTip.nHeight = 0;
+    newTip.nTime = Opt().FourthHFTime();
+    newTip.nHeight = 1;
+    newTip.pprev = &oldTip;
+    BOOST_CHECK(IsFourthHFActivatingBlock(newTip.GetMedianTimePast(), &oldTip));
+
+    // This fork has malleability fixes and thus restricts what transactions are
+    // valid. Thus it has to clear mempool going into the fork.
+    //
+    // It also adds new op codes, so mempool must be cleared if there is a rollback.
+
+    DummyMempool mempool;
+    int expectedCalls = 0;
+    ForkMempoolClearer(mempool, &oldTip, &oldTip);
+    BOOST_CHECK_EQUAL(expectedCalls, mempool.clearCalls);
+    // fork time
+    ForkMempoolClearer(mempool, &oldTip, &newTip);
+    BOOST_CHECK_EQUAL(++expectedCalls, mempool.clearCalls);
+    // rollback
+    ForkMempoolClearer(mempool, &newTip, &oldTip);
+    BOOST_CHECK_EQUAL(++expectedCalls, mempool.clearCalls);
+    // past fork time
+    oldTip.nTime = Opt().FourthHFTime();
+    newTip.nTime = Opt().FourthHFTime() + 1;
+    BOOST_CHECK_EQUAL(expectedCalls, mempool.clearCalls);
+}
 
 BOOST_AUTO_TEST_SUITE_END()

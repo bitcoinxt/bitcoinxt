@@ -56,6 +56,52 @@ bool IsFourthHFActive(int64_t mtpChainTip) {
     return IsForkActive(Opt().FourthHFTime(), mtpChainTip);
 }
 
+// Check if fork with incompatible transactions is deactivated.
+//
+// Called when tip is being rollbacked. Rollback happens by reorg or
+// invalidateblock call.
+static bool NeedsClearAfterRollback(const CBlockIndex* oldTip) {
+    assert(oldTip);
+    if (oldTip->pprev == nullptr)
+        return false;
+
+    const int64_t mtpOld = oldTip->GetMedianTimePast();
+    const int64_t mtpOldPrev = oldTip->pprev->GetMedianTimePast();
+
+    // forks requiring mempool clearing in rollback
+    const std::vector<std::function<bool(int64_t)>> forkChecks = {
+        IsUAHFActive, // adds replay protection
+        IsThirdHFActive, // adds new opcodes
+        IsFourthHFActive}; // adds new opcodes
+
+    for (auto isActive : forkChecks) {
+        bool forkUndone = isActive(mtpOld) && !isActive(mtpOldPrev);
+        if (forkUndone)
+            return true;
+    }
+    return false;
+}
+
+// Check if a fork with incompatible transactions is activated.
+//
+// Called when a block is appended to chain.
+static bool NeedsClearAfterAppend(const CBlockIndex* oldTip, int64_t mtpNew) {
+    assert(oldTip);
+
+    // forks requiring mempool clearing going into fork
+    const std::vector<std::function<bool(int64_t, const CBlockIndex*)>> forkChecks = {
+        IsUAHFActivatingBlock, // adds replay protection
+        IsFourthHFActivatingBlock // removes malleability vectors
+    };
+
+    for (auto& activatesFork : forkChecks) {
+        if (activatesFork(mtpNew, oldTip)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void ForkMempoolClearer(
         CTxMemPool& mempool, const CBlockIndex* oldTip, const CBlockIndex* newTip)
 {
@@ -63,33 +109,14 @@ void ForkMempoolClearer(
         return;
 
     const bool rollback = oldTip->nHeight > newTip->nHeight;
-    const uint64_t mtpOld = oldTip->GetMedianTimePast();
-    const uint64_t mtpNew = newTip->GetMedianTimePast();
+    bool clear = rollback
+        ? NeedsClearAfterRollback(oldTip)
+        : NeedsClearAfterAppend(oldTip, newTip->GetMedianTimePast());
 
-    if (rollback) {
-        // Tip is being rollbacked. This is caused by reorg or invalidateblock
-        // call. Check if fork with incompatible transactions is deactivated.
-        if (oldTip->pprev == nullptr)
-            return;
-
-        const uint64_t mtpOldPrev = oldTip->pprev->GetMedianTimePast();
-
-        bool forkUndone =
-            (IsUAHFActive(mtpOld) && !IsUAHFActive(mtpOldPrev))
-            || (IsThirdHFActive(mtpOld) && !IsThirdHFActive(mtpOldPrev));
-
-        if (forkUndone) {
-            LogPrint(Log::BLOCK, "Rollback past fork - clearing mempool.\n");
-            mempool.clear();
-        }
+    if (!clear)
         return;
-    }
 
-    // Block appended to chain.
-    // Check if a fork with incompatible transactions is activated.
-    if (IsUAHFActivatingBlock(mtpNew, oldTip))
-    {
-            LogPrint(Log::BLOCK, "HF activating block - clearing mempool.\n");
-            mempool.clear();
-    }
+    LogPrint(Log::BLOCK, "%s - clearing mempool\n", rollback
+             ? "Rollback past fork" : "Fork activating block");
+    mempool.clear();
 }
