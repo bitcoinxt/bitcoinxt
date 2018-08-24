@@ -79,9 +79,9 @@ class BIP66Test(ComparisonTestFramework):
         self.nodeaddress = self.nodes[0].getnewaddress()
         self.last_block_time = int(time.time())
 
-        ''' 98 more version 2 blocks '''
+        self.log.info("298 more version 2 blocks")
         test_blocks = []
-        for i in range(98):
+        for i in range(298):
             block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
             block.nVersion = 2
             block.rehash()
@@ -92,9 +92,9 @@ class BIP66Test(ComparisonTestFramework):
             height += 1
         yield TestInstance(test_blocks, sync_every_block=False)
 
-        ''' Mine 74 version 3 blocks '''
+        self.log.info("Mine 749 version 3 blocks")
         test_blocks = []
-        for i in range(74):
+        for i in range(749):
             block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
             block.nVersion = 3
             block.rehash()
@@ -105,12 +105,8 @@ class BIP66Test(ComparisonTestFramework):
             height += 1
         yield TestInstance(test_blocks, sync_every_block=False)
 
-        '''
-        Check that the new DERSIG rules are enforced in the 75th
-        version 3 block.
-
-        Before UAHF the DERSIG rules were not enforced at this point.
-        '''
+        self.log.info("Check that DERSIG rules are enforced in the 75th version 3 block.")
+        # Before UAHF the DERSIG rules were not enforced at this point.
         spendtx = self.create_transaction(self.nodes[0],
                 self.coinbase_blocks[0], self.nodeaddress, 1.0)
 
@@ -139,10 +135,40 @@ class BIP66Test(ComparisonTestFramework):
         height += 1
         yield TestInstance([[block, True]])
 
-        '''
-        Check that the new DERSIG rules are enforced in the 76th version 3
-        block.
-        '''
+        self.log.info("Mine 199 new version blocks on last valid tip")
+        test_blocks = []
+        for i in range(199):
+            block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
+            block.nVersion = 3
+            block.rehash()
+            block.solve()
+            test_blocks.append([block, True])
+            self.last_block_time += 1
+            self.tip = block.sha256
+            height += 1
+        yield TestInstance(test_blocks, sync_every_block=False)
+
+        self.log.info("Mine 1 old version block")
+        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
+        block.nVersion = 2
+        block.rehash()
+        block.solve()
+        self.last_block_time += 1
+        self.tip = block.sha256
+        height += 1
+        yield TestInstance([[block, True]])
+
+        self.log.info("Mine 1 new version block")
+        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
+        block.nVersion = 3
+        block.rehash()
+        block.solve()
+        self.last_block_time += 1
+        self.tip = block.sha256
+        height += 1
+        yield TestInstance([[block, True]])
+
+        self.log.info("Check that DERSIG rules are enforced in the 951st version 3 block")
         spendtx = self.create_transaction(self.nodes[0],
                 self.coinbase_blocks[1], self.nodeaddress, 1.0)
         unDERify(spendtx)
@@ -157,40 +183,7 @@ class BIP66Test(ComparisonTestFramework):
         self.last_block_time += 1
         yield TestInstance([[block, False]])
 
-        ''' Mine 19 new version blocks on last valid tip '''
-        test_blocks = []
-        for i in range(19):
-            block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
-            block.nVersion = 3
-            block.rehash()
-            block.solve()
-            test_blocks.append([block, True])
-            self.last_block_time += 1
-            self.tip = block.sha256
-            height += 1
-        yield TestInstance(test_blocks, sync_every_block=False)
-
-        ''' Mine 1 old version block '''
-        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
-        block.nVersion = 2
-        block.rehash()
-        block.solve()
-        self.last_block_time += 1
-        self.tip = block.sha256
-        height += 1
-        yield TestInstance([[block, True]])
-
-        ''' Mine 1 new version block '''
-        block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
-        block.nVersion = 3
-        block.rehash()
-        block.solve()
-        self.last_block_time += 1
-        self.tip = block.sha256
-        height += 1
-        yield TestInstance([[block, True]])
-
-        ''' Mine 1 old version block, should be invalid '''
+        self.log.inf("Mine 1 old version block, should be invalid")
         block = create_block(self.tip, create_coinbase(absoluteHeight = height), self.last_block_time + 1)
         block.nVersion = 2
         block.rehash()
