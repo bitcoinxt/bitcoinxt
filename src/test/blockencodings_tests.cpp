@@ -10,6 +10,7 @@
 #include "maxblocksize.h"
 
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 #include "test/thinblockutil.h"
 
 #include <boost/test/unit_test.hpp>
@@ -40,14 +41,6 @@ BOOST_AUTO_TEST_CASE(TransactionsRequestSerializationTest) {
     BOOST_CHECK_EQUAL(req1.indexes[1], req2.indexes[1]);
     BOOST_CHECK_EQUAL(req1.indexes[2], req2.indexes[2]);
     BOOST_CHECK_EQUAL(req1.indexes[3], req2.indexes[3]);
-}
-
-// Predicate for checking exception message contains string
-std::function<bool(const std::invalid_argument&)>
-errorContains(const std::string& str) {
-    return [str](const std::invalid_argument& err) {
-        return std::string(err.what()).find(str) != std::string::npos;
-    };
 }
 
 BOOST_AUTO_TEST_CASE(validate_compact_block) {
