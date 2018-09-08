@@ -178,23 +178,30 @@ CScript ParseScript(std::string s)
     return result;
 }
 
-bool DecodeHexTx(CTransaction& tx, const std::string& strHexTx)
+CTransaction DecodeHexTx(const std::string& strHexTx)
 {
-    if (!IsHex(strHexTx))
-        return false;
+    if (!IsHex(strHexTx)) {
+        throw std::invalid_argument("Argument is not a valid hex string.");
+    }
 
     vector<unsigned char> txData(ParseHex(strHexTx));
+
+    CTransaction tx;
     CDataStream ssData(txData, SER_NETWORK, PROTOCOL_VERSION);
     try {
         ssData >> tx;
-        if (!ssData.empty())
-            return false;
     }
-    catch (const std::exception&) {
-        return false;
+    catch (const std::ios_base::failure& e) {
+        throw std::invalid_argument("Error unserializing transation: "
+                                    + std::string(e.what()));
     }
-
-    return true;
+    if (!ssData.empty()) {
+        std::stringstream ss;
+        ss << "Excess data in hex string. After parsing transaction, "
+           << ssData.size() << " bytes remained.";
+        throw std::invalid_argument(ss.str());
+    }
+    return tx;
 }
 
 bool DecodeHexBlk(CBlock& block, const std::string& strHexBlk)

@@ -485,8 +485,13 @@ UniValue decoderawtransaction(const JSONRPCRequest& request)
 
     CTransaction tx;
 
-    if (!DecodeHexTx(tx, request.params[0].get_str()))
-        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+    try {
+        tx = DecodeHexTx(request.params[0].get_str());
+    }
+    catch (const std::exception& e) {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
+                           "TX decode failed: " + std::string(e.what()));
+    }
 
     UniValue result(UniValue::VOBJ);
     TxToJSON(tx, uint256(), result);
@@ -861,8 +866,13 @@ UniValue sendrawtransaction(const JSONRPCRequest& request)
 
     // parse hex string from parameter
     CTransaction tx;
-    if (!DecodeHexTx(tx, request.params[0].get_str()))
-        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
+    try {
+        tx = DecodeHexTx(request.params[0].get_str());
+    }
+    catch (const std::exception& e) {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
+                           "TX decode failed:" + std::string(e.what()));
+    }
     uint256 hashTx = tx.GetHash();
 
     bool fOverrideFees = false;
