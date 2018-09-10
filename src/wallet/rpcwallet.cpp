@@ -2504,9 +2504,13 @@ UniValue fundrawtransaction(const JSONRPCRequest& request)
 
     // parse hex string from parameter
     CTransaction origTx;
-    if (!DecodeHexTx(origTx, request.params[0].get_str()))
-        throw JSONRPCError(RPC_DESERIALIZATION_ERROR, "TX decode failed");
-
+    try {
+        origTx = DecodeHexTx(request.params[0].get_str());
+    }
+    catch (const std::exception& e) {
+        throw JSONRPCError(RPC_DESERIALIZATION_ERROR,
+                           "TX decode failed: " + std::string(e.what()));
+    }
     if (origTx.vout.size() == 0)
         throw JSONRPCError(RPC_INVALID_PARAMETER, "TX must have at least one output");
 

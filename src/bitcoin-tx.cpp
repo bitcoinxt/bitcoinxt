@@ -636,8 +636,7 @@ static int CommandLineRawTx(int argc, char* argv[])
             if (strHexTx == "-")                 // "-" implies standard input
                 strHexTx = readStdin();
 
-            if (!DecodeHexTx(txDecodeTmp, strHexTx))
-                throw runtime_error("invalid transaction encoding");
+            txDecodeTmp = DecodeHexTx(strHexTx);
 
             startArg = 2;
         } else

@@ -3,7 +3,9 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "core_io.h"
+
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -143,6 +145,35 @@ BOOST_AUTO_TEST_CASE(parse_push_test) {
                       std::runtime_error);
     BOOST_CHECK_THROW(ParseScript(TestPushOpcode(4, 0x80, 0x7F)),
                       std::runtime_error);
+}
+
+BOOST_AUTO_TEST_CASE(decodehextx_validtx) {
+    const std::string valid_tx = "0100000001db4f85b6e2b9f6378fd9f52d80e17c63153"
+        "d61e1cbc4d46632bf2aba3190d5b000000000000000000001000000000000000001510"
+        "0000000";
+    const uint256 valid_tx_hash = uint256S("dcb15f62e0d0893f2d1e0dd180b056d53ef"
+                                           "f80f9ac49330eb664bbb828378aee");
+    CTransaction tx;
+    BOOST_CHECK_NO_THROW(tx = DecodeHexTx(valid_tx));
+    BOOST_CHECK_EQUAL(valid_tx_hash.ToString(), tx.GetHash().ToString());
+}
+
+BOOST_AUTO_TEST_CASE(decodehextx_invalidtx) {
+    BOOST_CHECK_EXCEPTION(DecodeHexTx("garbage"), std::invalid_argument,
+                      errorContains("not a valid hex string"));
+
+    const std::string valid_tx = "0100000001db4f85b6e2b9f6378fd9f52d80e17c63153"
+        "d61e1cbc4d46632bf2aba3190d5b000000000000000000001000000000000000001510"
+        "0000000";
+    BOOST_CHECK_EXCEPTION(DecodeHexTx(valid_tx + "00"), std::invalid_argument,
+                          errorContains("Excess data in"));;
+
+    // change input count to FF
+    const std::string invalid = "01000000ff"
+        + valid_tx.substr(10, std::string::npos);
+
+    BOOST_CHECK_EXCEPTION(DecodeHexTx(invalid), std::invalid_argument,
+                          errorContains("Error unserializing"));
 }
 
 BOOST_AUTO_TEST_SUITE_END()

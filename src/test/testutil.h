@@ -3,7 +3,9 @@
 
 #include "main.h"
 #include <boost/filesystem/path.hpp>
-
+#include <functional>
+#include <stdexcept>
+#include <string>
 struct DummyBlockIndexEntry {
 DummyBlockIndexEntry(const uint256& hash) : hash(hash) {
     index.nStatus = BLOCK_HAVE_DATA;
@@ -18,5 +20,9 @@ DummyBlockIndexEntry(const uint256& hash) : hash(hash) {
 };
 
 boost::filesystem::path GetTempPath();
+
+// Used with BOOST_CHECK_EXCEPTION for checking contents of exception string
+std::function<bool(const std::invalid_argument&)> errorContains(
+        const std::string& str);
 
 #endif // BITCOIN_TEST_TESTUTIL_H

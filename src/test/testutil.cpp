@@ -31,3 +31,11 @@ boost::filesystem::path GetTempPath() {
     return path;
 #endif
 }
+
+std::function<bool(const std::invalid_argument&)> errorContains(
+        const std::string& str)
+{
+    return [str](const std::invalid_argument& err) {
+        return std::string(err.what()).find(str) != std::string::npos;
+    };
+}
