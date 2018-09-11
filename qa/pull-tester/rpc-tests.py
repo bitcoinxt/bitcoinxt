@@ -139,7 +139,6 @@ testScriptsExt = [
     'txn_doublespend.py --mineblock',
     'mempool_limit.py',
     'pruning.py',
-    'forknotify.py',
     'invalidateblock.py',
     'keypool.py',
     'receivedby.py',
