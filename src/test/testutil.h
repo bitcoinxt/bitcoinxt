@@ -25,4 +25,9 @@ boost::filesystem::path GetTempPath();
 std::function<bool(const std::invalid_argument&)> errorContains(
         const std::string& str);
 
+// Initialize dummy block index and chain them.
+void BuildDummyBlockIndex(std::vector<CBlockIndex>& blocks,
+                          const std::function<void(CBlockIndex&)>& customizeFunc,
+                          int64_t genesisBlockTime = 100);
+
 #endif // BITCOIN_TEST_TESTUTIL_H

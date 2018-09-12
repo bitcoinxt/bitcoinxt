@@ -39,3 +39,24 @@ std::function<bool(const std::invalid_argument&)> errorContains(
         return std::string(err.what()).find(str) != std::string::npos;
     };
 }
+
+void BuildDummyBlockIndex(std::vector<CBlockIndex>& blocks,
+                          const std::function<void(CBlockIndex&)>& customizeFunc,
+                          int64_t genesisBlockTime)
+{
+    int height = 0;
+    int64_t blocktime = genesisBlockTime;
+
+    CBlockIndex* prev = nullptr;
+
+    for (CBlockIndex& b : blocks)
+    {
+        b.nHeight = height++;
+        b.nTime = blocktime++;
+
+        b.pprev = prev;
+        prev = &b;
+
+        customizeFunc(b);
+    }
+}
