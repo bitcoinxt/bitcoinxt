@@ -88,6 +88,7 @@ BITCOIN_TESTS =\
   test/multisig_tests.cpp \
   test/net_tests.cpp \
   test/netbase_tests.cpp \
+  test/nodestate_tests.cpp \
   test/options_tests.cpp \
   test/p2p_protocol_tests.cpp \
   test/pmt_tests.cpp \

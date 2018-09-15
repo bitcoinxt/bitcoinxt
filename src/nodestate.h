@@ -10,6 +10,7 @@
 #include "uint256.h"
 #include "inflightindex.h" // QueuedBlock
 #include "sync.h" // CCriticalSection
+#include "main.h" // BlockMap
 
 #include <string>
 #include <set>
@@ -79,6 +80,11 @@ struct CNodeState {
 
     CNodeState(NodeId id, ThinBlockManager&, const CService& addr, const std::string& name);
     ~CNodeState();
+
+    /* Checks if last unknown block is now known and if it's better.
+     * Return true if pindexBestKnownBlock was updated
+     */
+    bool UpdateBestFromLast(const BlockMap& chainIndex);
 };
 
 // Class that maintains per-node state, and
