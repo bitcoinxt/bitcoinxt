@@ -14,6 +14,10 @@ bool IsUAHFActive(uint64_t mtpChainTip);
 bool IsThirdHFActivatingBlock(int64_t mtpCurrent, const CBlockIndex* pindexPrev);
 bool IsThirdHFActive(int64_t mtpChainTip);
 
+// Nov 2018 upgrade
+bool IsFourthHFActivatingBlock(int64_t mtpCurrent, const CBlockIndex* pindexPrev);
+bool IsFourthHFActive(int64_t mtpChainTip);
+
 void ForkMempoolClearer(CTxMemPool& mempool,
                         const CBlockIndex* oldTip, const CBlockIndex* newTip);
 

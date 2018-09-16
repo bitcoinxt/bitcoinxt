@@ -93,6 +93,19 @@ int64_t Opt::ThirdHFTime() const {
     return Args->GetArg("-thirdhftime", MTP_ACTIVATION);
 }
 
+// Activation time of the fourth BCH hard fork
+int64_t Opt::FourthHFTime() const {
+
+    // Never activate if we're on the BTC chain
+    if (!bool(UAHFTime()))
+        return 0;
+
+    // Default to 2018-11-15 16:40
+    int64_t MTP_ACTIVATION = 1542300000;
+    MTP_ACTIVATION = 0; // REVERT ME!
+    return Args->GetArg("-fourthhftime", MTP_ACTIVATION);
+}
+
 int64_t Opt::RespendRelayLimit() const {
     return Args->GetArg("-limitrespendrelay", 100);
 }

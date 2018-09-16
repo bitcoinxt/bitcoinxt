@@ -127,6 +127,44 @@ BOOST_AUTO_TEST_CASE(is_thirdhf_active) {
     BOOST_CHECK(!IsThirdHFActive(block4.GetMedianTimePast()));
 }
 
+BOOST_AUTO_TEST_CASE(is_fourthhf_active) {
+    auto arg = new DummyArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+
+    CBlockIndex genesis;
+    genesis.pprev = nullptr;
+    genesis.nTime = 11;
+
+    CBlockIndex block2;
+    block2.pprev = &genesis;
+    block2.nTime = 42;
+
+    CBlockIndex block3;
+    block3.pprev = &block2;
+    block3.nTime = 50;
+
+    CBlockIndex block4;
+    block4.pprev = &block3;
+    block4.nTime = 100;
+
+    arg->Set("-uahftime", 1);
+    // Activation time is exactly mtp of block2.
+    // In this test block2 and block3 have the same mtp.
+    arg->Set("-fourthhftime", block2.GetMedianTimePast());
+
+    BOOST_CHECK(!IsFourthHFActive(genesis.GetMedianTimePast()));
+    BOOST_CHECK(IsFourthHFActive(block2.GetMedianTimePast()));
+    BOOST_CHECK(IsFourthHFActive(block3.GetMedianTimePast()));
+    BOOST_CHECK(IsFourthHFActive(block4.GetMedianTimePast()));
+
+    // Never active if novemberhf is disabled.
+    arg->Set("-fourthhftime", 0);
+    BOOST_CHECK(!IsFourthHFActive(genesis.GetMedianTimePast()));
+    BOOST_CHECK(!IsFourthHFActive(block2.GetMedianTimePast()));
+    BOOST_CHECK(!IsFourthHFActive(block3.GetMedianTimePast()));
+    BOOST_CHECK(!IsFourthHFActive(block4.GetMedianTimePast()));
+}
+
 class DummyMempool : public CTxMemPool {
 public:
     DummyMempool() : CTxMemPool(CFeeRate(0)) { }
@@ -201,5 +239,40 @@ BOOST_AUTO_TEST_CASE(forkmempoolclearer_thirdhf) {
     BOOST_CHECK_EQUAL(1, mempool.clearCalls);
 }
 
+BOOST_AUTO_TEST_CASE(forkmempoolclearer_fourthhf) {
+    auto arg = new DummyArgGetter;
+    auto argraii = SetDummyArgGetter(std::unique_ptr<ArgGetter>(arg));
+    arg->Set("-fourthhftime", 1542300000); // TODO: REVERT ME!
+
+    CBlockIndex oldTip;
+    CBlockIndex newTip;
+
+    oldTip.nTime = Opt().FourthHFTime() - 1;
+    oldTip.nHeight = 0;
+    newTip.nTime = Opt().FourthHFTime();
+    newTip.nHeight = 1;
+    newTip.pprev = &oldTip;
+    BOOST_CHECK(IsFourthHFActivatingBlock(newTip.GetMedianTimePast(), &oldTip));
+
+    // This fork has malleability fixes and thus restricts what transactions are
+    // valid. Thus it has to clear mempool going into the fork.
+    //
+    // It also adds new op codes, so mempool must be cleared if there is a rollback.
+
+    DummyMempool mempool;
+    int expectedCalls = 0;
+    ForkMempoolClearer(mempool, &oldTip, &oldTip);
+    BOOST_CHECK_EQUAL(expectedCalls, mempool.clearCalls);
+    // fork time
+    ForkMempoolClearer(mempool, &oldTip, &newTip);
+    BOOST_CHECK_EQUAL(++expectedCalls, mempool.clearCalls);
+    // rollback
+    ForkMempoolClearer(mempool, &newTip, &oldTip);
+    BOOST_CHECK_EQUAL(++expectedCalls, mempool.clearCalls);
+    // past fork time
+    oldTip.nTime = Opt().FourthHFTime();
+    newTip.nTime = Opt().FourthHFTime() + 1;
+    BOOST_CHECK_EQUAL(expectedCalls, mempool.clearCalls);
+}
 
 BOOST_AUTO_TEST_SUITE_END()
