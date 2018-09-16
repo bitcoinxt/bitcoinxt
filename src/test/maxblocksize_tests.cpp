@@ -7,6 +7,7 @@
 #include "chainparams.h"
 #include "options.h"
 #include "test/test_bitcoin.h"
+#include "test/testutil.h"
 
 #include <boost/test/unit_test.hpp>
 
@@ -18,23 +19,14 @@ void fillBlockIndex(
         Consensus::Params& params, std::vector<CBlockIndex>& blockIndexes,
         bool addVotes, int64_t currMax) {
 
-    int height = 0;
-    int64_t blocktime = Opt().UAHFTime();
-
-    CBlockIndex* prev = nullptr;
-    for (CBlockIndex& index : blockIndexes)
-    {
-        index.nHeight = height++;
-        index.nTime = blocktime++;
+    auto customizeFunc = [addVotes, currMax](CBlockIndex& index) {
         index.nMaxBlockSize = currMax;
 
-        if (addVotes)
-            index.nMaxBlockSizeVote = std::max(
-                index.nHeight * 1000000, 1000000);
+        if (!addVotes) return;
 
-        index.pprev = prev;
-        prev = &index;
-    }
+        index.nMaxBlockSizeVote = std::max(index.nHeight * 1000000, 1000000);
+    };
+    BuildDummyBlockIndex(blockIndexes, customizeFunc, Opt().UAHFTime());
 };
 
 BOOST_AUTO_TEST_CASE(get_next_max_blocksize) {
