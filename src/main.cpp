@@ -5099,8 +5099,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         }
         FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
     }
-    else if (strCommand == "headers" && !fImporting && !fReindex) // Ignore headers received while importing
+    else if (strCommand == NetMsgType::HEADERS)
     {
+        if (fImporting || fReindex) {
+            LogPrint(Log::NET, "%s: message ignored, importing or reindexing\n", strCommand);
+            return true;
+        }
         std::vector<CBlockHeader> headers;
 
         // Bypass the normal CBlock deserialization, as we don't want to risk deserializing 2000 full blocks.
@@ -5115,13 +5119,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             ReadCompactSize(vRecv); // ignore tx count; assume it is 0.
         }
 
-        LOCK(cs_main);
-
         if (nCount == 0) {
             // Nothing interesting. Stop asking this peers for more headers.
             return true;
         }
 
+        LOCK(cs_main);
         MarkBlockAsInFlight inFlight;
         DefaultHeaderProcessor p(*connman, pfrom, blocksInFlight, thinblockmg, inFlight, CheckBlockIndex);
 
