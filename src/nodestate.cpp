@@ -39,3 +39,41 @@ void NodeStatePtr::insert(NodeId nodeid, const CNode *pnode, ThinBlockManager& t
 CNodeState::~CNodeState()
 {
 }
+
+static bool HasLessOrEqualWork(const CBlockIndex& a, const CBlockIndex& b) {
+    return a.nChainWork <= b.nChainWork;
+}
+
+bool CNodeState::UpdateBestFromLast(const BlockMap& chainIndex) {
+
+    if (hashLastUnknownBlock.IsNull()) {
+        // we have no unknown
+        return false;
+    }
+
+    auto b = chainIndex.find(hashLastUnknownBlock);
+    if (b == end(chainIndex)) {
+        // it's still unknown
+        return false;
+    }
+    assert(b->second);
+
+    // we have it, no longer unknown.
+    hashLastUnknownBlock.SetNull();
+    CBlockIndex* bestCandidate = b->second;
+    if (bestCandidate->nChainWork == 0) {
+        return false;
+    }
+
+    if (pindexBestKnownBlock == nullptr
+        || HasLessOrEqualWork(*pindexBestKnownBlock, *bestCandidate))
+    {
+        pindexBestKnownBlock = bestCandidate;
+        return true;
+    }
+
+    LogPrint(Log::NET, "%s candidate %s has less work than current best %s (peer %s)\n",
+            __func__, pindexBestKnownBlock->GetBlockHash().ToString(),
+            bestCandidate->GetBlockHash().ToString(), name);
+    return false;
+}

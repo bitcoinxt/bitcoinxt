@@ -366,20 +366,6 @@ struct MarkBlockAsInFlight : public BlockInFlightMarker {
     };
 };
 
-/** Check whether the last unknown block a peer advertized is not yet known. */
-static void ProcessBlockAvailability(NodeStatePtr& state) {
-    AssertLockHeld(cs_main);
-
-    if (!state->hashLastUnknownBlock.IsNull()) {
-        BlockMap::iterator itOld = mapBlockIndex.find(state->hashLastUnknownBlock);
-        if (itOld != mapBlockIndex.end() && itOld->second->nChainWork > 0) {
-            if (state->pindexBestKnownBlock == NULL || itOld->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
-                state->pindexBestKnownBlock = itOld->second;
-            state->hashLastUnknownBlock.SetNull();
-        }
-    }
-}
-
 /** Update pindexLastCommonBlock and add not-in-flight missing successors to vBlocks, until it has
  *  at most count entries. */
 void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<const CBlockIndex*>& vBlocks, std::set<NodeId>& nodeStaller) {
@@ -392,7 +378,7 @@ void FindNextBlocksToDownload(NodeId nodeid, unsigned int count, std::vector<con
     assert(!state.IsNull());
 
     // Make sure pindexBestKnownBlock is up to date, we'll need it.
-    ProcessBlockAvailability(state);
+    state->UpdateBestFromLast(mapBlockIndex);
 
     if (state->pindexBestKnownBlock == NULL || state->pindexBestKnownBlock->nChainWork < chainActive.Tip()->nChainWork) {
         // This peer has nothing interesting.
@@ -475,17 +461,9 @@ void UpdateBlockAvailability(NodeId nodeid, const uint256 &hash) {
     NodeStatePtr state(nodeid);
     assert(!state.IsNull());
 
-    ProcessBlockAvailability(state);
-
-    BlockMap::iterator it = mapBlockIndex.find(hash);
-    if (it != mapBlockIndex.end() && it->second->nChainWork > 0) {
-        // An actually better block was announced.
-        if (state->pindexBestKnownBlock == NULL || it->second->nChainWork >= state->pindexBestKnownBlock->nChainWork)
-            state->pindexBestKnownBlock = it->second;
-    } else {
-        // An unknown block was announced; just assume that the latest one is the best one.
-        state->hashLastUnknownBlock = hash;
-    }
+    state->UpdateBestFromLast(mapBlockIndex);
+    state->hashLastUnknownBlock = hash;
+    state->UpdateBestFromLast(mapBlockIndex);
 }
 
 void OnBlockFinished::operator()(const CBlock& block, const std::vector<NodeId>& ids) {
@@ -5121,8 +5099,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         }
         FlushStateToDisk(state, FLUSH_STATE_PERIODIC);
     }
-    else if (strCommand == "headers" && !fImporting && !fReindex) // Ignore headers received while importing
+    else if (strCommand == NetMsgType::HEADERS)
     {
+        if (fImporting || fReindex) {
+            LogPrint(Log::NET, "%s: message ignored, importing or reindexing\n", strCommand);
+            return true;
+        }
         std::vector<CBlockHeader> headers;
 
         // Bypass the normal CBlock deserialization, as we don't want to risk deserializing 2000 full blocks.
@@ -5137,13 +5119,12 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
             ReadCompactSize(vRecv); // ignore tx count; assume it is 0.
         }
 
-        LOCK(cs_main);
-
         if (nCount == 0) {
             // Nothing interesting. Stop asking this peers for more headers.
             return true;
         }
 
+        LOCK(cs_main);
         MarkBlockAsInFlight inFlight;
         DefaultHeaderProcessor p(*connman, pfrom, blocksInFlight, thinblockmg, inFlight, CheckBlockIndex);
 
@@ -5755,7 +5736,7 @@ bool SendMessages(CNode* pto, CConnman* connman, std::atomic<bool>& interruptMsg
         }
 
         // Try sending block announcements via headers
-        ProcessBlockAvailability(statePtr); // ensure pindexBestKnownBlock is up-to-date
+        statePtr->UpdateBestFromLast(mapBlockIndex); // ensure pindexBestKnownBlock is up-to-date
         BlockAnnounceSender ann(*connman, *pto);
         ann.announce();
 
