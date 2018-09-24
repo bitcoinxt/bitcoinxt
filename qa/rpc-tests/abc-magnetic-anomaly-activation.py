@@ -17,6 +17,7 @@ from test_framework.script import OP_RETURN
 
 # far into the future
 MAGNETIC_ANOMALY_START_TIME = 2000000000
+RPC_VERIFY_REJECTED = -26
 
 
 class PreviousSpendableOutput():
@@ -213,9 +214,10 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
         assert_equal(node.getblockheader(node.getbestblockhash())['mediantime'],
                      MAGNETIC_ANOMALY_START_TIME - 1)
 
-        # Check that block with small transactions are still accepted.
+        # Check that block with small transactions and blocks with them are still accepted.
         small_tx_block = block(4444, out[0], MIN_TX_SIZE - 1)
         assert_equal(len(small_tx_block.vtx[1].serialize()), MIN_TX_SIZE - 1)
+        node.sendrawtransaction(ToHex(small_tx_block.vtx[1]), True)
         yield accepted()
 
         # Now MTP is exactly the fork time. Small transaction are now rejected.
@@ -235,6 +237,11 @@ class MagneticAnomalyActivationTest(ComparisonTestFramework):
         large_tx_block = block(4446, out[1], MIN_TX_SIZE)
         assert_equal(len(large_tx_block.vtx[1].serialize()), MIN_TX_SIZE)
         yield accepted()
+
+        # Verfiy that ATMP doesn't accept undersize transactions
+        throwaway_block = block(4447, out[2], MIN_TX_SIZE - 1)
+        assert_raises_jsonrpc(RPC_VERIFY_REJECTED, "bad-txns-undersize",
+                node.sendrawtransaction, ToHex(throwaway_block.vtx[1]), True)
 
 
 if __name__ == '__main__':
