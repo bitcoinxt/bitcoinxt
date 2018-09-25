@@ -1780,7 +1780,7 @@ int PartitionCheck(bool (*initialDownloadCheck)(), CCriticalSection& cs, const C
 }
 
 // Protected by cs_main
-static VersionBitsCache versionbitscache;
+VersionBitsCache versionbitscache;
 
 int32_t ComputeBlockVersion(const CBlockIndex* pindexPrev, const Consensus::Params& params)
 {
