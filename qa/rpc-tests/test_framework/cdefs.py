@@ -50,6 +50,9 @@ COINBASE_MATURITY = 100
 # Minimum size a transaction can have.
 MIN_TX_SIZE = 100
 
+# Maximum bytes in the TxOut pubkey script
+MAX_TXOUT_PUBKEY_SCRIPT = 10000
+
 if __name__ == "__main__":
     # Output values if run standalone to verify
     print("DEFAULT_MAX_BLOCK_SIZE = %d (bytes)" % DEFAULT_MAX_BLOCK_SIZE)
