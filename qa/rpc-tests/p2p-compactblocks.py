@@ -9,6 +9,7 @@ from test_framework.util import *
 from test_framework.blocktools import create_block, create_coinbase
 from test_framework.siphash import siphash256
 from test_framework.script import CScript, OP_TRUE
+from test_framework.txtools import bloat_tx
 
 XT_TWEAK = True
 
@@ -478,7 +479,8 @@ class CompactBlocksTest(BitcoinTestFramework):
             tx = CTransaction()
             tx.vin.append(CTxIn(COutPoint(utxo[0], utxo[1]), b''))
             tx.vout.append(CTxOut(utxo[2] - 1000, CScript([OP_TRUE])))
-            tx.rehash()
+            bloat_tx(tx)
+            tx.calc_sha256()
             utxo = [tx.sha256, 0, tx.vout[0].nValue]
             block.vtx.append(tx)
 

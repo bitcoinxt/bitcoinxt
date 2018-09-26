@@ -14,6 +14,7 @@ from test_framework.script import *
 
 # far into the future
 MONOLITH_START_TIME = 2000000000
+FOURTH_START_TIME = MONOLITH_START_TIME * 2
 
 # Error due to invalid opcodes
 DISABLED_OPCODE_ERROR = b'non-mandatory-script-verify-flag (Attempted to use a disabled opcode)'
@@ -34,7 +35,8 @@ class MonolithActivationTest(ComparisonTestFramework):
         self.num_nodes = 1
         self.setup_clean_chain = True
         self.extra_args = [['-whitelist=127.0.0.1',
-                            "-thirdhftime=%d" % MONOLITH_START_TIME]]
+                            "-thirdhftime=%d" % MONOLITH_START_TIME,
+                            "-fourthhftime=%d" % FOURTH_START_TIME]]
 
         self.nodes = start_nodes(
             self.num_nodes, self.options.tmpdir,

@@ -6,6 +6,7 @@
 
 from .mininode import *
 from .script import CScript, OP_TRUE, OP_CHECKSIG
+from test_framework.txtools import bloat_tx
 
 # Create a block (with regtest difficulty)
 def create_block(hashprev, coinbase, nTime=None):
@@ -58,10 +59,8 @@ def create_coinbase(heightAdjust = 0, absoluteHeight = None, pubkey = None):
         coinbaseoutput.scriptPubKey = CScript([OP_TRUE])
     coinbase.vout = [ coinbaseoutput ]
 
-    # Make sure the coinbase is at least 100 bytes
-    coinbase_size = len(coinbase.serialize())
-    if coinbase_size < 100:
-        coinbase.vin[0].scriptSig += b'x' * (100 - coinbase_size)
+    # make sure tx is at least MIN_TX_SIZE
+    bloat_tx(coinbase)
 
     coinbase.calc_sha256()
     return coinbase
@@ -74,6 +73,8 @@ def create_transaction(prevtx, n, sig, value, scriptPubKey=CScript()):
     tx.vin.append(CTxIn(COutPoint(prevtx.sha256, n), sig, 0xffffffff))
     tx.vout.append(CTxOut(value, scriptPubKey))
     tx.calc_sha256()
+    # make sure tx is at least MIN_TX_SIZE
+    bloat_tx(tx)
     return tx
 
 def get_legacy_sigopcount_block(block, fAccurate=True):
