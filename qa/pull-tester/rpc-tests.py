@@ -151,7 +151,6 @@ testScriptsExt = [
     'rpcbind_test.py',
     'smartfees.py',
     'maxblocksinflight.py',
-    'rawtransactions.py',
     'p2p-acceptblock.py',
     'p2p-compactblocks.py',
     'mempool_packages.py',
