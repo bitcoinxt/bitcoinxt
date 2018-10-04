@@ -130,6 +130,7 @@ BITCOIN_TESTS =\
   test/univalue_tests.cpp \
   test/util_tests.cpp \
   test/utxocommit_tests.cpp \
+  test/utilblock_tests.cpp \
   test/utilprocessmsg_tests.cpp \
   test/utilfork_tests.cpp \
   test/xthin_tests.cpp
