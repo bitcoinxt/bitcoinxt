@@ -91,3 +91,12 @@ def get_legacy_sigopcount_tx(tx, fAccurate=True):
         # scriptSig might be of type bytes, so convert to CScript for the moment
         count += CScript(j.scriptSig).GetSigOpCount(fAccurate)
     return count
+
+def ltor_sort_block(block):
+    if len(block.vtx) <= 2:
+        return
+
+    for tx in block.vtx:
+        tx.calc_sha256()
+
+    block.vtx = [block.vtx[0]] + sorted(block.vtx[1:], key=lambda tx: tx.hash)

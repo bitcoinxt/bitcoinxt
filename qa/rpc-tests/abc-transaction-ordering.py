@@ -238,7 +238,7 @@ class TransactionOrderingTest(ComparisonTestFramework):
         self.dbg("Before we activate the Nov 15, 2018 HF, transaction order is respected.")
         def ordered_block(block_number, spend):
             b = block(block_number, spend=spend, tx_count=16)
-            b.vtx = [b.vtx[0]] + sorted(b.vtx[1:], key=lambda tx: tx.hash)
+            ltor_sort_block(b)
             update_block(block_number)
             return b
 
