@@ -107,6 +107,7 @@ class FullBlockTest(ComparisonTestFramework):
     def add_transactions_to_block(self, block, tx_list):
         [tx.rehash() for tx in tx_list]
         block.vtx.extend(tx_list)
+        ltor_sort_block(block)
 
     # this is a little handier to use than the version in blocktools.py
     def create_tx(self, spend_tx, n, value, script=CScript([OP_TRUE])):
@@ -489,7 +490,7 @@ class FullBlockTest(ComparisonTestFramework):
         cmpctblk_header.calc_sha256()
         assert(cmpctblk_header.sha256 == b33.sha256)
 
-        # Send a bigger block
+        self.log.info("Send a bigger block")
         peer.clear_block_data()
         b34 = block(34, spend=out[25], block_size=8 * ONE_MEGABYTE)
         yield accepted()
@@ -506,8 +507,8 @@ class FullBlockTest(ComparisonTestFramework):
         # Let's send a compact block and see if the node accepts it.
         # First, we generate the block and send all transaction to the mempool
         b35 = block(35, spend=out[26], block_size=8 * ONE_MEGABYTE)
-        for i in range(1, len(b35.vtx)):
-            node.sendrawtransaction(ToHex(b35.vtx[i]), True)
+        for tx in ttor_sort_transactions(b35.vtx[1:]):
+            node.sendrawtransaction(ToHex(tx), True)
 
         # Now we create the compact block and send it
         comp_block = HeaderAndShortIDs()

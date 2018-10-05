@@ -384,6 +384,7 @@ class BIP68Test(BitcoinTestFramework):
         block = create_block(tip, create_coinbase(absoluteHeight=self.nodes[0].getblockcount()+1))
         block.nVersion = 4
         block.vtx.extend([tx1, tx2, tx3])
+        ltor_sort_block(block)
         block.hashMerkleRoot = block.calc_merkle_root()
         block.rehash()
         block.solve()

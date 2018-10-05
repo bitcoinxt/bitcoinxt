@@ -34,6 +34,11 @@ Mine 1 new version block.
 Mine 1 old version block, see that the node rejects.
 '''
 
+# The function 'csv_invalidate' violates scriptsig-not-pushonly, which became
+# consensus enforced in the fourth hardfork.
+# This is a workaround. TODO: Fix the testcase.
+FOURTH_HF_ACTIVATION = int(time.time() * 2)
+
 class BIP65Test(ComparisonTestFramework):
 
     def __init__(self):
@@ -43,7 +48,8 @@ class BIP65Test(ComparisonTestFramework):
     def setup_network(self):
         # Must set the blockversion for this test
         self.nodes = start_nodes(self.num_nodes, self.options.tmpdir,
-                                 extra_args=[['-debug', '-whitelist=127.0.0.1', '-blockversion=3']],
+                                 extra_args=[['-debug', '-whitelist=127.0.0.1', '-blockversion=3',
+                                 '-fourthhftime=%s' % FOURTH_HF_ACTIVATION]],
                                  binary=[self.options.testbinary])
 
     def run_test(self):
