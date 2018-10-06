@@ -131,7 +131,7 @@ public:
         pchCashMessageStart[3] = 0xe8;
         nDefaultPort = 8333;
         nPruneAfterHeight = 100000;
-        nMinBlockfileBlocks = 128;
+        nMinBlockfileBlocks = 64;
 
         genesis = CreateGenesisBlock(1231006505, 2083236893, 0x1d00ffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
@@ -230,7 +230,7 @@ public:
         pchCashMessageStart[3] = 0xf4;
         nDefaultPort = 18333;
         nPruneAfterHeight = 1000;
-        nMinBlockfileBlocks = 128;
+        nMinBlockfileBlocks = 64;
 
         genesis = CreateGenesisBlock(1296688602, 414098458, 0x1d00ffff, 1, 50 * COIN);
         consensus.hashGenesisBlock = genesis.GetHash();
