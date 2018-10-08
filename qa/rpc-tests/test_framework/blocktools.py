@@ -100,3 +100,38 @@ def ltor_sort_block(block):
         tx.calc_sha256()
 
     block.vtx = [block.vtx[0]] + sorted(block.vtx[1:], key=lambda tx: tx.hash)
+
+# Sort by parent-first
+def ttor_sort_transactions(txs):
+    sorted_txs = []
+    index = dict()
+    added = set()
+
+    for t in txs:
+        t.calc_sha256()
+        index[t.sha256] = t
+
+    queue = txs
+
+    def add_or_queue(tx):
+        if tx.sha256 in added:
+            return
+        for i in tx.vin:
+            if i.prevout.hash in added:
+                continue
+            if not i.prevout.hash in index:
+                continue
+
+            # child of another tx in list,
+            # add back to queue, but add parent in front of it
+            queue.append(tx)
+            queue.append(index[i.prevout.hash])
+            return
+
+        sorted_txs.append(tx)
+        added.add(tx.sha256)
+
+    while len(queue):
+        add_or_queue(queue.pop())
+
+    return sorted_txs
