@@ -507,10 +507,9 @@ void OnBlockFinished::rejectAndPunish(const CValidationState& state,
     if (!state.IsInvalid(dos))
         return;
 
+    LogPrintf("Invalid block due to %s\n", FormatStateMessage(state));
+
     const std::string reason = state.GetRejectReason();
-
-    LogPrintf("Invalid block due to %s\n", reason.c_str());
-
     auto rejectPunishFunc = [=](CNode* pnode) {
         if (!strCommand.empty()) {
             g_connman->PushMessage(pnode, NetMsg(pnode, NetMsgType::REJECT,
@@ -1368,8 +1367,8 @@ void static InvalidBlockFound(CBlockIndex *pindex, const CValidationState &state
             CBlockReject reject = {(unsigned char)state.GetRejectCode(),
                 state.GetRejectReason().substr(0, MAX_REJECT_MESSAGE_LENGTH),
                 pindex->GetBlockHash()};
-            LogPrint(Log::BLOCK, "Rejecting block from %d, code %d, reason %s",
-                     id, state.GetRejectCode(), state.GetRejectReason());
+            LogPrint(Log::BLOCK, "Rejecting block from %d: %s\n",
+                     id, FormatStateMessage(state));
             nodeState->rejects.push_back(reject);
             if (blockSource.canMisbehave && nDoS > 0)
                 Misbehaving(id, nDoS, "invalid block: " + state.GetRejectReason());
@@ -1979,7 +1978,8 @@ bool ConnectBlock(const CBlock& block, CValidationState& state, CBlockIndex* pin
             continue;
         }
         if (!view.HaveInputs(tx)) {
-            return state.DoS(100, error("ConnectBlock(): inputs missing/spent"),
+            return state.DoS(100, error("%s: ConnectBlock(): inputs missing/spent in tx %s",
+                        __func__, tx.GetHash().ToString()),
                              REJECT_INVALID, "bad-txns-inputs-missingorspent");
         }
 
