@@ -164,6 +164,7 @@ def initialize_datadir(dirname, n):
         f.write("rpcpassword=" + rpc_p + "\n")
         f.write("port="+str(p2p_port(n))+"\n")
         f.write("rpcport="+str(rpc_port(n))+"\n")
+        f.write("fourthhftime=1526400000\n")
     return datadir
 
 def rpc_auth_pair(n):
