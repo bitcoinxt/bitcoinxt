@@ -35,6 +35,7 @@
 #include "policy/txpriority.h"
 #include "pow.h"
 #include "process_xthinblock.h"
+#include "relaycache.h"
 #include "respend/respenddetector.h"
 #include "thinblockbuilder.h"
 #include "thinblockconcluder.h"
@@ -4280,10 +4281,9 @@ void static ProcessGetData(CNode* pfrom, CConnman* connman, std::atomic<bool>& i
                 // Send stream from relay memory
                 bool pushed = false;
                 {
-                    LOCK(cs_mapRelay);
-                    map<CInv, CDataStream>::iterator mi = mapRelay.find(inv);
-                    if (mi != mapRelay.end()) {
-                        connman->PushMessage(pfrom, NetMsg(pfrom, inv.GetCommand(), (*mi).second));
+                    CTransaction tx = RelayCache::Instance().FindTx(inv.hash);
+                    if (!tx.IsNull()) {
+                        connman->PushMessage(pfrom, NetMsg(pfrom, inv.GetCommand(), tx));
                         pushed = true;
                     }
                 }
@@ -4375,15 +4375,8 @@ struct TxFinderImpl : public TxFinder {
         if (mapOrphanTransactions.count(h))
             return mapOrphanTransactions[h].tx;
 
-        // if not found, tx is left alone.
-        try {
-            FindTransactionInRelayMap(h, tx);
-        }
-        catch (const std::ios_base::failure& e) {
-            LogPrintf("Exception '%s' in FindTransactionInRelayMap ignored\n", e.what());
-            return CTransaction();
-        }
-
+        // if not found, tx is null
+        tx = RelayCache::Instance().FindTx(h);
         return tx;
     }
 
@@ -4990,7 +4983,10 @@ bool ProcessMessage(CNode* pfrom, string strCommand, CDataStream& vRecv,
         bool fMissingInputs = false;
         CValidationState state;
 
-        mapAlreadyAskedFor.erase(inv);
+        {
+            std::unique_lock<std::mutex> lock(mapAlreadyAskedFor_cs);
+            mapAlreadyAskedFor.erase(inv);
+        }
 
         if (!AlreadyHave(inv) && AcceptToMemoryPool(mempool, state, tx, true, &fMissingInputs, connman))
         {

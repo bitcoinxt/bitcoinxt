@@ -97,6 +97,7 @@ BITCOIN_TESTS =\
   test/processmessage_tests.cpp \
   test/raii_event_tests.cpp \
   test/ReceiveMsgBytes_tests.cpp \
+  test/relaycache_tests.cpp \
   test/rpc_tests.cpp \
   test/sanity_tests.cpp \
   test/scheduler_tests.cpp \

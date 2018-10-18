@@ -183,7 +183,6 @@ public:
     };
 
     void RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors, const bool fRespend = false);
-    void RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors, const bool fRespend = false);
 
     // Addrman functions
     size_t GetAddressCount() const;
@@ -409,10 +408,8 @@ CAddress GetLocalAddress(const CNetAddr *paddrPeer, uint64_t nLocalServices);
 extern bool fDiscover;
 extern bool fListen;
 
-extern std::map<CInv, CDataStream> mapRelay;
-extern std::deque<std::pair<int64_t, CInv> > vRelayExpiration;
-extern CCriticalSection cs_mapRelay;
 extern limitedmap<CInv, int64_t> mapAlreadyAskedFor;
+extern std::mutex mapAlreadyAskedFor_cs;
 
 struct LocalServiceInfo {
     int nScore;
@@ -712,8 +709,6 @@ public:
 };
 
 
-
-bool FindTransactionInRelayMap(uint256 hash, CTransaction &out);
 
 /** Return a timestamp in the future (in microseconds) for exponentially distributed events. */
 int64_t PoissonNextSend(int64_t nNow, int average_interval_seconds);
