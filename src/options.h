@@ -7,6 +7,8 @@
 #include <string>
 #include <vector>
 
+enum class BackendDB;
+
 class Opt {
 public:
     Opt();
@@ -15,8 +17,14 @@ public:
     std::string UserAgent() const;
     bool HidePlatform();
     std::vector<std::string> UAComment(bool validate = false) const;
+    int ScriptCheckThreads();
 
-        int ScriptCheckThreads();
+    // DB
+    BackendDB DB() const;
+    //! safemode is a tradeoff - set false for performance boost, but higher
+    //! risk of db corruption on abnormal program termination
+    bool DBSafeMode() const;
+
         int64_t CheckpointDays();
         uint64_t MaxBlockSizeVote();
         int64_t RespendRelayLimit() const;
@@ -39,6 +47,11 @@ public:
 
     //! Throws invalid argument on use of options that are no longer supported.
     void CheckRemovedOptions() const;
+};
+
+enum class BackendDB {
+    LEVELDB = 0,
+    LMDB = 1
 };
 
 /** Maximum number of script-checking threads allowed */

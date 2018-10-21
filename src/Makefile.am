@@ -125,7 +125,11 @@ BITCOIN_CORE_H = \
   key.h \
   keystore.h \
   leakybucket.h \
+  leveldbwrapper.h \
   limitedmap.h \
+  lmdb/dbresizemanager.h \
+  lmdb/lmdbutil.h \
+  lmdb/lmdbwrapper.h \
   main.h \
   maxblocksize.h \
   mempoolaccepter.h \
@@ -232,6 +236,10 @@ libbitcoin_server_a_SOURCES = \
   init.cpp \
   ipgroups.cpp \
   leakybucket.cpp \
+  leveldbwrapper.cpp \
+  lmdb/dbresizemanager.cpp \
+  lmdb/lmdbutil.cpp \
+  lmdb/lmdbwrapper.cpp \
   main.cpp \
   maxblocksize.cpp \
   mempoolaccepter.cpp \
@@ -433,7 +441,7 @@ if ENABLE_WALLET
 bitcoind_LDADD += libbitcoin_wallet.a
 endif
 
-bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(CURL_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS)
+bitcoind_LDADD += $(BOOST_LIBS) $(BDB_LIBS) $(SSL_LIBS) $(CRYPTO_LIBS) $(MINIUPNPC_LIBS) $(CURL_LIBS) $(EVENT_PTHREADS_LIBS) $(EVENT_LIBS) $(LMDB_LIBS)
 #
 
 # bitcoin-cli binary #

@@ -14,9 +14,12 @@
 #include "checkpoints.h"
 #include "compat/sanity.h"
 #include "consensus/validation.h"
+#include "dbwrapper.h"
 #include "httpserver.h"
 #include "httprpc.h"
 #include "key.h"
+#include "leveldbwrapper.h"
+#include "lmdb/lmdbwrapper.h"
 #include "main.h"
 #include "maxblocksize.h"
 #include "miner.h"
@@ -317,8 +320,10 @@ std::string HelpMessage(HelpMessageMode mode)
 #endif
     }
     strUsage += HelpMessageOpt("-datadir=<dir>", _("Specify data directory"));
+    strUsage += HelpMessageOpt("-db=<db>", "Set which database backend to use. Options: leveldb, lmdb [EXPERIMENTAL]. (default leveldb)");
     if (showDebug) {
         strUsage += HelpMessageOpt("-dbbatchsize", strprintf("Maximum database write batch size in bytes (default: %u)", nDefaultDbBatchSize));
+        strUsage += HelpMessageOpt("-dbsafemode", "Set false for less disk flushing, but higher risk of db corruption on abnormal termination. (default: 1)");
     }
     strUsage += HelpMessageOpt("-dbcache=<n>", strprintf(_("Set database cache size in megabytes (%d to %d, default: %d)"), nMinDbCache, nMaxDbCache, nDefaultDbCache));
     strUsage += HelpMessageOpt("-loadblock=<file>", _("Imports blocks from external blk000??.dat file") + " " + _("on startup"));
@@ -1284,12 +1289,16 @@ bool AppInit2()
     int64_t nTotalCache = (GetArg("-dbcache", nDefaultDbCache) << 20);
     nTotalCache = std::max(nTotalCache, nMinDbCache << 20); // total cache cannot be less than nMinDbCache
     nTotalCache = std::min(nTotalCache, nMaxDbCache << 20); // total cache cannot be greated than nMaxDbcache
-    int64_t nBlockTreeDBCache = nTotalCache / 8;
-    nBlockTreeDBCache = std::min(nBlockTreeDBCache, (GetBoolArg("-txindex", 0) ? nMaxBlockDBAndTxIndexCache : nMaxBlockDBCache) << 20);
-    nTotalCache -= nBlockTreeDBCache;
-    int64_t nCoinDBCache = std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23)); // use 25%-50% of the remainder for disk cache
-    nCoinDBCache = std::min(nCoinDBCache, nMaxCoinsDBCache << 20); // cap total coins db cache
-    nTotalCache -= nCoinDBCache;
+    int64_t nBlockTreeDBCache = 0;
+    int64_t nCoinDBCache = 0;
+    if (Opt().DB() == BackendDB::LEVELDB) {
+        nBlockTreeDBCache = nTotalCache / 8;
+        nBlockTreeDBCache = std::min(nBlockTreeDBCache, (GetBoolArg("-txindex", 0) ? nMaxBlockDBAndTxIndexCache : nMaxBlockDBCache) << 20);
+        nTotalCache -= nBlockTreeDBCache;
+        nCoinDBCache = std::min(nTotalCache / 2, (nTotalCache / 4) + (1 << 23)); // use 25%-50% of the remainder for disk cache
+        nCoinDBCache = std::min(nCoinDBCache, nMaxCoinsDBCache << 20); // cap total coins db cache
+        nTotalCache -= nCoinDBCache;
+    }
     nCoinCacheUsage = nTotalCache; // the rest goes to in-memory cache
     LogPrintf("Cache configuration:\n");
     LogPrintf("* Using %.1fMiB for block index database\n", nBlockTreeDBCache * (1.0 / 1024 / 1024));
@@ -1313,11 +1322,38 @@ bool AppInit2()
                 delete pblocktree;
 
                 // Detect database obfuscation by future versions of the DBWrapper
-                bool chainstateScrambled;
-                bool blockDbScrambled;
+                bool chainstateScrambled = false;
+                bool blockDbScrambled = false;
 
-                pblocktree = new CBlockTreeDB(nBlockTreeDBCache, blockDbScrambled, false, fReindex);
-                pcoinsdbview = new CCoinsViewDB(nCoinDBCache, chainstateScrambled, false, fReindex || fReindexChainState);
+                bool memoryOnly = false;
+                bool wipeBlockTree = fReindex;
+                bool wipeChainstate = fReindex || fReindexChainState;
+
+                if (Opt().DB() == BackendDB::LEVELDB) {
+                    auto path = GetDataDir() / "blocks" / "index";
+                    auto blockdb = CreateLevelDB(path,  nBlockTreeDBCache,
+                                                 blockDbScrambled, memoryOnly, wipeBlockTree);
+                    pblocktree = new CBlockTreeDB(std::move(blockdb));
+
+                    path = GetDataDir() / "chainstate";
+                    auto coindb = CreateLevelDB(path, nCoinDBCache,
+                                                chainstateScrambled, memoryOnly, wipeChainstate);
+                    pcoinsdbview = new CCoinsViewDB(std::move(coindb));
+                }
+                else if (Opt().DB() == BackendDB::LMDB) {
+                    bool safemode = Opt().DBSafeMode();
+                    auto path = GetDataDir() / "blockslmdb" / "index";
+                    pblocktree = new CBlockTreeDB(
+                            lmdb::CreateLMDB(path, memoryOnly, wipeBlockTree, safemode));
+
+                    path = GetDataDir() / "chainstatelmdb";
+                    pcoinsdbview = new CCoinsViewDB(
+                            lmdb::CreateLMDB(path, memoryOnly, wipeChainstate, safemode));
+                }
+                else {
+                    assert(!"unknown db type");
+                }
+
                 pcoinscatcher = new CCoinsViewErrorCatcher(pcoinsdbview);
 
                 if (fReindex) {

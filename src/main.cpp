@@ -15,6 +15,7 @@
 #include "chainparams.h"
 #include "checkpoints.h"
 #include "checkqueue.h"
+#include "clientversion.h"
 #include "compactblockprocessor.h"
 #include "compactthin.h"
 #include "consensus/consensus.h"
@@ -44,6 +45,7 @@
 #include "ui_interface.h"
 #include "undo.h"
 #include "util.h"
+#include "utildebug.h"
 #include "utilfork.h"
 #include "utilmoneystr.h"
 #include "utilprocessmsg.h"
@@ -1554,6 +1556,7 @@ bool AbortNode(const std::string& strMessage, const std::string& userMessage="")
 {
     strMiscWarning = strMessage;
     LogPrintf("*** %s\n", strMessage);
+    dump_backtrace_stderr();
     uiInterface.ThreadSafeMessageBox(
         userMessage.empty() ? _("Error: A fatal internal error occured, see debug.log for details") : userMessage,
         "", CClientUIInterface::MSG_ERROR);

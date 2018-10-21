@@ -14,9 +14,10 @@
 #include "guiutil.h"
 #include "optionsmodel.h"
 
-#include "options.h" // for MAX_SCRIPTCHECK_THREADS
 #include "netbase.h"
+#include "options.h" // for MAX_SCRIPTCHECK_THREADS
 #include "txdb.h" // for -dbcache defaults
+#include "util.h" // for GetNumCores
 
 #ifdef ENABLE_WALLET
 #include "wallet/wallet.h" // for CWallet::minTxFee

@@ -8,17 +8,19 @@
 
 
 #include "consensus/validation.h"
+#include "dbwrapper.h"
 #include "key.h"
+#include "leveldbwrapper.h"
 #include "main.h"
 #include "options.h"
 #include "random.h"
 #include "rpc/register.h"
 #include "rpc/server.h"
+#include "streams.h"
 #include "test/testutil.h"
 #include "txdb.h"
 #include "txmempool.h"
 #include "ui_interface.h"
-#include "streams.h"
 
 #include <boost/filesystem.hpp>
 #include <boost/test/unit_test.hpp>
@@ -55,8 +57,8 @@ TestingSetup::TestingSetup(const std::string& chainName) : BasicTestingSetup(cha
         mapArgs["-datadir"] = pathTemp.string();
         mempool.setSanityCheck(1.0);
         bool isObfuscated;
-        pblocktree = new CBlockTreeDB(1 << 20, isObfuscated, true);
-        pcoinsdbview = new CCoinsViewDB(1 << 23, isObfuscated, true);
+        pblocktree = new CBlockTreeDB(CreateLevelDB(pathTemp / "blocks" / "index", 1 << 20, isObfuscated, true));
+        pcoinsdbview = new CCoinsViewDB(CreateLevelDB(pathTemp / "chainstate", 1 << 23, isObfuscated, true));
         pcoinsTip = new CCoinsViewCache(pcoinsdbview);
         InitBlockIndex();
         {

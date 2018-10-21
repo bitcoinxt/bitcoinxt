@@ -60,6 +60,17 @@ int Opt::ScriptCheckThreads() {
     return nScriptCheckThreads;
 }
 
+BackendDB Opt::DB() const {
+    std::string db = Args->GetArg("-db", "leveldb");
+    if (db == "leveldb") return BackendDB::LEVELDB;
+    if (db == "lmdb") return BackendDB::LMDB;
+    throw std::invalid_argument("Unknown DB backend '" + db + "'");
+}
+
+bool Opt::DBSafeMode() const {
+    return Args->GetBool("-dbsafemode", true);
+}
+
 int64_t Opt::CheckpointDays() {
     int64_t def = DEFAULT_CHECKPOINT_DAYS * std::max(1, ScriptCheckThreads());
     return std::max(int64_t(1), Args->GetArg("-checkpoint-days", def));

@@ -2,9 +2,10 @@
 // Distributed under the MIT software license, see the accompanying
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 #include "arith_uint256.h"
+#include "streams.h"
+#include "test/test_bitcoin.h"
 #include "uint256.h"
 #include "version.h"
-#include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
 #include <stdint.h>

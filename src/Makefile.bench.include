@@ -29,7 +29,8 @@ bench_bench_bitcoin_LDADD = \
   $(LIBLEVELDB) \
   $(LIBMEMENV) \
   $(LIBSECP256K1) \
-  $(CURL_LIBS)
+  $(CURL_LIBS) \
+  $(LMDB_LIBS)
 
 if ENABLE_WALLET
 bench_bench_bitcoin_SOURCES += bench/coin_selection.cpp
