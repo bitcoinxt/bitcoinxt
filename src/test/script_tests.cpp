@@ -36,6 +36,9 @@ using namespace std;
 
 static const unsigned int flags = SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC;
 
+// Invalid sighashtype
+static const unsigned int SIGHASH_BUG = 0x20;
+
 unsigned int ParseScriptFlags(string strFlags);
 string FormatScriptFlags(unsigned int flags);
 
@@ -318,9 +321,9 @@ public:
         return *this;
     }
 
-    TestBuilder& PushSig(const CKey& key, int nHashType = SIGHASH_ALL, unsigned int lenR = 32, unsigned int lenS = 32, CAmount amount = 0)
+    TestBuilder& PushSig(const CKey& key, int nHashType = SIGHASH_ALL, unsigned int lenR = 32, unsigned int lenS = 32, CAmount amount = 0, uint32_t flags = SCRIPT_ENABLE_SIGHASH_FORKID)
     {
-        uint256 hash = SignatureHash(script, spendTx, 0, nHashType, amount);
+        uint256 hash = SignatureHash(script, spendTx, 0, nHashType, amount, flags);
         std::vector<unsigned char> vchSig, r, s;
         uint32_t iter = 0;
         do {
@@ -642,6 +645,42 @@ BOOST_AUTO_TEST_CASE(script_build)
     tests.push_back(TestBuilder(CScript() << ToByteVector(keys.pubkey1) << OP_CHECKSIG,
                                 "P2PK with undefined hashtype", SCRIPT_VERIFY_STRICTENC
                                ).PushSig(keys.key1, 5).ScriptError(SCRIPT_ERR_SIG_HASHTYPE));
+
+    // Generate P2PKH tests for invalid SigHashType
+    tests.push_back(
+        TestBuilder(CScript() << OP_DUP << OP_HASH160
+                              << ToByteVector(keys.pubkey0.GetID())
+                              << OP_EQUALVERIFY << OP_CHECKSIG,
+                    "P2PKH with invalid sighashtype", 0)
+            .PushSig(keys.key0, SIGHASH_BUG | SIGHASH_ALL, 32, 32, CAmount(0), 0)
+            .Push(keys.pubkey0));
+    tests.push_back(TestBuilder(CScript() << OP_DUP << OP_HASH160
+                                          << ToByteVector(keys.pubkey0.GetID())
+                                          << OP_EQUALVERIFY << OP_CHECKSIG,
+                                "P2PKH with invalid sighashtype and STRICTENC",
+                                SCRIPT_VERIFY_STRICTENC)
+                        .PushSig(keys.key0, SIGHASH_BUG | SIGHASH_ALL, 32, 32,
+                                 CAmount(0), SCRIPT_VERIFY_STRICTENC)
+                        .Push(keys.pubkey0)
+                        // Should fail for STRICTENC
+                        .ScriptError(SCRIPT_ERR_SIG_HASHTYPE));
+
+    // Generate P2SH tests for invalid SigHashType
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey1) << OP_CHECKSIG,
+                    "P2SH(P2PK) with invalid sighashtype", SCRIPT_VERIFY_P2SH,
+                    true)
+            .PushSig(keys.key1, SIGHASH_BUG | SIGHASH_ALL)
+            .PushRedeem());
+    tests.push_back(
+        TestBuilder(CScript() << ToByteVector(keys.pubkey1) << OP_CHECKSIG,
+                    "P2SH(P2PK) with invalid sighashtype and STRICTENC",
+                    SCRIPT_VERIFY_P2SH | SCRIPT_VERIFY_STRICTENC, true)
+            .PushSig(keys.key1, SIGHASH_BUG | SIGHASH_ALL)
+            .PushRedeem()
+            // Should fail for STRICTENC
+            .ScriptError(SCRIPT_ERR_SIG_HASHTYPE));
+
     tests.push_back(TestBuilder(CScript() << ToByteVector(keys.pubkey1) << OP_CHECKSIG << OP_NOT,
                                 "P2PK NOT with invalid sig and undefined hashtype but no STRICTENC", 0
                                ).PushSig(keys.key1, 5).DamagePush(10));
