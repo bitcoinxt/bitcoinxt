@@ -17,6 +17,7 @@
 #include "rpc/server.h"
 #include "script/script.h"
 #include "script/script_error.h"
+#include "script/sighashtype.h"
 #include "script/sign.h"
 #include "script/standard.h"
 #include "uint256.h"
@@ -755,30 +756,18 @@ UniValue signrawtransaction(const JSONRPCRequest& request)
     const CKeyStore& keystore = tempKeystore;
 #endif
 
-    int nHashType = SIGHASH_ALL | SIGHASH_FORKID;
+    SigHashType nHashType = SigHashType::ALL | SigHashType::FORKID;
     if (request.params.size() > 3 && !request.params[3].isNull()) {
-        static map<string, int> mapSigHashValues =
-            boost::assign::map_list_of
-            (std::string("ALL"), int(SIGHASH_ALL))
-            (std::string("ALL|ANYONECANPAY"), int(SIGHASH_ALL | SIGHASH_ANYONECANPAY))
-            (std::string("ALL|FORKID"), int(SIGHASH_ALL | SIGHASH_FORKID))
-            (std::string("ALL|FORKID|ANYONECANPAY"), int(SIGHASH_ALL | SIGHASH_FORKID | SIGHASH_ANYONECANPAY))
-            (std::string("NONE"), int(SIGHASH_NONE))
-            (std::string("NONE|ANYONECANPAY"), int(SIGHASH_NONE | SIGHASH_ANYONECANPAY))
-            (std::string("NONE|FORKID"), int(SIGHASH_NONE | SIGHASH_FORKID))
-            (std::string("NONE|FORKID|ANYONECANPAY"), int(SIGHASH_NONE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY))
-            (std::string("SINGLE"), int(SIGHASH_SINGLE))
-            (std::string("SINGLE|ANYONECANPAY"), int(SIGHASH_SINGLE | SIGHASH_ANYONECANPAY))
-            (std::string("SINGLE|FORKID"), int(SIGHASH_SINGLE | SIGHASH_FORKID))
-            (std::string("SINGLE|FORKID|ANYONECANPAY"), int(SIGHASH_SINGLE | SIGHASH_FORKID | SIGHASH_ANYONECANPAY));
         string strHashType = request.params[3].get_str();
-        if (mapSigHashValues.count(strHashType))
-            nHashType = mapSigHashValues[strHashType];
-        else
-            throw JSONRPCError(RPC_INVALID_PARAMETER, "Invalid sighash param");
+        try {
+            nHashType = FromStr(strHashType);
+        }
+        catch (const std::invalid_argument& e) {
+            throw JSONRPCError(RPC_INVALID_PARAMETER, e.what());
+        }
     }
 
-    bool fHashSingle = ((nHashType & ~(SIGHASH_ANYONECANPAY | SIGHASH_FORKID)) == SIGHASH_SINGLE);
+    bool fHashSingle = (nHashType & ~(SigHashType::ANYONECANPAY | SigHashType::FORKID)) == SigHashType::SINGLE;
 
     // Script verification errors
     UniValue vErrors(UniValue::VARR);

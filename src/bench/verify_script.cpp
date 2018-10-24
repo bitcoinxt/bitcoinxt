@@ -8,6 +8,7 @@
 #include "script/bitcoinconsensus.h"
 #endif
 #include "script/script.h"
+#include "script/sighashtype.h"
 #include "script/sign.h"
 #include "streams.h"
 
@@ -66,12 +67,12 @@ static void VerifyScriptBench(benchmark::State& state)
     CTransaction txCredit = BuildCreditingTransaction(scriptPubKey);
     CMutableTransaction txSpend = BuildSpendingTransaction(scriptSig, txCredit);
 
-    uint256 hash = SignatureHash(scriptPubKey, txSpend, 0, SIGHASH_ALL | SIGHASH_FORKID, txCredit.vout[0].nValue);
+    uint256 hash = SignatureHash(scriptPubKey, txSpend, 0, SigHashType::ALL | SigHashType::FORKID, txCredit.vout[0].nValue);
     std::vector<uint8_t> sig;
     if (!key.Sign(hash, sig)) {
         assert(!"sign failed");
     }
-    sig.push_back(static_cast<uint8_t>(SIGHASH_ALL | SIGHASH_FORKID));
+    sig.push_back(static_cast<uint8_t>(SigHashType::ALL | SigHashType::FORKID));
     txSpend.vin[0].scriptSig = CScript() << sig << ToByteVector(pubkey);
 
     // Benchmark.

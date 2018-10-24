@@ -11,6 +11,7 @@
 #include "crypto/sha256.h"
 #include "pubkey.h"
 #include "script/script.h"
+#include "script/sighashtype.h"
 #include "uint256.h"
 
 using namespace std;
@@ -171,21 +172,21 @@ bool static IsLowDERSignature(const valtype &vchSig, ScriptError* serror) {
     return true;
 }
 
-static uint32_t GetHashType(const valtype &vchSig) {
+static SigHashType GetHashType(const valtype &vchSig) {
     if (vchSig.size() == 0) {
-        return 0;
+        return SigHashType::UNDEFINED;
     }
 
-    return vchSig[vchSig.size() - 1];
+    return SigHashType(vchSig[vchSig.size() - 1]);
 }
 
 static void CleanupScriptCode(CScript &scriptCode,
                               const std::vector<unsigned char> &vchSig,
                               uint32_t flags) {
     // Drop the signature in scripts when SIGHASH_FORKID is not used.
-    uint32_t nHashType = GetHashType(vchSig);
+    SigHashType nHashType = GetHashType(vchSig);
     if (!(flags & SCRIPT_ENABLE_SIGHASH_FORKID) ||
-        !(nHashType & SIGHASH_FORKID)) {
+        !(nHashType & SigHashType::FORKID)) {
         scriptCode.FindAndDelete(CScript(vchSig));
     }
 }
@@ -194,8 +195,10 @@ static bool IsDefinedHashtypeSignature(const valtype &vchSig) {
     if (vchSig.size() == 0) {
         return false;
     }
-    uint32_t nHashType = GetHashType(vchSig) & ~(SIGHASH_ANYONECANPAY | SIGHASH_FORKID);
-    if (nHashType < SIGHASH_ALL || nHashType > SIGHASH_SINGLE)
+    SigHashType nHashType = GetHashType(vchSig)
+        & ~(SigHashType::ANYONECANPAY | SigHashType::FORKID);
+
+    if (nHashType < SigHashType::ALL || nHashType > SigHashType::SINGLE)
         return false;
 
     return true;
@@ -218,7 +221,7 @@ bool CheckSignatureEncoding(const vector<unsigned char> &vchSig, unsigned int fl
         if (!IsDefinedHashtypeSignature(vchSig)) {
             return set_error(serror, SCRIPT_ERR_SIG_HASHTYPE);
         }
-        bool usesForkId = GetHashType(vchSig) & SIGHASH_FORKID;
+        bool usesForkId = bool(GetHashType(vchSig) & SigHashType::FORKID);
         bool forkIdEnabled = flags & SCRIPT_ENABLE_SIGHASH_FORKID;
         if (!forkIdEnabled && usesForkId) {
             return set_error(serror, SCRIPT_ERR_ILLEGAL_FORKID);
@@ -1258,11 +1261,11 @@ private:
     const bool fHashNone;      //! whether the hashtype is SIGHASH_NONE
 
 public:
-    CTransactionSignatureSerializer(const CTransaction &txToIn, const CScript &scriptCodeIn, unsigned int nInIn, int nHashTypeIn) :
+    CTransactionSignatureSerializer(const CTransaction &txToIn, const CScript &scriptCodeIn, unsigned int nInIn, SigHashType nHashTypeIn) :
         txTo(txToIn), scriptCode(scriptCodeIn), nIn(nInIn),
-        fAnyoneCanPay(!!(nHashTypeIn & SIGHASH_ANYONECANPAY)),
-        fHashSingle((nHashTypeIn & 0x1f) == SIGHASH_SINGLE),
-        fHashNone((nHashTypeIn & 0x1f) == SIGHASH_NONE) {}
+        fAnyoneCanPay(bool(nHashTypeIn & SigHashType::ANYONECANPAY)),
+        fHashSingle(GetBaseType(nHashTypeIn) == SigHashType::SINGLE),
+        fHashNone(GetBaseType(nHashTypeIn) == SigHashType::NONE) {}
 
     /** Serialize the passed scriptCode, skipping OP_CODESEPARATORs */
     template<typename S>
@@ -1372,29 +1375,29 @@ PrecomputedTransactionData::PrecomputedTransactionData(const CTransaction& txTo)
     hashOutputs = GetOutputsHash(txTo);
 }
 
-uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsigned int nIn, uint32_t nHashType,
+uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsigned int nIn, SigHashType nHashType,
                       const CAmount &amount, unsigned int flags, const PrecomputedTransactionData* cache)
 {
-    if ((nHashType & SIGHASH_FORKID) &&
+    if (bool(nHashType & SigHashType::FORKID) &&
         (flags & SCRIPT_ENABLE_SIGHASH_FORKID)) {
         uint256 hashPrevouts;
         uint256 hashSequence;
         uint256 hashOutputs;
 
-        if (!(nHashType & SIGHASH_ANYONECANPAY)) {
+        if (!(nHashType & SigHashType::ANYONECANPAY)) {
             hashPrevouts = cache ? cache->hashPrevouts : GetPrevoutHash(txTo);
         }
 
-        if (!(nHashType & SIGHASH_ANYONECANPAY) &&
-            (nHashType & 0x1f) != SIGHASH_SINGLE &&
-            (nHashType & 0x1f) != SIGHASH_NONE) {
+        if (!(nHashType & SigHashType::ANYONECANPAY) &&
+            GetBaseType(nHashType) != SigHashType::SINGLE &&
+            GetBaseType(nHashType) != SigHashType::NONE) {
             hashSequence = cache ? cache->hashSequence : GetSequenceHash(txTo);
         }
 
-        if ((nHashType & 0x1f) != SIGHASH_SINGLE &&
-            (nHashType & 0x1f) != SIGHASH_NONE) {
+        if (GetBaseType(nHashType) != SigHashType::SINGLE &&
+            GetBaseType(nHashType) != SigHashType::NONE) {
             hashOutputs = cache ? cache->hashOutputs : GetOutputsHash(txTo);
-        } else if ((nHashType & 0x1f) == SIGHASH_SINGLE &&
+        } else if (GetBaseType(nHashType) == SigHashType::SINGLE &&
                    nIn < txTo.vout.size()) {
             CHashWriter ss(SER_GETHASH, 0);
             ss << txTo.vout[nIn];
@@ -1419,7 +1422,7 @@ uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsig
         // Locktime
         ss << txTo.nLockTime;
         // Sighash type
-        ss << nHashType;
+        ss << ToInt(nHashType);
 
         return ss.GetHash();
     }
@@ -1431,7 +1434,7 @@ uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsig
     }
 
     // Check for invalid use of SIGHASH_SINGLE
-    if ((nHashType & 0x1f) == SIGHASH_SINGLE) {
+    if (GetBaseType(nHashType) == SigHashType::SINGLE) {
         if (nIn >= txTo.vout.size()) {
             //  nOut out of range
             return one;
@@ -1443,7 +1446,7 @@ uint256 SignatureHash(const CScript& scriptCode, const CTransaction& txTo, unsig
 
     // Serialize and hash
     CHashWriter ss(SER_GETHASH, 0);
-    ss << txTmp << nHashType;
+    ss << txTmp << ToInt(nHashType);
     return ss.GetHash();
 }
 
@@ -1463,7 +1466,7 @@ bool TransactionSignatureChecker::CheckSig(const vector<unsigned char>& vchSigIn
     vector<unsigned char> vchSig(vchSigIn);
     if (vchSig.empty())
         return false;
-    uint32_t nHashType = GetHashType(vchSig);
+    SigHashType nHashType = GetHashType(vchSig);
     vchSig.pop_back();
 
     uint256 sighash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount, flags, this->txdata);

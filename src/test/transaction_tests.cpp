@@ -17,6 +17,7 @@
 #include "policy/policy.h"
 #include "script/script.h"
 #include "script/script_error.h"
+#include "script/sighashtype.h"
 #include "script/sign.h"
 
 #include <map>
@@ -362,13 +363,13 @@ BOOST_AUTO_TEST_CASE(test_big_transaction) {
     keystore.AddKeyPubKey(key, key.GetPubKey());
     CScript scriptPubKey = CScript() << ToByteVector(key.GetPubKey()) << OP_CHECKSIG;
 
-    vector<int> sigHashes;
-    sigHashes.push_back(SIGHASH_NONE | SIGHASH_ANYONECANPAY);
-    sigHashes.push_back(SIGHASH_SINGLE | SIGHASH_ANYONECANPAY);
-    sigHashes.push_back(SIGHASH_ALL | SIGHASH_ANYONECANPAY);
-    sigHashes.push_back(SIGHASH_NONE);
-    sigHashes.push_back(SIGHASH_SINGLE);
-    sigHashes.push_back(SIGHASH_ALL);
+    std::vector<SigHashType> sigHashes;
+    sigHashes.push_back(SigHashType::NONE | SigHashType::ANYONECANPAY);
+    sigHashes.push_back(SigHashType::SINGLE | SigHashType::ANYONECANPAY);
+    sigHashes.push_back(SigHashType::ALL | SigHashType::ANYONECANPAY);
+    sigHashes.push_back(SigHashType::NONE);
+    sigHashes.push_back(SigHashType::SINGLE);
+    sigHashes.push_back(SigHashType::ALL);
 
     // create a big transaction of 4500 inputs signed by the same key
     for(uint32_t ij = 0; ij < 4500; ij++) {

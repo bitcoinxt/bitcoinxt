@@ -12,6 +12,7 @@
 #include "main.h"
 #include "net.h"
 #include "pow.h"
+#include "script/sighashtype.h"
 #include "script/sign.h"
 #include "serialize.h"
 #include "util.h"
@@ -171,7 +172,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
         tx.vout.resize(1);
         tx.vout[0].nValue = 1*CENT;
         tx.vout[0].scriptPubKey = GetScriptForDestination(key.GetPubKey().GetID());
-        SignSignature(keystore, txPrev, tx, 0, SIGHASH_ALL | SIGHASH_FORKID);
+        SignSignature(keystore, txPrev, tx, 0, SigHashType::ALL | SigHashType::FORKID);
 
         AddOrphanTx(tx, i);
     }
@@ -191,7 +192,7 @@ BOOST_AUTO_TEST_CASE(DoS_mapOrphans)
             tx.vin[j].prevout.n = j;
             tx.vin[j].prevout.hash = txPrev.GetHash();
         }
-        SignSignature(keystore, txPrev, tx, 0, SIGHASH_ALL | SIGHASH_FORKID);
+        SignSignature(keystore, txPrev, tx, 0, SigHashType::ALL | SigHashType::FORKID);
         // Re-use same signature for other inputs
         // (they don't have to be valid for this test)
         for (unsigned int j = 1; j < tx.vin.size(); j++)

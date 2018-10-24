@@ -8,6 +8,7 @@
 #include "test/test_random.h"
 #include "script/interpreter.h"
 #include "script/script.h"
+#include "script/sighashtype.h"
 #include "serialize.h"
 #include "test/test_bitcoin.h"
 #include "util.h"
@@ -23,7 +24,7 @@
 extern UniValue read_json(const std::string& jsondata);
 
 // Old script.cpp SignatureHash function
-uint256 static SignatureHashOld(CScript scriptCode, const CTransaction& txTo, unsigned int nIn, int nHashType)
+uint256 static SignatureHashOld(CScript scriptCode, const CTransaction& txTo, unsigned int nIn, SigHashType nHashType)
 {
     static const uint256 one(uint256S("0000000000000000000000000000000000000000000000000000000000000001"));
     if (nIn >= txTo.vin.size())
@@ -43,7 +44,7 @@ uint256 static SignatureHashOld(CScript scriptCode, const CTransaction& txTo, un
     txTmp.vin[nIn].scriptSig = scriptCode;
 
     // Blank out some of the outputs
-    if ((nHashType & 0x1f) == SIGHASH_NONE)
+    if (GetBaseType(nHashType) == SigHashType::NONE)
     {
         // Wildcard payee
         txTmp.vout.clear();
@@ -53,7 +54,7 @@ uint256 static SignatureHashOld(CScript scriptCode, const CTransaction& txTo, un
             if (i != nIn)
                 txTmp.vin[i].nSequence = 0;
     }
-    else if ((nHashType & 0x1f) == SIGHASH_SINGLE)
+    else if (GetBaseType(nHashType) == SigHashType::SINGLE)
     {
         // Only lock-in the txout payee at same index as txin
         unsigned int nOut = nIn;
@@ -73,7 +74,7 @@ uint256 static SignatureHashOld(CScript scriptCode, const CTransaction& txTo, un
     }
 
     // Blank out other inputs completely, not recommended for open transactions
-    if (nHashType & SIGHASH_ANYONECANPAY)
+    if (bool(nHashType & SigHashType::ANYONECANPAY))
     {
         txTmp.vin[0] = txTmp.vin[nIn];
         txTmp.vin.resize(1);
@@ -81,7 +82,7 @@ uint256 static SignatureHashOld(CScript scriptCode, const CTransaction& txTo, un
 
     // Serialize and hash
     CHashWriter ss(SER_GETHASH, 0);
-    ss << txTmp << nHashType;
+    ss << txTmp << ToInt(nHashType);
     return ss.GetHash();
 }
 
@@ -132,13 +133,13 @@ BOOST_AUTO_TEST_CASE(sighash_test)
     nRandomTests = 500;
     #endif
     for (int i=0; i<nRandomTests; i++) {
-        int nHashType = insecure_rand();
+        SigHashType nHashType = SigHashType(insecure_rand());
 
         // Clear forkid
-        nHashType &= ~SIGHASH_FORKID;
+        nHashType &= ~SigHashType::FORKID;
 
         CMutableTransaction txTo;
-        RandomTransaction(txTo, (nHashType & 0x1f) == SIGHASH_SINGLE);
+        RandomTransaction(txTo, GetBaseType(nHashType) == SigHashType::SINGLE);
         CScript scriptCode;
         RandomScript(scriptCode);
         int nIn = insecure_rand() % txTo.vin.size();
@@ -184,7 +185,8 @@ BOOST_AUTO_TEST_CASE(sighash_from_data)
         if (test.size() == 1) continue; // comment
 
         std::string raw_tx, raw_script, sigHashHex;
-        int nIn, nHashType;
+        int nIn;
+        SigHashType nHashType;
         uint256 sh;
         CTransaction tx;
         CScript scriptCode = CScript();
@@ -194,7 +196,7 @@ BOOST_AUTO_TEST_CASE(sighash_from_data)
           raw_tx = test[0].get_str();
           raw_script = test[1].get_str();
           nIn = test[2].get_int();
-          nHashType = test[3].get_int();
+          nHashType = SigHashType(test[3].get_int());
           sigHashHex = test[4].get_str();
 
           uint256 sh;
