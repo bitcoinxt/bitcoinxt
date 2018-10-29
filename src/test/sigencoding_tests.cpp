@@ -5,6 +5,8 @@
 #include "test/test_bitcoin.h"
 
 #include "script/interpreter.h"
+#include "script/script_flags.h"
+#include "script/sigencoding.h"
 #include "script/sighashtype.h"
 
 #include <boost/test/unit_test.hpp>

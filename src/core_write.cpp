@@ -8,6 +8,7 @@
 #include "primitives/transaction.h"
 #include "script/script.h"
 #include "script/standard.h"
+#include "script/sigencoding.h"
 #include "script/sighashtype.h"
 #include "serialize.h"
 #include "streams.h"
