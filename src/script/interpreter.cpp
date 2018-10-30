@@ -85,6 +85,21 @@ bool static IsCompressedOrUncompressedPubKey(const valtype &vchPubKey) {
     return true;
 }
 
+static bool IsCompressedPubKey(const valtype &vchPubKey)
+{
+    if (vchPubKey.size() != 33)
+    {
+        //  Non-canonical public key: invalid length for compressed key
+        return false;
+    }
+    if (vchPubKey[0] != 0x02 && vchPubKey[0] != 0x03)
+    {
+        //  Non-canonical public key: invalid prefix for compressed key
+        return false;
+    }
+    return true;
+}
+
 /**
  * A canonical signature exists of: <30> <total len> <02> <len R> <R> <02> <len S> <S> <hashtype>
  * Where R and S are not negative (their first byte has its highest bit not set), and not
@@ -230,9 +245,17 @@ bool CheckSignatureEncoding(const vector<unsigned char> &vchSig, unsigned int fl
     return true;
 }
 
-bool static CheckPubKeyEncoding(const valtype &vchSig, unsigned int flags, ScriptError* serror) {
-    if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 && !IsCompressedOrUncompressedPubKey(vchSig)) {
+bool CheckPubKeyEncoding(const valtype &vchPubKey, unsigned int flags, ScriptError *serror)
+{
+    if ((flags & SCRIPT_VERIFY_STRICTENC) != 0 && !IsCompressedOrUncompressedPubKey(vchPubKey)) {
         return set_error(serror, SCRIPT_ERR_PUBKEYTYPE);
+    }
+
+    // Only compressed keys are accepted when
+    // SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE is enabled.
+    if (flags & SCRIPT_VERIFY_COMPRESSED_PUBKEYTYPE && !IsCompressedPubKey(vchPubKey))
+    {
+        return set_error(serror, SCRIPT_ERR_NONCOMPRESSED_PUBKEY);
     }
     return true;
 }
