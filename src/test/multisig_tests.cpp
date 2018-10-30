@@ -5,11 +5,12 @@
 #include "key.h"
 #include "keystore.h"
 #include "policy/policy.h"
+#include "script/interpreter.h"
+#include "script/ismine.h"
 #include "script/script.h"
 #include "script/script_error.h"
-#include "script/interpreter.h"
+#include "script/sighashtype.h"
 #include "script/sign.h"
-#include "script/ismine.h"
 #include "uint256.h"
 #include "test/test_bitcoin.h"
 
@@ -26,7 +27,7 @@ BOOST_FIXTURE_TEST_SUITE(multisig_tests, BasicTestingSetup)
 CScript
 sign_multisig(CScript scriptPubKey, vector<CKey> keys, CTransaction transaction, int whichIn)
 {
-    uint256 hash = SignatureHash(scriptPubKey, transaction, whichIn, SIGHASH_ALL | SIGHASH_FORKID, 0);
+    uint256 hash = SignatureHash(scriptPubKey, transaction, whichIn, SigHashType::ALL | SigHashType::FORKID, 0);
 
     CScript result;
     result << OP_0; // CHECKMULTISIG bug workaround
@@ -34,7 +35,7 @@ sign_multisig(CScript scriptPubKey, vector<CKey> keys, CTransaction transaction,
     {
         vector<unsigned char> vchSig;
         BOOST_CHECK(key.Sign(hash, vchSig));
-        vchSig.push_back((unsigned char)(SIGHASH_ALL | SIGHASH_FORKID));
+        vchSig.push_back(static_cast<unsigned char>(SigHashType::ALL | SigHashType::FORKID));
         result << vchSig;
     }
     return result;
@@ -303,7 +304,7 @@ BOOST_AUTO_TEST_CASE(multisig_Sign)
 
     for (int i = 0; i < 3; i++)
     {
-        BOOST_CHECK_MESSAGE(SignSignature(keystore, txFrom, txTo[i], 0, SIGHASH_ALL | SIGHASH_FORKID), strprintf("SignSignature %d", i));
+        BOOST_CHECK_MESSAGE(SignSignature(keystore, txFrom, txTo[i], 0, SigHashType::ALL | SigHashType::FORKID), strprintf("SignSignature %d", i));
     }
 }
 

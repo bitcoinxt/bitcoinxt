@@ -16,6 +16,7 @@
 #include "policy/policy.h"
 #include "policy/txpriority.h"
 #include "script/script.h"
+#include "script/sighashtype.h"
 #include "script/sign.h"
 #include "timedata.h"
 #include "util.h"
@@ -2061,9 +2062,9 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
                                               std::numeric_limits<unsigned int>::max()-1));
 
                 // Transaction signature hash type changes at hard fork
-                int nHashType = SIGHASH_ALL;
+                SigHashType nHashType = SigHashType::ALL;
                 if ((Opt().UAHFTime() != 0) && (chainActive.Tip()->GetMedianTimePast() >= Opt().UAHFTime())) {
-                    nHashType |= SIGHASH_FORKID;
+                    nHashType |= SigHashType::FORKID;
                 }
 
                 // Sign

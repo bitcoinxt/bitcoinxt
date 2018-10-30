@@ -9,6 +9,7 @@
 #include "keystore.h"
 #include "policy/policy.h"
 #include "primitives/transaction.h"
+#include "script/sighashtype.h"
 #include "script/standard.h"
 #include "uint256.h"
 
@@ -18,7 +19,7 @@ using namespace std;
 
 typedef vector<unsigned char> valtype;
 
-TransactionSignatureCreator::TransactionSignatureCreator(const CKeyStore* keystoreIn, const CTransaction* txToIn, unsigned int nInIn, const CAmount &amountIn, uint32_t nHashTypeIn) : BaseSignatureCreator(keystoreIn), txTo(txToIn), nIn(nInIn), amount(amountIn), nHashType(nHashTypeIn), checker(txTo, nIn, amount) {}
+TransactionSignatureCreator::TransactionSignatureCreator(const CKeyStore* keystoreIn, const CTransaction* txToIn, unsigned int nInIn, const CAmount &amountIn, SigHashType nHashTypeIn) : BaseSignatureCreator(keystoreIn), txTo(txToIn), nIn(nInIn), amount(amountIn), nHashType(nHashTypeIn), checker(txTo, nIn, amount) {}
 
 bool TransactionSignatureCreator::CreateSig(std::vector<unsigned char>& vchSig, const CKeyID& address, const CScript& scriptCode) const
 {
@@ -29,7 +30,7 @@ bool TransactionSignatureCreator::CreateSig(std::vector<unsigned char>& vchSig, 
     uint256 hash = SignatureHash(scriptCode, *txTo, nIn, nHashType, amount);
     if (!key.Sign(hash, vchSig))
         return false;
-    vchSig.push_back((unsigned char)nHashType);
+    vchSig.push_back(static_cast<unsigned char>(nHashType));
     return true;
 }
 
@@ -134,7 +135,7 @@ bool ProduceSignature(const BaseSignatureCreator& creator, const CScript& fromPu
                          creator.Checker()));
 }
 
-bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CMutableTransaction& txTo, unsigned int nIn, const CAmount &amount, uint32_t nHashType)
+bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CMutableTransaction& txTo, unsigned int nIn, const CAmount &amount, SigHashType nHashType)
 {
     assert(nIn < txTo.vin.size());
     CTxIn& txin = txTo.vin[nIn];
@@ -145,7 +146,7 @@ bool SignSignature(const CKeyStore &keystore, const CScript& fromPubKey, CMutabl
     return ProduceSignature(creator, fromPubKey, txin.scriptSig);
 }
 
-bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CMutableTransaction& txTo, unsigned int nIn, uint32_t nHashType)
+bool SignSignature(const CKeyStore &keystore, const CTransaction& txFrom, CMutableTransaction& txTo, unsigned int nIn, SigHashType nHashType)
 {
     assert(nIn < txTo.vin.size());
     CTxIn& txin = txTo.vin[nIn];
@@ -197,7 +198,7 @@ static CScript CombineMultisig(const CScript& scriptPubKey, const BaseSignatureC
             // apropriate flags.
             // TODO: Remove after the Hard Fork.
             uint32_t flags = STANDARD_SCRIPT_VERIFY_FLAGS;
-            if (sig.back() & SIGHASH_FORKID) {
+            if (bool(SigHashType(sig.back()) & SigHashType::FORKID)) {
                 flags |= SCRIPT_ENABLE_SIGHASH_FORKID;
             }
             if (checker.CheckSig(sig, pubkey, scriptPubKey, flags)) {
@@ -318,6 +319,6 @@ bool DummySignatureCreator::CreateSig(std::vector<unsigned char>& vchSig, const 
     vchSig[4 + 33] = 0x02;
     vchSig[5 + 33] = 32;
     vchSig[6 + 33] = 0x01;
-    vchSig[6 + 33 + 32] = SIGHASH_ALL | SIGHASH_FORKID;
+    vchSig[6 + 33 + 32] = static_cast<unsigned char>(SigHashType::ALL | SigHashType::FORKID);
     return true;
 }

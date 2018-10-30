@@ -17,16 +17,7 @@ class CPubKey;
 class CScript;
 class CTransaction;
 class uint256;
-
-/** Signature hash types/flags */
-enum
-{
-    SIGHASH_ALL = 1,
-    SIGHASH_NONE = 2,
-    SIGHASH_SINGLE = 3,
-    SIGHASH_FORKID = 0x40,
-    SIGHASH_ANYONECANPAY = 0x80,
-};
+enum class SigHashType : uint32_t;
 
 /** Script verification flags */
 enum
@@ -119,7 +110,7 @@ struct PrecomputedTransactionData
     PrecomputedTransactionData(const CTransaction& tx);
 };
 uint256 SignatureHash(const CScript &scriptCode, const CTransaction &txTo,
-                        unsigned int nIn, uint32_t nHashType, const CAmount &amount,
+                        unsigned int nIn, SigHashType nHashType, const CAmount &amount,
                         unsigned int flags = SCRIPT_ENABLE_SIGHASH_FORKID,
                         const PrecomputedTransactionData* cache = nullptr);
 

@@ -161,6 +161,7 @@ BITCOIN_CORE_H = \
   script/sigcache.h \
   script/sign.h \
   script/standard.h \
+  script/sighashtype.h \
   streams.h \
   support/allocators/secure.h \
   support/allocators/zeroafterfree.h \
@@ -362,6 +363,7 @@ libbitcoin_common_a_SOURCES = \
   scheduler.cpp \
   script/sign.cpp \
   script/standard.cpp \
+  script/sighashtype.cpp \
   utxocommit.cpp \
   $(BITCOIN_CORE_H)
 
