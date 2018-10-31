@@ -5,6 +5,8 @@
 #include "test/test_bitcoin.h"
 
 #include "script/interpreter.h"
+#include "script/script_flags.h"
+#include "script/sigencoding.h"
 #include "script/sighashtype.h"
 
 #include <boost/test/unit_test.hpp>
@@ -18,19 +20,11 @@ static valtype SignatureWithHashType(valtype vchSig, SigHashType sigHash) {
     return vchSig;
 }
 
-static void
-CheckSignatureErrorForAllSigHashType(const valtype &vchSig, uint32_t flags,
-                                     const ScriptError expected_error) {
-    for (int i = 0; i <= 0xff; i++) {
-        ScriptError err = SCRIPT_ERR_OK;
-        valtype sig = SignatureWithHashType(vchSig, SigHashType(i));
-        BOOST_CHECK(!CheckSignatureEncoding(sig, flags, &err));
-        BOOST_CHECK_EQUAL(err, expected_error);
-    }
-}
-
 static void CheckSignatureEncodingWithSigHashType(const valtype &vchSig,
                                                   uint32_t flags) {
+    ScriptError err = SCRIPT_ERR_OK;
+    BOOST_CHECK(CheckDataSignatureEncoding(vchSig, flags, &err));
+
     const bool hasForkId = (flags & SCRIPT_ENABLE_SIGHASH_FORKID) != 0;
     const bool hasStrictEnc = (flags & SCRIPT_VERIFY_STRICTENC) != 0;
 
@@ -44,15 +38,13 @@ static void CheckSignatureEncodingWithSigHashType(const valtype &vchSig,
     }
 
     for (const SigHashType baseSigHash : baseSigHashes) {
-        ScriptError err = SCRIPT_ERR_OK;
-
         // Check the signature with the proper forkid flag.
         SigHashType sigHash = baseSigHash;
         if (hasForkId) {
             sigHash |= SigHashType::FORKID;
         }
         valtype validSig = SignatureWithHashType(vchSig, sigHash);
-        BOOST_CHECK(CheckSignatureEncoding(validSig, flags, &err));
+        BOOST_CHECK(CheckTransactionSignatureEncoding(validSig, flags, &err));
 
         // If we have strict encoding, we prevent the use of undefined flags.
         std::array<SigHashType, 2> undefSigHashes{
@@ -62,8 +54,9 @@ static void CheckSignatureEncodingWithSigHashType(const valtype &vchSig,
 
         for (SigHashType undefSigHash : undefSigHashes) {
             valtype undefSighash = SignatureWithHashType(vchSig, undefSigHash);
-            BOOST_CHECK_EQUAL(CheckSignatureEncoding(undefSighash, flags, &err),
-                              !hasStrictEnc);
+            BOOST_CHECK_EQUAL(
+                CheckTransactionSignatureEncoding(undefSighash, flags, &err),
+                !hasStrictEnc);
             if (hasStrictEnc) {
                 BOOST_CHECK_EQUAL(err, SCRIPT_ERR_SIG_HASHTYPE);
             }
@@ -75,8 +68,9 @@ static void CheckSignatureEncodingWithSigHashType(const valtype &vchSig,
             : baseSigHash | SigHashType::FORKID;
         valtype invalidSig = SignatureWithHashType(vchSig, invalidSigHash);
 
-        BOOST_CHECK_EQUAL(CheckSignatureEncoding(invalidSig, flags, &err),
-                          !hasStrictEnc);
+        BOOST_CHECK_EQUAL(
+            CheckTransactionSignatureEncoding(invalidSig, flags, &err),
+            !hasStrictEnc);
         if (hasStrictEnc) {
             BOOST_CHECK_EQUAL(err,
                               hasForkId ? SCRIPT_ERR_MUST_USE_FORKID
@@ -160,6 +154,8 @@ BOOST_AUTO_TEST_CASE(checksignatureencoding_test) {
         // Invalid R and S types.
         {0x30, 0x06, 0x42, 0x01, 0x01, 0x02, 0x01, 0x01},
         {0x30, 0x06, 0x02, 0x01, 0x01, 0x42, 0x01, 0x01},
+        // S out of bounds.
+        {0x30, 0x06, 0x02, 0x01, 0x01, 0x02, 0x02, 0x00},
         // Too long.
         {0x30, 0x47, 0x02, 0x21, 0x00, 0x8e, 0x45, 0x16, 0xda, 0x72, 0x53,
          0xcf, 0x06, 0x8e, 0xff, 0xec, 0x6b, 0x95, 0xc4, 0x12, 0x21, 0xc0,
@@ -176,15 +172,16 @@ BOOST_AUTO_TEST_CASE(checksignatureencoding_test) {
         ScriptError err = SCRIPT_ERR_OK;
 
         // Empty sig is always valid.
-        BOOST_CHECK(CheckSignatureEncoding({}, flags, &err));
+        BOOST_CHECK(CheckDataSignatureEncoding({}, flags, &err));
+        BOOST_CHECK(CheckTransactionSignatureEncoding({}, flags, &err));
 
         // Signature are valid as long as the forkid flag is correct.
         CheckSignatureEncodingWithSigHashType(minimalSig, flags);
 
         if (flags & SCRIPT_VERIFY_LOW_S) {
             // If we do enforce low S, then high S sigs are rejected.
-            CheckSignatureErrorForAllSigHashType(highSSig, flags,
-                                                 SCRIPT_ERR_SIG_HIGH_S);
+            BOOST_CHECK(!CheckDataSignatureEncoding(highSSig, flags, &err));
+            BOOST_CHECK_EQUAL(err, SCRIPT_ERR_SIG_HIGH_S);
         } else {
             // If we do not enforce low S, then high S sigs are accepted.
             CheckSignatureEncodingWithSigHashType(highSSig, flags);
@@ -195,25 +192,26 @@ BOOST_AUTO_TEST_CASE(checksignatureencoding_test) {
                          SCRIPT_VERIFY_STRICTENC)) {
                 // If we get any of the dersig flags, the non canonical dersig
                 // signature fails.
-                CheckSignatureErrorForAllSigHashType(nonDERSig, flags,
-                                                     SCRIPT_ERR_SIG_DER);
+                BOOST_CHECK(
+                    !CheckDataSignatureEncoding(nonDERSig, flags, &err));
+                BOOST_CHECK_EQUAL(err, SCRIPT_ERR_SIG_DER);
             } else {
                 // If we do not check, then it is accepted.
-                CheckSignatureEncodingWithSigHashType(nonDERSig, flags);
+                BOOST_CHECK(CheckDataSignatureEncoding(nonDERSig, flags, &err));
             }
         }
 
         for (const valtype &nonDERSig : nonParsableSigs) {
             if (flags & (SCRIPT_VERIFY_DERSIG | SCRIPT_VERIFY_LOW_S |
                          SCRIPT_VERIFY_STRICTENC)) {
-                // If we get any of the dersig flags, the invalid signature
-                // fails.
-                CheckSignatureErrorForAllSigHashType(nonDERSig, flags,
-                                                     SCRIPT_ERR_SIG_DER);
+                // If we get any of the dersig flags, the high S but non dersig
+                // signature fails.
+                BOOST_CHECK(
+                    !CheckDataSignatureEncoding(nonDERSig, flags, &err));
+                BOOST_CHECK_EQUAL(err, SCRIPT_ERR_SIG_DER);
             } else {
-                // If we do not check, then it is accepted even though it cannot
-                // even be parsed.
-                CheckSignatureEncodingWithSigHashType(nonDERSig, flags);
+                // If we do not check, then it is accepted.
+                BOOST_CHECK(CheckDataSignatureEncoding(nonDERSig, flags, &err));
             }
         }
     }
