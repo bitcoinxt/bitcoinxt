@@ -147,6 +147,7 @@ BOOST_AUTO_TEST_CASE(parse_push_test) {
                       std::runtime_error);
 }
 
+
 BOOST_AUTO_TEST_CASE(decodehextx_validtx) {
     const std::string valid_tx = "0100000001db4f85b6e2b9f6378fd9f52d80e17c63153"
         "d61e1cbc4d46632bf2aba3190d5b000000000000000000001000000000000000001510"
@@ -174,6 +175,16 @@ BOOST_AUTO_TEST_CASE(decodehextx_invalidtx) {
 
     BOOST_CHECK_EXCEPTION(DecodeHexTx(invalid), std::invalid_argument,
                           errorContains("Error unserializing"));
+}
+
+void TestFormatRoundTrip(const std::string &script) {
+    BOOST_CHECK_EQUAL(script, FormatScript(ParseScript(script)));
+}
+
+BOOST_AUTO_TEST_CASE(format_script_test) {
+    TestFormatRoundTrip("0 1 5 CHECKDATASIG CHECKSIG XOR NOP5 NOP10 "
+                        "CHECKDATASIGVERIFY DEPTH RETURN VERIFY SPLIT INVERT "
+                        "EQUAL HASH256 GREATERTHANOREQUAL RSHIFT");
 }
 
 BOOST_AUTO_TEST_SUITE_END()

@@ -5,6 +5,7 @@
 
 #include "script.h"
 
+#include "script/script_flags.h"
 #include "tinyformat.h"
 #include "utilstrencodings.h"
 
@@ -129,6 +130,8 @@ const char* GetOpName(opcodetype opcode)
     case OP_CHECKSIGVERIFY         : return "OP_CHECKSIGVERIFY";
     case OP_CHECKMULTISIG          : return "OP_CHECKMULTISIG";
     case OP_CHECKMULTISIGVERIFY    : return "OP_CHECKMULTISIGVERIFY";
+    case OP_CHECKDATASIG           : return "OP_CHECKDATASIG";
+    case OP_CHECKDATASIGVERIFY     : return "OP_CHECKDATASIGVERIFY";
 
     // expanson
     case OP_NOP1                   : return "OP_NOP1";
@@ -228,9 +231,8 @@ bool CScriptNum::MinimallyEncode(std::vector<uint8_t> &data) {
     return true;
 }
 
-unsigned int CScript::GetSigOpCount(bool fAccurate) const
-{
-    unsigned int n = 0;
+uint32_t CScript::GetSigOpCount(uint32_t flags, bool fAccurate) const {
+    uint32_t n = 0;
     const_iterator pc = begin();
     opcodetype lastOpcode = OP_INVALIDOPCODE;
     while (pc < end())
@@ -247,15 +249,21 @@ unsigned int CScript::GetSigOpCount(bool fAccurate) const
             else
                 n += MAX_PUBKEYS_PER_MULTISIG;
         }
+        else if (opcode == OP_CHECKDATASIG || opcode == OP_CHECKDATASIGVERIFY) {
+            if (flags & SCRIPT_ENABLE_CHECKDATASIG) {
+                ++n;
+            }
+        }
         lastOpcode = opcode;
     }
     return n;
 }
 
-unsigned int CScript::GetSigOpCount(const CScript& scriptSig) const
-{
-    if (!IsPayToScriptHash())
-        return GetSigOpCount(true);
+uint32_t CScript::GetSigOpCount(uint32_t flags,
+                                const CScript &scriptSig) const {
+    if ((flags & SCRIPT_VERIFY_P2SH) == 0 || !IsPayToScriptHash()) {
+        return GetSigOpCount(flags, true);
+    }
 
     // This is a pay-to-script-hash scriptPubKey;
     // get the last item that the scriptSig
@@ -273,7 +281,7 @@ unsigned int CScript::GetSigOpCount(const CScript& scriptSig) const
 
     /// ... and return its opcount:
     CScript subscript(data.begin(), data.end());
-    return subscript.GetSigOpCount(true);
+    return subscript.GetSigOpCount(flags, true);
 }
 
 bool CScript::IsPayToScriptHash() const

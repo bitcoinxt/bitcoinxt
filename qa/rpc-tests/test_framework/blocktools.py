@@ -6,6 +6,7 @@
 
 from .mininode import *
 from .script import CScript, OP_TRUE, OP_CHECKSIG
+from test_framework.txtools import bloat_tx
 
 # Create a block (with regtest difficulty)
 def create_block(hashprev, coinbase, nTime=None):
@@ -57,6 +58,10 @@ def create_coinbase(heightAdjust = 0, absoluteHeight = None, pubkey = None):
     else:
         coinbaseoutput.scriptPubKey = CScript([OP_TRUE])
     coinbase.vout = [ coinbaseoutput ]
+
+    # make sure tx is at least MIN_TX_SIZE
+    bloat_tx(coinbase)
+
     coinbase.calc_sha256()
     return coinbase
 
@@ -68,6 +73,8 @@ def create_transaction(prevtx, n, sig, value, scriptPubKey=CScript()):
     tx.vin.append(CTxIn(COutPoint(prevtx.sha256, n), sig, 0xffffffff))
     tx.vout.append(CTxOut(value, scriptPubKey))
     tx.calc_sha256()
+    # make sure tx is at least MIN_TX_SIZE
+    bloat_tx(tx)
     return tx
 
 def get_legacy_sigopcount_block(block, fAccurate=True):
@@ -84,3 +91,47 @@ def get_legacy_sigopcount_tx(tx, fAccurate=True):
         # scriptSig might be of type bytes, so convert to CScript for the moment
         count += CScript(j.scriptSig).GetSigOpCount(fAccurate)
     return count
+
+def ltor_sort_block(block):
+    if len(block.vtx) <= 2:
+        return
+
+    for tx in block.vtx:
+        tx.calc_sha256()
+
+    block.vtx = [block.vtx[0]] + sorted(block.vtx[1:], key=lambda tx: tx.hash)
+
+# Sort by parent-first
+def ttor_sort_transactions(txs):
+    sorted_txs = []
+    index = dict()
+    added = set()
+
+    for t in txs:
+        t.calc_sha256()
+        index[t.sha256] = t
+
+    queue = txs
+
+    def add_or_queue(tx):
+        if tx.sha256 in added:
+            return
+        for i in tx.vin:
+            if i.prevout.hash in added:
+                continue
+            if not i.prevout.hash in index:
+                continue
+
+            # child of another tx in list,
+            # add back to queue, but add parent in front of it
+            queue.append(tx)
+            queue.append(index[i.prevout.hash])
+            return
+
+        sorted_txs.append(tx)
+        added.add(tx.sha256)
+
+    while len(queue):
+        add_or_queue(queue.pop())
+
+    return sorted_txs

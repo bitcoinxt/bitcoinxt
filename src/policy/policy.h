@@ -34,7 +34,8 @@ static const unsigned int STANDARD_SCRIPT_VERIFY_FLAGS = MANDATORY_SCRIPT_VERIFY
                                                          SCRIPT_VERIFY_NULLFAIL |
                                                          SCRIPT_VERIFY_CHECKLOCKTIMEVERIFY |
                                                          SCRIPT_VERIFY_CHECKSEQUENCEVERIFY |
-                                                         SCRIPT_VERIFY_LOW_S;
+                                                         SCRIPT_VERIFY_LOW_S |
+                                                         SCRIPT_VERIFY_SIGPUSHONLY;
 
 /** For convenience, standard but not mandatory verify flags. */
 static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS = STANDARD_SCRIPT_VERIFY_FLAGS & ~MANDATORY_SCRIPT_VERIFY_FLAGS;
@@ -42,6 +43,14 @@ static const unsigned int STANDARD_NOT_MANDATORY_VERIFY_FLAGS = STANDARD_SCRIPT_
 /** Used as the flags parameter to sequence and nLocktime checks in non-consensus code. */
 static const unsigned int STANDARD_LOCKTIME_VERIFY_FLAGS = LOCKTIME_VERIFY_SEQUENCE |
                                                            LOCKTIME_MEDIAN_TIME_PAST;
+/**
+ * Used as the flags parameters to check for sigops as if OP_CHECKDATASIG is
+ * enabled. Can be removed after OP_CHECKDATASIG is activated as the flag is
+ * made standard.
+ */
+static const uint32_t STANDARD_CHECKDATASIG_VERIFY_FLAGS =
+    STANDARD_SCRIPT_VERIFY_FLAGS | SCRIPT_ENABLE_CHECKDATASIG;
+
 
 bool IsStandard(const CScript& scriptPubKey, txnouttype& whichType);
     /**

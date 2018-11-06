@@ -164,6 +164,7 @@ def initialize_datadir(dirname, n):
         f.write("rpcpassword=" + rpc_p + "\n")
         f.write("port="+str(p2p_port(n))+"\n")
         f.write("rpcport="+str(rpc_port(n))+"\n")
+        f.write("fourthhftime=1526400000\n")
     return datadir
 
 def rpc_auth_pair(n):
@@ -524,6 +525,10 @@ def assert_raises_jsonrpc(code, message, fun, *args, **kwds):
         raise AssertionError("Unexpected exception raised: "+type(e).__name__)
     else:
         raise AssertionError("No exception raised")
+
+# TODO: Replace this wrapper function with https://github.com/bitcoin/bitcoin/pull/10853
+def assert_raises_rpc_error(*args, **kwargs):
+    return assert_raises_jsonrpc(*args, **kwargs)
 
 def assert_is_hex_string(string):
     try:

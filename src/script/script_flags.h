@@ -86,6 +86,7 @@ enum
     // Enable new opcodes.
     //
     SCRIPT_ENABLE_MONOLITH_OPCODES = (1U << 18),
+    SCRIPT_ENABLE_CHECKDATASIG = (1U << 19),
 };
 
 #endif

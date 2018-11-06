@@ -4,6 +4,7 @@
 // file COPYING or http://www.opensource.org/licenses/mit-license.php.
 
 #include "amount.h"
+#include "consensus/validation.h"
 #include "core_io.h"
 #include "dstencode.h"
 #include "init.h"
@@ -600,8 +601,9 @@ UniValue getreceivedbyaddress(const JSONRPCRequest& request)
     CAmount nAmount = 0;
     for (map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); ++it)
     {
+        CValidationState state;
         const CWalletTx& wtx = (*it).second;
-        if (wtx.IsCoinBase() || !CheckFinalTx(wtx))
+        if (wtx.IsCoinBase() || !ContextualCheckTransactionForNextBlock(wtx, state, -1))
             continue;
 
         BOOST_FOREACH(const CTxOut& txout, wtx.vout)
@@ -654,8 +656,9 @@ UniValue getreceivedbyaccount(const JSONRPCRequest& request)
     CAmount nAmount = 0;
     for (map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); ++it)
     {
+        CValidationState state;
         const CWalletTx& wtx = (*it).second;
-        if (wtx.IsCoinBase() || !CheckFinalTx(wtx))
+        if (wtx.IsCoinBase() || !ContextualCheckTransactionForNextBlock(wtx, state, -1))
             continue;
 
         BOOST_FOREACH(const CTxOut& txout, wtx.vout)
@@ -679,7 +682,8 @@ CAmount GetAccountBalance(CWalletDB& walletdb, const string& strAccount, int nMi
     for (map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); ++it)
     {
         const CWalletTx& wtx = (*it).second;
-        if (!CheckFinalTx(wtx) || wtx.GetBlocksToMaturity() > 0 || wtx.GetDepthInMainChain() < 0)
+        CValidationState state;
+        if (!ContextualCheckTransactionForNextBlock(wtx, state, -1) || wtx.GetBlocksToMaturity() > 0 || wtx.GetDepthInMainChain() < 0)
             continue;
 
         CAmount nReceived, nSent, nFee;
@@ -750,9 +754,12 @@ UniValue getbalance(const JSONRPCRequest& request)
         CAmount nBalance = 0;
         for (map<uint256, CWalletTx>::iterator it = pwalletMain->mapWallet.begin(); it != pwalletMain->mapWallet.end(); ++it)
         {
+            CValidationState state;
             const CWalletTx& wtx = (*it).second;
-            if (!CheckFinalTx(wtx) || wtx.GetBlocksToMaturity() > 0 || wtx.GetDepthInMainChain() < 0)
+            if (!ContextualCheckTransactionForNextBlock(wtx, state, -1) || wtx.GetBlocksToMaturity() > 0 || wtx.GetDepthInMainChain() < 0)
+            {
                 continue;
+            }
 
             CAmount allFee;
             string strSentAccount;
@@ -1133,8 +1140,10 @@ UniValue ListReceived(const UniValue& params, bool fByAccounts)
     for (const std::pair<uint256, CWalletTx>& pairWtx : pwalletMain->mapWallet) {
         const CWalletTx& wtx = pairWtx.second;
 
-        if (wtx.IsCoinBase() || !CheckFinalTx(wtx))
+        CValidationState state;
+        if (wtx.IsCoinBase() || !ContextualCheckTransactionForNextBlock(wtx, state, -1)) {
             continue;
+        }
 
         int nDepth = wtx.GetDepthInMainChain();
         if (nDepth < nMinDepth)

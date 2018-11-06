@@ -20,6 +20,7 @@
 #include "primitives/transaction.h"
 #include "timedata.h"
 #include "util.h"
+#include "utilfork.h"
 #include "utilmoneystr.h"
 #include "options.h"
 #include "validationinterface.h"
@@ -72,6 +73,17 @@ std::vector<unsigned char> BIP100Str(uint64_t hardLimit) {
     return std::vector<unsigned char>(begin(s), end(s));
 }
 
+// Make sure coinbase is at minimum MIN_TRANSACTION_SIZE
+static void BloatCoinbaseSize(CMutableTransaction& coinbase) {
+    size_t size = ::GetSerializeSize(coinbase, SER_NETWORK, PROTOCOL_VERSION);
+    if (size >= MIN_TRANSACTION_SIZE) {
+        return;
+    }
+    // operator<< prefixes the padding with minimum 1 byte, thus -1
+    size_t padding = MIN_TRANSACTION_SIZE - size - 1;
+    coinbase.vin[0].scriptSig << std::vector<uint8_t>(padding);
+}
+
 CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
 {
     const CChainParams& chainparams = Params();
@@ -113,12 +125,14 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
     int lastFewTxs = 0;
     CAmount nFees = 0;
 
+    int64_t nMedianTimePast = 0;
+
     {
         LOCK2(cs_main, mempool.cs);
         CBlockIndex* pindexPrev = chainActive.Tip();
         const int nHeight = pindexPrev->nHeight + 1;
         pblock->nTime = GetAdjustedTime();
-        const int64_t nMedianTimePast = pindexPrev->GetMedianTimePast();
+        nMedianTimePast = pindexPrev->GetMedianTimePast();
 
         pblock->nVersion = ComputeBlockVersion(pindexPrev, chainparams.GetConsensus());
         // -regtest only: allow overriding block.nVersion with
@@ -218,6 +232,16 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
             inBlock.insert(iter);
         }
 
+
+        if (IsFourthHFActive(nMedianTimePast)) {
+            // If magnetic anomaly is enabled, we make sure transaction are
+            // lexically ordered.
+            std::sort(std::begin(pblock->vtx) + 1, std::end(pblock->vtx),
+                    [](const CTransaction& a, const CTransaction& b) -> bool {
+                        return a.GetHash() < b.GetHash();
+                    });
+        }
+
         nLastBlockTx = nBlockTx;
         nLastBlockSize = nBlockSize;
         LogPrintf("CreateNewBlock(): total size %u txs: %u fees: %ld sigops %d\n", nBlockSize, nBlockTx, nFees, nBlockSigOps);
@@ -225,6 +249,7 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         // Compute final coinbase transaction.
         txNew.vout[0].nValue = nFees + GetBlockSubsidy(nHeight, chainparams.GetConsensus());
         txNew.vin[0].scriptSig = CScript() << nHeight << BIP100Str(hardLimit) << OP_0;
+        BloatCoinbaseSize(txNew);
         pblock->vtx[0] = txNew;
         pblocktemplate->vTxFees[0] = -nFees;
 
@@ -233,7 +258,8 @@ CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn)
         UpdateTime(pblock, Params().GetConsensus(), pindexPrev);
         pblock->nBits          = GetNextWorkRequired(pindexPrev, pblock, Params().GetConsensus());
         pblock->nNonce         = 0;
-        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0]);
+        pblocktemplate->vTxSigOps[0] = GetLegacySigOpCount(pblock->vtx[0],
+                                                           STANDARD_CHECKDATASIG_VERIFY_FLAGS);
 
         CValidationState state;
         if (!TestBlockValidity(state, *pblock, pindexPrev, false, false)) {

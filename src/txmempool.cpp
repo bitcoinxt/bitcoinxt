@@ -5,6 +5,7 @@
 
 #include "txmempool.h"
 
+#include "chainparams.h" // for GetConsensus.
 #include "clientversion.h"
 #include "consensus/consensus.h"
 #include "consensus/tx_verify.h"
@@ -14,6 +15,7 @@
 #include "streams.h"
 #include "timedata.h"
 #include "util.h"
+#include "utilblock.h"
 #include "utilmoneystr.h"
 #include "version.h"
 #include "respend/respenddetector.h"
@@ -519,7 +521,8 @@ void CTxMemPool::removeForReorg(const CCoinsViewCache *pcoins, unsigned int nMem
         const CTransaction& tx = it->GetTx();
         LockPoints lp = it->GetLockPoints();
         bool validLP =  TestLockPointValidity(&lp);
-        if (!CheckFinalTx(tx, flags) || !CheckSequenceLocks(tx, flags, &lp, validLP)) {
+        CValidationState state;
+        if (!ContextualCheckTransactionForNextBlock(tx, state, flags) || !CheckSequenceLocks(tx, flags, &lp, validLP)) {
             // Note if CheckSequenceLocks fails the LockPoints may still be invalid
             // So it's critical that we remove the tx and not depend on the LockPoints.
             transactionsToRemove.push_back(tx);
@@ -561,9 +564,10 @@ void CTxMemPool::removeConflicts(const CTransaction &tx, std::list<CTransaction>
 /**
  * Called when a block is connected. Removes from mempool and updates the miner fee estimator.
  */
-void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtx, unsigned int nBlockHeight,
+void CTxMemPool::removeForBlock(const std::vector<CTransaction>& vtxIn, unsigned int nBlockHeight,
                                 std::list<CTransaction>& conflicts, bool fCurrentEstimate)
 {
+    std::vector<CTransaction> vtx(SortByParentsFirst(begin(vtxIn), end(vtxIn)));
     LOCK(cs);
     std::vector<CTxMemPoolEntry> entries;
     BOOST_FOREACH(const CTransaction& tx, vtx)

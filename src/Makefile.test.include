@@ -59,6 +59,7 @@ BITCOIN_TESTS =\
   test/clientversion_tests.cpp \
   test/cashaddr_tests.cpp \
   test/cashaddrenc_tests.cpp \
+  test/checkdatasig_tests.cpp \
   test/coins_tests.cpp \
   test/compactblockprocessor_tests.cpp \
   test/compactprefiller_tests.cpp \
@@ -130,6 +131,7 @@ BITCOIN_TESTS =\
   test/univalue_tests.cpp \
   test/util_tests.cpp \
   test/utxocommit_tests.cpp \
+  test/utilblock_tests.cpp \
   test/utilprocessmsg_tests.cpp \
   test/utilfork_tests.cpp \
   test/xthin_tests.cpp

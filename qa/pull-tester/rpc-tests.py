@@ -125,8 +125,11 @@ testScripts = [
     'disablewallet.py',
     'rpcnamedargs.py',
     'abc-monolith-activation.py',
+    'abc-magnetic-anomaly-activation.py',
     'bip64.py',
     'p2p-leaktests.py',
+    'abc-transaction-ordering.py',
+    'abc-checkdatasig-activation.py'
 ]
 
 testScriptsExt = [
@@ -149,7 +152,6 @@ testScriptsExt = [
     'rpcbind_test.py',
     'smartfees.py',
     'maxblocksinflight.py',
-    'rawtransactions.py',
     'p2p-acceptblock.py',
     'p2p-compactblocks.py',
     'mempool_packages.py',

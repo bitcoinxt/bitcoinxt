@@ -8,6 +8,7 @@ from test_framework.util import *
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.mininode import *
 from test_framework.blocktools import *
+from test_framework.txtools import tx_grind_hash
 import logging
 import copy
 import time
@@ -119,6 +120,7 @@ class FullBlockTest(ComparisonTestFramework):
     def add_transactions_to_block(self, block, tx_list):
         [ tx.rehash() for tx in tx_list ]
         block.vtx.extend(tx_list)
+        ltor_sort_block(block)
 
     # this is a little handier to use than the version in blocktools.py
     def create_tx(self, spend_tx, n, value, script=CScript([OP_TRUE])):
@@ -157,6 +159,7 @@ class FullBlockTest(ComparisonTestFramework):
             block = create_block(base_block_hash, coinbase, block_time)
         else:
             coinbase.vout[0].nValue += spend.tx.vout[spend.n].nValue - 1 # all but one satoshi to fees
+            assert(coinbase.vout[0].nValue >= 0)
             coinbase.rehash()
             block = create_block(base_block_hash, coinbase, block_time)
             tx = create_transaction(spend.tx, spend.n, b"", 1, script)  # spend 1 satoshi
@@ -516,7 +519,7 @@ class FullBlockTest(ComparisonTestFramework):
         yield rejected(RejectResult(16, b'bad-blk-sigops'))
 
 
-        # CHECKSIGVERIFY
+        self.log.info("CHECKSIGVERIFY")
         tip(33)
         lots_of_checksigs = CScript([OP_CHECKSIGVERIFY] * (MAX_BLOCK_SIGOPS - 1))
         b35 = block(35, spend=out[10], script=lots_of_checksigs)
@@ -544,7 +547,7 @@ class FullBlockTest(ComparisonTestFramework):
         b37 = update_block(37, [tx])
         yield rejected(RejectResult(16, b'bad-txns-inputs-missingorspent'))
 
-        # attempt to spend b37's first non-coinbase tx, at which point b37 was still considered valid
+        self.log.info("attempt to spend b37's first non-coinbase tx, at which point b37 was still considered valid")
         tip(35)
         block(38, spend=txout_b37)
         yield rejected(RejectResult(16, b'bad-txns-inputs-missingorspent'))
@@ -555,7 +558,7 @@ class FullBlockTest(ComparisonTestFramework):
         #   13 (4) -> b15 (5) -> b23 (6) -> b30 (7) -> b31 (8) -> b33 (9) -> b35 (10) -> b39 (11) -> b41 (12)
         #                                                                                        \-> b40 (12)
         #
-        # b39 - create some P2SH outputs that will require 6 sigops to spend:
+        self.log.info("b39 - create some P2SH outputs that will require 6 sigops to spend:")
         #
         #           redeem_script = COINBASE_PUBKEY, (OP_2DUP+OP_CHECKSIGVERIFY) * 5, OP_CHECKSIG
         #           p2sh_script = OP_HASH160, ripemd160(sha256(script)), OP_EQUAL
@@ -583,16 +586,18 @@ class FullBlockTest(ComparisonTestFramework):
         # Until block is full, add tx's with 1 satoshi to p2sh_script, the rest to OP_TRUE
         tx_new = None
         tx_last = tx
+        tx_last_n = len(tx.vout) - 1
         total_size=len(b39.serialize())
         while(total_size < MAX_BLOCK_SIZE):
-            tx_new = create_tx(tx_last, 1, 1, p2sh_script)
-            tx_new.vout.append(CTxOut(tx_last.vout[1].nValue - 1, CScript([OP_TRUE])))
+            tx_new = create_tx(tx_last, tx_last_n, 1, p2sh_script)
+            tx_new.vout.append(CTxOut(tx_last.vout[tx_last_n].nValue - 1, CScript([OP_TRUE])))
             tx_new.rehash()
             total_size += len(tx_new.serialize())
             if total_size >= MAX_BLOCK_SIZE:
                 break
             b39.vtx.append(tx_new) # add tx to block
             tx_last = tx_new
+            tx_last_n = len(tx_new.vout) - 1
             b39_outputs += 1
 
         b39 = update_block(39, [])
@@ -629,6 +634,7 @@ class FullBlockTest(ComparisonTestFramework):
             scriptSig = CScript([sig, redeem_script])
 
             tx.vin[1].scriptSig = scriptSig
+            bloat_tx(tx)
             tx.rehash()
             new_txs.append(tx)
             lastOutpoint = COutPoint(tx.sha256, 0)
@@ -637,19 +643,23 @@ class FullBlockTest(ComparisonTestFramework):
         tx = CTransaction()
         tx.vin.append(CTxIn(lastOutpoint, b''))
         tx.vout.append(CTxOut(1, CScript([OP_CHECKSIG] * b40_sigops_to_fill)))
+        bloat_tx(tx)
         tx.rehash()
         new_txs.append(tx)
         update_block(40, new_txs)
         yield rejected(RejectResult(16, b'bad-blk-sigops'))
 
-        # same as b40, but one less sigop
+        self.log.info("same as b40, but one less sigop")
         tip(39)
+        b41_txs = b40.vtx[1:]
+        b41_txs.remove(tx) # last added tx in b40
         b41 = block(41, spend=None)
-        update_block(41, b40.vtx[1:-1])
+        update_block(41, b41_txs)
         b41_sigops_to_fill = b40_sigops_to_fill - 1
         tx = CTransaction()
         tx.vin.append(CTxIn(lastOutpoint, b''))
         tx.vout.append(CTxOut(1, CScript([OP_CHECKSIG] * b41_sigops_to_fill)))
+        bloat_tx(tx)
         tx.rehash()
         update_block(41, [tx])
         yield accepted()
@@ -751,18 +761,20 @@ class FullBlockTest(ComparisonTestFramework):
         b50.solve()
         yield rejected(RejectResult(16, b'bad-diffbits'))
 
-        # A block with two coinbase txns
+        self.log.info("A block with two coinbase txns")
         tip(44)
         b51 = block(51)
         cb2 = create_coinbase(absoluteHeight = 51, pubkey = self.coinbase_pubkey)
         b51 = update_block(51, [cb2])
         yield rejected(RejectResult(16, b'bad-cb-multiple'))
 
-        # A block w/ duplicate txns
+        self.log.info("A block w/ duplicate txns")
         # Note: txns have to be in the right position in the merkle tree to trigger this error
         tip(44)
         b52 = block(52, spend=out[15])
         tx = create_tx(b52.vtx[1], 0, 1)
+        assert(len(b52.vtx) == 2)
+        tx_grind_hash(tx, lambda h: h > b52.vtx[1].hash)
         b52 = update_block(52, [tx, tx])
         yield rejected(RejectResult(16, b'bad-txns-duplicate'))
 
@@ -822,9 +834,10 @@ class FullBlockTest(ComparisonTestFramework):
         b57 = block(57)
         tx = create_and_sign_tx(out[16].tx, out[16].n, 1)
         tx1 = create_tx(tx, 0, 1)
+        tx_grind_hash(tx1, lambda h: h > tx.hash)
         b57 = update_block(57, [tx, tx1])
 
-        # b56 - copy b57, add a duplicate tx
+        self.log.info("b56 - copy b57, add a duplicate tx")
         tip(55)
         b56 = copy.deepcopy(b57)
         self.blocks[56] = b56
@@ -838,9 +851,13 @@ class FullBlockTest(ComparisonTestFramework):
         b57p2 = block("57p2")
         tx = create_and_sign_tx(out[16].tx, out[16].n, 1)
         tx1 = create_tx(tx, 0, 1)
+        tx_grind_hash(tx1, lambda h: h > tx.hash)
         tx2 = create_tx(tx1, 0, 1)
+        tx_grind_hash(tx2, lambda h: h > tx1.hash)
         tx3 = create_tx(tx2, 0, 1)
+        tx_grind_hash(tx3, lambda h: h > tx2.hash)
         tx4 = create_tx(tx3, 0, 1)
+        tx_grind_hash(tx4, lambda h: h > tx3.hash)
         b57p2 = update_block("57p2", [tx, tx1, tx2, tx3, tx4])
 
         # b56p2 - copy b57p2, duplicate two non-consecutive tx's
@@ -872,6 +889,7 @@ class FullBlockTest(ComparisonTestFramework):
         assert(len(out[17].tx.vout) < 42)
         tx.vin.append(CTxIn(COutPoint(out[17].tx.sha256, 42), CScript([OP_TRUE]), 0xffffffff))
         tx.vout.append(CTxOut(0, b""))
+        bloat_tx(tx)
         tx.calc_sha256()
         b58 = update_block(58, [tx])
         yield rejected(RejectResult(16, b'bad-txns-inputs-missingorspent'))
@@ -907,6 +925,7 @@ class FullBlockTest(ComparisonTestFramework):
         yield rejected(RejectResult(16, b'bad-txns-BIP30'))
 
 
+        self.log.info("Test tx.isFinal is properly rejected")
         # Test tx.isFinal is properly rejected (not an exhaustive tx.isFinal test, that should be in data-driven transaction tests)
         #
         #   -> b39 (11) -> b42 (12) -> b43 (13) -> b53 (14) -> b55 (15) -> b57 (16) -> b60 (17)
@@ -983,7 +1002,7 @@ class FullBlockTest(ComparisonTestFramework):
         yield accepted()
         save_spendable_output()
 
-        # Spend an output created in the block itself
+        self.log.info("Spend an output created in the block itself")
         #
         # -> b42 (12) -> b43 (13) -> b53 (14) -> b55 (15) -> b57 (16) -> b60 (17) -> b64 (18) -> b65 (19)
         #
@@ -995,7 +1014,7 @@ class FullBlockTest(ComparisonTestFramework):
         yield accepted()
         save_spendable_output()
 
-        # Attempt to spend an output created later in the same block
+        self.log.info("Attempt to spend an output created later in the same block")
         #
         # -> b43 (13) -> b53 (14) -> b55 (15) -> b57 (16) -> b60 (17) -> b64 (18) -> b65 (19)
         #                                                                                    \-> b66 (20)
@@ -1004,9 +1023,10 @@ class FullBlockTest(ComparisonTestFramework):
         tx1 = create_and_sign_tx(out[20].tx, out[20].n, out[20].tx.vout[0].nValue)
         tx2 = create_and_sign_tx(tx1, 0, 1)
         update_block(66, [tx2, tx1])
-        yield rejected(RejectResult(16, b'bad-txns-inputs-missingorspent'))
+        yield accepted()
+        self.nodes[0].invalidateblock(b66.hash)
 
-        # Attempt to double-spend a transaction created in a block
+        self.log.info("Attempt to double-spend a transaction created in a block")
         #
         # -> b43 (13) -> b53 (14) -> b55 (15) -> b57 (16) -> b60 (17) -> b64 (18) -> b65 (19)
         #                                                                                    \-> b67 (20)
@@ -1057,6 +1077,7 @@ class FullBlockTest(ComparisonTestFramework):
         tx = CTransaction()
         tx.vin.append(CTxIn(COutPoint(bogus_tx.sha256, 0), b"", 0xffffffff))
         tx.vout.append(CTxOut(1, b""))
+        bloat_tx(tx)
         update_block(70, [tx])
         yield rejected(RejectResult(16, b'bad-txns-inputs-missingorspent'))
 
@@ -1073,6 +1094,7 @@ class FullBlockTest(ComparisonTestFramework):
         b72 = block(72)
         tx1 = create_and_sign_tx(out[21].tx, out[21].n, 2)
         tx2 = create_and_sign_tx(tx1, 0, 1)
+        tx_grind_hash(tx2, lambda h: tx2.hash > tx1.hash)
         b72 = update_block(72, [tx1, tx2])  # now tip is 72
         b71 = copy.deepcopy(b72)
         b71.vtx.append(tx2)   # add duplicate tx2
@@ -1163,7 +1185,7 @@ class FullBlockTest(ComparisonTestFramework):
         yield accepted()
         save_spendable_output()
 
-        # Check that if we push an element filled with CHECKSIGs, they are not counted
+        self.log.info("Check that if we push an element filled with CHECKSIGs, they are not counted")
         tip(75)
         b76 = block(76)
         size = MAX_BLOCK_SIGOPS - 1 + MAX_SCRIPT_ELEMENT_SIZE + 1 + 5
@@ -1258,6 +1280,7 @@ class FullBlockTest(ComparisonTestFramework):
         #
         b84 = block(84)
         tx1 = create_tx(out[29].tx, out[29].n, 0, CScript([OP_RETURN]))
+        vout_offset = len(tx1.vout)
         tx1.vout.append(CTxOut(0, CScript([OP_TRUE])))
         tx1.vout.append(CTxOut(0, CScript([OP_TRUE])))
         tx1.vout.append(CTxOut(0, CScript([OP_TRUE])))
@@ -1265,13 +1288,13 @@ class FullBlockTest(ComparisonTestFramework):
         tx1.calc_sha256()
         self.sign_tx(tx1, out[29].tx, out[29].n)
         tx1.rehash()
-        tx2 = create_tx(tx1, 1, 0, CScript([OP_RETURN]))
+        tx2 = create_tx(tx1, vout_offset, 0, CScript([OP_RETURN]))
         tx2.vout.append(CTxOut(0, CScript([OP_RETURN])))
-        tx3 = create_tx(tx1, 2, 0, CScript([OP_RETURN]))
+        tx3 = create_tx(tx1, vout_offset + 1, 0, CScript([OP_RETURN]))
         tx3.vout.append(CTxOut(0, CScript([OP_TRUE])))
-        tx4 = create_tx(tx1, 3, 0, CScript([OP_TRUE]))
+        tx4 = create_tx(tx1, vout_offset + 2, 0, CScript([OP_TRUE]))
         tx4.vout.append(CTxOut(0, CScript([OP_RETURN])))
-        tx5 = create_tx(tx1, 4, 0, CScript([OP_RETURN]))
+        tx5 = create_tx(tx1, vout_offset + 3, 0, CScript([OP_RETURN]))
 
         update_block(84, [tx1,tx2,tx3,tx4,tx5])
         yield accepted()

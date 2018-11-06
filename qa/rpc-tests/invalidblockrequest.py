@@ -8,6 +8,7 @@ from test_framework.util import *
 from test_framework.comptool import TestManager, TestInstance, RejectResult
 from test_framework.mininode import *
 from test_framework.blocktools import *
+from test_framework.txtools import tx_grind_hash
 import logging
 import copy
 import time
@@ -69,6 +70,7 @@ class InvalidBlockRequestTest(ComparisonTestFramework):
             height += 1
         yield test
 
+        self.log.info("test merkle-root malleability")
         '''
         Now we use merkle-root malleability to generate an invalid block with
         same blockheader.
@@ -79,9 +81,12 @@ class InvalidBlockRequestTest(ComparisonTestFramework):
         block2 = create_block(self.tip, create_coinbase(absoluteHeight = height), self.block_time)
         self.block_time += 1
 
-        # b'0x51' is OP_TRUE
-        tx1 = create_transaction(self.block1.vtx[0], 0, b'\x51', 50 * COIN)
-        tx2 = create_transaction(tx1, 0, b'\x51', 50 * COIN)
+        tx1 = create_transaction(self.block1.vtx[0], 0, b'', 50 * COIN,
+                scriptPubKey = CScript([OP_TRUE]))
+        tx2 = create_transaction(tx1, 0, b'', 50 * COIN)
+
+        # We want tx1 to come before tx2 in the block, after LTOR activation we need to grind the hash.
+        tx_grind_hash(tx2, lambda h: h > tx1.hash)
 
         block2.vtx.extend([tx1, tx2])
         block2.hashMerkleRoot = block2.calc_merkle_root()
@@ -100,7 +105,6 @@ class InvalidBlockRequestTest(ComparisonTestFramework):
         yield TestInstance([[block2, RejectResult(16, b'bad-txns-duplicate')], [block2_orig, True]])
         height += 1
 
-        # Check transactions for duplicate inputs
         self.log.info("Test duplicate input block.")
 
         block2_orig.vtx[2].vin.append(block2_orig.vtx[2].vin[0])

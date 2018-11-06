@@ -6,7 +6,7 @@
 from test_framework.test_framework import ComparisonTestFramework
 from test_framework.util import *
 from test_framework.mininode import ToHex, CTransaction, NetworkThread
-from test_framework.blocktools import create_coinbase, create_block
+from test_framework.blocktools import create_coinbase, create_block, ltor_sort_block
 from test_framework.comptool import TestInstance, TestManager
 from test_framework.script import *
 from io import BytesIO
@@ -92,6 +92,11 @@ def all_rlt_txs(txarray):
                     txs.append(txarray[b31][b25][b22][b18])
     return txs
 
+# The function 'csv_invalidate' violates scriptsig-not-pushonly, which became
+# consensus enforced in the fourth hardfork.
+# This is a workaround. TODO: Fix the testcase.
+FOURTH_HF_ACTIVATION = int(time.time() * 2)
+
 class BIP68_112_113Test(ComparisonTestFramework):
     def __init__(self):
         super().__init__()
@@ -100,7 +105,8 @@ class BIP68_112_113Test(ComparisonTestFramework):
     def setup_network(self):
         # Must set the blockversion for this test
         self.nodes = start_nodes(self.num_nodes, self.options.tmpdir,
-                                 extra_args=[['-debug', '-whitelist=127.0.0.1', '-blockversion=4']],
+                                 extra_args=[['-debug', '-whitelist=127.0.0.1', '-blockversion=4', 
+                                 '-fourthhftime=%s' % FOURTH_HF_ACTIVATION]],
                                  binary=[self.options.testbinary])
 
     def run_test(self):
@@ -143,6 +149,7 @@ class BIP68_112_113Test(ComparisonTestFramework):
         block = create_block(self.tip, create_coinbase(absoluteHeight=self.tipheight + 1), self.last_block_time + 600)
         block.nVersion = version
         block.vtx.extend(txs)
+        ltor_sort_block(block)
         block.hashMerkleRoot = block.calc_merkle_root()
         block.rehash()
         block.solve()

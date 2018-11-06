@@ -183,6 +183,7 @@ BITCOIN_CORE_H = \
   ui_interface.h \
   undo.h \
   util.h \
+  utilblock.h \
   utildebug.h \
   utilfork.h \
   utilhash.h \
@@ -195,6 +196,7 @@ BITCOIN_CORE_H = \
   versionbits.h \
   wallet/crypter.h \
   wallet/db.h \
+  wallet/finaltx.h \
   wallet/rpcwallet.h \
   wallet/wallet.h \
   wallet/walletdb.h \
@@ -270,6 +272,7 @@ libbitcoin_server_a_SOURCES = \
   timedata.cpp \
   txdb.cpp \
   txmempool.cpp \
+  utilblock.cpp \
   utildebug.cpp \
   utilfork.cpp \
   utilhash.cpp \
@@ -286,6 +289,7 @@ libbitcoin_wallet_a_CXXFLAGS = $(AM_CXXFLAGS) $(PIE_FLAGS)
 libbitcoin_wallet_a_SOURCES = \
   wallet/crypter.cpp \
   wallet/db.cpp \
+  wallet/finaltx.cpp \
   wallet/rpcdump.cpp \
   wallet/rpcwallet.cpp \
   wallet/wallet.cpp \

@@ -16,7 +16,7 @@
 template <typename T>
 class CCheckQueueControl;
 
-/** 
+/**
  * Queue for verifications that have to be performed.
   * The verifications are represented by a type T, which must provide an
   * operator(), returning a bool.
@@ -146,15 +146,15 @@ public:
     void Add(std::vector<T>& vChecks)
     {
         boost::unique_lock<boost::mutex> lock(mutex);
-        BOOST_FOREACH (T& check, vChecks) {
-            queue.push_back(T());
-            check.swap(queue.back());
+        for (T &check : vChecks) {
+            queue.push_back(std::move(check));
         }
         nTodo += vChecks.size();
-        if (vChecks.size() == 1)
+        if (vChecks.size() == 1) {
             condWorker.notify_one();
-        else if (vChecks.size() > 1)
+        } else if (vChecks.size() > 1) {
             condWorker.notify_all();
+        }
     }
 
     ~CCheckQueue()
@@ -169,7 +169,7 @@ public:
 
 };
 
-/** 
+/**
  * RAII-style controller object for a CCheckQueue that guarantees the passed
  * queue is finished before continuing.
  */

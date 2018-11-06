@@ -28,6 +28,10 @@ test that enforcement has not triggered (which triggers ACTIVE)
 test that enforcement has triggered
 '''
 
+# The function 'csv_invalidate' violates scriptsig-not-pushonly, which became
+# consensus enforced in the fourth hardfork.
+# This is a workaround. TODO: Fix the testcase.
+FOURTH_HF_ACTIVATION = int(time.time() * 2)
 
 class BIP9SoftForksTest(ComparisonTestFramework):
 
@@ -37,7 +41,8 @@ class BIP9SoftForksTest(ComparisonTestFramework):
 
     def setup_network(self):
         self.nodes = start_nodes(self.num_nodes, self.options.tmpdir,
-                                 extra_args=[['-debug', '-whitelist=127.0.0.1']],
+                                 extra_args=[['-debug', '-whitelist=127.0.0.1',
+                                 '-fourthhftime=%s' % FOURTH_HF_ACTIVATION]],
                                  binary=[self.options.testbinary])
 
     def run_test(self):

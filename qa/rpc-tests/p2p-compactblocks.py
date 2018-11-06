@@ -6,9 +6,10 @@
 from test_framework.mininode import *
 from test_framework.test_framework import BitcoinTestFramework
 from test_framework.util import *
-from test_framework.blocktools import create_block, create_coinbase
+from test_framework.blocktools import create_block, create_coinbase, ltor_sort_block, ttor_sort_transactions
 from test_framework.siphash import siphash256
 from test_framework.script import CScript, OP_TRUE
+from test_framework.txtools import bloat_tx
 
 XT_TWEAK = True
 
@@ -163,6 +164,7 @@ class CompactBlocksTest(BitcoinTestFramework):
 
         block2 = self.build_block_on_tip(self.nodes[0])
         block2.vtx.append(tx)
+        ltor_sort_block(block2)
         block2.hashMerkleRoot = block2.calc_merkle_root()
         block2.solve()
         self.test_node.send_and_ping(msg_block(block2))
@@ -478,10 +480,12 @@ class CompactBlocksTest(BitcoinTestFramework):
             tx = CTransaction()
             tx.vin.append(CTxIn(COutPoint(utxo[0], utxo[1]), b''))
             tx.vout.append(CTxOut(utxo[2] - 1000, CScript([OP_TRUE])))
-            tx.rehash()
+            bloat_tx(tx)
+            tx.calc_sha256()
             utxo = [tx.sha256, 0, tx.vout[0].nValue]
             block.vtx.append(tx)
 
+        ltor_sort_block(block)
         block.hashMerkleRoot = block.calc_merkle_root()
         block.solve()
         return block
@@ -513,7 +517,6 @@ class CompactBlocksTest(BitcoinTestFramework):
         utxo = self.utxos.pop(0)
 
         block = self.build_block_with_transactions(node, utxo, 5)
-        self.utxos.append([block.vtx[-1].sha256, 0, block.vtx[-1].vout[0].nValue])
         comp_block = HeaderAndShortIDs()
         if XT_TWEAK:
             comp_block.initialize_from_block(block)
@@ -530,7 +533,6 @@ class CompactBlocksTest(BitcoinTestFramework):
 
         utxo = self.utxos.pop(0)
         block = self.build_block_with_transactions(node, utxo, 5)
-        self.utxos.append([block.vtx[-1].sha256, 0, block.vtx[-1].vout[0].nValue])
 
         # Now try interspersing the prefilled transactions
         if XT_TWEAK:
@@ -544,26 +546,28 @@ class CompactBlocksTest(BitcoinTestFramework):
         # Now try giving one transaction ahead of time.
         utxo = self.utxos.pop(0)
         block = self.build_block_with_transactions(node, utxo, 5)
-        self.utxos.append([block.vtx[-1].sha256, 0, block.vtx[-1].vout[0].nValue])
-        test_node.send_and_ping(msg_tx(block.vtx[1]))
-        assert(block.vtx[1].hash in node.getrawmempool())
+        ahead_tx = ttor_sort_transactions(block.vtx[1:])[0] # tx without parents in same block
+        ahead_tx_index = block.vtx.index(ahead_tx)
+        test_node.send_and_ping(msg_tx(ahead_tx))
+        assert(ahead_tx.hash in node.getrawmempool())
 
-        # Prefill 4 out of the 6 transactions, and verify that only the one
-        # that was not in the mempool is requested.
-        if XT_TWEAK:
-            comp_block.initialize_from_block(block, prefill_list=[0, 2, 3, 4])
-        else:
-            comp_block.initialize_from_block(block, prefill_list=[0, 2, 3, 4], use_witness=with_witness)
-        test_getblocktxn_response(comp_block, test_node, [5])
+        # Prefill all transactions, except two, one the node doesn't have and
+        # one in the mempool, and verify that only the one that was not in the
+        # mempool is requested.
+        prefill_list = [x for x in range(0, len(block.vtx))]
+        prefill_list.remove(ahead_tx_index)
+        missing_tx_index = ahead_tx_index - 1
+        prefill_list.remove(missing_tx_index)
+        comp_block.initialize_from_block(block, prefill_list=prefill_list)
+        test_getblocktxn_response(comp_block, test_node, [missing_tx_index])
 
-        msg_bt.block_transactions = BlockTransactions(block.sha256, [block.vtx[5]])
+        msg_bt.block_transactions = BlockTransactions(block.sha256, [block.vtx[missing_tx_index]])
         test_tip_after_message(node, test_node, msg_bt, block.sha256)
 
         # Now provide all transactions to the node before the block is
         # announced and verify reconstruction happens immediately.
         utxo = self.utxos.pop(0)
         block = self.build_block_with_transactions(node, utxo, 10)
-        self.utxos.append([block.vtx[-1].sha256, 0, block.vtx[-1].vout[0].nValue])
         for tx in block.vtx[1:]:
             test_node.send_message(msg_tx(tx))
         test_node.sync_with_ping()
@@ -593,19 +597,20 @@ class CompactBlocksTest(BitcoinTestFramework):
         if XT_TWEAK:
             version = 1
 
-        if (len(self.utxos) == 0):
-            self.make_utxos()
         utxo = self.utxos.pop(0)
 
         block = self.build_block_with_transactions(node, utxo, 10)
-        self.utxos.append([block.vtx[-1].sha256, 0, block.vtx[-1].vout[0].nValue])
-        # Relay the first 5 transactions from the block in advance
-        for tx in block.vtx[1:6]:
+        # Relay 5 transactions from the block in advance
+        relayed_in_advance = []
+        for tx in ttor_sort_transactions(block.vtx[1:]):
             test_node.send_message(msg_tx(tx))
+            relayed_in_advance.append(tx)
+            if len(relayed_in_advance) == 5:
+                break
         test_node.sync_with_ping()
         # Make sure all transactions were accepted.
         mempool = node.getrawmempool()
-        for tx in block.vtx[1:6]:
+        for tx in relayed_in_advance:
             assert(tx.hash in mempool)
 
         # Send compact block
@@ -619,7 +624,12 @@ class CompactBlocksTest(BitcoinTestFramework):
         with mininode_lock:
             assert(test_node.last_getblocktxn is not None)
             absolute_indexes = test_node.last_getblocktxn.block_txn_request.to_absolute()
-        assert_equal(absolute_indexes, [6, 7, 8, 9, 10])
+        expected_indexes = []
+        for i in range(1, len(block.vtx)):
+            if block.vtx[i] in relayed_in_advance:
+                continue
+            expected_indexes.append(i)
+        assert_equal(absolute_indexes, expected_indexes)
 
         # Now give an incorrect response.
         # Note that it's possible for bitcoind to be smart enough to know we're
@@ -775,8 +785,6 @@ class CompactBlocksTest(BitcoinTestFramework):
 
         [l.clear_block_announcement() for l in listeners]
 
-        # ToHex() won't serialize with witness, but this block has no witnesses
-        # anyway. TODO: repeat this test with witness tx's to a segwit node.
         node.submitblock(ToHex(block))
 
         for l in listeners:
@@ -785,7 +793,7 @@ class CompactBlocksTest(BitcoinTestFramework):
             for l in listeners:
                 assert(l.last_cmpctblock is not None)
                 l.last_cmpctblock.header_and_shortids.header.calc_sha256()
-                assert_equal(l.last_cmpctblock.header_and_shortids.header.sha256, block.sha256)
+                assert_equal(l.last_cmpctblock.header_and_shortids.header.hash, block.hash)
 
     # Test that we don't get disconnected if we relay a compact block with valid header,
     # but invalid transactions.
@@ -859,6 +867,8 @@ class CompactBlocksTest(BitcoinTestFramework):
         self.test_node.wait_for_verack()
 
         # We will need UTXOs to construct transactions in later tests.
+        self.make_utxos()
+        self.make_utxos()
         self.make_utxos()
 
         print("Running tests, pre-segwit activation:")
