@@ -14,21 +14,32 @@ namespace Consensus {
 
 enum DeploymentPos
 {
-    DEPLOYMENT_TESTDUMMY,
-    DEPLOYMENT_CSV, // Deployment of BIP68, BIP112, and BIP113.
-    MAX_VERSION_BITS_DEPLOYMENTS
+    DEPLOYMENT_CSV = 0, // Deployment of BIP68, BIP112, and BIP113.
+    DEPLOYMENT_TESTDUMMY = 28,
+    MAX_VERSION_BITS_DEPLOYMENTS = 29
 };
 
 /**
- * Struct for each individual consensus rule change using BIP9.
+ * Struct for each individual consensus rule change using BIP135.
  */
-struct BIP9Deployment {
-    /** Bit position to select the particular bit in nVersion. */
-    int bit;
+struct ForkDeployment
+{
+    /** Deployment name */
+    const char *name;
+    /** Whether GBT clients can safely ignore this rule in simplified usage */
+    bool gbt_force;
     /** Start MedianTime for version bits miner confirmation. Can be a date in the past */
     int64_t nStartTime;
     /** Timeout/expiry MedianTime for the deployment attempt. */
     int64_t nTimeout;
+    /** Window size (in blocks) for generalized versionbits signal tallying */
+    int windowsize;
+    /** Threshold (in blocks / window) for generalized versionbits lock-in */
+    int threshold;
+    /** Minimum number of blocks to remain in locked-in state */
+    int minlockedblocks;
+    /** Minimum duration (in seconds based on MTP) to remain in locked-in state */
+    int64_t minlockedtime;
 };
 
 /**
@@ -44,14 +55,8 @@ struct Params {
     int BIP65Height;
     /** Block height at which BIP66 becomes active */
     int BIP66Height;
-    /**
-     * Minimum blocks including miner confirmation of the total of 2016 blocks in a retargetting period,
-     * (nPowTargetTimespan / nPowTargetSpacing) which is also used for BIP9 deployments.
-     * Examples: 1916 for 95%, 1512 for testchains.
-     */
-    uint32_t nRuleChangeActivationThreshold;
-    uint32_t nMinerConfirmationWindow;
-    BIP9Deployment vDeployments[MAX_VERSION_BITS_DEPLOYMENTS];
+    /** Defined BIP135 deployments. */
+    std::map<DeploymentPos, ForkDeployment> vDeployments;
     /**
      * BIP100: One-based position from beginning (end) of the ascending sorted list of max block size
      * votes in a retarget interval, at which the possible new lower (higher) max block size is read.

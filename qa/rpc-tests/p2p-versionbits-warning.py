@@ -10,15 +10,18 @@ import re
 import time
 from test_framework.blocktools import create_block, create_coinbase
 
-'''
-Test version bits' warning system.
+"""Test version bits warning system.
 
 Generate chains with block versions that appear to be signalling unknown
-soft-forks, and test that warning alerts are generated.
-'''
+forks, and test that warning alerts are generated.
+"""
 
-VB_PERIOD = 144 # versionbits period length for regtest
-VB_THRESHOLD = 108 # versionbits activation threshold for regtest
+VB_PERIOD = 100 # unknown versionbits period length
+VB_THRESHOLD = 51 # unknown versionbits warning level
+WARN_UNKNOWN_RULES_MINED = "Unknown block versions being mined! It's possible unknown rules are in effect"
+# the warning echo'd by alertnotify is sanitized
+WARN_UNKNOWN_RULES_MINED_SANITIZED = re.compile("^Warning: Unknown block versions being mined Its possible unknown rules are in effect")
+VB_PATTERN = re.compile("^Warning.*versionbit")
 VB_TOP_BITS = 0x20000000
 VB_UNKNOWN_BIT = 26 # Choose a bit unassigned to any deployment
 
@@ -70,12 +73,14 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         self.num_nodes = 1
 
     def setup_network(self):
+        self.nodes = []
         self.alert_filename = os.path.join(self.options.tmpdir, "alert.txt")
         # Open and close to create zero-length file
-        with open(self.alert_filename, 'w') as _:
+        with open(self.alert_filename, 'w', encoding='utf8') as _:
             pass
-        self.extra_args = [["-debug", "-logtimemicros=1", "-alertnotify=echo %s >> \"" + self.alert_filename + "\""]]
-        self.nodes = start_nodes(self.num_nodes, self.options.tmpdir, self.extra_args)
+        self.node_options = ["-debug", "-logtimemicros=1",
+                             "-alertnotify=echo %s >> \"" + self.alert_filename + "\""]
+        self.nodes.append(start_node(0, self.options.tmpdir, self.node_options))
 
     # Send numblocks blocks via peer with nVersionToUse set.
     def send_blocks_with_version(self, peer, numblocks, nVersionToUse):
@@ -95,9 +100,9 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         peer.sync_with_ping()
 
     def test_versionbits_in_alert_file(self):
-        with open(self.alert_filename, 'r') as f:
+        with open(self.alert_filename, 'r', encoding='utf8') as f:
             alert_text = f.read()
-        assert(VB_PATTERN.match(alert_text))
+        assert(WARN_UNKNOWN_RULES_MINED_SANITIZED.match(alert_text))
 
     def run_test(self):
         # Setup the p2p connection and start up the network thread.
@@ -114,11 +119,13 @@ class VersionBitsWarningTest(BitcoinTestFramework):
 
         # 1. Have the node mine one period worth of blocks
         self.nodes[0].generate(VB_PERIOD)
+        assert(self.nodes[0].getblockcount() ==  VB_PERIOD)
 
         # 2. Now build one period of blocks on the tip, with < VB_THRESHOLD
         # blocks signaling some unknown bit.
         nVersion = VB_TOP_BITS | (1<<VB_UNKNOWN_BIT)
-        self.send_blocks_with_version(test_node, VB_THRESHOLD-1, nVersion)
+        self.send_blocks_with_version(test_node, VB_THRESHOLD - 1, nVersion)
+        assert(self.nodes[0].getblockcount() ==  VB_PERIOD + VB_THRESHOLD - 1)
 
         # Fill rest of period with regular version blocks
         self.nodes[0].generate(VB_PERIOD - VB_THRESHOLD + 1)
@@ -127,39 +134,39 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         assert(not VB_PATTERN.match(self.nodes[0].getinfo()["errors"]))
         assert(not VB_PATTERN.match(self.nodes[0].getmininginfo()["errors"]))
         assert(not VB_PATTERN.match(self.nodes[0].getnetworkinfo()["warnings"]))
+        assert(self.nodes[0].getblockcount() ==  VB_PERIOD * 2)
 
-        # 3. Now build one period of blocks with >= VB_THRESHOLD blocks signaling
+        # 3. Now build one period of blocks with > VB_THRESHOLD blocks signaling
         # some unknown bit
         self.send_blocks_with_version(test_node, VB_THRESHOLD, nVersion)
+        assert(self.nodes[0].getblockcount() ==  VB_PERIOD * 2 + VB_THRESHOLD)
         self.nodes[0].generate(VB_PERIOD - VB_THRESHOLD)
         # Might not get a versionbits-related alert yet, as we should
-        # have gotten a different alert due to more than 51/100 blocks
+        # have gotten a different alert due to more than 50/100 blocks
         # being of unexpected version.
         # Check that get*info() shows some kind of error.
         assert(WARN_UNKNOWN_RULES_MINED in self.nodes[0].getinfo()["errors"])
         assert(WARN_UNKNOWN_RULES_MINED in self.nodes[0].getmininginfo()["errors"])
         assert(WARN_UNKNOWN_RULES_MINED in self.nodes[0].getnetworkinfo()["warnings"])
+        assert(len(self.nodes[0].getinfo()["errors"]) != 0)
+        self.test_versionbits_in_alert_file()
+
+        assert(self.nodes[0].getblockcount() ==  VB_PERIOD * 3)
 
         # Mine a period worth of expected blocks so the generic block-version warning
-        # is cleared, and restart the node. This should move the versionbit state
-        # to ACTIVE.
+        # is cleared, and restart the node.
         self.nodes[0].generate(VB_PERIOD)
         stop_nodes(self.nodes)
         # Empty out the alert file
-        with open(self.alert_filename, 'w') as _:
+        with open(self.alert_filename, 'w', encoding='utf8') as _:
             pass
-        self.nodes = start_nodes(self.num_nodes, self.options.tmpdir, self.extra_args)
+        self.nodes[0] = start_node(0, self.options.tmpdir, self.node_options)
 
-        # Connecting one block should be enough to generate an error.
+        # Since there are no unknown versionbits exceeding threshold in last period,
+        # no error will be generated.
         self.nodes[0].generate(1)
-        assert(WARN_UNKNOWN_RULES_ACTIVE in self.nodes[0].getinfo()["errors"])
-        assert(WARN_UNKNOWN_RULES_ACTIVE in self.nodes[0].getmininginfo()["errors"])
-        assert(WARN_UNKNOWN_RULES_ACTIVE in self.nodes[0].getnetworkinfo()["warnings"])
-        stop_nodes(self.nodes)
-        self.test_versionbits_in_alert_file()
-
-        # Test framework expects the node to still be running...
-        self.nodes = start_nodes(self.num_nodes, self.options.tmpdir, self.extra_args)
+        assert(len(self.nodes[0].getinfo()["errors"]) == 0)
+        assert(self.nodes[0].getblockcount() ==  VB_PERIOD * 4 + 1)
 
 if __name__ == '__main__':
     VersionBitsWarningTest().main()

@@ -72,6 +72,7 @@ BITCOIN_TESTS =\
   test/dbwrapper_tests.cpp \
   test/DoS_tests.cpp \
   test/dstencode_tests.cpp \
+  test/genversionbits_tests.cpp \
   test/getarg_tests.cpp \
   test/hash_tests.cpp \
   test/ipgroups_tests.cpp \
