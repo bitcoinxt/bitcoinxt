@@ -2063,7 +2063,7 @@ bool CWallet::CreateTransaction(const vector<CRecipient>& vecSend, CWalletTx& wt
 
                 // Transaction signature hash type changes at hard fork
                 SigHashType nHashType = SigHashType::ALL;
-                if ((Opt().UAHFTime() != 0) && (chainActive.Tip()->GetMedianTimePast() >= Opt().UAHFTime())) {
+                if (Opt().UAHFTime()) {
                     nHashType |= SigHashType::FORKID;
                 }
 
