@@ -165,7 +165,8 @@ class VersionBitsWarningTest(BitcoinTestFramework):
         # Since there are no unknown versionbits exceeding threshold in last period,
         # no error will be generated.
         self.nodes[0].generate(1)
-        assert(len(self.nodes[0].getinfo()["errors"]) == 0)
+        errors = self.nodes[0].getinfo()["errors"]
+        assert(len(errors) == 0 or errors.startswith("This is a pre-release test build"))
         assert(self.nodes[0].getblockcount() ==  VB_PERIOD * 4 + 1)
 
 if __name__ == '__main__':
