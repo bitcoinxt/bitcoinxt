@@ -4,7 +4,7 @@
 
   ```
   cd bitcoinxt/contrib/gitian-debian
-  wget https://github.com/bitcoinxt/bitcoinxt/releases/download/v0.11J/bitcoin-xt-0.11.0-J-linux64.tar.gz
+  wget https://github.com/bitcoinxt/bitcoinxt/releases/download/v0.11K/bitcoin-xt-0.11.0-K-linux64.tar.gz
   ```
 
 2. Execute debian installer build script:
@@ -17,7 +17,7 @@
 1. Install newly created debian package on test debian system:
 
   ```
-  sudo gdebi bitcoinxt-0.11J.deb
+  sudo gdebi bitcoinxt-0.11K.deb
   ```
 
 2. Verify bitcoinxt daemon installed and started:
