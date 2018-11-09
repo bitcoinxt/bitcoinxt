@@ -341,6 +341,8 @@ libbitcoin_consensus_a_SOURCES = \
   script/script_flags.h \
   script/sigencoding.cpp \
   script/sigencoding.h \
+  script/sighashtype.cpp \
+  script/sighashtype.h \
   serialize.h \
   tinyformat.h \
   uint256.cpp \
