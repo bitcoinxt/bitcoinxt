@@ -10,6 +10,7 @@
 #include "rpc/server.h"
 #include "sync.h"
 #include "util.h"
+#include "utilblock.h" // BlockStatusToStr
 #include "hash.h"
 #include "versionbits.h"
 
@@ -82,6 +83,14 @@ UniValue blockheaderToJSON(const CBlockIndex* blockindex)
     CBlockIndex *pnext = chainActive.Next(blockindex);
     if (pnext)
         result.push_back(Pair("nextblockhash", pnext->GetBlockHash().GetHex()));
+
+    UniValue blockstatus(UniValue::VOBJ);
+    auto s = BlockStatusToStr(blockindex->nStatus);
+    blockstatus.push_back(Pair("validation_checks", std::get<0>(s)));
+    blockstatus.push_back(Pair("validation_failures", std::get<1>(s)));
+    blockstatus.push_back(Pair("data_availablity", std::get<2>(s)));
+    result.push_back(Pair("blockstatus", blockstatus));
+
     return result;
 }
 

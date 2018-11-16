@@ -121,6 +121,17 @@ class BlockchainTest(BitcoinTestFramework):
         assert isinstance(int(header['versionHex'], 16), int)
         assert isinstance(header['difficulty'], Decimal)
 
+        assert_equal(header["blockstatus"]["validation_checks"],
+                "Valid header; Parent headers are valid; Valid transactions; Valid coin spends; Valid scripts and signatures")
+        assert_equal(header["blockstatus"]["validation_failures"], "")
+        assert_equal(header["blockstatus"]["data_availablity"], "Block data available")
+
+        node.invalidateblock(besthash)
+        header = node.getblockheader(besthash)
+        assert_equal(header["blockstatus"]["validation_failures"], "Block failed a validity check; Block descends from a failed block")
+        node.reconsiderblock(besthash)
+
+
     def _test_getdifficulty(self):
         difficulty = self.nodes[0].getdifficulty()
         # 1 hash in 2 should be valid, so difficulty should be 1/2**31
