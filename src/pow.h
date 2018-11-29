@@ -10,12 +10,11 @@
 
 #include <stdint.h>
 
-class CBlockHeader;
 class CBlockIndex;
 class uint256;
 class arith_uint256;
 
-unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, const CBlockHeader *pblock, const Consensus::Params&);
+unsigned int GetNextWorkRequired(const CBlockIndex* pindexLast, uint32_t nextblocktime, const Consensus::Params&);
 unsigned int CalculateNextWorkRequired(const CBlockIndex* pindexLast, int64_t nFirstBlockTime, const Consensus::Params&);
 
 /** Check whether a block hash satisfies the proof-of-work requirement specified by nBits */
@@ -29,7 +28,7 @@ int64_t GetBlockProofEquivalentTime(const CBlockIndex& to, const CBlockIndex& fr
  * Bitcoin cash's difficulty adjustment mechanism.
  */
 uint32_t GetNextCashWorkRequired(const CBlockIndex *pindexPrev,
-                                 const CBlockHeader *pblock,
+                                 uint32_t nextblocktime,
                                  const Consensus::Params &params);
 
 #endif // BITCOIN_POW_H
