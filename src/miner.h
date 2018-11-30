@@ -17,6 +17,7 @@ class CReserveKey;
 class CScript;
 class CWallet;
 namespace Consensus { struct Params; };
+namespace miner { class BlockBuilder; }
 
 struct CBlockTemplate
 {
@@ -28,7 +29,7 @@ struct CBlockTemplate
 /** Run the miner threads */
 void GenerateBitcoins(bool fGenerate, int nThreads, const CChainParams& chainparams, CConnman*);
 /** Generate a new block, without valid proof-of-work */
-CBlockTemplate* CreateNewBlock(const CScript& scriptPubKeyIn);
+void CreateNewBlock(miner::BlockBuilder& block, const CScript& scriptPubKeyIn, bool checkValidity = true);
 /** Modify the extranonce in a block */
 void IncrementExtraNonce(CBlock* pblock, CBlockIndex* pindexPrev, unsigned int& nExtraNonce, uint64_t nMaxBlockSize);
 void UpdateTime(CBlockHeader* pblock, const Consensus::Params& consensusParams, const CBlockIndex* pindexPrev);
