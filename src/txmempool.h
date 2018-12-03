@@ -371,7 +371,7 @@ private:
     uint64_t totalTxSize; //! sum of all mempool tx' byte sizes
     uint64_t cachedInnerUsage; //! sum of dynamic memory usage of all the map elements (NOT the maps themselves)
 
-    boost::mutex cs_txPerSec;
+    std::mutex cs_txPerSec;
     double nTxPerSec; //BU: tx's per second accepted into the mempool
 public:
     typedef boost::multi_index_container<
@@ -531,7 +531,7 @@ public:
     // BU: begin
     double TransactionsPerSecond()
     {
-        boost::mutex::scoped_lock lock(cs_txPerSec);
+        std::lock_guard<std::mutex> lock(cs_txPerSec);
         return nTxPerSec;
     }
     // BU: end
