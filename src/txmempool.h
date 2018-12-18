@@ -369,6 +369,8 @@ private:
     uint64_t totalTxSize; //! sum of all mempool tx' byte sizes
     uint64_t cachedInnerUsage; //! sum of dynamic memory usage of all the map elements (NOT the maps themselves)
 
+    std::mutex cs_txPerSec;
+    double nTxPerSec; //BU: tx's per second accepted into the mempool
 public:
     typedef boost::multi_index_container<
         CTxMemPoolEntry,
@@ -503,6 +505,9 @@ public:
     /** Expire all transaction (and their dependencies) in the mempool older than time. Return the number of removed transactions. */
     int Expire(int64_t time);
 
+    /** BU: Every transaction that is accepted into the mempool will call this method to update the current value*/
+    void UpdateTransactionsPerSecond();
+
     unsigned long size()
     {
         LOCK(cs);
@@ -520,6 +525,14 @@ public:
         LOCK(cs);
         return (mapTx.count(hash) != 0);
     }
+
+    // BU: begin
+    double TransactionsPerSecond()
+    {
+        std::lock_guard<std::mutex> lock(cs_txPerSec);
+        return nTxPerSec;
+    }
+    // BU: end
 
     bool lookup(uint256 hash, CTransaction& result) const;
 

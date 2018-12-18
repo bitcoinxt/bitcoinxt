@@ -66,6 +66,10 @@ public Q_SLOTS:
     void setNumConnections(int count);
     /** Set number of blocks and last block date shown in the UI */
     void setNumBlocks(int count, const QDateTime& blockDate);
+    /** Set size (number of transactions and memory usage) of the mempool in the UI */
+    void setMempoolSize(long numberOfTxs, size_t dynUsage);
+    /** Set tx's per second in the UI */
+    void setTransactionsPerSecond(double nTxPerSec);
     /** Go forward or back in history */
     void browseHistory(int offset);
     /** Scroll console view to end */

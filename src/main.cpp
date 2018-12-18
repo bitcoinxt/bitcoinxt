@@ -1060,6 +1060,7 @@ bool AcceptToMemoryPool(CTxMemPool& pool, CValidationState &state, const CTransa
                 return state.DoS(0, false, REJECT_INSUFFICIENTFEE, "mempool full");
         }
 
+        pool.UpdateTransactionsPerSecond();
         SyncWithWallets(tx, NULL, false);
     }
 
