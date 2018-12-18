@@ -20,8 +20,6 @@
 #include "boost/multi_index_container.hpp"
 #include "boost/multi_index/ordered_index.hpp"
 #include "boost/multi_index/hashed_index.hpp"
-#include <boost/thread/locks.hpp>
-#include <boost/thread/mutex.hpp>
 
 class CAutoFile;
 class CBlockIndex;

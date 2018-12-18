@@ -146,7 +146,7 @@ void ClientModel::updateTimer()
 
     Q_EMIT mempoolSizeChanged(getMempoolSize(), getMempoolDynamicUsage());
     Q_EMIT bytesChanged(getTotalBytesRecv(), getTotalBytesSent());
-    Q_EMIT transactionsPerSecondChanged(getTransactionsPerSecond()); // BU:
+    Q_EMIT transactionsPerSecondChanged(getTransactionsPerSecond());
 }
 
 void ClientModel::updateNumConnections(int numConnections)

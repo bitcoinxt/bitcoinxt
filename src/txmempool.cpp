@@ -905,7 +905,6 @@ void CTxMemPool::TrimToSize(size_t sizelimit) {
     }
 }
 
-// BU: begin
 void CTxMemPool::UpdateTransactionsPerSecond()
 {
     std::lock_guard<std::mutex> lock(cs_txPerSec);
@@ -925,4 +924,3 @@ void CTxMemPool::UpdateTransactionsPerSecond()
     nTxPerSec += 1/nSecondsToAverage; // The amount that the new tx will add to the tx rate
     if (nTxPerSec < 0) nTxPerSec = 0;
 }
-// BU: end
