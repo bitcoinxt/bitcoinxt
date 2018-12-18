@@ -1,4 +1,5 @@
 #include "utildebug.h"
+#include "util.h"
 
 #ifdef __linux__
 #include <execinfo.h>
@@ -25,4 +26,15 @@ void dump_backtrace_stderr() {
 #else
     std::cerr << "Backtrace not available on this platform" << std::endl;
 #endif
+}
+
+void throw_bad_state(const char* why, const char* func,
+                            const char* file, int line)
+{
+    std::stringstream err;
+    err << "Bad state - expectation '" << why << "' failed at  "
+        << func << " in " << file << ":" << line;
+
+    LogPrintf("ERROR: %s", err.str());
+    throw bad_state_error(err.str());
 }

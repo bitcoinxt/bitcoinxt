@@ -70,4 +70,7 @@ struct VersionBitsCache
 ThresholdState VersionBitsState(const CBlockIndex* pindexPrev, const Consensus::Params& params, Consensus::DeploymentPos pos, VersionBitsCache& cache);
 uint32_t VersionBitsMask(const Consensus::Params& params, Consensus::DeploymentPos pos);
 
+Consensus::DeploymentPos GetBIP135BitByName(const Consensus::Params& params,
+                                            const std::string& name);
+
 #endif

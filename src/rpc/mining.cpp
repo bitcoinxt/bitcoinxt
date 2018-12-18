@@ -15,6 +15,8 @@
 #include "main.h"
 #include "maxblocksize.h"
 #include "miner.h"
+#include "miner/serializableblockbuilder.h"
+#include "miner/gbtblockbuilder.h"
 #include "net.h"
 #include "pow.h"
 #include "rpc/server.h"
@@ -130,30 +132,32 @@ UniValue generateBlocks(boost::shared_ptr<CReserveScript> coinbaseScript, int nG
     UniValue blockHashes(UniValue::VARR);
     while (nHeight < nHeightEnd)
     {
-        unique_ptr<CBlockTemplate> pblocktemplate(CreateNewBlock(coinbaseScript->reserveScript));
-        if (!pblocktemplate.get())
-            throw JSONRPCError(RPC_INTERNAL_ERROR, "Couldn't create new block");
-        CBlock *pblock = &pblocktemplate->block;
+        CBlock block;
+        {
+            miner::SerializableBlockBuilder builder;
+            CreateNewBlock(builder, coinbaseScript->reserveScript);
+            block = builder.Release();
+        }
         {
             LOCK(cs_main);
             uint64_t nMaxBlockSize = GetNextMaxBlockSize(chainActive.Tip(), Params().GetConsensus());
-            IncrementExtraNonce(pblock, chainActive.Tip(), nExtraNonce, nMaxBlockSize);
+            IncrementExtraNonce(&block, chainActive.Tip(), nExtraNonce, nMaxBlockSize);
         }
-        while (nMaxTries > 0 && pblock->nNonce < nInnerLoopCount && !CheckProofOfWork(pblock->GetHash(), pblock->nBits, Params().GetConsensus())) {
-            ++pblock->nNonce;
+        while (nMaxTries > 0 && block.nNonce < nInnerLoopCount && !CheckProofOfWork(block.GetHash(), block.nBits, Params().GetConsensus())) {
+            ++block.nNonce;
             --nMaxTries;
         }
         if (nMaxTries == 0) {
             break;
         }
-        if (pblock->nNonce == nInnerLoopCount) {
+        if (block.nNonce == nInnerLoopCount) {
             continue;
         }
         CValidationState state;
-        if (!ProcessNewBlock(state, BlockSource{}, pblock, true, NULL, g_connman.get()))
+        if (!ProcessNewBlock(state, BlockSource{}, &block, true, NULL, g_connman.get()))
             throw JSONRPCError(RPC_INTERNAL_ERROR, "ProcessNewBlock, block not accepted");
         ++nHeight;
-        blockHashes.push_back(pblock->GetHash().GetHex());
+        blockHashes.push_back(block.GetHash().GetHex());
 
         //mark script as important because it was used at least for one coinbase output if the script came from the wallet
         if (keepScript)
@@ -370,20 +374,6 @@ static UniValue BIP22ValidationResult(const CValidationState& state)
     return "valid?";
 }
 
-static const Consensus::ForkDeployment& gbt_vb_fork(const Consensus::Params& consensusParams, const Consensus::DeploymentPos pos)
-{
-    return consensusParams.vDeployments.at(pos);
-}
-
-static const std::string gbt_vb_name(const Consensus::ForkDeployment& fork)
-{
-    std::string s = fork.name;
-    if (!fork.gbt_force) {
-        s.insert(s.begin(), '!');
-    }
-    return s;
-}
-
 UniValue getblocktemplate(const JSONRPCRequest& request)
 {
     if (request.fHelp || request.params.size() > 1)
@@ -585,177 +575,22 @@ UniValue getblocktemplate(const JSONRPCRequest& request)
     }
 
     // Update block
-    static CBlockIndex* pindexPrev;
-    static int64_t nStart;
-    static CBlockTemplate* pblocktemplate;
-    if (pindexPrev != chainActive.Tip() ||
-        (mempool.GetTransactionsUpdated() != nTransactionsUpdatedLast && GetTime() - nStart > 5))
-    {
-        // Clear pindexPrev so future calls make a new block, despite any failures from here on
-        pindexPrev = NULL;
+    CBlockIndex* pindexPrev = chainActive.Tip();
+    nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
+    miner::GBTBlockBuilder builder;
+    builder.SetClientRules(std::move(setClientRules));
+    builder.SetMaxVersionPreVB(nMaxVersionPreVB);
+    builder.SetLongPollID(pindexPrev->GetBlockHash(), nTransactionsUpdatedLast);
 
-        // Store the pindexBest used before CreateNewBlock, to avoid races
-        nTransactionsUpdatedLast = mempool.GetTransactionsUpdated();
-        CBlockIndex* pindexPrevNew = chainActive.Tip();
-        nStart = GetTime();
-
-        // Create new block
-        if(pblocktemplate)
-        {
-            delete pblocktemplate;
-            pblocktemplate = NULL;
-        }
-        CScript scriptDummy = CScript() << OP_TRUE;
-        pblocktemplate = CreateNewBlock(scriptDummy);
-        if (!pblocktemplate)
-            throw JSONRPCError(RPC_OUT_OF_MEMORY, "Out of memory");
-
-        // Need to update only after we know CreateNewBlock succeeded
-        pindexPrev = pindexPrevNew;
+    CScript scriptDummy = CScript() << OP_TRUE;
+    try {
+        CreateNewBlock(builder, scriptDummy);
     }
-    CBlock* pblock = &pblocktemplate->block; // pointer for convenience
-    const Consensus::Params& consensusParams = Params().GetConsensus();
-
-    // Update nTime
-    UpdateTime(pblock, consensusParams, pindexPrev);
-    pblock->nNonce = 0;
-
-    UniValue aCaps(UniValue::VARR); aCaps.push_back("proposal");
-
-    UniValue transactions(UniValue::VARR);
-    map<uint256, int64_t> setTxIndex;
-    int i = 0;
-    BOOST_FOREACH (CTransaction& tx, pblock->vtx)
-    {
-        uint256 txHash = tx.GetHash();
-        setTxIndex[txHash] = i++;
-
-        if (tx.IsCoinBase())
-            continue;
-
-        UniValue entry(UniValue::VOBJ);
-
-        entry.push_back(Pair("data", EncodeHexTx(tx)));
-
-        entry.push_back(Pair("hash", txHash.GetHex()));
-
-        UniValue deps(UniValue::VARR);
-        BOOST_FOREACH (const CTxIn &in, tx.vin)
-        {
-            if (setTxIndex.count(in.prevout.hash))
-                deps.push_back(setTxIndex[in.prevout.hash]);
-        }
-        entry.push_back(Pair("depends", deps));
-
-        int index_in_template = i - 1;
-        entry.push_back(Pair("fee", pblocktemplate->vTxFees[index_in_template]));
-        entry.push_back(Pair("sigops", pblocktemplate->vTxSigOps[index_in_template]));
-        transactions.push_back(entry);
+    catch (const std::invalid_argument& e) {
+        throw JSONRPCError(RPC_INVALID_PARAMETER, e.what());
     }
 
-    uint64_t nMaxBlockSize = GetNextMaxBlockSize(chainActive.Tip(), Params().GetConsensus());
-    CScript flags = CScript() << BIP100Str(nMaxBlockSize);
-    flags +=  COINBASE_FLAGS;
-    UniValue aux(UniValue::VOBJ);
-    aux.push_back(Pair("flags", HexStr(flags.begin(), flags.end())));
-
-    arith_uint256 hashTarget = arith_uint256().SetCompact(pblock->nBits);
-
-    UniValue aMutable(UniValue::VARR);
-    aMutable.push_back("time");
-    aMutable.push_back("transactions");
-    aMutable.push_back("prevblock");
-
-    UniValue result(UniValue::VOBJ);
-    result.push_back(Pair("capabilities", aCaps));
-
-    UniValue aRules(UniValue::VARR);
-    UniValue vbavailable(UniValue::VOBJ);
-    for (int i = 0; i < (int)Consensus::MAX_VERSION_BITS_DEPLOYMENTS; ++i) {
-        Consensus::DeploymentPos bit = static_cast<Consensus::DeploymentPos>(i);
-        if (!IsConfiguredDeployment(consensusParams, bit)) {
-            continue;
-        }
-        ThresholdState state = VersionBitsState(pindexPrev, consensusParams, bit, versionbitscache);
-        switch (state)
-        {
-        case THRESHOLD_DEFINED:
-        case THRESHOLD_FAILED:
-            // Not exposed to GBT at all
-            break;
-        case THRESHOLD_LOCKED_IN:
-            // Ensure bit is set in block version
-            pblock->nVersion |= VersionBitsMask(consensusParams, bit);
-        // FALLTHROUGH
-        // to get vbavailable set...
-        case THRESHOLD_STARTED:
-        {
-            const Consensus::ForkDeployment &fork = gbt_vb_fork(consensusParams, bit);
-            std::string forkName = gbt_vb_name(fork);
-            vbavailable.push_back(Pair(forkName, bit));
-            if (setClientRules.find(fork.name) == setClientRules.end())
-            {
-                if (!fork.gbt_force)
-                {
-                    // If the client doesn't support this, don't indicate it in the [default] version
-                    pblock->nVersion &= ~VersionBitsMask(consensusParams, bit);
-                }
-            }
-            break;
-        }
-        case THRESHOLD_ACTIVE:
-        {
-            // Add to rules only
-            const Consensus::ForkDeployment &fork = gbt_vb_fork(consensusParams, bit);
-            std::string forkName = gbt_vb_name(fork);
-            aRules.push_back(forkName);
-            if (setClientRules.find(fork.name) == setClientRules.end())
-            {
-                // Not supported by the client; make sure it's safe to proceed
-                if (!fork.gbt_force)
-                {
-                    // If we do anything other than throw an exception here, be sure version/force isn't sent to old
-                    // clients
-                    throw JSONRPCError(RPC_INVALID_PARAMETER,
-                        strprintf("Support for '%s' rule requires explicit client support", fork.name));
-                }
-            }
-            break;
-        }
-        }
-    }
-    result.push_back(Pair("version", pblock->nVersion));
-    result.push_back(Pair("rules", aRules));
-    result.push_back(Pair("vbavailable", vbavailable));
-    result.push_back(Pair("vbrequired", int(0)));
-
-    if (nMaxVersionPreVB >= 2) {
-        // If VB is supported by the client, nMaxVersionPreVB is -1, so we won't get here
-        // Because BIP 34 changed how the generation transaction is serialised, we can only use version/force back to v2
-        // blocks
-        // This is safe to do [otherwise-]unconditionally only because we are throwing an exception above if a non-force
-        // deployment gets activated
-        // Note that this can probably also be removed entirely after the first BIP9/BIP135 non-force deployment
-        // (ie, segwit) gets activated
-        aMutable.push_back("version/force");
-    }
-
-    result.push_back(Pair("previousblockhash", pblock->hashPrevBlock.GetHex()));
-    result.push_back(Pair("transactions", transactions));
-    result.push_back(Pair("coinbaseaux", aux));
-    result.push_back(Pair("coinbasevalue", (int64_t)pblock->vtx[0].vout[0].nValue));
-    result.push_back(Pair("longpollid", chainActive.Tip()->GetBlockHash().GetHex() + i64tostr(nTransactionsUpdatedLast)));
-    result.push_back(Pair("target", hashTarget.GetHex()));
-    result.push_back(Pair("mintime", (int64_t)pindexPrev->GetMedianTimePast()+1));
-    result.push_back(Pair("mutable", aMutable));
-    result.push_back(Pair("noncerange", "00000000ffffffff"));
-    result.push_back(Pair("sigoplimit", MaxBlockSigops(nMaxBlockSize)));
-    result.push_back(Pair("sizelimit", nMaxBlockSize));
-    result.push_back(Pair("curtime", pblock->GetBlockTime()));
-    result.push_back(Pair("bits", strprintf("%08x", pblock->nBits)));
-    result.push_back(Pair("height", (int64_t)(pindexPrev->nHeight+1)));
-
-    return result;
+    return builder.Release();
 }
 
 class submitblock_StateCatcher : public CValidationInterface

@@ -184,3 +184,15 @@ void VersionBitsCache::Clear()
         caches[d].clear();
     }
 }
+
+Consensus::ForkDeployment GetBIP135ForkByName(const Consensus::Params& params,
+                                            const std::string& name)
+{
+    const auto& deployments = params.vDeployments;
+    for (auto& d : deployments) {
+        if (std::string(d.second.name) == name) {
+            return d.second;
+        }
+    }
+    throw std::invalid_argument("Bit '" + name + "' does not exist");
+}

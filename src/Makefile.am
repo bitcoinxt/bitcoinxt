@@ -134,6 +134,11 @@ BITCOIN_CORE_H = \
   memusage.h \
   merkleblock.h \
   miner.h \
+  miner/blockbuilder.h \
+  miner/gbtblockbuilder.h \
+  miner/gbtparser.h \
+  miner/serializableblockbuilder.h \
+  miner/utilminer.h \
   net.h \
   netbase.h \
   netmessagemaker.h \
@@ -243,6 +248,10 @@ libbitcoin_server_a_SOURCES = \
   mempoolfeemodifier.cpp \
   merkleblock.cpp \
   miner.cpp \
+  miner/gbtblockbuilder.cpp \
+  miner/gbtparser.cpp \
+  miner/serializableblockbuilder.cpp \
+  miner/utilminer.cpp \
   net.cpp \
   noui.cpp \
   options.cpp \

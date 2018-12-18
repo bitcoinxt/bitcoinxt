@@ -9,6 +9,7 @@
 #include "consensus/validation.h"
 #include "main.h"
 #include "miner.h"
+#include "miner/serializableblockbuilder.h"
 #include "pubkey.h"
 #include "uint256.h"
 #include "util.h"
@@ -17,6 +18,8 @@
 #include "test/test_bitcoin.h"
 
 #include <boost/test/unit_test.hpp>
+
+using namespace miner;
 
 BOOST_FIXTURE_TEST_SUITE(miner_tests, TestingSetup)
 
@@ -73,7 +76,6 @@ bool TestSequenceLocks(const CTransaction &tx, int flags)
 BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 {
     CScript scriptPubKey = CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") << OP_CHECKSIG;
-    CBlockTemplate *pblocktemplate;
     CMutableTransaction tx,tx2;
     CScript script;
     uint256 hash;
@@ -85,7 +87,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     fCheckpointsEnabled = false;
 
     // Simple block creation, nothing special yet:
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(scriptPubKey));
+    CBlock block;
+    {
+        miner::SerializableBlockBuilder builder;
+        BOOST_CHECK_NO_THROW(CreateNewBlock(builder, scriptPubKey));
+        block = builder.Release();
+    }
 
     // We can't make transactions until we have inputs
     // Therefore, load 100 blocks :)
@@ -93,7 +100,7 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     std::vector<CTransaction*>txFirst;
     for (unsigned int i = 0; i < sizeof(blockinfo)/sizeof(*blockinfo); ++i)
     {
-        CBlock *pblock = &pblocktemplate->block; // pointer for convenience
+        CBlock *pblock = &block;
         pblock->nVersion = 1;
         pblock->nTime = chainActive.Tip()->GetMedianTimePast()+1;
         CMutableTransaction txCoinbase(pblock->vtx[0]);
@@ -114,11 +121,12 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         BOOST_CHECK(state.IsValid());
         pblock->hashPrevBlock = pblock->GetHash();
     }
-    delete pblocktemplate;
 
     // Just to make sure we can still make simple blocks
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(scriptPubKey));
-    delete pblocktemplate;
+    {
+        miner::SerializableBlockBuilder builder;
+        BOOST_CHECK_NO_THROW(CreateNewBlock(builder, scriptPubKey));
+    }
 
     // block sigops > limit: 1000 CHECKMULTISIG + 1
     tx.vin.resize(1);
@@ -137,7 +145,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(spendsCoinbase).FromTx(tx));
         tx.vin[0].prevout.hash = hash;
     }
-    BOOST_CHECK_THROW(CreateNewBlock(scriptPubKey), std::runtime_error);
+    {
+        SerializableBlockBuilder builder;
+        BOOST_CHECK_THROW(CreateNewBlock(builder, scriptPubKey), std::runtime_error);
+    }
     mempool.clear();
 
     tx.vin[0].prevout.hash = txFirst[0]->GetHash();
@@ -151,8 +162,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(spendsCoinbase).SigOps(20).FromTx(tx));
         tx.vin[0].prevout.hash = hash;
     }
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(scriptPubKey));
-    delete pblocktemplate;
+    {
+        SerializableBlockBuilder builder;
+        BOOST_CHECK_NO_THROW(CreateNewBlock(builder, scriptPubKey));
+    }
     mempool.clear();
 
     // block size > limit
@@ -172,14 +185,19 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(spendsCoinbase).FromTx(tx));
         tx.vin[0].prevout.hash = hash;
     }
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(scriptPubKey));
-    delete pblocktemplate;
+    {
+        SerializableBlockBuilder builder;
+        BOOST_CHECK_NO_THROW(CreateNewBlock(builder, scriptPubKey));
+    }
     mempool.clear();
 
     // orphan in mempool, template creation fails
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).FromTx(tx));
-    BOOST_CHECK_THROW(CreateNewBlock(scriptPubKey), std::runtime_error);
+    {
+        SerializableBlockBuilder builder;
+        BOOST_CHECK_THROW(CreateNewBlock(builder, scriptPubKey), std::runtime_error);
+    }
     mempool.clear();
 
     // child with higher priority than parent
@@ -196,8 +214,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.vout[0].nValue = 5900000000LL;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(400000000LL).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(scriptPubKey));
-    delete pblocktemplate;
+    {
+        SerializableBlockBuilder builder;
+        BOOST_CHECK_NO_THROW(CreateNewBlock(builder, scriptPubKey));
+    }
     mempool.clear();
 
     // coinbase in mempool, template creation fails
@@ -208,7 +228,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     hash = tx.GetHash();
     // give it a fee so it'll get mined
     mempool.addUnchecked(hash, entry.Fee(100000).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    BOOST_CHECK_THROW(CreateNewBlock(scriptPubKey), std::runtime_error);
+    {
+        SerializableBlockBuilder builder;
+        BOOST_CHECK_THROW(CreateNewBlock(builder, scriptPubKey), std::runtime_error);
+    }
     mempool.clear();
 
     // invalid (pre-p2sh) txn in mempool, template creation fails
@@ -225,7 +248,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.vout[0].nValue -= 1000000;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(1000000).Time(GetTime()).SpendsCoinbase(false).FromTx(tx));
-    BOOST_CHECK_THROW(CreateNewBlock(scriptPubKey), std::runtime_error);
+    {
+        SerializableBlockBuilder builder;
+        BOOST_CHECK_THROW(CreateNewBlock(builder, scriptPubKey), std::runtime_error);
+    }
     mempool.clear();
 
     // double spend txn pair in mempool, template creation fails
@@ -238,7 +264,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.vout[0].scriptPubKey = CScript() << OP_2;
     hash = tx.GetHash();
     mempool.addUnchecked(hash, entry.Fee(100000000L).Time(GetTime()).SpendsCoinbase(true).FromTx(tx));
-    BOOST_CHECK_THROW(CreateNewBlock(scriptPubKey), std::runtime_error);
+    {
+        SerializableBlockBuilder builder;
+        BOOST_CHECK_THROW(CreateNewBlock(builder, scriptPubKey), std::runtime_error);
+    }
     mempool.clear();
 
     // subsidy changing
@@ -255,8 +284,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         next->nMaxBlockSize = prev->nMaxBlockSize;
         chainActive.SetTip(next);
     }
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(scriptPubKey));
-    delete pblocktemplate;
+    {
+        SerializableBlockBuilder builder;
+        BOOST_CHECK_NO_THROW(CreateNewBlock(builder, scriptPubKey));
+    }
     // Extend to a 210000-long block chain.
     while (chainActive.Tip()->nHeight < 210000) {
         CBlockIndex* prev = chainActive.Tip();
@@ -269,8 +300,10 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
         next->nMaxBlockSize = prev->nMaxBlockSize;
         chainActive.SetTip(next);
     }
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(scriptPubKey));
-    delete pblocktemplate;
+    {
+        SerializableBlockBuilder builder;
+        BOOST_CHECK_NO_THROW(CreateNewBlock(builder, scriptPubKey));
+    }
     // Delete the dummy blocks again.
     while (chainActive.Tip()->nHeight > nHeight) {
         CBlockIndex* del = chainActive.Tip();
@@ -386,23 +419,29 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
     tx.vin[0].nSequence = CTxIn::SEQUENCE_LOCKTIME_TYPE_FLAG | 1;
     BOOST_CHECK(!TestSequenceLocks(tx, flags)); // Sequence locks fail
 
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(scriptPubKey));
+    {
+        SerializableBlockBuilder builder;
+        BOOST_CHECK_NO_THROW(CreateNewBlock(builder, scriptPubKey));
+        block = builder.Release();
+    }
 
     // None of the of the absolute height/time locked tx should have made
     // it into the template because we still check IsFinalTx in CreateNewBlock,
     // but relative locked txs will if inconsistently added to mempool.
     // For now these will still generate a valid template until BIP68 soft fork
-    BOOST_CHECK_EQUAL(pblocktemplate->block.vtx.size(), size_t(3));
-    delete pblocktemplate;
+    BOOST_CHECK_EQUAL(block.vtx.size(), size_t(3));
     // However if we advance height by 1 and time by 512, all of them should be mined
     for (int i = 0; i < CBlockIndex::nMedianTimeSpan; i++)
         chainActive.Tip()->GetAncestor(chainActive.Tip()->nHeight - i)->nTime += 512; //Trick the MedianTimePast
     chainActive.Tip()->nHeight++;
     SetMockTime(chainActive.Tip()->GetMedianTimePast() + 1);
 
-    BOOST_CHECK(pblocktemplate = CreateNewBlock(scriptPubKey));
-    BOOST_CHECK_EQUAL(pblocktemplate->block.vtx.size(), size_t(5));
-    delete pblocktemplate;
+    {
+        SerializableBlockBuilder builder;
+        BOOST_CHECK_NO_THROW(CreateNewBlock(builder, scriptPubKey));
+        block = builder.Release();
+    }
+    BOOST_CHECK_EQUAL(block.vtx.size(), size_t(5));
 
     chainActive.Tip()->nHeight--;
     SetMockTime(0);
@@ -416,8 +455,9 @@ BOOST_AUTO_TEST_CASE(CreateNewBlock_validity)
 
 std::string DefaultCoinbaseStr() {
     CScript scriptPubKey = CScript() << ParseHex("04678afdb0fe5548271967f1a67130b7105cd6a828e03909a67962e0ea1f61deb649f6bc3f4cef38c4f35504e51ec112de5c384df7ba0b8d578a4c702b6bf11d5f") << OP_CHECKSIG;
-    std::unique_ptr<CBlockTemplate> tpl(CreateNewBlock(scriptPubKey));
-    CScript coinbase = tpl->block.vtx.at(0).vin.at(0).scriptSig;
+    SerializableBlockBuilder builder;
+    CreateNewBlock(builder, scriptPubKey);
+    CScript coinbase = builder.Release().vtx.at(0).vin.at(0).scriptSig;
     return std::string(coinbase.begin(), coinbase.end());
 }
 
