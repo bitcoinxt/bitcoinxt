@@ -10,16 +10,17 @@
 // compat.h must be included first to correctly define FD_SETSIZE
 #include "compat.h"
 
-#include "net.h"
 #include "addrman.h"
 #include "chainparams.h"
 #include "clientversion.h"
-#include "primitives/transaction.h"
-#include "scheduler.h"
-#include "ui_interface.h"
 #include "crypto/common.h"
 #include "ipgroups.h"
+#include "net.h"
 #include "options.h"
+#include "primitives/transaction.h"
+#include "relaycache.h"
+#include "scheduler.h"
+#include "ui_interface.h"
 
 #ifdef WIN32
 #include <string.h>
@@ -71,10 +72,8 @@ map<CNetAddr, LocalServiceInfo> mapLocalHost;
 static bool vfReachable[NET_MAX] = {};
 static bool vfLimited[NET_MAX] = {};
 
-map<CInv, CDataStream> mapRelay;
-deque<pair<int64_t, CInv> > vRelayExpiration;
-CCriticalSection cs_mapRelay;
 limitedmap<CInv, int64_t> mapAlreadyAskedFor(MAX_INV_SZ);
+std::mutex mapAlreadyAskedFor_cs;
 
 // Signals for message handling
 static CNodeSignals g_signals;
@@ -2029,22 +2028,11 @@ void CConnman::GetNodeStats(std::vector<CNodeStats>& vstats)
     }
 }
 
-void CConnman::RelayTransaction(const CTransaction& tx, const CDataStream& ss, std::vector<uint256>& vAncestors, const bool fRespend)
+void CConnman::RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors, const bool fRespend)
 {
-    CInv inv(MSG_TX, tx.GetHash());
-    {
-        LOCK(cs_mapRelay);
-        // Expire old relay messages
-        while (!vRelayExpiration.empty() && vRelayExpiration.front().first < GetTime())
-        {
-            mapRelay.erase(vRelayExpiration.front().second);
-            vRelayExpiration.pop_front();
-        }
-
-        // Save original serialized message so newer versions are preserved
-        mapRelay.insert(std::make_pair(inv, ss));
-        vRelayExpiration.push_back(std::make_pair(GetTime() + 15 * 60, inv));
-    }
+    RelayCache& cache = RelayCache::Instance();
+    cache.ExpireOld();
+    cache.Insert(tx);
     LOCK(cs_vNodes);
     BOOST_FOREACH(CNode* pnode, vNodes)
     {
@@ -2069,31 +2057,11 @@ void CConnman::RelayTransaction(const CTransaction& tx, const CDataStream& ss, s
                 }
             }
             else {
-                pnode->PushInventory(inv);
+                pnode->PushInventory(CInv(MSG_TX, tx.GetHash()));
             }
         }
     }
 }
-
-bool FindTransactionInRelayMap(uint256 hash, CTransaction &out) {
-    LOCK(cs_mapRelay);
-    CInv inv(MSG_TX, hash);
-    map<CInv, CDataStream>::iterator mi = mapRelay.find(inv);
-    if (mi != mapRelay.end()) {
-        (*mi).second >> out;
-        return true;
-    }
-    return false;
-}
-
-void CConnman::RelayTransaction(const CTransaction& tx, std::vector<uint256>& vAncestors, const bool fRespend)
-{
-    CDataStream ss(SER_NETWORK, PROTOCOL_VERSION);
-    ss.reserve(10000);
-    ss << tx;
-    RelayTransaction(tx, ss, vAncestors, fRespend);
-}
-
 
 void CConnman::RecordBytesRecv(uint64_t bytes)
 {
@@ -2207,6 +2175,7 @@ void CNode::AskFor(const CInv& inv)
     // We're using mapAskFor as a priority queue,
     // the key is the earliest time the request can be sent
     int64_t nRequestTime;
+    std::unique_lock<std::mutex> lock(mapAlreadyAskedFor_cs);
     limitedmap<CInv, int64_t>::const_iterator it = mapAlreadyAskedFor.find(inv);
     if (it != mapAlreadyAskedFor.end())
         nRequestTime = it->second;
