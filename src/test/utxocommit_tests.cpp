@@ -17,6 +17,7 @@
 
 #include "secp256k1/include/secp256k1_multiset.h"
 #include "utxocommit.h"
+#include "utilutxocommit.h"
 
 static COutPoint RandomOutpoint() {
     const COutPoint op(GetRandHash(), (uint32_t)GetRandInt(1000));
@@ -143,7 +144,7 @@ BOOST_AUTO_TEST_CASE(utxo_commit_addcursor) {
     // We will compare the commitment generated step-by-step, and the one
     // created
     // from cursor
-    CUtxoCommit commit_step, commit_cursor;
+    CUtxoCommit commit_step;
 
     LogPrintf("Preparing database\n");
 
@@ -167,7 +168,7 @@ BOOST_AUTO_TEST_CASE(utxo_commit_addcursor) {
     LogPrintf("Starting ECMH generation from cursor\n");
 
     std::unique_ptr<CCoinsViewCursor> pcursor(pcoinsdbview->Cursor());
-    commit_cursor.AddCoinView(pcursor.get());
+    CUtxoCommit commit_cursor = BuildUtxoCommit(pcursor.get(), 10);
 
     BOOST_CHECK(commit_step == commit_cursor);
     LogPrintf("ECMH generation from cursor done\n");

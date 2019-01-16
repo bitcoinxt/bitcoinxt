@@ -52,9 +52,6 @@ public:
 
     uint256 GetHash() const;
 
-    // Initializes from an existing UTXO set
-    bool AddCoinView(CCoinsViewCursor *cursor);
-
     // Comparison
     friend bool operator==(const CUtxoCommit &a, const CUtxoCommit &b) {
         return a.GetHash() == b.GetHash();
