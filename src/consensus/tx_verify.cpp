@@ -140,6 +140,12 @@ unsigned int GetP2SHSigOpCount(const CTransaction& tx, const CCoinsViewCache& in
     return nSigOps;
 }
 
+uint64_t GetTransactionSigOpCount(const CTransaction &tx,
+                                  const CCoinsViewCache &view, uint32_t flags) {
+    return GetLegacySigOpCount(tx, flags) +
+           GetP2SHSigOpCount(tx, view, flags);
+}
+
 bool CheckTransaction(const CTransaction& tx, CValidationState &state)
 {
     // Basic checks that don't depend on any context
