@@ -48,6 +48,17 @@ unsigned int GetP2SHSigOpCount(const CTransaction& tx,
                                uint32_t scriptFlags);
 
 /**
+ * Compute total signature operation of a transaction.
+ * @param[in] tx     Transaction for which we are computing the cost
+ * @param[in] inputs Map of previous transactions that have outputs we're
+ * spending
+ * @param[in] flags  Script verification flags
+ * @return Total signature operation cost of tx
+ */
+uint64_t GetTransactionSigOpCount(const CTransaction &tx,
+                                  const CCoinsViewCache &inputs,
+                                  uint32_t flags);
+/**
  * Check if transaction is final and can be included in a block with the
  * specified height and time. Consensus critical.
  */
